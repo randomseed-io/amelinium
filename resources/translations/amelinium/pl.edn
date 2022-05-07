@@ -1,0 +1,16 @@
+{:amelinium.i18n/translations
+  {:pl
+    {:roles-table {:present-label "TAK"
+                   :missing-label "—"
+                   :global-label  "[KAŻDY]"
+                   :global-marker " (globalna)"
+                   :context-label "Klient"
+                   :roles-label   "Role"}
+     :roles       {:admin     "Administrator organizacji"
+                   :manager   "Menedżer organizacji"
+                   :tester    "Tester"
+                   :anonymous "Użytkownik anonimowy"
+                   :known     "Użytkownik niezalogowany"
+                   :user      "Użytkownik zalogowany"
+                   :self      "Właściciel zasobu"
+                   :banned    "Konto zablokowane"}}}}

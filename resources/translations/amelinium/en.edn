@@ -1,0 +1,17 @@
+{:amelinium.i18n/translations
+  {:en
+    {:roles-table {:present-label "YES"
+                   :missing-label "—"
+                   :global-label  "[ANY]"
+                   :global-marker " (global)"
+                   :context-label "Context"
+                   :roles-label   "Roles"}
+     :roles       {:admin     "Organization Admin"
+                   :manager   "Organization Manager"
+                   :tester    "Tester"
+                   :anonymous "Anonymous User"
+                   :known     "Logged-out User"
+                   :user      "Logged-in User"
+                   :self      "Resource Owner"
+                   :banned    "Account Blocked"}}}}
+
