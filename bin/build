@@ -1,0 +1,5 @@
+#!/bin/sh
+
+echo "[amelinium] Building JAR, please wait..."
+
+clojure -M:build

@@ -1,0 +1,5 @@
+#!/bin/sh
+
+echo "[amelinium] Starting server, please wait..."
+
+clojure -A:server
