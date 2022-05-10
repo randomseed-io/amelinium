@@ -1,0 +1,7 @@
+{
+ ;; Databases
+
+ :amelinium.db/main.props {:username "ameluser"
+                           :password "ThePassword.8"}
+
+ }

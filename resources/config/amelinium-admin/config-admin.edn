@@ -1,0 +1,21 @@
+{
+
+ :amelinium.app/properties {:profile :admin}
+
+ ;; Databases
+
+ :amelinium.db/main-migrator.props {:dbtype                "mariadb"
+                                    :dbname                "amelinium"
+                                    :logger                #ref :amelinium.app/logger
+                                    :app-timezone          #ref :amelinium.app/timezone
+                                    :localSocket           "/tmp/mysql.sock"
+                                    :useLegacyDatetimeCode false
+                                    :serverTimezone        "UTC"}
+
+ :amelinium.db/main-migrator {:properties     #ref :amelinium.db/main-migrator.props
+                              :initializer    ragtime.next-jdbc/sql-database
+                              :loader         ragtime.next-jdbc/load-resources
+                              :migrations-dir "migrations/amelinium"}
+
+ :amelinium.db/migrators [#ref :amelinium.db/main-migrator]
+ }

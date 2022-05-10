@@ -1,0 +1,55 @@
+#!/bin/sh
+
+echo "[amelinium] Adding database users and setting permissions"
+echo
+
+DB=amelinium
+DB_HOST=localhost
+DB_ROOT_USER=root
+
+MIGRATION_USER='`amigrator`@`localhost`'
+REGULAR_USER='`ameluser`@`localhost`'
+
+MIGRATION_PASSWORD="!AmeliniumMigrator!"
+REGULAR_PASSWORD="ThePassword.8"
+
+echo "This script will create migration and regular users"
+echo "with default passwords."
+echo
+echo "It is advised to modify copy if this script to reflect your setup"
+echo "and later reflect the changes in your config.edn file."
+echo
+echo "Root database user will be used to execute the query."
+echo "You will be asked for its password."
+echo
+echo "Database:         ${DB}"
+echo "Database host:    ${DB_HOST}"
+echo "User to add:      ${REGULAR_USER} (if not exists)"
+echo "Migration user:   ${MIGRATION_USER} (if not exists)"
+echo "Root DB user:     ${DB_ROOT_USER} (needed in this session only)"
+echo "Root DB password: (to be entered interactively)"
+echo
+echo "Press ENTER to continue or CTRL+C to abort."
+echo
+
+read
+
+mysql -h ${DB_HOST} -u ${DB_ROOT_USER} -p <<EOF
+CREATE USER IF NOT EXISTS ${MIGRATION_USER} identified via ed25519 USING password('${MIGRATION_PASSWORD}');
+CREATE USER IF NOT EXISTS ${REGULAR_USER} identified via ed25519 USING password('${REGULAR_PASSWORD}');
+
+GRANT SHOW DATABASES, CREATE TEMPORARY TABLES, LOCK TABLES, SHOW VIEW ON *.* TO ${MIGRATION_USER};
+
+CREATE DATABASE IF NOT EXISTS ${DB} /*!40100 DEFAULT CHARACTER SET utf8mb4 */ COMMENT 'Amelinium Database';
+
+GRANT ALL PRIVILEGES ON ${DB}.* TO ${MIGRATION_USER};
+
+GRANT USAGE ON *.* TO ${REGULAR_USER};
+GRANT ALL PRIVILEGES ON ${DB}.* TO ${REGULAR_USER};
+
+FLUSH PRIVILEGES;
+EOF
+
+echo "Next step: run bin/repl and call (db/migrate!)"
+
+exit 0
