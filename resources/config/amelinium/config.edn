@@ -1,0 +1,304 @@
+{
+
+ ;; System settings
+
+ :amelinium.system/properties #ref :amelinium.app/properties
+ :amelinium.system/timezone   :UTC
+
+ ;; Application properties
+
+ :amelinium.app/properties {:name        "Amelinium"
+                            :title       "Amelinium Web Service"
+                            :profile     :production
+                            :author      "Paweł Wilk"
+                            :description "The Web App Server"
+                            :version     "1.0.0"
+                            :license     "Copyright by Paweł Wilk"}
+
+ ;; Application shortcuts
+
+ :amelinium.app/db           #ref :amelinium.db/main
+ :amelinium.app/logger       #ref :amelinium.logging/unilog
+ :amelinium.app/timezone     #ref :amelinium.system/timezone
+ :amelinium.app/http-server  #ref :amelinium.http.server/undertow
+ :amelinium.app/http-routes  #ref :amelinium.http.router/routes
+ :amelinium.app/http-router  #ref :amelinium.http.router/default
+ :amelinium.app/http-handler #ref :amelinium.http.handler/default
+
+ ;; Databases (usernames and passwords loaded from other files)
+
+ :amelinium.db/main.props {:dbtype               "mariadb"
+                           :dbname               "amelinium"
+                           :logger               #ref :amelinium.app/logger
+                           :app-timezone         #ref :amelinium.app/timezone
+                           :maximumPoolSize      20
+                           :connectionTestQuery  "SELECT 1"
+                           :dataSourceProperties {:localSocket           "/tmp/mysql.sock"
+                                                  :useLegacyDatetimeCode false
+                                                  :serverTimezone        "UTC"}}
+
+ :amelinium.db/main {:properties  #ref :amelinium.db/main.props
+                     :initializer amelinium.db/pool-datasource
+                     ;;:initializer next.jdbc/get-datasource
+                     :finalizer   amelinium.db/close-pool
+                     :suspender   amelinium.db/suspend-pool
+                     :resumer     amelinium.db/resume-pool
+                     :caches      #ref :amelinium.db/caches}
+
+ :amelinium.db/caches {:amelinium.web.model.user/settings-cache {:ttl [4  seconds] :size 1024}
+                       :amelinium.web.model.user/props-cache    {:ttl [10 seconds] :size 1024}
+                       :amelinium.web.model.user/ids-cache      {:size 2048}}
+
+ ;; Buffered database loggers
+
+ :amelinium.web.oplog.auth/log {:db           #ref :amelinium.db/main
+                                :timeout      [25 seconds]
+                                :buffered-max 108}
+
+ ;; Lazy request map
+
+ :amelinium.http.middleware.lazy-request/lazy-request {:enabled? true}
+
+ ;; HTTP middleware
+
+ :amelinium.http.middleware.remote-ip/reserved ["0.0.0.0/8"       "10.0.0.0/8"
+                                                "100.64.0.0/10"   "127.0.0.0/8"
+                                                "169.254.0.0/16"  "172.16.0.0/12"
+                                                "192.0.0.0/24"    "192.0.2.0/24"
+                                                "192.88.99.0/24"  "192.168.0.0/24"
+                                                "198.18.0.0/15"   "198.51.100.0/24"
+                                                "203.0.113.0/24"  "224.0.0.0/4"
+                                                "233.252.0.0/24"  "240.0.0.0/4"
+                                                "255.255.255.255/32"
+                                                "::/0" "::/128" "::1/128"
+                                                "::ffff:0:0/96"  "::ffff:0:0:0/96"
+                                                "64:ff9b::/96"   "64:ff9b:1::/48"
+                                                "100::/64"       "2001::/32"
+                                                "2001:20::/28"   "2001:db8::/32"
+                                                "2002::/16"      "fc00::/7"
+                                                "fe80::/10"      "ff00::/8"]
+
+ :amelinium.http.middleware.remote-ip/getter {:proxy-header :x-forwarded-for
+                                              :handler      amelinium.http.middleware.remote-ip/handler
+                                              :proxy-for    nil}
+
+ ;;:amelinium.http.middleware.db/amelinium {:db #ref :amelinium.db/main :name :amelinium.db/main}
+
+ :amelinium.http.middleware.session/session {:db               #ref :amelinium.db/main
+                                             :cache-ttl        [14 seconds]
+                                             :cache-size       256
+                                             :wrong-ip-expires true
+                                             :single-session   true
+                                             :handler          amelinium.http.middleware.session/handler
+                                             :expires          [15 minutes]
+                                             :hard-expires     [1 hour]
+                                             :session-key      :session-id}
+
+ :amelinium.http.middleware.roles/roles {:db                    #ref :amelinium.db/main
+                                         :cache-ttl             [2 minutes]
+                                         :cache-size            256
+                                         :handler               amelinium.http.middleware.roles/handler
+                                         :query-roles-fn        nil
+                                         :context-column        :slug
+                                         :authorize-default?    true
+                                         :unauthorized-redirect nil
+                                         :req-context-fn        nil
+                                         :req-self-role-fn      nil
+                                         :req-context-path      [:path-params :client]
+                                         :req-self-path         [:reitit.core/match :data :self?]
+                                         :req-self-check-path   nil
+                                         :global-context        :!
+                                         :anonymous-role        :anonymous
+                                         :logged-in-role        :user
+                                         :known-user-role       :known
+                                         :self-role             :self
+                                         :keep-unknown?         true
+                                         :roles                 {:admin   "Organization Admin"
+                                                                 :manager "Organization Manager"
+                                                                 :tester  "Organization Tester"
+                                                                 :user    "Logged-in User"
+                                                                 :self    "Resource Owner"
+                                                                 :banned  "Banned User"}}
+
+ :amelinium.http.middleware.language/supported [:en :pl]
+ :amelinium.http.middleware.language/language  {:default        :en
+                                                :supported      #ref :amelinium.http.middleware.language/supported
+                                                :language-param :lang}
+
+ :amelinium.http.middleware.content/content {:language #ref :amelinium.http.middleware.language/supported
+                                             :mime     ["text/html"]
+                                             :charset  :utf-8
+                                             :encoding ["deflate" "gzip" "identity"]}
+
+ :amelinium.http.middleware/generic amelinium.web.controller/render-page!
+ :amelinium.http.middleware/prep    amelinium.web.controller/prep-request!
+
+ :amelinium.http.middleware/backend [#ref :amelinium.http.middleware.lazy-request/lazy-request
+                                     #ref :amelinium.http.middleware/generic
+                                     reitit.ring.middleware.parameters/parameters-middleware
+                                     #ref :amelinium.http.middleware.content/content
+                                     #ref :amelinium.http.middleware.remote-ip/getter
+                                     #ref :amelinium.http.middleware.session/session
+                                     #ref :amelinium.http.middleware.language/language
+                                     #ref :amelinium.http.middleware.roles/roles
+                                     #ref :amelinium.http.middleware/prep]
+
+ ;; HTTP routes
+
+ :amelinium.http.router/routes []
+
+ ;; HTTP default router
+
+ :amelinium.http.router/default [#ref :amelinium.http.router/routes {:data {}}]
+
+ ;; HTTP default handler
+
+ :amelinium.http.handler/default {:router            #ref :amelinium.http.router/default
+                                  :resource-pathname "/"
+                                  :not-found         {:status 404 :body "NOT FOUND"}
+                                  :redirect-slash    :add}
+
+ ;; Jetty server settings
+
+ :amelinium.http.server/jetty {:enabled?             false
+                               :ssl?                 true
+                               :ssl-port             5000
+                               :port                 4000
+                               :host                 "0.0.0.0"
+                               :join?                false
+                               :keystore             "certs/zakrzep.p12"
+                               :truststore           "certs/zakrzep-trust.p12"
+                               :same-key-passwords?  true
+                               :client-auth          :need
+                               :send-server-version? false
+                               :gzip?                true
+                               :min-threads          100
+                               :max-threads          200
+                               :gzip-min-size        256
+                               :gzip-types           ["text/css" "text/plain" "text/javascript"
+                                                      "text/html" "text/xhtml" "text/markdown"
+                                                      "text/pdf" "text/csv" "text/rss" "text/xsl"
+                                                      "message/rfc822" "text/comma-separated-values"
+                                                      "application/xhtml+xml" "application/javascript"
+                                                      "application/json" "application/xml"
+                                                      "application/pdf" "application/x-xml"
+                                                      "application/mbox" "application/rdf+xml"
+                                                      "application/rss+xml" "application/xml-dtd"
+                                                      "image/svg+xml"]
+                               :handler              #ref :amelinium.app/http-handler
+                               :properties           #ref :amelinium.app/properties
+                               :logger               #ref :amelinium.app/logger}
+
+ ;; Undertow HTTP server settings
+
+ :amelinium.http.server/undertow {:enabled?            false
+                                  :http2?              true
+                                  :ssl?                false
+                                  :ssl-port            5000
+                                  :port                4000
+                                  :client-auth         :need
+                                  :io-threads          10
+                                  :host                "0.0.0.0"
+                                  :keystore            "certs/zakrzep.p12"
+                                  :truststore          "certs/zakrzep-trust.p12"
+                                  :same-key-passwords? true
+                                  :session-manager?    false
+                                  :compress?           true
+                                  :compress-predicate  "max-content-size(256) and regex(pattern='text|mess|app|image/svg', value='%{o,Content-Type}')"
+                                  :handler             #ref :amelinium.app/http-handler
+                                  :properties          #ref :amelinium.app/properties
+                                  :logger              #ref :amelinium.app/logger}
+
+ ;; Auth settings
+
+ :amelinium.auth.pwd/settings.strong {:wait        0.4
+                                      :wait-random [0 1.5]
+                                      :wait-nouser 0.6
+                                      :suite       #ref :amelinium.auth.pwd/suite.strong}
+
+ :amelinium.auth.pwd/settings.simple {:wait        0.4
+                                      :wait-random [0 1.5]
+                                      :wait-nouser 0.6
+                                      :suite       #ref :amelinium.auth.pwd/suite.simple}
+
+ :amelinium.auth.pwd/suite.strong
+ [{:name        :scrypt
+   :handler     amelinium.auth.algo.scrypt/handler
+   :salt-length 8
+   :parallel    1}
+
+  {:name         :pbkdf2
+   :handler      amelinium.auth.algo.pbkdf2/handler
+   :iterations   100000
+   :salt-length  16
+   :salt-charset "abcdefghijklmnopqrstuvwzyx0123456789-."}]
+
+ :amelinium.auth.pwd/suite.simple
+ [{:name         :pbkdf2
+   :handler      amelinium.auth.algo.pbkdf2/handler
+   :iterations   100000
+   :salt-length  16
+   :salt-charset "abcdefghijklmnopqrstuvwzyxABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-."}]
+
+ :amelinium.auth/strong {:db                   #ref :amelinium.db/main
+                         :passwords            #ref :amelinium.auth.pwd/settings.strong
+                         :account-types        :manager     ; account types handled by this engine
+                         :locking/max-attempts 5            ; max failed attempts before soft-lock
+                         :locking/lock-wait    [15 minutes] ; minutes to wait for unlock after soft-lock
+                         :locking/fail-expires [5 minutes]  ; time for 1 failed attempt to be forgotten
+                         }
+
+ :amelinium.auth/simple {:db                   #ref :amelinium.db/main
+                         :passwords            #ref :amelinium.auth.pwd/settings.simple
+                         :account-types        :user        ; account types handled by this engine
+                         :locking/max-attempts 5            ; max failed attempts before soft-lock
+                         :locking/lock-wait    [10 minutes] ; minutes to wait for unlock after soft-lock
+                         :locking/fail-expires [3 minutes]  ; time for 1 failed attempt to be forgotten
+                         }
+
+ ;; Preferred authentication types by account type
+ ;; (used in config-less functions and has precedence over the detected)
+
+ :amelinium.auth.preference/default #ref :amelinium.auth/simple
+ :amelinium.auth.preference/by-type {:system #ref :amelinium.auth/strong}
+
+ ;; I18n
+
+ :amelinium.i18n/translations {:tongue/fallback :en}
+
+ ;; Logger
+
+ :amelinium.logging/unilog {:system      #ref :amelinium.app/properties
+                            :prev-config {}
+                            :level       :info
+                            :console     false
+                            :appenders   [{:appender       :rolling-file
+                                           :file           "${user.home}/.amelinium/amelinium.log"
+                                           :encoder        :pattern-cool
+                                           :pattern        "%p [%date{yyyy-MM-dd'T'HH:mm:ss, UTC},%date{SSS, UTC}Z] %t - %c %m%n"
+                                           :rolling-policy {:type        :time-based
+                                                            :max-history 7
+                                                            :pattern     ".%d{yyyy-MM-dd}"}}
+                                          {:appender       :rolling-file
+                                           :file           "${user.home}/.amelinium/amelinium-json.log"
+                                           :encoder        :json-log
+                                           :rolling-policy {:type        :time-based
+                                                            :max-history 7
+                                                            :pattern     ".%d{yyyy-MM-dd}"}}
+                                          {:appender :console-info
+                                           :encoder  :pattern
+                                           :pattern
+                                           "%highlight(%-5level) %gray([%d{HH:mm:ss, UTC}] %magenta([%-7thread])) %cyan(%-34c) %m%n"}]
+                            :overrides   {"org.apache.http"                               :info
+                                          "org.apache.http.wire"                          :error
+                                          "org.eclipse.jetty"                             :info
+                                          "org.eclipse.jetty.util.log"                    :info
+                                          "io.netty"                                      :info
+                                          "io.netty.util"                                 :info
+                                          "io.netty.util.internal"                        :info
+                                          "io.netty.util.ResourceLeakDetector"            :info
+                                          "io.netty.util.internal.PlatformDependent"      :info
+                                          "io.netty.util.internal.PlatformDependent0"     :info
+                                          "io.netty.util.internal.CleanerJava9"           :info
+                                          "io.netty.util.internal.InternalThreadLocalMap" :info
+                                          }}}
