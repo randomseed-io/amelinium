@@ -76,9 +76,9 @@
   (deref-symbols config nil))
 
 (system/add-prep  ::routes  [_ config] (prep-routes config))
-(system/add-init  ::routes  [_ config] (var/reset routes (new-routes config)))
-(system/add-halt! ::routes  [_ config] (var/reset routes nil))
+(system/add-init  ::routes  [k config] (var/make k (new-routes config)))
+(system/add-halt! ::routes  [k config] (var/make k nil))
 
 (system/add-prep  ::default [_ config] (prep-router config))
-(system/add-init  ::default [_ config] (var/reset default (new-router config)))
-(system/add-halt! ::default [_ config] (var/reset default nil))
+(system/add-init  ::default [k config] (var/make k (new-router config)))
+(system/add-halt! ::default [k config] (var/make k nil))
