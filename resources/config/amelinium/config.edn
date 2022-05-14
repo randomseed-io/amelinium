@@ -301,4 +301,10 @@
                                           "io.netty.util.internal.PlatformDependent0"     :info
                                           "io.netty.util.internal.CleanerJava9"           :info
                                           "io.netty.util.internal.InternalThreadLocalMap" :info
-                                          }}}
+                                          }
+                            :context-transformer {amelinium.logging/mask         [:password :pwd :private-key :private
+                                                                                  :secret :signature :request-id
+                                                                                  :anti-phisihng-code]
+                                                  amelinium.logging/pseudonimize [:user :username :nick :nickname]
+                                                  clojure.core/str               [:currency]
+                                                  amelinium.logging/pr-session   [:session]}}}

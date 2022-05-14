@@ -11,6 +11,7 @@
             [buddy.core.hash                 :as              hash]
             [buddy.core.codecs               :as            codecs]
             [io.randomseed.utils.map         :as               map]
+            [io.randomseed.utils.var         :as               var]
             [io.randomseed.utils.log         :as               log]
             [io.randomseed.utils             :refer [some-str-spc]])
 
@@ -48,8 +49,7 @@
 (def ctx-transformer
   {mask         [:password :pwd :private-key :private :secret :signature :request-id :anti-phisihng-code]
    pseudonimize [:user :username :nick :nickname]
-   str          [:for-currency :currency :cur :baseAsset :quoteAsset
-                 :money :for-money :currencies :regi :registry]
+   str          [:currency]
    pr-session   [:session]})
 
 ;;
@@ -79,14 +79,22 @@
 ;; System handlers
 ;;
 
+(defn prep-context-transformer
+  [m]
+  (when m
+    (map/map-keys var/deref-symbol m)))
+
 (system/add-prep
  ::unilog [_ config]
- (log/preprocess-config config))
+ (log/preprocess-config
+  (map/update-existing config :context-transformer prep-context-transformer)))
 
 (system/add-init
  ::unilog
  [_ config]
- (log/init! (map/assoc-missing config :context-transformer ctx-transformer))
+ (log/init! (-> config
+                (map/update-existing :context-transformer prep-context-transformer)
+                (map/assoc-missing   :context-transformer ctx-transformer)))
  (msg-with-val "Configuration profile:" (:profile (:system config)) config))
 
 (system/add-halt!
