@@ -350,6 +350,11 @@
      :dbs-up     mig-dbs
      :props-up   (set (map #(get-in app/post-config [%1 :properties :key]) mig-dbs))}))
 
+(defn- migrators-key
+  [v]
+  (or (if (map? v) (get :migrators-key v) (valuable v))
+      ::migrators))
+
 (defn migrate!
   "Migrates all databases (or a database specified by a migrator function passed as an
   argument) up to the latest migration. Optional map of options can be passed which
@@ -357,7 +362,7 @@
   ([]
    (migrate! nil))
   ([opts]
-   (let [mig-key   (or (:migrators-key opts) ::migrators)
+   (let [mig-key   (migrators-key opts)
          state-pre (migrators-state mig-key)]
      (when-not (:migrators? state-pre) (app/start-admin! mig-key))
      (if (fn? opts)
@@ -373,7 +378,7 @@
        (let [state-post (migrators-state mig-key)
              stop-keys  (concat (set/difference (:dbs-up   state-post) (:dbs-up   state-pre))
                                 (set/difference (:props-up state-post) (:props-up state-pre)))]
-         (apply app/stop! ::migrators (filter identity stop-keys)))))
+         (apply app/stop! mig-key (filter identity stop-keys)))))
    nil))
 
 (defn rollback!
@@ -384,7 +389,7 @@
   ([]
    (rollback! nil))
   ([opts]
-   (let [mig-key   (or (:migrators-key opts) ::migrators)
+   (let [mig-key   (migrators-key opts)
          state-pre (migrators-state mig-key)]
      (when-not (:migrators? state-pre) (app/start-admin! mig-key))
      (if (fn? opts)
@@ -398,7 +403,7 @@
                                 (set/difference (:props-up state-post) (:props-up state-pre)))]
          (apply app/stop! mig-key (filter identity stop-keys))))))
   ([opts amount-or-id]
-   (let [mig-key   (or (:migrators-key opts) ::migrators)
+   (let [mig-key   (migrators-key opts)
          state-pre (migrators-state mig-key)]
      (when-not (:migrators? state-pre) (app/start-admin! mig-key))
      (if (fn? opts)
