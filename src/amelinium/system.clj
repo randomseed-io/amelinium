@@ -45,45 +45,52 @@
   ([cfg]
    (prep cfg nil))
   ([cfg keys]
-   (if-some [keys (or (seq keys) (seq (::keys cfg)))]
-     (assoc (ig/prep (dissoc cfg ::keys ::config-sources) keys) ::keys keys)
-     (ig/prep cfg))))
+   (let [pure-cfg (dissoc cfg ::keys ::config-sources)]
+     (if-some [keys (or (seq keys) (seq (::keys cfg)))]
+       (assoc (ig/prep pure-cfg keys) ::keys keys)
+       (ig/prep pure-cfg)))))
 
 (defn init
   ([cfg]
    (init cfg nil))
   ([cfg keys]
-   (if-some [keys (or (seq keys) (seq (::keys cfg)))]
-     (assoc (ig/init (dissoc cfg ::keys ::config-sources) keys) ::keys keys)
-     (ig/init cfg))))
+   (let [pure-cfg (dissoc cfg ::keys ::config-sources)]
+     (if-some [keys (or (seq keys) (seq (::keys cfg)))]
+       (assoc (ig/init pure-cfg keys) ::keys keys)
+       (ig/init pure-cfg)))))
 
 (defn suspend!
   ([cfg]
    (suspend! cfg nil))
   ([cfg keys]
-   (if-some [keys (seq keys)]
-     (ig/suspend! (dissoc cfg ::keys) keys)
-     (ig/suspend! (dissoc cfg ::keys)))))
+   (let [pure-cfg (dissoc cfg ::keys ::config-sources)]
+     (if-some [keys (seq keys)]
+       (ig/suspend! pure-cfg keys)
+       (ig/suspend! pure-cfg)))))
 
 (defn resume
   ([cfg system]
    (resume cfg system nil))
   ([cfg system keys]
-   (if-some [keys (seq keys)]
-     (ig/resume (dissoc cfg ::keys) (dissoc system ::keys) keys)
-     (ig/resume (dissoc cfg ::keys) (dissoc system ::keys)))))
+   (let [pure-cfg (dissoc cfg    ::keys ::config-sources)
+         pure-sys (dissoc system ::keys ::config-sources)]
+     (if-some [keys (seq keys)]
+       (ig/resume pure-cfg pure-sys keys)
+       (ig/resume pure-cfg pure-sys)))))
 
 (defn halt!
   ([cfg]
    (halt! cfg nil))
   ([cfg keys]
-   (if-some [keys (seq keys)]
-     (ig/halt! (dissoc cfg ::keys) keys)
-     (ig/halt! (dissoc cfg ::keys)))))
+   (let [pure-cfg (dissoc cfg ::keys ::config-sources)]
+     (if-some [keys (seq keys)]
+       (ig/halt! pure-cfg keys)
+       (ig/halt! pure-cfg)))))
 
 (defn expand
   [cfg]
-  (ig/expand (dissoc cfg ::keys)))
+  (let [pure-cfg (dissoc cfg ::keys ::config-sources)]
+    (ig/expand cfg)))
 
 (defn ref?
   [v]
