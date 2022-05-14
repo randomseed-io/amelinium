@@ -578,11 +578,11 @@
 (system/add-init     ::migrator    [k config] (var/make k (init-mig  k config)))
 (system/add-halt!    ::migrator    [k config] (var/make k (close-mig k config)))
 
-(system/add-init     ::migrators   [_ config] (var/reset migrators (init-migrators config)))
-(system/add-halt!    ::migrators   [_ config] (var/reset migrators nil))
+(system/add-init     ::migrators   [k config] (var/make k (init-migrators config)))
+(system/add-halt!    ::migrators   [k config] (var/make k nil))
 
-(system/add-init     ::caches      [_ config] (var/reset caches (init-caches  config)))
-(system/add-halt!    ::caches      [_ config] (var/reset caches (purge-caches config)))
+(system/add-init     ::caches      [k config] (var/make k (init-caches  config)))
+(system/add-halt!    ::caches      [k config] (var/make k (purge-caches config)))
 
 (derive ::main                ::initializer)
 (derive ::main.props          ::properties)
