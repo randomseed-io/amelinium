@@ -109,7 +109,6 @@
 
 (defonce ^:private lock 'lock)
 
-(defonce local-config      nil)  ;; path to an optional, local configuration file
 (defonce config            nil)  ;; configuration which was read from files
 (defonce post-config       nil)  ;; configuration prepared by parser
 (defonce state             nil)  ;; current state of this application
