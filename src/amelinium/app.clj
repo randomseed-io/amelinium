@@ -53,6 +53,11 @@
   `(binding [*ns-reload-watch-dirs* ~watch-dirs]
      ~@body))
 
+(defmacro with-ns-tracker
+  [ns-tracker & body]
+  `(binding [*ns-tracker* ~ns-tracker]
+     ~@body))
+
 ;;
 ;; property names
 ;;
@@ -80,15 +85,20 @@
 ;; hot reloading
 ;;
 
-(def modified-namespaces
-  (ns-tracker/ns-tracker *ns-reload-watch-dirs*))
-
-(defn check-modified-namespaces
+(defn make-ns-tracker
   []
-  (doseq [ns-sym (modified-namespaces)]
-    (require ns-sym :reload)))
+  (when-some [wdirs *ns-reload-watch-dirs*]
+    (when-some [wdirs (and (sequential? wdirs) (seq wdirs))]
+      (ns-tracker/ns-tracker wdirs))))
 
-(def ns-reload check-modified-namespaces)
+(def ^:dynamic *ns-tracker*
+  (make-ns-tracker))
+
+(defn reload-namespaces
+  []
+  (when-some [nstracker *ns-tracker*]
+    (doseq [ns-sym (nstracker)]
+      (require ns-sym :reload))))
 
 ;;
 ;; direct references
@@ -244,16 +254,16 @@
 (defn restart!           [& k] (apply stop-app    k) (apply start-app *local-config* *resource-config-dirs* k))
 (defn stop!              [& k] (apply stop-app    k))
 (defn suspend!           [& k] (apply suspend-app k))
-(defn resume!            [& k] (apply resume-app  *local-config* *resource-config-dirs* k))
-(defn start-dev!         [& k] (apply start-app *local-dev-config* *resource-config-dirs* k))
-(defn start-admin!       [& k] (apply start-app *local-config* *resource-admin-dirs* k))
+(defn resume!            [& k] (apply resume-app *local-config* *resource-config-dirs* k))
+(defn start-dev!         [& k] (apply start-app  *local-dev-config* *resource-config-dirs* k))
+(defn start-admin!       [& k] (apply start-app  *local-config* *resource-admin-dirs* k))
 
 (defn reload!
   [& k]
   (if (stopped?)
-    (ns-reload)
+    (reload-namespaces)
     (do (apply stop-app k)
-        (ns-reload)
+        (reload-namespaces)
         (apply start-app *local-config* *resource-config-dirs* k))))
 
 (defn print-state        [ ] (pprint (state)))
