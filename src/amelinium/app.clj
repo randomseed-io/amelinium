@@ -48,6 +48,11 @@
              *local-config*         local-file]
      ~@body))
 
+(defmacro with-watch-dirs
+  [watch-dirs & body]
+  `(binding [*ns-reload-watch-dirs* watch-dirs]
+     ~@body))
+
 ;;
 ;; property names
 ;;
