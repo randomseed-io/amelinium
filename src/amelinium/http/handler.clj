@@ -48,5 +48,5 @@
     (b/update config [:*] var/deref-symbol)))
 
 (system/add-prep  ::default [_ config] config)
-(system/add-init  ::default [_ config] (var/reset default (new-handler config)))
-(system/add-halt! ::default [_ config] (var/reset default nil))
+(system/add-init  ::default [k config] (var/make k (new-handler config)))
+(system/add-halt! ::default [k config] (var/make k nil))
