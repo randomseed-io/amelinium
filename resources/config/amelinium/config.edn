@@ -130,18 +130,18 @@
                                              :charset  :utf-8
                                              :encoding ["deflate" "gzip" "identity"]}
 
- :amelinium.http.middleware/generic amelinium.web.controller/render-page!
- :amelinium.http.middleware/prep    amelinium.web.controller/prep-request!
+ :amelinium.http.middleware/renderer amelinium.web.controller/render-page!
+ :amelinium.http.middleware/preparer amelinium.web.controller/prep-request!
 
- :amelinium.http.middleware/default [#ref :amelinium.http.middleware.lazy-request/lazy-request
-                                     #ref :amelinium.http.middleware/generic
-                                     reitit.ring.middleware.parameters/parameters-middleware
-                                     #ref :amelinium.http.middleware.content/content
-                                     #ref :amelinium.http.middleware.remote-ip/getter
-                                     #ref :amelinium.http.middleware.session/session
-                                     #ref :amelinium.http.middleware.language/language
-                                     #ref :amelinium.http.middleware.roles/roles
-                                     #ref :amelinium.http.middleware/prep]
+ :amelinium.http.middleware/default-chain [#ref :amelinium.http.middleware.lazy-request/lazy-request
+                                           #ref :amelinium.http.middleware/renderer
+                                           reitit.ring.middleware.parameters/parameters-middleware
+                                           #ref :amelinium.http.middleware.content/content
+                                           #ref :amelinium.http.middleware.remote-ip/getter
+                                           #ref :amelinium.http.middleware.session/session
+                                           #ref :amelinium.http.middleware.language/language
+                                           #ref :amelinium.http.middleware.roles/roles
+                                           #ref :amelinium.http.middleware/preparer]
 
  ;; HTTP routes
 

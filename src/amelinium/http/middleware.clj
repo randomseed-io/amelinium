@@ -16,14 +16,14 @@
             [io.randomseed.utils.var   :as       var]
             [io.randomseed.utils.map   :as       map]))
 
-(defn generic
+(defn init-renderer
   "Generic middleware which renders results by calling configured web handler
   function (`:post` key of `config` if `config` is a map or a value of `config`)."
   [k config]
   (let [web-handler-sym (if (map? config) (:post config) config)
         web-handler     (var/deref-symbol web-handler-sym)]
     (when web-handler
-      (log/msg "Installing generic web handler:"  web-handler-sym)
+      (log/msg "Installing rendering web handler:"  web-handler-sym)
       {:name    (or (keyword k) ::renderer)
        :compile (fn [data opts]
                   (fn [handler]
@@ -31,7 +31,7 @@
                       (let [resp (handler req)]
                         (if (response/response? resp) resp (web-handler resp))))))})))
 
-(defn prep
+(defn init-preparer
   "Generic middleware which prepares a request for the controller."
   [k config]
   (let [preparer-sym (if (map? config) (:pre config) config)
@@ -55,10 +55,10 @@
 (system/add-init  ::chain    [k config] (var/make k (prep-chain config)))
 (system/add-halt! ::chain    [k config] (var/make k nil))
 
-(system/add-init  ::generic   [k config] (generic k config))
-(system/add-halt! ::generic   [_ config] nil)
+(system/add-init  ::renderer [k config] (init-renderer k config))
+(system/add-halt! ::renderer [_ config] nil)
 
-(system/add-init  ::prep      [k config] (prep k config))
-(system/add-halt! ::prep      [_ config] nil)
+(system/add-init  ::preparer [k config] (init-preparer k config))
+(system/add-halt! ::preparer [_ config] nil)
 
-(derive ::default ::chain)
+(derive ::default-chain ::chain)
