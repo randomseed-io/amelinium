@@ -23,9 +23,6 @@
             [amelinium.auth.specs      :refer  :all]))
 
 (defonce ^:private lock 'lock)
-(defonce settings  nil)
-(defonce encryptor nil)
-(defonce checker   nil)
 
 (def ^:const default-settings
   {:wait        1
@@ -211,36 +208,34 @@
 (defn encrypt
   "Encrypts the given plain text password using all encryption functions in the given
   encryption suite."
-  ([plain local-settings]
-   (s/assert :amelinium.auth.plain/password plain)
-   (let [settings   (or local-settings settings)
-         _          (s/assert (s/nilable :amelinium.auth.pwd/settings) settings)
-         used-suite (:suite settings)]
-     ;; extract suite from settings or use global as fallback
-     ;; loop through all encryption steps in the provided suite
-     ;; extracting encryption functions and using them
-     ;; on passwords returned by calling previous ones
-     ;; then store the results and important parameters (like salt)
-     ;; in order (as a vector) while removing :password key from all
-     ;; except the last one (which will be needed during checking)
-     (loop [lastpass plain, todo used-suite, stack []]
-       (let [opts    (first todo)
-             encfn   (:encrypt-fn opts)
-             results (if (ifn? encfn)        ; if there is an encryption function
-                       (-> lastpass          ; for the previously generated password
-                           (encfn settings)  ; run an encryption function on it
-                           (assoc            ; to get the encrypted password and a bunch of parameters
-                            :handler-id      ; armor the results (a map) with the handler-id
-                            (get-in opts     ; containing names of encryption and decryption functions
-                                    [:handler :id]))) ; for checking purposes
-                       {:password lastpass})
-             newpass (:password results)]
-         ;; if there are more items in our chain
-         (if-some [nextf (next todo)]
-           (recur newpass nextf (conj stack (dissoc results :password))) ; stack the current one and repeat the process
-           (conj stack results))))))                                     ; otherwise stack the last results with a final encrypted password
-  ([plain]
-   (encrypt plain settings)))
+  [plain local-settings]
+  (s/assert :amelinium.auth.plain/password plain)
+  (let [settings   local-settings
+        _          (s/assert (s/nilable :amelinium.auth.pwd/settings) settings)
+        used-suite (:suite settings)]
+    ;; extract suite from settings or use global as fallback
+    ;; loop through all encryption steps in the provided suite
+    ;; extracting encryption functions and using them
+    ;; on passwords returned by calling previous ones
+    ;; then store the results and important parameters (like salt)
+    ;; in order (as a vector) while removing :password key from all
+    ;; except the last one (which will be needed during checking)
+    (loop [lastpass plain, todo used-suite, stack []]
+      (let [opts    (first todo)
+            encfn   (:encrypt-fn opts)
+            results (if (ifn? encfn)        ; if there is an encryption function
+                      (-> lastpass          ; for the previously generated password
+                          (encfn settings)  ; run an encryption function on it
+                          (assoc            ; to get the encrypted password and a bunch of parameters
+                           :handler-id      ; armor the results (a map) with the handler-id
+                           (get-in opts     ; containing names of encryption and decryption functions
+                                   [:handler :id]))) ; for checking purposes
+                      {:password lastpass})
+            newpass (:password results)]
+        ;; if there are more items in our chain
+        (if-some [nextf (next todo)]
+          (recur newpass nextf (conj stack (dissoc results :password))) ; stack the current one and repeat the process
+          (conj stack results))))))                                    ; otherwise stack the last results with a final encrypted password
 
 (defn check
   "Checks if the given plain text password is correct by comparing it with the result
@@ -249,17 +244,12 @@
   ([plain settings shared-suite intrinsic-suite & other-suites]
    (check plain (apply merge-suites shared-suite intrinsic-suite other-suites)))
 
-  ([plain user-suite]
-   (check plain user-suite settings))
-
   ([plain user-suite user-settings]
    (s/assert (s/nilable :amelinium.auth.plain/password)   plain)
    (s/assert (s/nilable :amelinium.auth/password-chain)   user-suite)
    (s/assert (s/nilable :amelinium.auth.settings/generic) user-settings)
    (let [combo?   (map? user-suite) ; combined settings
-         settings (if (nil? user-settings) ; provided settings are nil?
-                    settings               ; use global settings
-                    user-settings)]        ; otherwise use the provided settings
+         settings user-settings]
 
      ;; wait some time
      (when-not combo?
@@ -326,10 +316,9 @@
 ;;
 
 (defn printable-suite
-  ([] (printable-suite (:suite settings)))
-  ([suite]
-   (s/assert (s/nilable :amelinium.auth.config/suite) suite)
-   (map (comp normalize-name :name) suite)))
+  [suite]
+  (s/assert (s/nilable :amelinium.auth.config/suite) suite)
+  (map (comp normalize-name :name) suite))
 
 (defn shared
   [crypto-entry]
@@ -345,10 +334,9 @@
     (assoc dfl :handler-id hid)))
 
 (defn shared-suite
-  ([] (shared-suite (:suite settings)))
-  ([suite]
-   (s/assert :amelinium.auth/crypto-suite suite)
-   (map shared suite)))
+  [suite]
+  (s/assert :amelinium.auth/crypto-suite suite)
+  (map shared suite))
 
 (def shared-chain shared-suite)
 
@@ -362,21 +350,19 @@
      :intrinsic (apply dissoc crypto-entry (keys shared-suite))}))
 
 (defn split-suite
-  ([]
-   (split-suite (:suite settings)))
-  ([suite]
-   (s/assert :amelinium.auth/crypto-suite suite)
-   (loop [todo     suite
-          st-chain []
-          va-chain []]
-     (let [pwd-entry    (first todo)
-           nexte        (next  todo)
-           shared-pwd   (shared pwd-entry)
-           new-st-chain (conj st-chain shared-pwd)
-           new-va-chain (conj va-chain (apply dissoc pwd-entry (keys shared-pwd)))]
-       (if (nil? nexte)
-         {:shared new-st-chain, :intrinsic new-va-chain}
-         (recur nexte new-st-chain new-va-chain))))))
+  [suite]
+  (s/assert :amelinium.auth/crypto-suite suite)
+  (loop [todo     suite
+         st-chain []
+         va-chain []]
+    (let [pwd-entry    (first todo)
+          nexte        (next  todo)
+          shared-pwd   (shared pwd-entry)
+          new-st-chain (conj st-chain shared-pwd)
+          new-va-chain (conj va-chain (apply dissoc pwd-entry (keys shared-pwd)))]
+      (if (nil? nexte)
+        {:shared new-st-chain, :intrinsic new-va-chain}
+        (recur nexte new-st-chain new-va-chain)))))
 
 (def split-chain split-suite)
 
@@ -388,11 +374,9 @@
       (map/update-existing :name normalize-name)))
 
 (defn human-readable-suite
-  ([]
-   (human-readable-suite (:suite settings)))
-  ([suite]
-   (s/assert :amelinium.auth/crypto-suite suite)
-   (map human-readable suite)))
+  [suite]
+  (s/assert :amelinium.auth/crypto-suite suite)
+  (map human-readable suite))
 
 (def human-readable-chain human-readable-suite)
 
@@ -488,7 +472,7 @@
    config))
 
 (system/add-prep  ::pwd [_ config] (prepare-settings config))
-(system/add-halt! ::pwd [_ config] (var/reset encryptor (var/reset checker (var/reset settings nil))))
+(system/add-halt! ::pwd [_ config] nil)
 
 (derive ::settings.strong ::pwd)
 (derive ::settings.simple ::pwd)
