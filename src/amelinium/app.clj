@@ -34,23 +34,23 @@
 
 (defmacro with-config-dirs
   [dirs & body]
-  `(binding [*resource-config-dirs* dirs]
+  `(binding [*resource-config-dirs* ~dirs]
      ~@body))
 
 (defmacro with-local-config
   [local-file & body]
-  `(binding [*local-config* local-file]
+  `(binding [*local-config* ~local-file]
      ~@body))
 
 (defmacro with-configs
   [local-file dirs & body]
-  `(binding [*resource-config-dirs* dirs
-             *local-config*         local-file]
+  `(binding [*resource-config-dirs* ~dirs
+             *local-config*         ~local-file]
      ~@body))
 
 (defmacro with-watch-dirs
   [watch-dirs & body]
-  `(binding [*ns-reload-watch-dirs* watch-dirs]
+  `(binding [*ns-reload-watch-dirs* ~watch-dirs]
      ~@body))
 
 ;;
