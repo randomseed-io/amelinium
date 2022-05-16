@@ -353,7 +353,7 @@
 (defn path-template-with-param
   "Returns a template for the given match if the route supports the given parameter."
   ([match required-param]
-   (template-with-param match required-param nil))
+   (path-template-with-param match required-param nil))
   ([match required-param short-circuit]
    (when-some [required-param (some-keyword-simple required-param)]
      (when-some [t (get match :template)]
@@ -396,7 +396,7 @@
             ;; path is parameterized and the parameter value is the same
             (some-> (r/match->path m query-params) (str location qparams))
             ;; path is not parameterized or the parameter value is different
-            (if-some [template (template-with-param m param cur-pvalue)]
+            (if-some [template (path-template-with-param m param cur-pvalue)]
               ;; path is parameterized with our parameter
               ;; we can re-parameterize the path by calling template-path
               (when-some [p (template-path m {param pvalue})]
