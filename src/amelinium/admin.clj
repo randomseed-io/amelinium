@@ -31,7 +31,6 @@
             [amelinium.http.router            :as           router]
             [amelinium.http.handler           :as          handler]
             [amelinium.auth                   :as             auth]
-            [amelinium.auth.preference        :as        auth-pref]
             [amelinium.auth.pwd               :as              pwd]
             [io.randomseed.utils.bus          :as              bus]
             [io.randomseed.utils.fs           :as               fs]

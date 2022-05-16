@@ -1,8 +1,8 @@
 (ns
 
-  ^{:doc    "amelinium service, authentication."
-    :author "Paweł Wilk"
-    :added  "1.0.0"}
+    ^{:doc    "amelinium service, authentication."
+      :author "Paweł Wilk"
+      :added  "1.0.0"}
 
     amelinium.auth
 
@@ -11,30 +11,13 @@
   (:require [amelinium.db               :as        db]
             [amelinium.logging          :as       log]
             [amelinium.auth.pwd         :as       pwd]
-            [amelinium.auth.preference  :as      pref]
             [amelinium.system           :as    system]
             [io.randomseed.utils        :refer   :all]
             [io.randomseed.utils.time   :as      time]
             [io.randomseed.utils.var    :as       var]
             [io.randomseed.utils.map    :as       map]))
 
-;; Helpers
-
-(defn config
-  "Returns the given authentication configuration or obtains one from the global
-  repository maintained in amelinium.auth.preference/by-type."
-  [auth-config-or-account-type]
-  (if (and (map? auth-config-or-account-type)
-           (contains? auth-config-or-account-type :account-types/ids))
-    auth-config-or-account-type
-    (pref/by-account-type (keyword auth-config-or-account-type))))
-
-(defn config-or-default
-  "Returns the given authentication configuration or obtains one from the global
-  repository maintained in amelinium.auth.preference/by-type. If the configuration
-  cannot be retrieved it falls back to the default one."
-  [auth-config-or-account-type]
-  (or (config auth-config-or-account-type) pref/default))
+(defonce config nil)
 
 ;; Password authentication
 
@@ -135,13 +118,43 @@
              (str "(max attempts: "  (:locking/max-attempts s)
                   ", lock wait: "    (time/seconds  (:locking/lock-wait    s)) " s"
                   ", lock expires: " (time/seconds  (:locking/fail-expires s)) " s)"))
-    (pref/with-lock
-      (doseq [atype (:account-types/ids s)]
-        (pref/update-by-account-type atype s)))
     s))
+
+(defn config-by-type
+  "Returns authentication configuration for the given account type using an
+  authentication configuration map."
+  [config account-type]
+  (when-some [types-map (:types config)]
+    (or (get types-map (some-keyword-simple account-type))
+        (get types-map (:default-type config)))))
+
+(defn config-by-type-with-var
+  "Returns authentication configuration for the given account type using an
+  authentication configuration map stored in a Var of the given (fully-qualified)
+  name."
+  [var-name account-type]
+  (config-by-type (var/deref var-name) account-type))
+
+;; Mapping of account type to preferred authentication configuration
+
+(defn init-by-type
+  "Prepares static authentication preference map."
+  [config]
+  (->> config
+       (map/map-keys some-keyword-simple)
+       map/remove-empty-values))
+
+(defn init-config
+  "Initializes authentication configuration."
+  [config]
+  (-> config
+      (map/update-existing :types init-by-type)))
 
 (system/add-init  ::auth [k config] (wrap-auth k config))
 (system/add-halt! ::auth [_ config] nil)
+
+(system/add-init  ::config [k config] (var/make k (init-config config)))
+(system/add-halt! ::config [k config] (var/make k nil))
 
 (derive ::strong ::auth)
 (derive ::simple ::auth)

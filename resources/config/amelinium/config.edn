@@ -257,10 +257,11 @@
                          }
 
  ;; Preferred authentication types by account type
- ;; (used in config-less functions and has precedence over the detected)
 
- :amelinium.auth.preference/default #ref :amelinium.auth/simple
- :amelinium.auth.preference/by-type {:system #ref :amelinium.auth/strong}
+ :amelinium.auth/config {:db           #ref :amelinium.db/main
+                         :default-type :user
+                         :types        {:system #ref :amelinium.auth/strong
+                                        :user   #ref :amelinium.auth/simple}}
 
  ;; I18n
 
@@ -268,40 +269,40 @@
 
  ;; Logger
 
- :amelinium.logging/unilog {:system      #ref :amelinium.app/properties
-                            :prev-config {}
-                            :level       :info
-                            :console     false
-                            :appenders   [{:appender       :rolling-file
-                                           :file           "${user.home}/.amelinium/amelinium.log"
-                                           :encoder        :pattern-cool
-                                           :pattern        "%p [%date{yyyy-MM-dd'T'HH:mm:ss, UTC},%date{SSS, UTC}Z] %t - %c %m%n"
-                                           :rolling-policy {:type        :time-based
-                                                            :max-history 7
-                                                            :pattern     ".%d{yyyy-MM-dd}"}}
-                                          {:appender       :rolling-file
-                                           :file           "${user.home}/.amelinium/amelinium-json.log"
-                                           :encoder        :json-log
-                                           :rolling-policy {:type        :time-based
-                                                            :max-history 7
-                                                            :pattern     ".%d{yyyy-MM-dd}"}}
-                                          {:appender :console-info
-                                           :encoder  :pattern
-                                           :pattern
-                                           "%highlight(%-5level) %gray([%d{HH:mm:ss, UTC}] %magenta([%-7thread])) %cyan(%-34c) %m%n"}]
-                            :overrides   {"org.apache.http"                               :info
-                                          "org.apache.http.wire"                          :error
-                                          "org.eclipse.jetty"                             :info
-                                          "org.eclipse.jetty.util.log"                    :info
-                                          "io.netty"                                      :info
-                                          "io.netty.util"                                 :info
-                                          "io.netty.util.internal"                        :info
-                                          "io.netty.util.ResourceLeakDetector"            :info
-                                          "io.netty.util.internal.PlatformDependent"      :info
-                                          "io.netty.util.internal.PlatformDependent0"     :info
-                                          "io.netty.util.internal.CleanerJava9"           :info
-                                          "io.netty.util.internal.InternalThreadLocalMap" :info
-                                          }
+ :amelinium.logging/unilog {:system              #ref :amelinium.app/properties
+                            :prev-config         {}
+                            :level               :info
+                            :console             false
+                            :appenders           [{:appender       :rolling-file
+                                                   :file           "${user.home}/.amelinium/amelinium.log"
+                                                   :encoder        :pattern-cool
+                                                   :pattern        "%p [%date{yyyy-MM-dd'T'HH:mm:ss, UTC},%date{SSS, UTC}Z] %t - %c %m%n"
+                                                   :rolling-policy {:type        :time-based
+                                                                    :max-history 7
+                                                                    :pattern     ".%d{yyyy-MM-dd}"}}
+                                                  {:appender       :rolling-file
+                                                   :file           "${user.home}/.amelinium/amelinium-json.log"
+                                                   :encoder        :json-log
+                                                   :rolling-policy {:type        :time-based
+                                                                    :max-history 7
+                                                                    :pattern     ".%d{yyyy-MM-dd}"}}
+                                                  {:appender :console-info
+                                                   :encoder  :pattern
+                                                   :pattern
+                                                   "%highlight(%-5level) %gray([%d{HH:mm:ss, UTC}] %magenta([%-7thread])) %cyan(%-34c) %m%n"}]
+                            :overrides           {"org.apache.http"                               :info
+                                                  "org.apache.http.wire"                          :error
+                                                  "org.eclipse.jetty"                             :info
+                                                  "org.eclipse.jetty.util.log"                    :info
+                                                  "io.netty"                                      :info
+                                                  "io.netty.util"                                 :info
+                                                  "io.netty.util.internal"                        :info
+                                                  "io.netty.util.ResourceLeakDetector"            :info
+                                                  "io.netty.util.internal.PlatformDependent"      :info
+                                                  "io.netty.util.internal.PlatformDependent0"     :info
+                                                  "io.netty.util.internal.CleanerJava9"           :info
+                                                  "io.netty.util.internal.InternalThreadLocalMap" :info
+                                                  }
                             :context-transformer {amelinium.logging/mask         [:password :pwd :private-key :private
                                                                                   :secret :signature :request-id
                                                                                   :anti-phisihng-code]
