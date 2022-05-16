@@ -90,6 +90,4 @@
   (when (and m channel)
     (async/>!! channel [m (t/now)])))
 
-(system/add-prep  ::log [_ config] (map/assoc-missing config :table :authlog))
-(system/add-init  ::log [k config] (let [c (oplog/init! k config)] (var/make k (:fn/reporter c)) c))
-(system/add-halt! ::log [k config] (oplog/stop! k config) (var/make k nil))
+(derive ::oplog/log ::log)

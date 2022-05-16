@@ -14,6 +14,7 @@
             [amelinium.db                    :as         db]
             [io.randomseed.utils.time        :as       time]
             [io.randomseed.utils.var         :as        var]
+            [io.randomseed.utils.map         :as        map]
             [io.randomseed.utils             :refer    :all]))
 
 ;; Queue and channel helpers
@@ -155,5 +156,6 @@
     (log/msg "Operations logger" k "stopped"))
   nil)
 
-(system/add-init  ::oplog [k config] (init! k config))
-(system/add-halt! ::oplog [k config] (stop! k config))
+(system/add-prep  ::log [k config] (map/assoc-missing config :table (some-keyword-simple k)))
+(system/add-init  ::log [k config] (let [c (init! k config)] (var/make k (:fn/reporter c)) c))
+(system/add-halt! ::log [k config] (stop! k config) (var/make k nil))
