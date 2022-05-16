@@ -83,60 +83,6 @@
     (binding [amelinium.core/*some-switch* :some-value]
       (run-all-tests))))
 
-;; Users and passwords
-
-(defn set-password
-  "Sets a user password in a database for the given user-spec (a user map, user ID or
-  UID). It will use the password configuration obtained from authentication
-  configuration associated with user's account type."
-  ([user-spec]
-   (set-password nil user-spec nil))
-  ([user-spec plain-password]
-   (set-password nil user-spec plain-password))
-  ([db user-spec plain-password]
-   (if-some [db (if db db (do (println "Using db/auth as the data source.") db/auth))]
-     (if-some [user-id (user/find-id db user-spec)]
-       (if-some [user (user/props db user-id)]
-         (let [atype       (:account-type user)
-               atexp       (when-not atype " (default)")
-               auth-config (auth/config-or-default atype)
-               auth-model  (some-str (:id auth-config))
-               atype       (or atype (:account-types/default auth-config))]
-           (println (str "Changing password for user " user-id "." \newline
-                         "Account type is " atype atexp
-                         ", chosen auth model is " auth-model "." \newline))
-           (if-some [plain-password (or (some-str plain-password) (crypto/ask-pass))]
-             (if-some [chains (auth/make-password-json plain-password auth-config)]
-               (let [ret (user/update-password db user-id chains)
-                     cnt (or (::jdbc/update-count ret) 0)]
-                 (when (pos-int? cnt) (println "Password changed successfully."))
-                 (println (str "Updated rows: " cnt)))
-               (println "Authentication engine could not produce password chains."))
-             (println "Password is empty or blank.")))
-         (println "Cannot retrieve user properties."))
-       (println "Cannot find user in a database."))
-     (println "Data source is not active. Run the application?"))))
-
-(defn lock-account
-  ([user-spec]
-   (lock-account nil user-spec))
-  ([db user-spec]
-   (let [db (if db db (do (println "Using db/auth as the data source.") db/auth))]
-     (if-some [user-id (user/find-id db user-spec)]
-       (do (println (str "Locking account for user " user-id))
-           (user/prop-set db user-id :locked (t/now)))
-       (println "Cannot find user in a database.")))))
-
-(defn unlock-account
-  ([user-spec]
-   (unlock-account nil user-spec))
-  ([db user-spec]
-   (let [db (if db db (do (println "Using db/auth as the data source.") db/auth))]
-     (if-some [user-id (user/find-id db user-spec)]
-       (do (println (str "Unlocking account for user " user-id))
-           (user/prop-del db user-id :locked))
-       (println "Cannot find user in a database.")))))
-
 ;; generate preferred auth for account-types
 
 (comment 
