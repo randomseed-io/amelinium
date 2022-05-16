@@ -90,4 +90,4 @@
   (when (and m channel)
     (async/>!! channel [m (t/now)])))
 
-(derive ::oplog/log ::log)
+(derive ::log ::oplog/log)

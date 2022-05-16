@@ -17,6 +17,8 @@
             [io.randomseed.utils.map         :as        map]
             [io.randomseed.utils             :refer    :all]))
 
+(defonce log nil)
+
 ;; Queue and channel helpers
 
 (defn queue
