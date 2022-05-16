@@ -240,6 +240,7 @@
                      ^clojure.lang.Fn finalizer
                      ^clojure.lang.Fn suspender
                      ^clojure.lang.Fn resumer
+                     ^clojure.lang.Keyword dbkey
                      ^String dbname
                      datasource])
 
@@ -260,15 +261,16 @@
 (def dbname-key-finder
   (some-fn (comp some-str :orig-key)
            #(when (or (string? %) (ident? %)) (some-str %))
-           (comp some-str :orig-key :properties)
-           (comp some-str :orig-key :datasource)
-           (comp some-str :orig-key :datasource :datastore)
-           (comp some-str :orig-key :datastore :datasource)
-           (comp some-str :orig-key :datastore)
-           (comp some-str :orig-key :db-spec :datastore)
-           (comp some-str :orig-key :db-spec)
-           (comp some-str :orig-key :properties :datasource)
-           (comp some-str :orig-key :properties :datastore)))
+           (comp some-str :dbkey)
+           (comp some-str :dbkey :properties)
+           (comp some-str :dbkey :datasource)
+           (comp some-str :dbkey :datasource :datastore)
+           (comp some-str :dbkey :datastore :datasource)
+           (comp some-str :dbkey :datastore)
+           (comp some-str :dbkey :db-spec :datastore)
+           (comp some-str :dbkey :db-spec)
+           (comp some-str :dbkey :properties :datasource)
+           (comp some-str :dbkey :properties :datastore)))
 
 (def dbname-finder
   (some-fn #(when (or (string? %) (ident? %)) (some-str %))
@@ -306,7 +308,9 @@
   structure by using known patterns."
   ([v]
    (when v
-     (dbname-key-finder v)))
+     (or (and (db-config? v) (some-str (get v :dbkey)))
+         (dbname-key-finder v)
+         nil)))
   ([v & more]
    (or (db-key-name v)
        (some dbname-key-finder (filter identity (cons v more)))
@@ -339,7 +343,7 @@
   [config]
   (when (and config (sequential? config) (seq config))
     (->> (filter fn? config)
-         (map #(:orig-key (%)))
+         (map #(:dbkey (%)))
          (filter identity)
          distinct seq)))
 
@@ -470,10 +474,10 @@
     (-> config
         (map/update-existing :dbname         fs/parse-java-properties)
         (map/update-existing :migrations-dir fs/parse-java-properties)
-        (map/update-missing  :user           (constantly (get config :username)))
-        (map/update-missing  :username       (constantly (get config :user)))
-        (map/dissoc-if       :username       nil?)
-        (map/dissoc-if       :user           nil?))))
+        (map/assoc-missing  :user            (get config :username))
+        (map/assoc-missing  :username        (get config :user))
+        (map/dissoc-if      :username        nil?)
+        (map/dissoc-if      :user            nil?))))
 
 (defn init-db
   ([k config]
@@ -493,13 +497,14 @@
      (let [db-props (-> :properties config (dissoc :logger :migrations-dir) prep-db)
            db-name  (db-name db-props config k)
            db-key   (db-key-name k db-props config)
-           db-props (map/update-missing db-props :name db-name)]
+           db-props (map/assoc-missing db-props :name db-name :dbkey db-key)]
        (log/msg "Configuring database" db-name (str "(" db-key ")"))
-       (DBConfig. ^clojure.lang.Fn ds-getter
-                  ^clojure.lang.Fn ds-closer
-                  ^clojure.lang.Fn ds-suspender
-                  ^clojure.lang.Fn ds-resumer
-                  ^String          db-name
+       (DBConfig. ^clojure.lang.Fn      ds-getter
+                  ^clojure.lang.Fn      ds-closer
+                  ^clojure.lang.Fn      ds-suspender
+                  ^clojure.lang.Fn      ds-resumer
+                  ^clojure.lang.Keyword db-key
+                  ^String               db-name
                   (ds-getter db-props))))))
 
 (defn close-db
@@ -550,7 +555,7 @@
         migdir (fs/parse-java-properties (or (:migrations-dir config)
                                              (get-in config [:properties :migrations-dir])))
         config (-> config
-                   (assoc :orig-key k :datastore ds)
+                   (assoc :dbkey k :datastore ds)
                    (map/update-existing :reporter  var/deref-symbol)
                    (map/update-existing :strategy  keyword)
                    (dissoc :loader :logger :initializer :properties))]
