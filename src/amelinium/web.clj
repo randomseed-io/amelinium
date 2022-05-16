@@ -1124,7 +1124,7 @@
   ([smap-or-req other]
    (session/session-key smap-or-req other)))
 
-(defn get-variable-failed?
+(defn session-variable-get-failed?
   [v]
   (session/get-variable-failed? v))
 

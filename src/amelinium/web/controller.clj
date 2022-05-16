@@ -138,7 +138,7 @@
   ([req gmap smap]
    (if-not gmap
      req
-     (if (web/get-variable-failed? gmap)
+     (if (web/session-variable-get-failed? gmap)
        (assoc req :goto-injected? true :goto-uri false :goto false)
        (let [req (assoc req :goto-injected? true :goto-uri (get gmap :uri))]
          (if-some [form-data (extract-form-data req gmap smap)]
