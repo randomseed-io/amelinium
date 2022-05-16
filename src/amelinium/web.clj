@@ -358,7 +358,7 @@
            (some-> (r/match->path m query-params)
                    (str location qparams))))))))
 
-(defn template-with-param
+(defn path-template-with-param
   "Returns a template for the given match if the route supports the given parameter."
   ([match required-param]
    (template-with-param match required-param nil))
