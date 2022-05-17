@@ -57,7 +57,7 @@
 
  ;; Lazy request map
 
- :amelinium.http.middleware.lazy-request/lazy-request {:enabled? true}
+ :amelinium.http.middleware.lazy-req/lazy-request {:enabled? true}
 
  ;; HTTP middleware
 
@@ -133,7 +133,7 @@
  :amelinium.http.middleware/renderer amelinium.web.controller/render-page!
  :amelinium.http.middleware/preparer amelinium.web.controller/prep-request!
 
- :amelinium.http.middleware/default-chain [#ref :amelinium.http.middleware.lazy-request/lazy-request
+ :amelinium.http.middleware/default-chain [#ref :amelinium.http.middleware.lazy-req/lazy-request
                                            #ref :amelinium.http.middleware/renderer
                                            reitit.ring.middleware.parameters/parameters-middleware
                                            #ref :amelinium.http.middleware.content/content
@@ -289,7 +289,7 @@
                                                   {:appender :console-info
                                                    :encoder  :pattern
                                                    :pattern
-                                                   "%highlight(%-5level) %gray([%d{HH:mm:ss, UTC}] %magenta([%-7thread])) %cyan(%-34c) %m%n"}]
+                                                   "%highlight(%-5level) %gray([%d{HH:mm:ss, UTC}] %magenta([%-7thread])) %cyan(%-36c) %m%n"}]
                             :overrides           {"org.apache.http"                               :info
                                                   "org.apache.http.wire"                          :error
                                                   "org.eclipse.jetty"                             :info

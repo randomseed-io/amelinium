@@ -4,7 +4,7 @@
       :author "Paweł Wilk"
       :added  "1.0.0"}
 
-    amelinium.http.middleware.lazy-request
+    amelinium.http.middleware.lazy-req
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 

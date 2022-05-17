@@ -131,7 +131,7 @@
   (let [ip-getter     (var/deref-symbol ip-getter-sym)
         proxy-setting (process-proxy proxy-setting)
         proxy-for-fn  (process-proxy-for proxy-for)]
-    (log/msg "Installing remote IP analyzer:" ip-getter-sym
+    (log/msg "Installing IP analyzer:" ip-getter-sym
              (when proxy-setting (str "(proxy header: " proxy-setting ")")))
     {:name    ::ip-getter
      :compile (fn [_ _]
