@@ -39,54 +39,29 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Data population
 
-(def ^:const common-populators '[[:route/data      route-data+]
-                                 [:auth/db         auth-db+]
-                                 [:language/user   user-lang+]
-                                 [:oplog/logger    oplog-logger+]])
-
 (defn route-data
-  "Injects route data directly to a request map."
+  "Injects route data directly into a request map."
   [req _]
   (get (get req ::r/match) :data))
 
 (defn auth-db+
+  "Injects authorization data source directly into a request map."
   [req _]
   (get (get (get req :route/data) :auth/config) :db))
 
 (defn oplog-logger+
+  "Injects operations logger function into a request map."
   [req _]
   (delay (web/oplog-logger req)))
 
 (defn user-lang+
+  "Injects user's preferred language into a request map."
   [req _]
   (delay
     (when-some [db (web/auth-db req)]
       (when-some [user-id (get (get req :session) :user/id)]
         (when-some [supported (get (get req :language/settings) :supported)]
           (supported (user/setting db user-id :language)))))))
-
-(defn compile-populators
-  "Prepares population map."
-  [populators]
-  (->> populators
-       (map #(if (map? %) (seq %) %))
-       (map #(if (coll? %) % (list (keyword %) (symbol %))))
-       flatten (partition 2)
-       (map    (fn [[k v]] (list (keyword k) (if (ident? v) (var/deref v) v))))
-       (filter (fn [[k v]] (and (keyword? k) (instance? clojure.lang.IFn v))))
-       (map vec) vec))
-
-(def ^:const common-populators-compiled
-  (compile-populators common-populators))
-
-(defn populate+
-  "For each populator map calls the function identified by map's value and associates
-  its result in a request with its key. Called function must accept two arguments (a
-  request and a key) and return a value to be associated."
-  ([req]
-   (populate+ req common-populators-compiled))
-  ([req populators]
-   (reduce (fn [req [k f]] (assoc req k (f req k))) req populators)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Calculations
@@ -389,13 +364,12 @@
       ;; There is no session. Short-circuit.
 
       (not (and sess (or (get sess :id) (get sess :err/id))))
-      (-> req populate+ (cleanup-req @auth-state))
+      (-> req (cleanup-req @auth-state))
 
       ;; Account is manually hard-locked.
 
       (account-locked? req sess @auth-db)
-      (let [req      (populate+ req)
-            user-id  (:user/id      sess)
+      (let [user-id  (:user/id      sess)
             email    (:user/email   sess)
             ip-addr  (:remote-ip/str req)
             for-user (log/for-user user-id email ip-addr)
@@ -412,8 +386,7 @@
       ;; Session expired and the time for prolongation has passed.
 
       (hard-expiry? req sess)
-      (let [req      (populate+ req)
-            user-id  (:user/id      sess)
+      (let [user-id  (:user/id      sess)
             email    (:user/email   sess)
             ip-addr  (:remote-ip/str req)
             for-user (log/for-user user-id email ip-addr)
@@ -432,17 +405,16 @@
       ;; We have to preserve form data and original, destination URI in a session variable.
 
       (prolongation? sess @auth-state @login-data?)
-      (let [req (populate+ req)]
-        (user/put-session-var (web/allow-soft-expired sess) (get req :session/config)
-                              :goto {:uri       (get req :uri)
-                                     :form-data (get (cleanup-req req @auth-state) :form-params)})
-        (web/move-to req (or (http/get-route-data req :auth/prolongate)
-                             :login/prolongate)))
+      (do (user/put-session-var (web/allow-soft-expired sess) (get req :session/config)
+                                :goto {:uri       (get req :uri)
+                                       :form-data (get (cleanup-req req @auth-state) :form-params)})
+          (web/move-to req (or (http/get-route-data req :auth/prolongate)
+                               :login/prolongate)))
 
       :----pass
 
       (let [valid-session? (get sess :valid?)
-            req            (-> req populate+
+            req            (-> req
                                (populate-goto+ sess (get req :session/config))
                                (cleanup-req @auth-state))
             [_ auth?]      @auth-state
