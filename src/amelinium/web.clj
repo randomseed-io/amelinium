@@ -90,6 +90,8 @@
 ;; Operations logging
 
 (defn oplog-config
+  "Returns operations logger configuration obtained from a request or a `Match`
+  object."
   [req-or-match]
   (or (http/get-route-data req-or-match :oplog/config)
       (when-not (instance? Match req-or-match)
@@ -351,7 +353,8 @@
                    (str location qparams))))))))
 
 (defn path-template-with-param
-  "Returns a template for the given match if the route supports the given parameter."
+  "Returns a path template for the given match if the route supports the given
+  parameter."
   ([match required-param]
    (path-template-with-param match required-param nil))
   ([match required-param short-circuit]
