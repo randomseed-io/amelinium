@@ -56,7 +56,7 @@
           timeout        (time/milliseconds timeout 5000)
           chans-to-watch [messages kill]
           new-timeout    #(async/timeout timeout)]
-      (log/msg "Starting operations logger" id)
+      (log/msg "Starting operations logger:" id)
       (assoc config :channel/runner
              (async/thread
                (log/dbg "Buffered OP Logger" id "is started")
@@ -152,7 +152,7 @@
   finish its work."
   [k {:keys [fn/reporter-name channel/kill channel/runner]}]
   (when kill
-    (log/msg "Stopping operations logger" k)
+    (log/msg "Stopping operations logger:" k)
     (async/put! kill true)
     (when runner (async/<!! runner))
     (log/msg "Operations logger" k "stopped"))

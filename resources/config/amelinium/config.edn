@@ -52,6 +52,7 @@
  ;; Buffered database loggers
 
  :amelinium.web.oplog.auth/log {:db           #ref :amelinium.db/main
+                                :table        :authlog
                                 :timeout      [25 seconds]
                                 :buffered-max 108}
 
