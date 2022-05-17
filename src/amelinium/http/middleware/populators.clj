@@ -42,7 +42,7 @@
    :compile (fn [_ _]
               (fn [handler]
                 (fn [req]
-                  (populate req compiled-populators))))})
+                  (handler (populate req compiled-populators)))))})
 
 (system/add-init  ::default [k config] (wrap-populators k (compile config)))
 (system/add-halt! ::default [_ config] nil)
