@@ -18,12 +18,12 @@
 ;; If `true` then parameters without validators assigned are considered valid.
 ;; If `false` then unknown parameters are causing validation to fail.
 
-(def ^:const default-pass?   false)
+(def ^:const default-pass? true)
 
 ;; Required parameters checker.
 ;; If set to `true` then the `required-params` is used (at least 1 must be present).
 
-(def ^:const check-required?  true)
+(def ^:const check-required? false)
 
 ;; Validation map.
 
@@ -38,9 +38,6 @@
 (def ^:const must-be-empty
   ["session-challenge" "weblock-id" "goto-challenge-phrase"
    "mailto-response" "secret-token" "totem-potem" "name-middle" "x-ax"
-   "jolt-abyss" "krzyz-panski" "param-fill-15-38" "form-data-02" "do-re-mi-fa" "tokidi"
-   "form-token-03" "aks3-dk91-f9ff-0c10f" "primary-validator" "second-title" "bcsk-id"
-   "transforming-the-tunes" "gulasz-leszlasz" "primary-wikary" "mp3-jp2"
    "ex-in-tid" "x-aix" "x-accx" "secondary-rsp-token" "captcha-xid"])
 
 (def ^:const required-params

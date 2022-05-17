@@ -9,29 +9,29 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [reitit.ring                      :as       ring]
-            [ring.middleware.keyword-params   :as    ring-kw]
-            [ring.util.http-response          :as       resp]
-            [ring.util.request                :as        req]
-            [ring.util.codec                  :as      codec]
-            [reitit.core                      :as          r]
-            [reitit.ring                      :as       ring]
-            [selmer.filters                   :as    filters]
-            [selmer.parser                    :as       tmpl]
-            [lazy-map.core                    :as   lazy-map]
-            [tick.core                        :as          t]
-            [amelinium.i18n                   :as       i18n]
-            [amelinium.i18n                   :refer    [tr]]
-            [amelinium.logging                :as        log]
-            [amelinium.web.model.user         :as       user]
-            [io.randomseed.utils.time         :as       time]
-            [io.randomseed.utils.var          :as        var]
-            [io.randomseed.utils.map          :as        map]
-            [io.randomseed.utils              :refer    :all]
-            [amelinium.web                    :as        web]
-            [amelinium.auth                   :as       auth]
-            [amelinium.http                   :as       http]
-            [amelinium.http.validators        :as validators]
+  (:require [reitit.ring                        :as       ring]
+            [ring.middleware.keyword-params     :as    ring-kw]
+            [ring.util.http-response            :as       resp]
+            [ring.util.request                  :as        req]
+            [ring.util.codec                    :as      codec]
+            [reitit.core                        :as          r]
+            [reitit.ring                        :as       ring]
+            [selmer.filters                     :as    filters]
+            [selmer.parser                      :as       tmpl]
+            [lazy-map.core                      :as   lazy-map]
+            [tick.core                          :as          t]
+            [amelinium.i18n                     :as       i18n]
+            [amelinium.i18n                     :refer    [tr]]
+            [amelinium.logging                  :as        log]
+            [amelinium.web.model.user           :as       user]
+            [io.randomseed.utils.time           :as       time]
+            [io.randomseed.utils.var            :as        var]
+            [io.randomseed.utils.map            :as        map]
+            [io.randomseed.utils                :refer    :all]
+            [amelinium.web                      :as        web]
+            [amelinium.auth                     :as       auth]
+            [amelinium.http                     :as       http]
+            [amelinium.http.validators          :as validators]
             [amelinium.http.middleware.language :as   language]))
 
 (def ^:const keywordize-params? false)
@@ -39,7 +39,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Data population
 
-(defn route-data
+(defn validate-params+
+  "Sets `:params/valid?` in a request map on a basis of result from calling
+  `amelinium.http.validators/validate`."
+  [req _]
+  (validators/validate (get req :form-params)))
+
+(defn route-data+
   "Injects route data directly into a request map."
   [req _]
   (get (get req ::r/match) :data))
@@ -358,7 +364,7 @@
 
       ;; Request is invalid.
 
-      (not (validators/validate (get req :form-params)))
+      (not (get req :params/valid?))
       (-> req web/no-app-data web/render-bad-params)
 
       ;; There is no session. Short-circuit.
