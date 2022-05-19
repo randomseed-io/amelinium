@@ -148,6 +148,7 @@
   "Initializes authentication configuration."
   [config]
   (-> config
+      (map/update-existing :db db/ds)
       (map/update-existing :types init-by-type)))
 
 (system/add-init  ::auth [k config] (wrap-auth k config))
