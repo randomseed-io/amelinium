@@ -48,6 +48,12 @@
 (def ^:const default-required-blank
   ["some-blank-token"])
 
+(def ^:const default-result-key
+  :validators/params-valid?)
+
+(def ^:const default-config-key
+  :validators/config)
+
 ;; Required generation
 
 (defn gen-required-blank
@@ -173,23 +179,31 @@
   This function returns a given configuration map with the following keys transformed
   as described earlier:
 
-  * Booleans:
+  Booleans:
     * `:enabled?` (`true` if enabled in configuration with `:enabled?`)
     * `:disabled?` (`false` if enabled in configuration with `:enabled?`)
     * `:default-pass?` (`true` if unknown parameters are considered valid)
     * `:check-required?` (`true` if required parameters are to be checked)
-  * Vectors:
+
+  Vectors:
     * `:required/some` (required parameters having auto-generated validators for non-blanks)
     * `:required/blank` (required parameters having auto-generated validators for blanks)
     * `:required/any` (required parameters having auto-generated validators for any values)
     * `:required/special` (all required parameters having auto-generated validators)
     * `:required` (all required parameters, including those having auto-generated validators)
-  * Maps:
+
+  Maps:
     * `:required/cat` (all required parameters with categories assigned)
     * `:validators` (manually configured validators for parameter names)
-    * `:validators/all` (manually and automatically configured validators)."
+    * `:validators/all` (manually and automatically configured validators)
+
+  Keywords:
+    * `:result-key` (key identifying validation results in a request map)
+    * `:config-key` (key identifying configuration in a request map)."
   [{required-some   :required/some
     required-blank  :required/blank
+    result-key      :result-key
+    config-key      :config-key
     required        :required
     validators      :validators
     enabled?        :enabled?
@@ -201,7 +215,9 @@
                      required-blank  default-required-blank
                      check-required? default-check-required?
                      default-pass?   default-default-pass?
-                     validators      default-validators}
+                     validators      default-validators
+                     result-key      default-result-key
+                     config-key      default-config-key}
     :as             config}]
   (let [cr?                 (boolean check-required?)
         default-pass?       (boolean default-pass?)
@@ -247,6 +263,8 @@
         validators-map      (merge (or required-map {}) (or validators {}))
         validators-map      (when (seq validators-map) validators-map)]
     (assoc config
+           :result-key       (keyword result-key)   ;; results identifier
+           :config-key       (keyword config-key)   ;; configuration identifier
            :check-required?  cr?                    ;; check for required params
            :enabled?         enabled?               ;; validation enabled
            :disabled?        (not enabled?)         ;; validation disabled
@@ -279,13 +297,19 @@
   Maps:
     * `:validators` (validators assigned to parameter names)
 
+  Keywords:
+    * `:result-key` (key identifying validation results in a request map)
+    * `:config-key` (key identifying configuration in a request map).
+
   Validator names should be strings or objects which are convertible to strings.
   Validators can be various objects, see `io.randomseed.utils.validators/Validating`
   protocol.
 
   The result of calling this function is a map intended to be used with Reitit router
   as a middleware. The handler function itself will add `:validators/config` and
-  `:validators/params-valid?` entries to a request map.
+  `:validators/params-valid?` entries to a request map. Names of these identifying
+  keys can be changed by setting `:result-key` and/or `:config-key` configuration
+  options.
 
   The behavior of validation function can be controlled by setting
   `:validators/disabled?` and/or `:validators/check-required?` in a request context
@@ -299,6 +323,7 @@
   See `amelinium.http.middleware.validators/prep-validators` to see the detailed
   logic behind preparing the configuration."
   [k {:keys [required required-all validators-all
+             config-key results-key
              disabled? default-pass? check-required?]
       :as   config}]
   (log/msg "Installing validators:" k)
@@ -308,8 +333,8 @@
                 (fn [req]
                   (handler
                    (assoc req
-                          :validators/config config
-                          :validators/params-valid?
+                          config-key config
+                          results-key
                           (or (get req :validators/disabled? disabled?)
                               (v/validate (get req :form-params)
                                           validators-all
