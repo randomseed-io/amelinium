@@ -77,15 +77,15 @@
   randomly selected, unique names which fit to certain categories (required keys
   which must be blank, required keys which must not be blank, required keys which may
   have any value)."
-  ([{:keys [required-cat required-spec]} items rng]
-   (when (and required-cat required-spec)
-     (group-by required-cat (vec/rand-nths required-spec items rng))))
-  ([{:keys [required-cat required-spec]} items]
-   (when (and required-cat required-spec)
-     (group-by required-cat (vec/rand-nths required-spec items))))
-  ([{:keys [required-cat required-spec]}]
-   (when (and required-cat required-spec)
-     (group-by required-cat (vec/rand-nths required-spec)))))
+  ([{:keys [required-cat required-auto]} items rng]
+   (when (and required-cat required-auto)
+     (group-by required-cat (vec/rand-nths required-auto items rng))))
+  ([{:keys [required-cat required-auto]} items]
+   (when (and required-cat required-auto)
+     (group-by required-cat (vec/rand-nths required-auto items))))
+  ([{:keys [required-cat required-auto]}]
+   (when (and required-cat required-auto)
+     (group-by required-cat (vec/rand-nths required-auto)))))
 
 ;; Initialization
 
@@ -100,8 +100,10 @@
 ;; then it should remain as required, not being removed
 
 (defn prep-validators
-  [{:keys [required-some required-blank required check-required? default-pass? validators]
-    :or   {required        default-required
+  [{:keys [required-some required-blank required validators
+           enabled? check-required? default-pass?]
+    :or   {enabled?        true
+           required        default-required
            required-some   default-required-some
            required-blank  default-required-blank
            check-required? default-check-required?
@@ -110,6 +112,7 @@
     :as   config}]
   (let [cr?                 (boolean check-required?)
         default-pass?       (boolean default-pass?)
+        enabled?            (boolean enabled?)
         validators          (->> validators (map/map-keys some-str) (map/map-vals var/deref-symbol))
         validators          (apply dissoc validators bad-keys)
         validators          (when (seq validators) validators)
@@ -118,13 +121,13 @@
         required-some       (map some-str required-some)
         required-blank      (map some-str required-blank)
         required-user       (set (remove bad-keys required-user))
-        required-some       (set (remove bad-keys (remove validators-keys required-some)))
-        required-blank      (set (remove bad-keys (remove validators-keys required-blank)))
+        required-some       (set (remove bad-keys required-some))
+        required-blank      (set (remove bad-keys required-blank))
         required-sb         (set/union required-some required-blank)
         required-user       (set/difference required-user required-sb)
         required-both       (set/intersection required-some required-blank)
-        required-blank      (set/difference required-blank required-both)
-        required-some       (set/difference required-some required-both)
+        required-blank      (set/difference required-blank required-both validators-keys)
+        required-some       (set/difference required-some  required-both validators-keys)
         required-any        (set/difference required-user validators-keys)
         required-any        (set/union required-any required-both)
         required-user       (set/union required-user required-any)
@@ -134,52 +137,56 @@
         required-any        (when (seq required-any)        required-any)
         required-some-trxs  (pair-keys required-some (complement str/blank?))
         required-blank-trxs (pair-keys required-blank str/blank?)
-        required-trxs       (pair-keys required-any  true)
-        required-some-tags  (pair-keys required-some  :some)
-        required-blank-tags (pair-keys required-blank :blank)
-        required-any-tags   (pair-keys required-any   :any)
-        required-tags       (pair-keys required-user  :other)
+        required-trxs       (pair-keys required-any true)
+        required-some-tags  (pair-keys required-some   :some)
+        required-blank-tags (pair-keys required-blank  :blank)
+        required-any-tags   (pair-keys required-any    :any)
+        required-tags       (pair-keys required-params :custom)
         required-cat        (into {} (concat required-tags
                                              required-some-tags
                                              required-blank-tags
                                              required-any-tags))
         required-cat        (when (seq required-cat) required-cat)
-        required-spec       (select-keys required-cat [:some :blank :any])
-        required-map        (when cr? (into {} (concat required-some-trxs
-                                                       required-blank-trxs
-                                                       required-trxs)))
+        required-auto       (set/union required-some required-blank required-any)
+        required-map        (into {} (concat required-some-trxs
+                                             required-blank-trxs
+                                             required-trxs))
         validators-map      (merge (or required-map {}) (or validators {}))
         validators-map      (when (seq validators-map) validators-map)]
     (assoc config
            :check-required? cr?
+           :enabled?        enabled?
+           :disabled?       (not enabled?)
            :default-pass?   default-pass?
            :required-some   (vec required-some)
            :required-blank  (vec required-blank)
            :required-any    (vec required-any)
-           :required-spec   (vec required-spec)
+           :required-auto   (vec required-auto)
            :required        (vec required-user)
            :required-all    (vec required-params)
            :required-cat    required-cat
            :validators      validators
-           :validators-map  validators-map)))
+           :validators-all  validators-map)))
 
 (defn wrap-validators
   "Validators wrapping middleware."
-  [k {:keys [required required-all validators-map default-pass?]
+  [k {:keys [required required-all validators-all
+             disabled? default-pass? check-required?]
       :as   config}]
   (log/msg "Installing validators:" k)
-  (let [config (dissoc config :validators-map)]
-    {:name    k
-     :compile (fn [_ _]
-                (fn [handler]
-                  (fn [req]
-                    (handler (assoc req
-                                    :validators/config config
-                                    :validators/params-valid?
-                                    (v/validate (get req :form-params)
-                                                validators-map
-                                                default-pass?
-                                                required-all))))))}))
+  {:name    k
+   :compile (fn [_ _]
+              (fn [handler]
+                (fn [req]
+                  (handler
+                   (assoc req
+                          :validators/config config
+                          :validators/params-valid?
+                          (or disabled?
+                              (v/validate (get req :form-params)
+                                          validators-all
+                                          default-pass?
+                                          (when check-required? required-all))))))))})
 
 (system/add-prep  ::default [_ config] (prep-validators config))
 (system/add-init  ::default [k config] (wrap-validators k (prep-validators config)))
