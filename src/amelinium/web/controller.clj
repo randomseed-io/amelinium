@@ -31,19 +31,12 @@
             [amelinium.web                      :as        web]
             [amelinium.auth                     :as       auth]
             [amelinium.http                     :as       http]
-            [amelinium.http.validators          :as validators]
             [amelinium.http.middleware.language :as   language]))
 
 (def ^:const keywordize-params? false)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Data population
-
-(defn validate-params+
-  "Sets `:params/valid?` in a request map on a basis of result from calling
-  `amelinium.http.validators/validate`."
-  [req _]
-  (validators/validate (get req :form-params)))
 
 (defn route-data+
   "Injects route data directly into a request map."
@@ -364,7 +357,7 @@
 
       ;; Request is invalid.
 
-      (not (get req :params/valid?))
+      (not (get req :validators/params-valid?))
       (-> req web/no-app-data web/render-bad-params)
 
       ;; There is no session. Short-circuit.

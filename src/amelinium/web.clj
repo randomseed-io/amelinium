@@ -8,34 +8,34 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [clojure.set                        :as          set]
-            [clojure.string                     :as          str]
-            [clojure.core.memoize               :as          mem]
-            [clojure.java.io                    :as           io]
-            [tick.core                          :as            t]
-            [lazy-map.core                      :as     lazy-map]
-            [reitit.core                        :as            r]
-            [reitit.ring                        :as         ring]
+  (:require [clojure.set                          :as          set]
+            [clojure.string                       :as          str]
+            [clojure.core.memoize                 :as          mem]
+            [clojure.java.io                      :as           io]
+            [tick.core                            :as            t]
+            [lazy-map.core                        :as     lazy-map]
+            [reitit.core                          :as            r]
+            [reitit.ring                          :as         ring]
             [ring.util.response]
-            [ring.util.http-response            :as         resp]
-            [ring.util.request                  :as          req]
-            [selmer.parser                      :as       selmer]
-            [amelinium.http                     :as         http]
-            [amelinium.http.middleware.roles    :as        roles]
-            [amelinium.http.middleware.language :as     language]
-            [amelinium.http.middleware.session  :as      session]
-            [amelinium.http.middleware.db       :as       mid-db]
-            [amelinium.http.validators          :as   validators]
-            [amelinium.web.oplog.auth           :as   oplog-auth]
-            [amelinium.web.model.user           :as         user]
-            [amelinium.logging                  :as          log]
-            [amelinium.db                       :as           db]
-            [io.randomseed.utils.time           :as         time]
-            [io.randomseed.utils.vec            :as          vec]
-            [io.randomseed.utils.map            :as          map]
-            [io.randomseed.utils             :refer         :all]
-            [hiccup.core                     :refer         :all]
-            [hiccup.table                       :as        table])
+            [ring.util.http-response              :as         resp]
+            [ring.util.request                    :as          req]
+            [selmer.parser                        :as       selmer]
+            [amelinium.http                       :as         http]
+            [amelinium.http.middleware.roles      :as        roles]
+            [amelinium.http.middleware.language   :as     language]
+            [amelinium.http.middleware.session    :as      session]
+            [amelinium.http.middleware.db         :as       mid-db]
+            [amelinium.http.middleware.validators :as   validators]
+            [amelinium.web.oplog.auth             :as   oplog-auth]
+            [amelinium.web.model.user             :as         user]
+            [amelinium.logging                    :as          log]
+            [amelinium.db                         :as           db]
+            [io.randomseed.utils.time             :as         time]
+            [io.randomseed.utils.vec              :as          vec]
+            [io.randomseed.utils.map              :as          map]
+            [io.randomseed.utils                  :refer      :all]
+            [hiccup.core                          :refer      :all]
+            [hiccup.table                         :as        table])
 
   (:import [reitit.core Match]
            [lazy_map.core LazyMapEntry LazyMap]))
@@ -43,14 +43,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Request map keys exposed in views
 
-(def ^:const http-keys      [::r/router ::r/match :path-params])
-(def ^:const page-keys      [:title :subtitle])
-(def ^:const param-keys     [:query-params :form-params :path-params])
-(def ^:const session-keys   [:session])
-(def ^:const remote-ip-keys [:remote-ip :remote-ip/str :remote-ip/by-proxy? :remote-ip/proxy])
-(def ^:const language-keys  [:language/id :language/str :accept :language/settings])
-(def ^:const roles-keys     [:roles :roles/in-context :roles/context
-                             :roles/user-authorized? :roles/user-authenticated?])
+(def ^:const http-keys       [::r/router ::r/match :path-params])
+(def ^:const page-keys       [:title :subtitle])
+(def ^:const param-keys      [:query-params :form-params :path-params])
+(def ^:const validators-keys [:validators/config :validators/params-valid?])
+(def ^:const session-keys    [:session])
+(def ^:const remote-ip-keys  [:remote-ip :remote-ip/str :remote-ip/by-proxy? :remote-ip/proxy])
+(def ^:const language-keys   [:language/id :language/str :accept :language/settings])
+(def ^:const roles-keys      [:roles :roles/in-context :roles/context
+                              :roles/user-authorized? :roles/user-authenticated?])
 
 (def ^:const common-auth-keys (vec (concat session-keys remote-ip-keys roles-keys)))
 
@@ -1540,19 +1541,31 @@
 (defn anti-spam-code
   "Generates anti-spam HTML string containing randomly selected fields from
   the given set."
-  ([coll]
-   (anti-spam-code coll 1 nil))
-  ([coll num]
-   (anti-spam-code coll num nil))
-  ([coll num rng]
-   (apply str (map #(str "<input type=\"text\" name=\"" % "\" class=\"subspace\" />")
-                   (vec/rand-nths coll num rng)))))
+  ([config]
+   (anti-spam-code config 1 nil))
+  ([config num]
+   (anti-spam-code config num nil))
+  ([config num rng]
+   (let [r       (validators/gen-required config num rng)
+         k-some  (seq (get r :some))
+         k-blank (seq (get r :blank))
+         k-any   (seq (get r :any))
+         r       (concat
+                  (when k-some  (map vector k-some  (repeat "some-value")))
+                  (when k-blank (map vector k-blank (repeat "")))
+                  (when k-any   (map vector k-any   (repeat "any-value"))))]
+     (when (seq r)
+       (apply str (map #(str "<input type=\"text\" name=\""   (nth % 0)
+                             "\" class=\"subspace\" value=\"" (nth % 1)
+                             "\"/>")
+                       r))))))
+
 ;; Template helpers
 
 (selmer/add-tag!
  :anti-spam-field
  (fn [args ctx]
-   (anti-spam-code validators/must-be-empty 2)))
+   (anti-spam-code (get ctx :validators/config) 2)))
 
 (defn lang-url
   [localized? ctx path-or-name lang params query-params lang-settings]
@@ -1591,7 +1604,7 @@
          out-path        (lang-url false ctx path-or-name lang params query-params lang-settings)]
      (if (and sid skey)
        (str "<form name=\"sessionLink\" class=\"formlink\" action=\"" out-path "\" method=\"post\">"
-            (anti-spam-code validators/must-be-empty)
+            (anti-spam-code (get ctx :validators/config))
             "<button type=\"submit\" class=\"link\" name=\"" skey "\" value=\"" sid "\">"
             (get-in content [:link :content])
             "</button></form>")
@@ -1606,7 +1619,7 @@
          skey (session-key ctx)]
      (if (and sid skey)
        (str "<form name=\"sessionLink\" class=\"formlink\" action=\"" url "\" method=\"post\">"
-            (anti-spam-code validators/must-be-empty)
+            (anti-spam-code (get ctx :validators/config))
             "<button type=\"submit\" class=\"link\" name=\"" skey "\" value=\"" sid "\">"
             (get-in content [:slink :content])
             "</button></form>")
@@ -1617,7 +1630,7 @@
  :session-data
  (fn [args ctx]
    (let [skey (session-key ctx)]
-     (str (anti-spam-code validators/must-be-empty)
+     (str (anti-spam-code (get ctx :validators/config))
           "<input type=\"hidden\" name=\"" skey "\" value=\"" (get (get ctx :session) :id) "\" />"))))
 
 ;; Language helpers

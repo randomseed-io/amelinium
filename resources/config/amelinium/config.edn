@@ -131,8 +131,9 @@
                                              :charset  :utf-8
                                              :encoding ["deflate" "gzip" "identity"]}
 
+ :amelinium.http.middleware.validators/default {}
+
  :amelinium.http.middleware.populators/default [[:route/data    amelinium.web.controller/route-data+]
-                                                [:params/valid? amelinium.web.controller/validate-params+]
                                                 [:auth/db       amelinium.web.controller/auth-db+]
                                                 [:language/user amelinium.web.controller/user-lang+]
                                                 [:oplog/logger  amelinium.web.controller/oplog-logger+]]
@@ -148,6 +149,7 @@
                                            #ref :amelinium.http.middleware.session/session
                                            #ref :amelinium.http.middleware.language/language
                                            #ref :amelinium.http.middleware.roles/roles
+                                           #ref :amelinium.http.middleware.validators/default
                                            #ref :amelinium.http.middleware.populators/default
                                            #ref :amelinium.http.middleware/preparer]
 
