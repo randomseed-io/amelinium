@@ -147,26 +147,26 @@
                                              required-blank-tags
                                              required-any-tags))
         required-cat        (when (seq required-cat) required-cat)
-        required-auto       (set/union required-some required-blank required-any)
+        required-special    (set/union required-some required-blank required-any)
         required-map        (into {} (concat required-some-trxs
                                              required-blank-trxs
                                              required-trxs))
         validators-map      (merge (or required-map {}) (or validators {}))
         validators-map      (when (seq validators-map) validators-map)]
     (assoc config
-           :check-required? cr?
-           :enabled?        enabled?
-           :disabled?       (not enabled?)
-           :default-pass?   default-pass?
-           :required-some   (vec required-some)
-           :required-blank  (vec required-blank)
-           :required-any    (vec required-any)
-           :required-auto   (vec required-auto)
-           :required        (vec required-user)
-           :required-all    (vec required-params)
-           :required-cat    required-cat
-           :validators      validators
-           :validators-all  validators-map)))
+           :check-required?  cr?                    ;; check for required params
+           :enabled?         enabled?               ;; validation enabled
+           :disabled?        (not enabled?)         ;; validation disabled
+           :default-pass?    default-pass?          ;; default strategy for unknown params
+           :required-some    (vec required-some)    ;; required params with non-blank content
+           :required-blank   (vec required-blank)   ;; required params with blank content
+           :required-any     (vec required-any)     ;; required params with any content
+           :required-special (vec required-special) ;; required params with auto-created validators
+           :required         (vec required-user)    ;; required params specified elsewhere
+           :required-all     (vec required-params)  ;; all usable, required params
+           :required-cat     required-cat           ;; required params by category
+           :validators       validators             ;; validators provided in config
+           :validators-all   validators-map)))      ;; all validators (manual and auto-created)
 
 (defn wrap-validators
   "Validators wrapping middleware."
