@@ -323,7 +323,7 @@
   See `amelinium.http.middleware.validators/prep-validators` to see the detailed
   logic behind preparing the configuration."
   [k {:keys [required required-all validators-all
-             config-key results-key
+             config-key result-key
              disabled? default-pass? check-required?]
       :as   config}]
   (log/msg "Installing validators:" k)
@@ -334,7 +334,7 @@
                   (handler
                    (assoc req
                           config-key config
-                          results-key
+                          result-key
                           (or (get req :validators/disabled? disabled?)
                               (v/validate (get req :form-params)
                                           validators-all
