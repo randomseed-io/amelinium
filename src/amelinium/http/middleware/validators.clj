@@ -181,7 +181,6 @@
 
   Booleans:
     * `:enabled?` (`true` if enabled in configuration with `:enabled?`)
-    * `:disabled?` (`false` if enabled in configuration with `:enabled?`)
     * `:default-pass?` (`true` if unknown parameters are considered valid)
     * `:check-required?` (`true` if required parameters are to be checked)
 
@@ -267,7 +266,6 @@
            :config-key       (keyword config-key)   ;; configuration identifier
            :check-required?  cr?                    ;; check for required params
            :enabled?         enabled?               ;; validation enabled
-           :disabled?        (not enabled?)         ;; validation disabled
            :default-pass?    default-pass?          ;; default strategy for unknown params
            :required/some    (vec required-some)    ;; required params with non-blank content
            :required/blank   (vec required-blank)   ;; required params with blank content
@@ -284,7 +282,6 @@
 
   Switches:
     * `:enabled?` (`true` if enabled in configuration with `:enabled?`)
-    * `:disabled?` (`false` if enabled in configuration with `:enabled?`)
     * `:default-pass?` (`true` if unknown parameters are considered valid)
     * `:check-required?` (`true` if required parameters are to be checked)
 
@@ -322,25 +319,30 @@
 
   See `amelinium.http.middleware.validators/prep-validators` to see the detailed
   logic behind preparing the configuration."
-  [k {:keys [required required-all validators-all
-             config-key result-key
-             disabled? default-pass? check-required?]
-      :as   config}]
+  [k {config-key      :config-key
+      result-key      :result-key
+      enabled?        :enabled?
+      check-required? :check-required?
+      default-pass?   :default-pass?
+      required-all    :required/all
+      validators-all  :validators/all
+      :as             config}]
   (log/msg "Installing validators:" k)
-  {:name    k
-   :compile (fn [_ _]
-              (fn [handler]
-                (fn [req]
-                  (handler
-                   (assoc req
-                          config-key config
-                          result-key
-                          (or (get req :validators/disabled? disabled?)
-                              (v/validate (get req :form-params)
-                                          validators-all
-                                          default-pass?
-                                          (when (get req :validators/check-required? check-required?)
-                                            required-all))))))))})
+  (let [disabled? (not enabled?)]
+    {:name    k
+     :compile (fn [_ _]
+                (fn [handler]
+                  (fn [req]
+                    (handler
+                     (assoc req
+                            config-key config
+                            result-key
+                            (or (get req :validators/disabled? disabled?)
+                                (v/validate (get req :form-params)
+                                            validators-all
+                                            default-pass?
+                                            (when (get req :validators/check-required? check-required?)
+                                              required-all))))))))}))
 
 (system/add-prep  ::default [_ config] (prep-validators config))
 (system/add-init  ::default [k config] (wrap-validators k (if (:required/cat config)
