@@ -59,6 +59,7 @@
 ;; Later on we put them under :app/data-required for being used by the injecting function
 
 (def ^:const common-keys (vec (concat common-auth-keys
+                                      validators-keys
                                       language-keys
                                       http-keys
                                       param-keys
