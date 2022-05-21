@@ -1539,6 +1539,14 @@
 
 ;; Anti-spam
 
+(defn- random-uuid-or-empty
+  ([]
+   (random-uuid-or-empty nil))
+  ([rng]
+   (if (zero? (get-rand-int 2 rng))
+     (random-uuid)
+     "")))
+
 (defn anti-spam-code
   "Generates anti-spam HTML string containing randomly selected fields from
   the given set."
@@ -1552,9 +1560,9 @@
          k-blank (seq (get r :blank))
          k-any   (seq (get r :any))
          r       (concat
-                  (when k-some  (map vector k-some  (repeat "some-value")))
+                  (when k-some  (map vector k-some  (repeatedly random-uuid)))
                   (when k-blank (map vector k-blank (repeat "")))
-                  (when k-any   (map vector k-any   (repeat "any-value"))))]
+                  (when k-any   (map vector k-any   (repeatedly #(random-uuid-or-empty rng)))))]
      (when (seq r)
        (apply str (map #(str "<input type=\"text\" name=\""   (nth % 0)
                              "\" class=\"subspace\" value=\"" (nth % 1)
