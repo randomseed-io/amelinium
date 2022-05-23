@@ -287,17 +287,17 @@
   ([req {:keys [config processor
                 req-context-fn req-self-role-fn
                 anonymous-role known-user-role self-role
-                global-context authorize-default?]
+                global-context authorize-default? session-key]
          :or   {authorize-default? true}
          :as   config}]
    (inject-roles req config processor
                  req-context-fn req-self-role-fn
                  anonymous-role known-user-role self-role
-                 global-context authorize-default?))
+                 global-context authorize-default? session-key))
   ([req config processor rcfn srfn
     anonymous-role known-user-role self-role
-    global-context authorize-default?]
-   (let [session        (get req :session)
+    global-context authorize-default? session-key]
+   (let [session        (get req session-key)
          authenticated? (delay (user-authenticated? session))
          roles          (delay (let [sr (when (and self-role @authenticated?) (srfn req))]
                                  (cond-> (get-roles-from-session config session
@@ -389,6 +389,7 @@
       (update            :req-context-fn     (fnil identity get-req-context))
       (update            :req-self-role-fn   (fnil identity get-req-self))
       (update            :query-roles-fn     (fnil identity query-roles))
+      (update            :session-key        (fnil some-keyword :session))
       (map/assoc-missing :keep-unknown?      true)
       (update            :keep-unknown?      boolean)
       (map/assoc-missing :authorize-default? true)
@@ -423,7 +424,7 @@
            req-self-role-fn req-context-fn query-roles-fn
            global-context context-column
            self-role logged-in-role anonymous-role known-user-role roles
-           authorize-default? keep-unknown?]
+           authorize-default? keep-unknown? session-key]
     :as   config}]
   (when-some [processor (var/deref-symbol (:handler config))]
     (let [handler-name     (:handler config)
@@ -443,7 +444,8 @@
                                   :handler #(inject-roles %1 config mem-processor
                                                           req-context-fn req-self-role-fn
                                                           anonymous-role known-user-role self-role
-                                                          global-context authorize-default?)
+                                                          global-context authorize-default?
+                                                          session-key)
                                   :query-roles-fn query-roles-fn
                                   :processor      mem-processor
                                   :invalidator    invalidator)]
@@ -458,7 +460,8 @@
                          (inject-roles req config mem-processor
                                        req-context-fn req-self-role-fn
                                        anonymous-role known-user-role self-role
-                                       global-context authorize-default?))))))})))
+                                       global-context authorize-default?
+                                       session-key))))))})))
 
 (system/add-prep  ::roles [_ config] (prep-config config))
 (system/add-init  ::roles [_ config] (wrap-roles  config))
