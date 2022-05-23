@@ -93,7 +93,7 @@
                                              :handler          amelinium.http.middleware.session/handler
                                              :expires          [15 minutes]
                                              :hard-expires     [1 hour]
-                                             :session-key      :session-id}
+                                             :session-id-key   :session-id}
 
  :amelinium.http.middleware.roles/roles {:db                    #ref :amelinium.db/main
                                          :cache-ttl             [2 minutes]

@@ -197,23 +197,33 @@
 ;; Configuration
 
 (defn session-key
-  "Returns a string of configured session ID field name."
+  "Returns a string of configured session ID field name by extracting it from `opts`
+  which can be a map containing `:session-id-key`, a request map containing the given
+  `result-key` associated with a map with `:session-id-key`, a request map containing
+  the given `config-key` associated with a map with `:session-id-key` or a
+  keyword (returned immediately). Optional `other` map can be provided which will be
+  used as a second try when `opts` lookup will fail. The function returns
+  \"session-id\" string when other methods fail."
   ([opts]
-   (if (keyword? opts)
-     opts
-     (or (get opts :session-key)
-         (get (get opts :session)        :session-key)
-         (get (get opts :session/config) :session-key)
-         "session-id")))
+   (session-key opts :session :session/config))
   ([opts other]
+   (session-key opts other :session :session/config))
+  ([opts result-key config-key]
    (if (keyword? opts)
      opts
-     (or (get opts :session-key)
-         (get (get opts :session)        :session-key)
-         (get (get opts :session/config) :session-key)
-         (:session-key other)
-         (get (:session other)           :session-key)
-         (get (:session/config other)    :session-key)
+     (or (get opts :session-id-key)
+         (get (get opts result-key) :session-id-key)
+         (get (get opts config-key) :session-id-key)
+         "session-id")))
+  ([opts other result-key config-key]
+   (if (keyword? opts)
+     opts
+     (or (get opts :session-id-key)
+         (get (get opts result-key) :session-id-key)
+         (get (get opts config-key) :session-id-key)
+         (:session-if-key other)
+         (get (result-key other)    :session-id-key)
+         (get (config-key other)    :session-id-key)
          "session-id"))))
 
 (def session-field session-key)
@@ -361,25 +371,25 @@
    (let [smap (sql/get-by-id db :sessions sid db/opts-slashed-map)
          smap (update smap :ip ip/to-address)
          smap (if (and (not (get smap :id)) (not (get smap :err/id))) (assoc smap :err/id sid) smap)
-         smap (map/assoc-missing smap :session-key (or (get opts :session-key) "session-id"))
+         smap (map/assoc-missing smap :session-id-key (or (get opts :session-id-key) "session-id"))
          stat (state smap opts remote-ip)]
      (if (get stat :cause)
        (mkbad smap opts :error stat)
        (mkgood smap)))))
 
 (defn process
-  "Takes session processing handler, request map and optional session options and
+  "Takes a session processing handler, request map and an optional session options and
   validates session against database or memoized session data. Returns a session
   map."
   ([handler-fn req]
    (process handler-fn req (get req :session/config)))
   ([handler-fn req opts]
    (let [db   (get opts :db)
-         skey (or (get opts :session-key) "session-id")]
+         skey (or (get opts :session-id-key) "session-id")]
      (if-some [sid (some-str (get-in req [:form-params skey]))]
        (if-not (sid-valid? sid)
          (mkbad {:id sid} opts
-                :session-key skey
+                :session-id-key skey
                 :error {:reason   "Malformed session-id parameter"
                         :cause    :malformed-session-id
                         :severity :info})
@@ -401,7 +411,7 @@
                                                            (:user/email smap)
                                                            (or (ip/plain-ip-str (ip/to-address (:ip smap)))
                                                                (:remote-ip/str req))))})))))))
-       {:id nil :err/id nil :session-key skey}))))
+       {:id nil :err/id nil :session-id-key skey}))))
 
 (defn prolong
   "Re-validates session by updating its timestamp and re-running validation."
@@ -451,7 +461,7 @@
                (mkbad sess opts :error stat))
            (let [sess-db (set/rename-keys sess {:user/id :user_id :user/email :user_email})
                  r       (db/replace! db :sessions sess-db db/opts-simple-map)
-                 sess    (assoc sess :session-key (or (get opts :session-key) "session-id"))]
+                 sess    (assoc sess :session-id-key (or (get opts :session-id-key) "session-id"))]
              (invalidate-cache! opts db (get sess :id) ip)
              (if (and r (pos-int? (::jdbc/update-count r)))
                (do (if (get opts :single-session)
@@ -498,7 +508,7 @@
                               (update :hard-expires time/parse-duration)
                               (update :cache-ttl    time/parse-duration)
                               (update :cache-size   safe-parse-long)
-                              (update :session-key  #(or (some-str %) "session-id"))
+                              (update :session-id-key #(or (some-str %) "session-id"))
                               (calc-cache-expires))
             mem-processor (db/memoizer processor config)
             invalidator   (setup-invalidator processor mem-processor)
