@@ -88,7 +88,7 @@
        (when (and (map? form-data) (pos-int? (count form-data)))
          (let [smap    (or smap (get req :session))
                opts    (get req :session/config)
-               sid-key (web/session-key smap opts)]
+               sid-key (web/session-key smap opts :session :session/config)]
            (dissoc form-data sid-key)))))))
 
 (defn- remove-login-data

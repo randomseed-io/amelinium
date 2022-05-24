@@ -12,6 +12,7 @@
             [clojure.string                       :as          str]
             [clojure.core.memoize                 :as          mem]
             [clojure.java.io                      :as           io]
+            [potemkin.namespaces                  :as            p]
             [tick.core                            :as            t]
             [lazy-map.core                        :as     lazy-map]
             [reitit.core                          :as            r]
@@ -1114,12 +1115,8 @@
 
 ;; Sessions
 
-(defn session-key
-  "Returns session field name."
-  ([smap-or-req]
-   (session/session-key smap-or-req))
-  ([smap-or-req other]
-   (session/session-key smap-or-req other)))
+(p/import-vars [amelinium.http.middleware.session
+                session-key])
 
 (defn session-variable-get-failed?
   [v]
@@ -1548,8 +1545,8 @@
      "")))
 
 (defn anti-spam-code
-  "Generates anti-spam HTML string containing randomly selected fields from
-  the given set."
+  "Generates anti-spam HTML string containing randomly selected fields and values using
+  `validators/gen-required`."
   ([config]
    (anti-spam-code config 1 nil))
   ([config num]

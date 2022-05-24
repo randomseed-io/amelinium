@@ -332,11 +332,23 @@
 ;; Cache invalidation.
 
 (defn invalidate-cache!
+  "Invalidates cache."
+  {:arglists '([req sid]
+               [req smap]
+               [req sid config-key]
+               [req smap config-key]
+               [opts sid ip-address]
+               [opts db sid ip-address])}
   ([req sid-or-smap]
-   (let [opts (get req :session/config)]
-     (invalidate-cache! opts (get opts :db) (:id sid-or-smap sid-or-smap) (get req :remote-ip))))
-  ([opts sid ip-address]
-   (invalidate-cache! opts (get opts :db) sid ip-address))
+   (let [opts (get req :session/config)
+         sid  (if (map? sid-or-smap) (get sid-or-smap :id) sid-or-smap)]
+     (invalidate-cache! opts (get opts :db) sid (get req :remote-ip))))
+  ([opts-or-req sid-or-smap ip-address-or-config-key]
+   (if (keyword? ip-address-or-config-key)
+     (invalidate-cache! opts-or-req (get opts-or-req :db) sid-or-smap ip-address-or-config-key)
+     (let [opts (get opts-or-req ip-address-or-config-key)
+           sid  (if (map? sid-or-smap) (get sid-or-smap :id) sid-or-smap)]
+       (invalidate-cache! opts (get opts-or-req :db) sid (get opts-or-req :remote-ip)))))
   ([opts db sid ip-address]
    (when-some [invalidator (get opts :invalidator)]
      (invalidator opts db sid ip-address))))
@@ -378,13 +390,17 @@
        (mkgood smap)))))
 
 (defn process
-  "Takes a session processing handler, request map and an optional session options and
-  validates session against database or memoized session data. Returns a session
-  map."
+  "Takes a session processing handler, a request map and an optional session options or
+  a config key and validates session against database or memoized session
+  data. Returns a session map."
+  {:arglists '([handler-fn req]
+               [handler-fn req config-key]
+               [handler-fn req opts])}
   ([handler-fn req]
    (process handler-fn req (get req :session/config)))
-  ([handler-fn req opts]
-   (let [db   (get opts :db)
+  ([handler-fn req opts-or-config-key]
+   (let [opts (if (map? opts-or-config-key) opts-or-config-key (get req opts-or-config-key))
+         db   (get opts :db)
          skey (or (get opts :session-id-key) "session-id")]
      (if-some [sid (some-str (get-in req [:form-params skey]))]
        (if-not (sid-valid? sid)
@@ -497,33 +513,37 @@
 
 (defn wrap-session
   "Session maintaining middleware."
-  [config]
+  [k config]
   (let [handler-sym (get config :handler)]
     (when-some [processor (var/deref-symbol handler-sym)]
       (let [dbname        (db/db-name (get config :db))
             config        (-> config
                               (dissoc :handler)
-                              (update :db           db/ds)
-                              (update :expires      time/parse-duration)
-                              (update :hard-expires time/parse-duration)
-                              (update :cache-ttl    time/parse-duration)
-                              (update :cache-size   safe-parse-long)
+                              (update :db             db/ds)
+                              (update :expires        time/parse-duration)
+                              (update :hard-expires   time/parse-duration)
+                              (update :cache-ttl      time/parse-duration)
+                              (update :cache-size     safe-parse-long)
+                              (update :session-key    #(or (some-keyword %) :session))
+                              (update :config-key     #(or (some-keyword %) :session/config))
                               (update :session-id-key #(or (some-str %) "session-id"))
                               (calc-cache-expires))
+            session-key   (get config :session-key :session)
+            config-key    (get config :config-key  :session/config)
             mem-processor (db/memoizer processor config)
             invalidator   (setup-invalidator processor mem-processor)
             config        (assoc config :invalidator invalidator)]
         (log/msg "Installing session handler:" handler-sym)
         (log/msg "Using database" dbname "for storing sessions")
-        {:name    ::session
+        {:name    (keyword k)
          :compile (fn [{:keys [no-session?]} opts]
                     (when (and (not no-session?) (get config :db))
                       (fn [h]
                         (fn [req]
                           (h
                            (assoc req
-                                  :session (delay (process mem-processor req config))
-                                  :session/config config))))))}))))
+                                  session-key (delay (process mem-processor req config))
+                                  config-key config))))))}))))
 
-(system/add-init  ::session [_ config] (wrap-session config))
+(system/add-init  ::session [k config] (wrap-session k config))
 (system/add-halt! ::session [_ config] nil)
