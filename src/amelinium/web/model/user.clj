@@ -179,14 +179,18 @@
 
 (defn create-session
   "Creates a session for user of the given ID and IP address."
-  ([opts user-id user-email ip]
-   (session/create opts user-id user-email ip))
-  ([opts user ip]
-   (session/create opts (get user :id) (get user :email) ip)))
+  ([req opts-or-config-key user-id user-email ip-address]
+   (session/create req opts-or-config-key user-id user-email ip-address))
+  ([opts user-id user-email ip-address]
+   ((get opts :fn/create) user-id user-email ip-address))
+  ([opts user ip-address]
+   ((get opts :fn/create) (get user :id) (get user :email) ip-address)))
 
 (defn prolong-session
-  [opts smap ip]
-  (session/prolong opts smap ip))
+  ([opts smap ip-address]
+   ((get opts :fn/prolong) smap ip-address))
+  ([req opts-or-config-key smap ip-address]
+   (session/prolong req opts-or-config-key smap ip-address)))
 
 (defn get-session-var
   [smap opts var-name & more]

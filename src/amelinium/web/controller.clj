@@ -262,7 +262,7 @@
        (let [goto-uri (when (get sess :expired?) (get req :goto-uri))
              opts     (get req :session/config)
              sess     (if goto-uri
-                        (user/prolong-session sess opts ipaddr)
+                        (user/prolong-session opts sess ipaddr)
                         (user/create-session opts user-id user-email ipaddr))]
 
          (if-not (get sess :valid?)
