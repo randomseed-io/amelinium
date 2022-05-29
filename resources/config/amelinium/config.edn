@@ -89,7 +89,7 @@
                                              :cache-ttl        [14 seconds]
                                              :cache-size       256
                                              :wrong-ip-expires true
-                                             :single-session   true
+                                             :single-session?  true
                                              :handler          amelinium.http.middleware.session/handler
                                              :expires          [15 minutes]
                                              :hard-expires     [1 hour]

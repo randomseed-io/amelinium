@@ -86,9 +86,9 @@
    (when (and gmap (= (get req :uri) (get gmap :uri)))
      (when-some [form-data (get gmap :form-data)]
        (when (and (map? form-data) (pos-int? (count form-data)))
-         (let [smap    (or smap (get req :session))
-               opts    (get req :session/config)
-               sid-key (web/session-key smap opts :session :session/config)]
+         (let [smap      (or smap (get req :session))
+               sess-opts (get req :session/config)
+               sid-key   (web/session-key smap sess-opts :session :session/config)]
            (dissoc form-data sid-key)))))))
 
 (defn- remove-login-data
@@ -165,14 +165,14 @@
 
 (defn- get-goto+
   "Gets go-to map from a session variable even if the session expired."
-  [smap opts]
-  (user/get-session-var (web/allow-soft-expired smap) opts :goto))
+  [smap sess-opts]
+  (user/get-session-var sess-opts (web/allow-soft-expired smap) :goto))
 
 (defn- get-goto-for-valid+
   "Gets go-to map from session variable if the session is valid (and not expired)."
-  [smap opts]
+  [smap sess-opts]
   (when (and smap (get smap :valid?))
-    (get-goto+ smap opts)))
+    (get-goto+ smap sess-opts)))
 
 (defn- populate-goto+
   "Gets go-to data from session variable if it does not yet exist in req
@@ -181,11 +181,11 @@
   session setting."
   ([req smap]
    (populate-goto+ req smap (get req :session/config)))
-  ([req smap opts]
+  ([req smap sess-opts]
    (if (or (get req :goto-injected?) (not smap)
            (not (get (web/allow-soft-expired smap) :id)))
      req
-     (inject-goto req (get-goto+ smap opts) smap))))
+     (inject-goto req (get-goto+ smap sess-opts) smap))))
 
 (defn- prolongation?
   "Returns true if session is expired (but not hard expired) and a user is not logged
@@ -259,11 +259,11 @@
            (user/update-login-ok auth-db user-id ipaddr)
            :authenticated!)
 
-       (let [goto-uri (when (get sess :expired?) (get req :goto-uri))
-             opts     (get req :session/config)
-             sess     (if goto-uri
-                        (user/prolong-session opts sess ipaddr)
-                        (user/create-session opts user-id user-email ipaddr))]
+       (let [goto-uri  (when (get sess :expired?) (get req :goto-uri))
+             sess-opts (get req :session/config)
+             sess      (if goto-uri
+                         (user/prolong-session sess-opts sess ipaddr)
+                         (user/create-session sess-opts user-id user-email ipaddr))]
 
          (if-not (get sess :valid?)
 

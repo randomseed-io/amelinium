@@ -193,24 +193,24 @@
    (session/prolong req opts-or-config-key smap ip-address)))
 
 (defn get-session-var
-  [smap opts var-name & more]
+  [opts smap var-name & more]
   (if more
-    (apply session/get-var smap opts var-name more)
-    (session/get-var smap opts var-name)))
+    (apply session/get-var opts smap var-name more)
+    (session/get-var opts smap var-name)))
 
 (defn put-session-var
-  [smap opts var-name v & more]
+  [opts smap var-name v & more]
   (if more
-    (apply session/put-var! smap opts var-name v more)
-    (session/put-var! smap opts var-name v)))
+    (apply session/put-var! opts smap var-name v more)
+    (session/put-var! opts smap var-name v)))
 
 (def set-session-var put-session-var)
 
 (defn del-session-var
-  [smap opts var-name & more]
+  [opts smap var-name & more]
   (if more
-    (apply session/del-var! smap opts var-name more)
-    (session/del-var! smap opts var-name)))
+    (apply session/del-var! opts smap var-name more)
+    (session/del-var! opts smap var-name)))
 
 ;; Roles
 

@@ -13,7 +13,6 @@
             [tick.core                    :as          t]
             [buddy.core.hash              :as       hash]
             [buddy.core.codecs            :as     codecs]
-            [taoensso.nippy               :as      nippy]
             [next.jdbc.sql                :as        sql]
             [next.jdbc                    :as       jdbc]
             [amelinium.db                 :as         db]
@@ -182,6 +181,14 @@
     (::jdbc/update-count
      (db/replace! db table sess-db db/opts-simple-map))))
 
+(defn delete-user-vars
+  [opts db sessions-table variables-table user-id]
+  (jdbc/execute-one! db [(str-spc "DELETE FROM" variables-table
+                                  "WHERE EXISTS (SELECT 1 FROM" sessions-table
+                                  (str "WHERE " sessions-table ".user_id = ?")
+                                  (str "AND " variables-table ".session_id = " sessions-table ".id)"))
+                         user-id]))
+
 ;; Marking
 
 (defn mkgood
@@ -249,103 +256,92 @@
 ;; Session variables
 
 (defn- prep-opts
-  [opts-or-smap sid-or-opts]
-  (let [secar? (map? sid-or-opts)
-        opts   (if secar? sid-or-opts           opts-or-smap)
-        sid    (if secar? (get opts-or-smap :id) sid-or-opts)
-        smap   (if secar? opts-or-smap                   nil)]
-    [smap opts sid]))
+  [opts id-or-smap]
+  (if (map? id-or-smap)
+    [id-or-smap opts (get id-or-smap :id)]
+    [nil opts id-or-smap]))
 
 (defn- prep-names
   [coll]
   (when (coll? coll)
     (seq (if (map? coll) (keys coll) coll))))
 
-(def ^{:private  true
-       :arglists '([db session-id setting-id])}
-  get-var-core
-  "Gets a session variable and de-serializes it to a Clojure data structure."
-  (db/make-setting-getter :session-variables :session-id))
-
-(def ^{:private  true
-       :arglists '([db session-id setting-id value]
-                   [db session-id setting-id value & pairs])}
-  put-var-core
-  "Stores one or more session variables in a database. Max. object size is 32 KB."
-  (db/make-setting-setter :session-variables :session-id))
-
-(def ^{:private  true
-       :arglists '([db session-id]
-                   [db session-id setting-id]
-                   [db session-id setting-id & setting-ids])}
-  del-var-core
-  "Deletes one or more session variables settings from a database."
-  (db/make-setting-deleter :session-variables :session-id))
-
 (defn get-var
   "Gets session variable and de-serializes it to a Clojure data structure."
-  ([opts-or-smap sid-or-opts var-name]
-   (let [[smap opts sid] (prep-opts opts-or-smap sid-or-opts)]
+  {:arglists '([opts sid var-name]
+               [opts smap var-name])}
+  ([opts sid-or-smap var-name]
+   (let [[smap opts sid] (prep-opts opts sid-or-smap)]
      (if (and smap (not (valid? smap)))
        (log/err "Cannot get session variable" var-name "because session is not valid")
-       (get-var-core (get opts :db) sid var-name)))))
+       ((get opts :fn/var-get) sid var-name)))))
 
 (defn get-variable-failed?
+  "Returns `true` if the value `v` obtained from a session variable indicates that it
+  actually could not be successfully fetched from a database."
   [v]
   (= ::db/get-failed v))
 
 (defn put-var!
-  [opts-or-smap sid-or-opts var-name value & pairs]
-  (let [[smap opts sid] (prep-opts opts-or-smap sid-or-opts)]
+  "Puts a session variable `var-name` with a value `value` into a database. The session
+  can be identified with a session ID (`sid`) or a session map (`smap`). Optional
+  `pairs` of variable names and values can be given to perform a batch operation for
+  multiple variables."
+  {:arglists '([opts sid var-name value & pairs]
+               [opts smap var-name value & pairs])}
+  [opts sid-or-smap var-name value & pairs]
+  (let [[smap opts sid] (prep-opts opts sid-or-smap)]
     (if-not sid
       (log/err "Cannot store session variable" var-name
                "because session ID is not valid")
       (if pairs
-        (put-var-core (get opts :db) sid var-name value)
-        (apply put-var-core (get opts :db) sid var-name value pairs)))))
+        ((get opts :fn/var-set) sid var-name value)
+        (apply (get opts :fn/var-set) sid var-name value pairs)))))
 
 (defn del-var!
-  [opts-or-smap sid-or-opts var-name & names]
-  (let [[smap opts sid] (prep-opts opts-or-smap sid-or-opts)]
+  "Deletes from a session variable `var-name` assigned to a session of the given
+  ID (`sid`) or a session map (`smap`). Optional variable `names` can be given to
+  perform a batch operation for multiple variables."
+  {:arglists '([opts sid var-name & names]
+               [opts smap var-name & names])}
+  [opts sid-or-smap var-name & names]
+  (let [[smap opts sid] (prep-opts opts sid-or-smap)]
     (if-not sid
       (log/err "Cannot delete session variable" var-name
                "because session ID is not valid")
       (if names
-        (del-var-core (get opts :db) sid var-name)
-        (apply del-var-core (get opts :db) sid var-name names)))))
+        ((get opts :fn/var-del) sid var-name)
+        (apply (get opts :fn/var-del) sid var-name names)))))
 
 (defn del-vars!
-  [opts-or-smap sid-or-opts]
-  (let [[smap opts sid] (prep-opts opts-or-smap sid-or-opts)]
+  "Deletes all session variables which belong to a session of the given ID (`sid`) or a
+  session map (`smap`)."
+  {:arglists '([opts sid]
+               [opts smap])}
+  [opts sid-or-smap]
+  (let [[smap opts sid] (prep-opts opts sid-or-smap)]
     (if-not sid
       (log/err "Cannot delete session variables"
                "because session ID is not valid")
-      (del-var-core (get opts :db) sid))))
-
-(def ^:const mass-del-sql
-  (str-spc "DELETE FROM session_variables"
-           "WHERE EXISTS (SELECT 1 FROM sessions"
-           "WHERE sessions.user_id = ?"
-           " AND session_variables.session_id = sessions.id)"))
+      ((get opts :fn/var-del) sid))))
 
 (defn del-user-vars!
-  [opts-or-smap sid-or-opts]
-  (let [[smap opts sid] (prep-opts opts-or-smap sid-or-opts)
-        user-id         (get smap :user/id)
-        user-email      (get smap :user/email)
-        db              (get opts :db)]
-    (cond
-      (not sid)     (log/err "Cannot delete session variables"
-                             (log/for-user user-id user-email)
-                             (when sid (str "of" sid))
-                             "because session ID is not valid")
-      (not user-id) (log/err "Cannot delete session variables of" sid
-                             "because user ID" user-id "is invalid"
-                             (log/for-user nil user-email))
-      (not db)      (log/err "Cannot delete session variables"
-                             (log/for-user user-id user-email)
-                             "because there is no database connection")
-      :else         (jdbc/execute-one! db [mass-del-sql user-id]))))
+  "Deletes all session variables which belong to a user. The user can be specified as
+  `user-id`, `sid` (indirectly) or `smap` (indirectly)."
+  {:arglists '([opts user-id]
+               [opts smap])}
+  [opts smap-or-user-id]
+  (let [[smap opts user-id] (prep-opts opts smap-or-user-id)
+        del-fn              (get opts :fn/vars-del-user)]
+    (if user-id
+      (del-fn user-id)
+      (let [user-id    (get smap :user/id)
+            user-email (get smap :user/email)]
+        (if-not user-id
+          (log/err "Cannot delete session variables"
+                   "because user ID" user-id "is invalid"
+                   (log/for-user nil user-email))
+          (del-fn user-id))))))
 
 ;; Cache invalidation.
 
@@ -529,7 +525,8 @@
   ([req opts-or-config-key user-id user-email ip-address]
    (let [opts (config-options req opts-or-config-key)]
      ((get opts :fn/create) user-id user-email ip-address)))
-  ([opts setter-fn invalidator-fn user-id user-email ip-address]
+  ([opts setter-fn invalidator-fn var-del-fn var-del-user-fn single-session?
+    user-id user-email ip-address]
    (let [user-id    (valuable user-id)
          user-email (some-str user-email)]
      (if-not (and user-id user-email)
@@ -553,11 +550,11 @@
                (mkbad sess opts :error stat))
            (let [updated-count (setter-fn sess)
                  sess          (assoc sess :session-id-field (or (some-str (get opts :session-id-field)) "session-id"))]
-             (invalidator-fn (get sess :id) ip)
+             (invalidator-fn sid ip)
              (if (pos-int? updated-count)
-               (do (if (get opts :single-session)
-                     (del-user-vars! sess opts)
-                     (del-vars! sess opts))
+               (do (if single-session?
+                     (var-del-user-fn user-id)
+                     (var-del-fn sid))
                    (mkgood sess))
                (do (log/err "Problem saving session" (log/for-user user-id user-email ipplain))
                    (mkbad sess opts
@@ -595,8 +592,8 @@
   (let [dbname             (db/db-name (get config :db))
         config             (-> config
                                (update :db               db/ds)
-                               (update :table/sessions   #(or (some-str-simple %) "sessions"))
-                               (update :table/variables  #(or (some-str-simple %) "variables"))
+                               (update :table/sessions   #(or (to-snake-simple-str %) "sessions"))
+                               (update :table/variables  #(or (to-snake-simple-str %) "session_variables"))
                                (update :expires          time/parse-duration)
                                (update :hard-expires     time/parse-duration)
                                (update :cache-ttl        time/parse-duration)
@@ -604,6 +601,7 @@
                                (update :session-key      #(or (some-keyword %) :session))
                                (update :config-key       #(or (some-keyword %) :session/config))
                                (update :session-id-field #(or (some-str %) "session-id"))
+                               (update :single-session?  boolean)
                                (calc-cache-expires))
         db                 (get config :db)
         session-key        (get config :session-key)
@@ -612,6 +610,7 @@
         variables-table    (get config :table/variables)
         session-id-field   (get config :session-id-field)
         cache-expires      (get config :expires)
+        single-session?    (get config :single-session?)
         getter-fn          (setup-fn config :fn/getter get-session-by-id)
         getter-fn-w        #(getter-fn config db sessions-table %1 %2)
         config             (assoc config :fn/getter getter-fn-w)
@@ -636,7 +635,32 @@
         config             (assoc config :fn/setter setter-fn-w)
         prolong-fn         #(prolong config mem-handler update-active-fn-w invalidator-fn %1 %2)
         config             (assoc config :fn/prolong prolong-fn)
-        create-fn          #(create config setter-fn-w invalidator-fn %1 %2 %3)
+        var-get-core-fn    (db/make-setting-getter  variables-table :session-id)
+        var-set-core-fn    (db/make-setting-setter  variables-table :session-id)
+        var-del-core-fn    (db/make-setting-deleter variables-table :session-id)
+        var-del-user-fn    (setup-fn config :fn/vars-del-user delete-user-vars)
+        var-get-fn         #(var-get-core-fn db %1 %2)
+        var-set-fn         (fn
+                             ([session-id setting-id value]
+                              (var-set-core-fn db session-id setting-id value))
+                             ([session-id setting-id value & pairs]
+                              (apply var-set-core-fn db session-id setting-id value pairs)))
+        var-del-fn         (fn
+                             ([session-id]
+                              (var-del-core-fn db session-id))
+                             ([session-id setting-id]
+                              (var-del-core-fn db session-id setting-id))
+                             ([session-id setting-id & setting-ids]
+                              (apply var-del-core-fn db session-id setting-id setting-ids)))
+        var-del-user-fn-w  #(var-del-user-fn config db sessions-table variables-table %)
+        config             (assoc config
+                                  :fn/var-get var-get-fn
+                                  :fn/var-set var-set-fn
+                                  :fn/var-del var-del-fn
+                                  :fn/vars-del-user var-del-user-fn-w)
+        create-fn          #(create config
+                                    setter-fn-w invalidator-fn var-del-fn var-del-user-fn-w
+                                    single-session? %1 %2 %3)
         config             (assoc config :fn/create create-fn)]
     (log/msg "Installing session handler:" k)
     (when dbname (log/msg "Using database" dbname "for storing sessions"))
