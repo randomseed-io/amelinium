@@ -266,13 +266,13 @@
         (reload-namespaces)
         (apply start-app *local-config* *resource-config-dirs* k))))
 
-(defn print-state        [ ] (pprint (state)))
-(defn print-config       [ ] (pprint (config)))
-(defn print-post-config  [ ] (pprint (post-config)))
+(defn print-state        [ ] (pprint state))
+(defn print-config       [ ] (pprint config))
+(defn print-post-config  [ ] (pprint post-config))
 
-(defn cprint-state       [ ] (cprint (state)))
-(defn cprint-config      [ ] (cprint (config)))
-(defn cprint-post-config [ ] (cprint (post-config)))
+(defn cprint-state       [ ] (cprint state))
+(defn cprint-config      [ ] (cprint config))
+(defn cprint-post-config [ ] (cprint post-config))
 
 ;;
 ;; main function
