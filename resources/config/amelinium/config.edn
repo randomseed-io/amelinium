@@ -85,6 +85,9 @@
 
  ;;:amelinium.http.middleware.db/amelinium {:db #ref :amelinium.db/main :name :amelinium.db/main}
 
+ :amelinium.http.middleware.headers/default {:server       :header/remove
+                                             :X-Powered-By "Amelinium"}
+
  :amelinium.http.middleware.session/session {:db               #ref :amelinium.db/main
                                              :cache-ttl        [14 seconds]
                                              :cache-size       256
