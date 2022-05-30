@@ -18,7 +18,7 @@
 (defn wrap
   "Lazy request map middleware."
   [{:keys [enabled?]
-    :or   {enabled? false}}]
+    :or   {enabled? true}}]
   (when enabled?
     (log/msg "Initializing lazy request map middleware")
     {:name    ::lazy-request

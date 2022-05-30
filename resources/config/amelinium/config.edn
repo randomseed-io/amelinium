@@ -85,8 +85,9 @@
 
  ;;:amelinium.http.middleware.db/amelinium {:db #ref :amelinium.db/main :name :amelinium.db/main}
 
- :amelinium.http.middleware.headers/default {:server       :header/remove
-                                             :X-Powered-By "Amelinium"}
+ :amelinium.http.middleware.headers/default {:server                  :header/remove
+                                             :X-Powered-By            "Amelinium"
+                                             :Content-Security-Policy {:default-src ["'self'"]}}
 
  :amelinium.http.middleware.session/session {:db               #ref :amelinium.db/main
                                              :cache-ttl        [14 seconds]
@@ -151,7 +152,7 @@
                                            :request-keys [:content]}
 
  :amelinium.http.middleware/default-chain [#ref :amelinium.http.middleware.lazy-req/lazy-request
-                                           #ref :amelinium.http.middleware/renderer
+                                           #ref :amelinium.http.middleware.content/content
                                            reitit.ring.middleware.parameters/parameters-middleware
                                            #ref :amelinium.http.middleware.content/content
                                            #ref :amelinium.http.middleware.remote-ip/getter
@@ -160,7 +161,10 @@
                                            #ref :amelinium.http.middleware.roles/roles
                                            #ref :amelinium.http.middleware.validators/default
                                            #ref :amelinium.http.middleware.populators/default
-                                           #ref :amelinium.http.middleware/preparer]
+                                           #ref :amelinium.http.middleware.headers/default
+                                           #ref :amelinium.http.middleware/preparer
+                                           #ref :amelinium.http.middleware/renderer
+                                           #ref :amelinium.http.middleware.debug/default]
 
  ;; HTTP routes
 
