@@ -29,7 +29,9 @@
                   (fn [handler]
                     (fn [req]
                       (let [resp (handler req)]
-                        (if (response/response? resp) resp (web-handler resp))))))})))
+                        (if (response/response? resp)
+                          resp
+                          (web-handler resp))))))})))
 
 (defn init-preparer
   "Generic middleware which prepares a request for the controller."
