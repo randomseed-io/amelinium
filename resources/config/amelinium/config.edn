@@ -149,7 +149,7 @@
  :amelinium.http.middleware/preparer amelinium.web.controller/prep-request!
 
  :amelinium.http.middleware.debug/default {:enabled?     false
-                                           :request-keys [:content]}
+                                           :request-keys [:accept]}
 
  :amelinium.http.middleware/default-chain [#ref :amelinium.http.middleware.lazy-req/lazy-request
                                            #ref :amelinium.http.middleware.content/content

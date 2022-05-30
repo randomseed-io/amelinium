@@ -21,18 +21,22 @@
       :or   {enabled? true}}]
   (when enabled?
     (log/msg "Initializing debugging middleware")
-    {:name    k
-     :compile (fn [_ _]
-                (fn [handler]
-                  (fn [req]
-                    (println "--------")
-                    (println "REQUEST:")
-                    (cprint (select-keys req request-keys))
-                    (let [resp (handler req)]
-                      (println "---------")
-                      (println "RESPONSE:")
-                      (cprint (select-keys resp response-keys))
-                      resp))))}))
+    (let [request-keys  (when (seq request-keys)  request-keys)
+          response-keys (when (seq response-keys) response-keys)]
+      {:name    k
+       :compile (fn [_ _]
+                  (fn [handler]
+                    (fn [req]
+                      (when (some? request-keys)
+                        (println "--------")
+                        (println "REQUEST:")
+                        (cprint (select-keys req request-keys)))
+                      (let [resp (handler req)]
+                        (when (some? response-keys)
+                          (println "---------")
+                          (println "RESPONSE:")
+                          (cprint (select-keys resp response-keys)))
+                        resp))))})))
 
 (system/add-init  ::default [k config] (wrap k config))
 (system/add-halt! ::default [_ config] nil)
