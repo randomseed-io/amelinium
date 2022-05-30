@@ -263,7 +263,7 @@
              sess-opts (get req :session/config)
              sess      (if goto-uri
                          (user/prolong-session sess-opts sess ipaddr)
-                         (user/create-session sess-opts user-id user-email ipaddr))]
+                         (user/create-session  sess-opts user-id user-email ipaddr))]
 
          (if-not (get sess :valid?)
 
@@ -404,7 +404,8 @@
       ;; We have to preserve form data and original, destination URI in a session variable.
 
       (prolongation? sess @auth-state @login-data?)
-      (do (user/put-session-var (web/allow-soft-expired sess) (get req :session/config)
+      (do (user/put-session-var (get req :session/config)
+                                (web/allow-soft-expired sess)
                                 :goto {:uri       (get req :uri)
                                        :form-data (get (cleanup-req req @auth-state) :form-params)})
           (web/move-to req (or (http/get-route-data req :auth/prolongate)
@@ -454,7 +455,7 @@
 
         (and valid-session?
              (or goto-failed? goto-unwanted?)
-             (user/del-session-var sess (get req :session/config) :goto))
+             (user/del-session-var (get req :session/config) sess :goto))
 
         ;; Remove login data from the request if we are not authenticating a user.
         ;; Take care about broken go-to (move to a login page in such case).
