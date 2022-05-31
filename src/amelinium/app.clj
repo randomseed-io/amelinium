@@ -30,6 +30,7 @@
 (def ^:dynamic *resource-config-dirs* ["config/amelinium"
                                        "translations/amelinium"])
 (def ^:dynamic *resource-admin-dirs*  ["config/amelinium"
+                                       "translations/amelinium"
                                        "config/amelinium-admin"])
 
 (defmacro with-config-dirs
@@ -43,8 +44,9 @@
      ~@body))
 
 (defmacro with-configs
-  [local-file dirs & body]
+  [local-file dirs admin-dirs & body]
   `(binding [*resource-config-dirs* ~dirs
+             *resource-admin-dirs*  ~admin-dirs
              *local-config*         ~local-file]
      ~@body))
 
@@ -246,17 +248,17 @@
 ;; application control
 ;;
 
-(defn configure!         [   ] (configure-app *local-config* *resource-config-dirs*))
+(defn configure!         [   ] (configure-app *local-config*     *resource-config-dirs*))
 (defn configure-dev!     [   ] (configure-app *local-dev-config* *resource-config-dirs*))
-(defn configure-admin!   [   ] (configure-app *local-config* *resource-admin-dirs*))
+(defn configure-admin!   [   ] (configure-app *local-config*     *resource-admin-dirs*))
 
 (defn start!             [& k] (apply start-app   *local-config* *resource-config-dirs* k))
 (defn restart!           [& k] (apply stop-app    k) (apply start-app *local-config* *resource-config-dirs* k))
 (defn stop!              [& k] (apply stop-app    k))
 (defn suspend!           [& k] (apply suspend-app k))
-(defn resume!            [& k] (apply resume-app *local-config* *resource-config-dirs* k))
+(defn resume!            [& k] (apply resume-app *local-config*     *resource-config-dirs* k))
 (defn start-dev!         [& k] (apply start-app  *local-dev-config* *resource-config-dirs* k))
-(defn start-admin!       [& k] (apply start-app  *local-config* *resource-admin-dirs* k))
+(defn start-admin!       [& k] (apply start-app  *local-config*     *resource-admin-dirs* k))
 
 (defn reload!
   [& k]
