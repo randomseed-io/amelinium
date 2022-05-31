@@ -356,7 +356,7 @@
 
 (defn- migrators-key
   [v]
-  (or (if (map? v) (get :migrators-key v) (valuable v))
+  (or (if (map? v) (get v :migrators-key) (valuable v))
       ::migrators))
 
 (defn migrate!
