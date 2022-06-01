@@ -14,13 +14,13 @@
   (:require [clojure.spec.alpha      :as        s]
             [crypto.equality         :as   crypto]
             [jsonista.core           :as     json]
-            [amelinium.system          :as   system]
-            [amelinium.logging         :as      log]
+            [amelinium.system        :as   system]
+            [amelinium.logging       :as      log]
             [io.randomseed.utils.var :as      var]
             [io.randomseed.utils.map :as      map]
             [io.randomseed.utils     :as        u]
             [io.randomseed.utils     :refer  :all]
-            [amelinium.auth.specs      :refer  :all]))
+            [amelinium.auth.specs    :refer  :all]))
 
 (defonce ^:private lock 'lock)
 
