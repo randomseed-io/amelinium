@@ -227,8 +227,9 @@
 (def ^:const on-slash      (re-pattern "/"))
 (def ^:const slash-break   (re-pattern "[^/]+|/"))
 
-(defn- path-variants-core
+(defn path-variants-core
   "Generates a list of all possible language variants of a path."
+  {:no-doc true}
   ([path lang-id]
    (when-some [path (some-str path)]
      (when-some [lang (some-str lang-id)]
@@ -377,7 +378,8 @@
         (when-some [t (get match :template)]
           (some? (some #{(str param)} (re-seq slash-break t)))))))
 
-(defn- parameterized-page-core
+(defn parameterized-page-core
+  {:no-doc true}
   [param rtr id pvalue params query-params require-param? name-path-fallback?]
   (let [pvalue (some-str pvalue)
         param  (some-keyword-simple param)]
@@ -1401,7 +1403,7 @@
   "Universal page renderer. Takes a request, a data map to be used in templates, a
   subdirectory for the view file (defaults to `nil`), a subdirectory for the template
   file (defaults to `nil`), a language string (guessed if not given, unless
-  explicitly set to `false`) and ` session map (used only when the language cannot be
+  explicitly set to `false`) and a session map (used only when the language cannot be
   established otherwise and taken from the request if not given). Template filename
   and view filename are taken from the request map (under the keys `:app/template`
   and `:app/view`)."
@@ -1418,10 +1420,7 @@
   ([req data views-subdir layouts-subdir lang]
    (render req data views-subdir layouts-subdir lang nil))
   ([req data views-subdir layouts-subdir lang sess]
-   (let [lang (or lang
-                  (when-not (false? lang)
-                    (or (get req :language/str)
-                        (pick-language-str req))))
+   (let [lang (or lang (when-not (false? lang) (pick-language-str req)))
          layt (resolve-layout req lang layouts-subdir)
          view (resolve-view   req lang views-subdir)]
      (when (and layt view)
