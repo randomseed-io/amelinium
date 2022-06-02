@@ -9,8 +9,7 @@
   (:require [clojure.string      :as    str]
             [io.randomseed.utils :as  utils]
             [amelinium.logging   :as    log]
-            [amelinium.system    :as system]
-            [puget.printer :refer [cprint]]))
+            [amelinium.system    :as system]))
 
 (defn- map-entry
   [k v]
@@ -44,12 +43,16 @@
 (defn deleter
   [delete-list]
   (when (seq delete-list)
-    (fn [headers] (apply dissoc headers delete-list))))
+    (fn [headers]
+      (apply dissoc headers delete-list))))
 
 (defn adder
-  [entries]
+  [entries entries-map]
   (when (seq entries)
-    (fn [headers] (into headers entries))))
+    (fn [headers]
+      (if headers
+        (into headers entries)
+        entries-map))))
 
 (defn transformer
   [& fns]
@@ -62,13 +65,15 @@
     (let [config (group-by (comp #{:header/remove} val) (seq config))
           to-del (seq (map utils/some-str-simple (keys (get config :header/remove))))
           to-add (seq (map prep-hdr-entry (get config nil)))
+          to-map (into {} to-add)
           del-fn (deleter to-del)
-          add-fn (adder   to-add)]
+          add-fn (adder   to-add to-map)]
       {:fn/transformer (transformer add-fn del-fn)
        :fn/adder       (or add-fn identity)
        :fn/deleter     (or del-fn identity)
        :headers/add    (when to-add (vec to-add))
-       :headers/del    (when to-del (vec to-del))})))
+       :headers/del    (when to-del (vec to-del))
+       :headers/map    (when (seq to-map) to-map)})))
 
 (defn wrap-headers
   "Headers handler wrapper."
