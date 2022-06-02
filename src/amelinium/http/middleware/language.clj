@@ -88,7 +88,7 @@
    (form-lang-id nil config (get req :form-params)))
   ([_ config fp]
    (when fp
-     (let [lang-param (or (some-str (get config :language-param)) "lang")]
+     (let [lang-param (or (get config :language-param) "lang")]
        (some->> (get fp lang-param)
                 some-str
                 (re-matches re-lang)
@@ -103,13 +103,36 @@
   ([_ config fp]
    (some-str (form-lang-id nil config fp))))
 
+(defn body-lang-id
+  ([req]
+   (body-lang-id nil (get req :language/settings) (get req :body)))
+  ([req config]
+   (body-lang-id nil config (get req :body)))
+  ([_ config fp]
+   (when fp
+     (let [lang-param (or (get config :language-param-api) :lang)]
+       (some->> (get fp lang-param)
+                some-str
+                (re-matches re-lang)
+                some-keyword-simple
+                (get (get config :supported #{})))))))
+
+(defn body-lang-str
+  ([req]
+   (some-str (body-lang-id req (get req :language/settings) (get req :body))))
+  ([req config]
+   (some-str (body-lang-id req config (get req :body))))
+  ([_ config fp]
+   (some-str (body-lang-id nil config fp))))
+
 (defn guess-lang-nodefault-id
   ([req]
    (guess-lang-nodefault-id req (get req :language/settings)))
   ([req config]
    (or (path-lang-id    req config)
        (form-lang-id    req config)
-       (accept-lang-id  req config))))
+       (accept-lang-id  req config)
+       (body-lang-id    req config))))
 
 (defn guess-lang-nodefault-str
   ([req]
@@ -160,11 +183,12 @@
   [config]
   (let [default (or (some-keyword-simple (:default config)) default-fallback-language)]
     (-> config
-        (assoc  :default        default)
-        (update :supported      #(when % (if (system/ref? %) % (map some-keyword-simple (if (coll? %) % (cons % nil))))))
-        (update :supported      #(when % (if (system/ref? %) % (disj (conj (set %) default) nil))))
-        (update :supported      #(if (system/ref? %) % (or (not-empty %) #{default})))
-        (update :language-param (fnil some-keyword-simple :lang)))))
+        (assoc  :default            default)
+        (update :supported          #(when % (if (system/ref? %) % (map some-keyword-simple (if (coll? %) % (cons % nil))))))
+        (update :supported          #(when % (if (system/ref? %) % (disj (conj (set %) default) nil))))
+        (update :supported          #(if (system/ref? %) % (or (not-empty %) #{default})))
+        (update :language-param     (fnil some-keyword-simple :lang))
+        (update :language-param-api (fnil some-keyword-simple :lang)))))
 
 (defn wrap-language
   "Language wrapping middleware."
