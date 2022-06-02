@@ -29,6 +29,7 @@
             [io.randomseed.utils.map            :as        map]
             [io.randomseed.utils                :refer    :all]
             [amelinium.web                      :as        web]
+            [amelinium.api                      :as        api]
             [amelinium.auth                     :as       auth]
             [amelinium.http                     :as       http]
             [amelinium.http.middleware.language :as   language]))
@@ -471,6 +472,10 @@
   keys which should be present in :app/data."
   [req]
   (web/render-ok req))
+
+(defn render-api!
+  [req]
+  (api/render-ok req))
 
 (defn default
   [req]
