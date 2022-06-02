@@ -34,10 +34,7 @@
   [k config]
   (when (:enabled? config)
     (log/msg "Initializing content format handler:" k)
-    (m/create
-     (if (map? config)
-       (dissoc config :enabled?)
-       config))))
+    (m/create (if (map? config) (dissoc config :enabled?) config))))
 
 (defn prep-format
   [{:keys [enabled? allow-empty-input? return default-charset default-format]
@@ -56,7 +53,7 @@
          :return             (or (some-keyword return)      format-default-return)
          :default-charset    (or (some-str default-charset) format-default-charset)
          :default-format     (or (some-str default-format)  format-default-format))
-        (update :charsets    vec/of-strings system/ref?)
+        (update :charsets    (comp set (partial vec/of-strings system/ref?)))
         (update :formats     prep-formats))))
 
 (system/add-init  ::default [k config] (init-format k (prep-format config)))
