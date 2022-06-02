@@ -60,6 +60,12 @@
 
  :amelinium.http.middleware.lazy-req/lazy-request {:enabled? true}
 
+
+ ;; Swagger support
+
+ :amelinium.web.swagger/handler    {:enabled? true}
+ :amelinium.web.swagger/handler-ui {:enabled? true}
+
  ;; HTTP middleware
 
  :amelinium.http.middleware.remote-ip/reserved ["0.0.0.0/8"       "10.0.0.0/8"

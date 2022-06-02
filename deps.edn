@@ -35,12 +35,12 @@
            integrant/integrant                  {:mvn/version "0.8.0"}        ;; system management via multimethods
            metosin/maailma                      {:mvn/version "1.1.0"}        ;; configuration reading (delivers data to integrant)
            io.netty/netty-handler               {:mvn/version "4.1.70.Final"} ;; SSL context management
-           metosin/reitit                       {:mvn/version "0.5.17"}       ;; HTTP router
-           metosin/reitit-middleware            {:mvn/version "0.5.17"}       ;; HTTP default middleware for Reitit
-           metosin/reitit-swagger               {:mvn/version "0.5.17"}       ;; Swagger handler
-           metosin/reitit-swagger-ui            {:mvn/version "0.5.17"}       ;; Swagger UI handler
-           metosin/reitit-http                  {:mvn/version "0.5.17"}       ;; HTTP handler (async support)
-           metosin/reitit-malli                 {:mvn/version "0.5.17"}       ;; HTTP data-oriented schemas
+           metosin/reitit                       {:mvn/version "0.5.18"}       ;; HTTP router
+           metosin/reitit-middleware            {:mvn/version "0.5.18"}       ;; HTTP default middleware for Reitit
+           metosin/reitit-swagger               {:mvn/version "0.5.18"}       ;; Swagger handler
+           metosin/reitit-swagger-ui            {:mvn/version "0.5.18"}       ;; Swagger UI handler
+           metosin/reitit-http                  {:mvn/version "0.5.18"}       ;; HTTP handler (async support)
+           metosin/reitit-malli                 {:mvn/version "0.5.18"}       ;; HTTP data-oriented schemas
            metosin/muuntaja                     {:mvn/version "0.6.8"}        ;; HTTP transformations
            metosin/muuntaja-msgpack             {:mvn/version "0.6.8"}        ;; HTTP MessagePack format
            metosin/ring-http-response           {:mvn/version "0.9.3"}        ;; HTTP responses (replaces ring.util.response)
