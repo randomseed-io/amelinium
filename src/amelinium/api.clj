@@ -172,6 +172,13 @@
          (seq body)
          body)))))
 
+(defn response?
+  [req]
+  (and (map? req)
+       (integer?  (:status req))
+       (or (map?  (:headers req))
+           (coll? (:body req)))))
+
 (defn render-response
   "Universal response renderer. Uses the render function to render the response body
   unless the `req` is already a valid response (then it is returned as-is)."
@@ -180,7 +187,7 @@
   ([resp-fn]
    (render-response resp-fn nil))
   ([resp-fn req]
-   (if (resp/response? req) req (resp-fn (render req)))))
+   (if (response? req) req (resp-fn (render req)))))
 
 (defn render-ok
   ([]
