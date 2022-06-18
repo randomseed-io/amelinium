@@ -27,5 +27,9 @@
                   (fn [req]
                     (h (lazy-map/->LazyMap req)))))}))
 
-(system/add-init  ::lazy-request [_ config] (wrap config))
-(system/add-halt! ::lazy-request [_ config] nil)
+(system/add-init  ::default [_ config] (wrap config))
+(system/add-halt! ::default [_ config] nil)
+
+(derive ::web ::default)
+(derive ::api ::default)
+(derive ::all ::default)

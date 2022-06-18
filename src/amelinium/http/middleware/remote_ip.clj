@@ -127,13 +127,13 @@
 
 (defn wrap-ip
   "Client IP getter middleware."
-  [ip-getter-sym proxy-setting proxy-for]
+  [k ip-getter-sym proxy-setting proxy-for]
   (let [ip-getter     (var/deref-symbol ip-getter-sym)
         proxy-setting (process-proxy proxy-setting)
         proxy-for-fn  (process-proxy-for proxy-for)]
     (log/msg "Installing IP analyzer:" ip-getter-sym
              (when proxy-setting (str "(proxy header: " proxy-setting ")")))
-    {:name    ::ip-getter
+    {:name    k
      :compile (fn [_ _]
                 (fn [h]
                   (fn [req]
@@ -149,7 +149,16 @@
 (system/add-init  ::reserved [_ config] config)
 (system/add-halt! ::reserved [_ config] nil)
 
-(system/add-init  ::getter   [_ config] (wrap-ip (:handler      config)
+(system/add-init  ::default  [k config] (wrap-ip k
+                                                 (:handler      config)
                                                  (:proxy-header config)
                                                  (:proxy-for    config)))
-(system/add-halt! ::getter   [_ config] nil)
+(system/add-halt! ::default [_ config] nil)
+
+(derive ::web ::default)
+(derive ::api ::default)
+(derive ::all ::default)
+
+(derive ::web-reserved ::reserved)
+(derive ::api-reserved ::reserved)
+(derive ::all-reserved ::reserved)

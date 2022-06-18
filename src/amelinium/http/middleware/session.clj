@@ -677,5 +677,9 @@
                                                           req config session-id-field))
                               config-key config))))))}))
 
-(system/add-init  ::session [k config] (wrap-session k config))
-(system/add-halt! ::session [_ config] nil)
+(system/add-init  ::default [k config] (wrap-session k config))
+(system/add-halt! ::default [_ config] nil)
+
+(derive ::web ::default)
+(derive ::api ::default)
+(derive ::all ::default)

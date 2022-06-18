@@ -63,4 +63,17 @@
 (system/add-init  ::preparer [k config] (init-preparer k config))
 (system/add-halt! ::preparer [_ config] nil)
 
+(derive ::default       ::chain)
 (derive ::default-chain ::chain)
+
+(derive ::web           ::chain)
+(derive ::api           ::chain)
+
+(derive ::web-chain     ::chain)
+(derive ::api-chain     ::chain)
+
+(derive ::web-renderer  ::renderer)
+(derive ::web-preparer  ::preparer)
+
+(derive ::api-renderer ::renderer)
+(derive ::api-preparer ::preparer)

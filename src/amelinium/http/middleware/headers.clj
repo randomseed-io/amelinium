@@ -96,3 +96,7 @@
 (system/add-init  ::default [k config] (init-headers k config))
 (system/add-prep  ::default [k config] (prep-config config))
 (system/add-halt! ::default [_ config] nil)
+
+(derive ::web ::default)
+(derive ::api ::default)
+(derive ::all ::default)

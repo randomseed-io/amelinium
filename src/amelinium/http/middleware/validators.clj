@@ -349,3 +349,7 @@
                                                             config
                                                             (prep-validators config))))
 (system/add-halt! ::default [_ config] nil)
+
+(derive ::web ::default)
+(derive ::api ::default)
+(derive ::all ::default)

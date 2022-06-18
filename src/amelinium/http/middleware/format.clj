@@ -59,3 +59,7 @@
 (system/add-init  ::default [k config] (init-format k (prep-format config)))
 (system/add-prep  ::default [_ config] (prep-format config))
 (system/add-halt! ::default [_ config] nil)
+
+(derive ::web ::default)
+(derive ::api ::default)
+(derive ::all ::default)

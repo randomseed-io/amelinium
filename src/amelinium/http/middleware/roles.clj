@@ -463,6 +463,10 @@
                                        global-context authorize-default?
                                        session-key))))))})))
 
-(system/add-prep  ::roles [_ config] (prep-config config))
-(system/add-init  ::roles [_ config] (wrap-roles  config))
-(system/add-halt! ::roles [_ config] nil)
+(system/add-prep  ::default [_ config] (prep-config config))
+(system/add-init  ::default [_ config] (wrap-roles  config))
+(system/add-halt! ::default [_ config] nil)
+
+(derive ::web ::default)
+(derive ::api ::default)
+(derive ::all ::default)

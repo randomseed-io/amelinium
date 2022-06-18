@@ -50,3 +50,5 @@
 (system/add-prep  ::default [_ config] config)
 (system/add-init  ::default [k config] (var/make k (new-handler config)))
 (system/add-halt! ::default [k config] (var/make k nil))
+
+(derive ::web ::default)

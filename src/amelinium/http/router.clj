@@ -82,3 +82,6 @@
 (system/add-prep  ::default [_ config] (prep-router config))
 (system/add-init  ::default [k config] (var/make k (new-router config)))
 (system/add-halt! ::default [k config] (var/make k nil))
+
+(derive ::web        ::default)
+(derive ::web-routes ::routes)

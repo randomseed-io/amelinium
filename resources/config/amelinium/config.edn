@@ -21,9 +21,9 @@
  :amelinium.app/logger       #ref :amelinium.logging/unilog
  :amelinium.app/timezone     #ref :amelinium.system/timezone
  :amelinium.app/http-server  #ref :amelinium.http.server/undertow
- :amelinium.app/http-routes  #ref :amelinium.http.router/routes
- :amelinium.app/http-router  #ref :amelinium.http.router/default
- :amelinium.app/http-handler #ref :amelinium.http.handler/default
+ :amelinium.app/http-routes  #ref :amelinium.http.router/web-routes
+ :amelinium.app/http-router  #ref :amelinium.http.router/web
+ :amelinium.app/http-handler #ref :amelinium.http.handler/web
 
  ;; Databases (usernames and passwords loaded from other files)
 

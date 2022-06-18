@@ -46,3 +46,7 @@
 
 (system/add-init  ::default [k config] (wrap-populators k (compile config)))
 (system/add-halt! ::default [_ config] nil)
+
+(derive ::web ::default)
+(derive ::api ::default)
+(derive ::all ::default)

@@ -43,6 +43,10 @@
         (update :charset  (fnil identity ["utf-8"]))
         (update :encoding (fnil identity ["identity"])))))
 
-(system/add-init  ::content [k config] (wrap-accept k (var/reset settings (prep-accept config))))
-(system/add-prep  ::content [_ config] (prep-accept config))
-(system/add-halt! ::content [_ config] (var/reset settings nil))
+(system/add-init  ::default [k config] (wrap-accept k (prep-accept config)))
+(system/add-prep  ::default [_ config] (prep-accept config))
+(system/add-halt! ::default [_ config] nil)
+
+(derive ::web ::default)
+(derive ::api ::default)
+(derive ::all ::default)

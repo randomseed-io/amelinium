@@ -205,10 +205,25 @@
                                     :language/id       lang-id
                                     :language/str      lang-str))))))})
 
-(system/add-init  ::language [k config] (wrap-language k (prep-language config)))
-(system/add-prep  ::language [_ config] (prep-language config))
-(system/add-halt! ::language [_ config] nil)
+(system/add-init  ::default [k config] (wrap-language k (prep-language config)))
+(system/add-prep  ::default [_ config] (prep-language config))
+(system/add-halt! ::default [_ config] nil)
 
 (system/add-init  ::supported [_ config] (prep-supported config))
 (system/add-prep  ::supported [_ config] (prep-supported config))
 (system/add-halt! ::supported [_ config] nil)
+
+(system/add-init  ::pickers   [_ config] config)
+(system/add-halt! ::pickers   [_ config] nil)
+
+(derive ::web ::default)
+(derive ::api ::default)
+(derive ::all ::default)
+
+(derive ::web-pickers ::pickers)
+(derive ::api-pickers ::pickers)
+(derive ::all-pickers ::pickers)
+
+(derive ::web-supported ::supported)
+(derive ::api-supported ::supported)
+(derive ::all-supported ::supported)

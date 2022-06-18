@@ -24,3 +24,9 @@
 
 (system/add-init  ::db [k config] (wrap-db k (:name config) (:db config)))
 (system/add-halt! ::db [_ config] nil)
+
+(derive ::default ::db)
+
+(derive ::web ::db)
+(derive ::api ::db)
+(derive ::all ::db)
