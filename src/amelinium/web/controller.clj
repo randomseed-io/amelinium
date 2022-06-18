@@ -289,45 +289,44 @@
 ;; Special actions (controller handlers)
 
 (defn authenticate!
-  "Logs user in. Takes a request and obtains database connection, client IP address and
-  authentication configuration from it. Also takes login and password fields from
-  form parameters map (POST method) of a request. Calls check-password helper which
-  uses database (user/get-password function) to obtain shared and intrinsic chain of
-  password settings in a JSON format. Next step is to pass plain password, IP address
-  and these chains (expressing vectors of maps) to a checker function referred in
-  authentication settings (under the key :check-fn). When the result is a truthy
-  value then user/update-login-ok is called, otherwise user/update-login-failed is
-  called. If the login was successful, session is created (with user/create-session)
-  and welcome page is rendered. If the login was not successful, user is redirected
-  to a page explaining the reason (bad password or username, bad session or exceeded
-  attempts)."
+  "Logs user in when user e-mail and password are given, or checks if the session is
+  valid to serve a current page.
+
+  Takes a request map and obtains database connection, client IP address and
+  authentication configuration from it. Also gets a user e-mail and a password from a
+  map associated with the `:form-params` key of the `req`. Calls
+  `auth-user-with-password!` to get a result or a redirect if authentication was not
+  successful.
+
+  If there is no e-mail or password given (the value is `nil`, `false` or an empty
+  string) then authentication is not performed but instead validity of a session is
+  tested. If the session is invalid redirect to a login page is performed. The
+  destination URL is obtained via the route name taken from the `:auth/login` key of
+  a route data, or from `:login` route identifier as default. If the destination path
+  is parameterized with a language the redirect will set this path parameter to a
+  value obtained by calling the `web/pick-language-str` using language detection
+  chain identified by the `:user` key. The same language will be
+  passed to `auth-user-with-password!`.
+
+  If the session is valid then the given request map is returned with the
+  `:authenticated!` key set to `true`."
   [req]
   (let [form-params    (get req :form-params)
         user-email     (some-str (get form-params "login"))
         password       (when user-email (some-str (get form-params "password")))
-        sess           (get req  :session)
-        lang-settings  (get req :language/settings)
+        sess           (get req :session)
+        lang           (web/pick-language-str req :user)
         valid-session? (get sess :valid?)
-        ring-match     (ring/get-match req)
-        route-data     (http/get-route-data req)
-        lang           (web/pick-language-str req web/language-pickers-logged-in)]
-
-    (if password
-      ;; Authenticate using email and password.
-      (auth-user-with-password! req user-email password sess route-data lang)
-
-      ;; Check session.
-      (if-not valid-session?
-
-        ;; Invalid session causes a redirect to a login page.
-        (web/move-to req (get route-data :auth/login :manager/login) lang)
-
-        ;; Valid session causes page to be served.
-        (if (some? (language/path-lang-id req lang-settings ring-match))
-          ;; Render the contents in a language specified by the current path.
-          req
-          ;; Redirect to a proper language version of this very page.
-          (web/move-to req (or (get route-data :name) (get req :uri)) lang))))))
+        ring-match     (get req ::r/match)
+        route-data     (http/get-route-data ring-match)]
+    (cond
+      password          (auth-user-with-password! req user-email password sess route-data lang)
+      valid-session?    (if (some? (language/from-path req))
+                          ;; Render the contents in a language specified by the current path.
+                          req
+                          ;; Redirect to a proper language version of this very page.
+                          (web/move-to req (or (get route-data :name) (get req :uri)) lang))
+      :invalid-session! (web/move-to req (get route-data :auth/login :login) lang))))
 
 (defn login!
   "Prepares response data to display a login page."
