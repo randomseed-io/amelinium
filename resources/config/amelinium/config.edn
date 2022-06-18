@@ -45,20 +45,20 @@
                      :resumer     amelinium.db/resume-pool
                      :caches      #ref :amelinium.db/caches}
 
- :amelinium.db/caches {:amelinium.web.model.user/settings-cache {:ttl [4  seconds] :size 1024}
-                       :amelinium.web.model.user/props-cache    {:ttl [10 seconds] :size 1024}
-                       :amelinium.web.model.user/ids-cache      {:size 2048}}
+ :amelinium.db/caches {:amelinium.model.user/settings-cache {:ttl [4  seconds] :size 1024}
+                       :amelinium.model.user/props-cache    {:ttl [10 seconds] :size 1024}
+                       :amelinium.model.user/ids-cache      {:size 2048}}
 
  ;; Buffered database loggers
 
- :amelinium.web.oplog.auth/log {:db           #ref :amelinium.db/main
-                                :table        :authlog
-                                :timeout      [25 seconds]
-                                :buffered-max 108}
+ :amelinium.common.oplog.auth/log {:db           #ref :amelinium.db/main
+                                   :table        :authlog
+                                   :timeout      [25 seconds]
+                                   :buffered-max 108}
 
  ;; Lazy request map
 
- :amelinium.http.middleware.lazy-req/lazy-request {:enabled? true}
+ :amelinium.http.middleware.lazy-req/all {:enabled? true}
 
 
  ;; Swagger support
@@ -74,101 +74,119 @@
 
  ;;:amelinium.http.middleware.db/amelinium {:db #ref :amelinium.db/main :name :amelinium.db/main}
 
- :amelinium.http.middleware.headers/default {:server                  :header/remove
-                                             :X-Powered-By            "Amelinium"
-                                             :Content-Security-Policy {:default-src ["'self'"]}}
+ :amelinium.http.middleware.headers/web {:server                  :header/remove
+                                         :X-Powered-By            "Amelinium"
+                                         :Content-Security-Policy {:default-src ["'self'"]}}
 
- :amelinium.http.middleware.session/session {:db               #ref :amelinium.db/main
-                                             :cache-ttl        [14 seconds]
-                                             :cache-size       256
-                                             :wrong-ip-expires true
-                                             :single-session?  true
-                                             :handler          amelinium.http.middleware.session/handler
-                                             :expires          [15 minutes]
-                                             :hard-expires     [1 hour]
-                                             :config-key       :session/config
-                                             :session-key      :session
-                                             :session-id-field :session-id}
+ :amelinium.http.middleware.session/web {:db               #ref :amelinium.db/main
+                                         :cache-ttl        [14 seconds]
+                                         :cache-size       256
+                                         :wrong-ip-expires true
+                                         :single-session?  true
+                                         :handler          amelinium.http.middleware.session/handler
+                                         :expires          [15 minutes]
+                                         :hard-expires     [1 hour]
+                                         :config-key       :session/config
+                                         :session-key      :session
+                                         :session-id-field :session-id}
 
- :amelinium.http.middleware.roles/roles {:db                    #ref :amelinium.db/main
-                                         :cache-ttl             [2 minutes]
-                                         :cache-size            256
-                                         :handler               amelinium.http.middleware.roles/handler
-                                         :session-key           :session
-                                         :query-roles-fn        nil
-                                         :context-column        :slug
-                                         :authorize-default?    true
-                                         :unauthorized-redirect nil
-                                         :req-context-fn        nil
-                                         :req-self-role-fn      nil
-                                         :req-context-path      [:path-params :client]
-                                         :req-self-path         [:reitit.core/match :data :self?]
-                                         :req-self-check-path   nil
-                                         :global-context        :!
-                                         :anonymous-role        :anonymous
-                                         :logged-in-role        :user
-                                         :known-user-role       :known
-                                         :self-role             :self
-                                         :keep-unknown?         true
-                                         :roles                 {:admin   "Organization Admin"
-                                                                 :manager "Organization Manager"
-                                                                 :tester  "Organization Tester"
-                                                                 :user    "Logged-in User"
-                                                                 :self    "Resource Owner"
-                                                                 :banned  "Banned User"}}
+ :amelinium.http.middleware.roles/web {:db                    #ref :amelinium.db/main
+                                       :cache-ttl             [2 minutes]
+                                       :cache-size            256
+                                       :handler               amelinium.http.middleware.roles/handler
+                                       :session-key           :session
+                                       :query-roles-fn        nil
+                                       :context-column        :slug
+                                       :authorize-default?    true
+                                       :unauthorized-redirect nil
+                                       :req-context-fn        nil
+                                       :req-self-role-fn      nil
+                                       :req-context-path      [:path-params :client]
+                                       :req-self-path         [:reitit.core/match :data :self?]
+                                       :req-self-check-path   nil
+                                       :global-context        :!
+                                       :anonymous-role        :anonymous
+                                       :logged-in-role        :user
+                                       :known-user-role       :known
+                                       :self-role             :self
+                                       :keep-unknown?         true
+                                       :roles                 {:admin   "Organization Admin"
+                                                               :manager "Organization Manager"
+                                                               :tester  "Organization Tester"
+                                                               :user    "Logged-in User"
+                                                               :self    "Resource Owner"
+                                                               :banned  "Banned User"}}
 
- :amelinium.http.middleware.language/supported [:en :pl]
- :amelinium.http.middleware.language/language  {:default        :en
-                                                :supported      #ref :amelinium.http.middleware.language/supported
-                                                :language-param :lang}
+ :amelinium.http.middleware.language/web-supported [:en :pl]
+ :amelinium.http.middleware.language/web-pickers   {:default [amelinium.http.middleware.language/path-picker
+                                                              amelinium.http.middleware.language/form-params-picker
+                                                              :language/user
+                                                              :language/client
+                                                              amelinium.http.middleware.language/accept-picker]
+                                                    :browser [amelinium.http.middleware.language/form-params-picker
+                                                              :language/user
+                                                              amelinium.http.middleware.language/accept-picker
+                                                              :language/client
+                                                              :language/id
+                                                              amelinium.http.middleware.language/path-picker]
+                                                    :user    [amelinium.http.middleware.language/form-params-picker
+                                                              :language/user
+                                                              :language/client
+                                                              amelinium.http.middleware.language/path-picker
+                                                              amelinium.http.middleware.language/accept-picker
+                                                              :language/id]}
 
- :amelinium.http.middleware.content/content {:language #ref :amelinium.http.middleware.language/supported
-                                             :mime     ["text/html"]
-                                             :charset  :utf-8
-                                             :encoding ["deflate" "gzip" "identity"]}
+ :amelinium.http.middleware.language/web {:default   :en
+                                          :param     :lang
+                                          :pickers   #ref :amelinium.http.middleware.language/web-pickers
+                                          :supported #ref :amelinium.http.middleware.language/supported}
 
- :amelinium.http.middleware.validators/default {}
+ :amelinium.http.middleware.content/web {:language #ref :amelinium.http.middleware.language/web
+                                         :mime     ["text/html"]
+                                         :charset  :utf-8
+                                         :encoding ["deflate" "gzip" "identity"]}
 
- :amelinium.http.middleware.populators/default [[:route/data    amelinium.web.controller/route-data+]
-                                                [:auth/db       amelinium.web.controller/auth-db+]
-                                                [:language/user amelinium.web.controller/user-lang+]
-                                                [:oplog/logger  amelinium.web.controller/oplog-logger+]]
+ :amelinium.http.middleware.validators/web {}
 
- :amelinium.http.middleware/renderer amelinium.web.controller/render-page!
- :amelinium.http.middleware/preparer amelinium.web.controller/prep-request!
+ :amelinium.http.middleware.populators/web [[:route/data    amelinium.web.controller/route-data+]
+                                            [:auth/db       amelinium.web.controller/auth-db+]
+                                            [:language/user amelinium.web.controller/user-lang+]
+                                            [:oplog/logger  amelinium.web.controller/oplog-logger+]]
 
- :amelinium.http.middleware.debug/default {:enabled?     false
-                                           :request-keys [:accept]}
+ :amelinium.http.middleware/web-renderer amelinium.web.controller/render!
+ :amelinium.http.middleware/web-preparer amelinium.web.controller/prep!
 
- :amelinium.http.middleware/default-chain [#ref :amelinium.http.middleware.lazy-req/lazy-request
-                                           #ref :amelinium.http.middleware.content/content
-                                           reitit.ring.middleware.parameters/parameters-middleware
-                                           #ref :amelinium.http.middleware.content/content
-                                           #ref :amelinium.http.middleware.remote-ip/getter
-                                           #ref :amelinium.http.middleware.session/session
-                                           #ref :amelinium.http.middleware.language/language
-                                           #ref :amelinium.http.middleware.roles/roles
-                                           #ref :amelinium.http.middleware.validators/default
-                                           #ref :amelinium.http.middleware.populators/default
-                                           #ref :amelinium.http.middleware.headers/default
-                                           #ref :amelinium.http.middleware/preparer
-                                           #ref :amelinium.http.middleware/renderer
-                                           #ref :amelinium.http.middleware.debug/default]
+ :amelinium.http.middleware.debug/web {:enabled?     false
+                                       :request-keys [:accept]}
+
+ :amelinium.http.middleware/web [#ref :amelinium.http.middleware.lazy-req/all
+                                 #ref :amelinium.http.middleware.content/web
+                                 reitit.ring.middleware.parameters/parameters-middleware
+                                 #ref :amelinium.http.middleware.remote-ip/all
+                                 #ref :amelinium.http.middleware.session/web
+                                 #ref :amelinium.http.middleware.language/web
+                                 #ref :amelinium.http.middleware.roles/web
+                                 #ref :amelinium.http.middleware.validators/web
+                                 #ref :amelinium.http.middleware.populators/web
+                                 #ref :amelinium.http.middleware.headers/web
+                                 #ref :amelinium.http.middleware/web-preparer
+                                 #ref :amelinium.http.middleware/web-renderer
+                                 #ref :amelinium.http.middleware.debug/web]
 
  ;; HTTP routes
 
- :amelinium.http.router/routes []
+ :amelinium.http.router/web-routes []
 
  ;; HTTP default router
 
- :amelinium.http.router/default [#ref :amelinium.http.router/routes {:data {}}]
+ :amelinium.http.router/web [#ref :amelinium.http.router/web-routes {:data {}}]
 
  ;; HTTP default handler
 
- :amelinium.http.handler/default {:router            #ref :amelinium.http.router/default
-                                  :resource-pathname "/"
-                                  :not-found         {:status 404 :body "NOT FOUND"}
-                                  :redirect-slash    :add}
+ :amelinium.http.handler/web {:router            #ref :amelinium.http.router/web
+                              :resource-pathname "/"
+                              :not-found         {:status 404 :body "NOT FOUND"}
+                              :redirect-slash    :add}
 
  ;; Jetty server settings
 

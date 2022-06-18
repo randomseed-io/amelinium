@@ -4,7 +4,7 @@
       :author "Paweł Wilk"
       :added  "1.0.0"}
 
-    amelinium.web.oplog.auth
+    amelinium.common.oplog.auth
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
@@ -13,7 +13,7 @@
             [amelinium.logging        :as        log]
             [amelinium.system         :as     system]
             [amelinium.db             :as         db]
-            [amelinium.web.oplog      :as      oplog]
+            [amelinium.common.oplog   :as      oplog]
             [io.randomseed.utils.var  :as        var]
             [io.randomseed.utils.map  :as        map]
             [io.randomseed.utils      :refer    :all]))

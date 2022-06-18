@@ -4,7 +4,7 @@
       :author "Paweł Wilk"
       :added  "1.0.0"}
 
-    amelinium.web.oplog
+    amelinium.common.oplog
 
   (:refer-clojure :exclude [parse-long uuid random-uuid run!])
 
@@ -106,9 +106,9 @@
   associated by the initializer within a returned map.
 
   So, if no `:reporter` nor `:writer` is set in configuration, and the configuration
-  key is `:amelinium.web.oplog.auth/log` then the defaults would be:
-  `amelinium.web.oplog.auth/log-reporter` (reporting) and
-  `amelinium.web.oplog.auth/log-writer` (writing). Both must be defined."
+  key is `:amelinium.common.oplog.auth/log` then the defaults would be:
+  `amelinium.common.oplog.auth/log-reporter` (reporting) and
+  `amelinium.common.oplog.auth/log-writer` (writing). Both must be defined."
   [k {:keys [db table writer reporter buffered-max timeout] :as config}]
   (when (and db (ident? k) (valuable? table))
     (let [db          (db/ds db)

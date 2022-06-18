@@ -1,6 +1,6 @@
 (ns
 
-    ^{:doc    "amelinium service, common controller functions."
+    ^{:doc    "amelinium service, common web controller functions."
       :author "Paweł Wilk"
       :added  "1.0.0"
       :no-doc true}
@@ -9,8 +9,8 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [reitit.ring                        :as       ring]
-            [ring.middleware.keyword-params     :as    ring-kw]
+  (:require [potemkin.namespaces                :as          p]
+            [reitit.ring                        :as       ring]
             [ring.util.http-response            :as       resp]
             [ring.util.request                  :as        req]
             [ring.util.codec                    :as      codec]
@@ -23,7 +23,8 @@
             [amelinium.i18n                     :as       i18n]
             [amelinium.i18n                     :refer    [tr]]
             [amelinium.logging                  :as        log]
-            [amelinium.web.model.user           :as       user]
+            [amelinium.model.user               :as       user]
+            [amelinium.common.controller        :as     common]
             [io.randomseed.utils.time           :as       time]
             [io.randomseed.utils.var            :as        var]
             [io.randomseed.utils.map            :as        map]
@@ -34,51 +35,22 @@
             [amelinium.http                     :as       http]
             [amelinium.http.middleware.language :as   language]))
 
-(def ^:const keywordize-params? false)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Data population
 
-(defn route-data+
-  "Injects route data directly into a request map."
-  [req _]
-  (get (get req ::r/match) :data))
-
-(defn auth-db+
-  "Injects authorization data source directly into a request map."
-  [req _]
-  (get (get (get req :route/data) :auth/config) :db))
-
-(defn oplog-logger+
-  "Injects operations logger function into a request map."
-  [req _]
-  (delay (web/oplog-logger req)))
-
-(defn user-lang+
-  "Injects user's preferred language into a request map."
-  [req _]
-  (delay
-    (when-some [db (web/auth-db req)]
-      (when-some [user-id (get (get req :session) :user/id)]
-        (when-some [supported (get (get req :language/settings) :supported)]
-          (supported (user/setting db user-id :language)))))))
+(p/import-vars [amelinium.common.controller
+                route-data+ auth-db+ oplog-logger+ user-lang+])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Calculations
+;; Authentication
 
-(defn- kw-form-data
-  "Changes form data keys into keywords by calling
-  ring.middleware.keyword-params/keyword-params-request on a crafted map."
-  ([form-data]
-   (kw-form-data form-data {}))
-  ([form-data opts]
-   (if (and keywordize-params? form-data)
-     (-> (array-map :params form-data)
-         (ring-kw/keyword-params-request opts)
-         :params)
-     form-data)))
+(p/import-vars [amelinium.common.controller
+                check-password lock-remaining-mins
+                account-locked? prolongation? prolongation-auth?
+                regular-auth? hard-expiry?
+                keywordize-params? kw-form-data])
 
-(defn- extract-form-data
+(defn extract-form-data
   "Gets go-to data from for a valid (and not expired) session. Returns form data as a
   map. The resulting map has session-id entry removed (if found)."
   ([req gmap]
@@ -92,18 +64,18 @@
                sid-key   (web/session-key smap sess-opts :session :session/config)]
            (dissoc form-data sid-key)))))))
 
-(defn- remove-login-data
+(defn remove-login-data
   "Removes login data from the form params part of a request map."
   [req]
   (-> req
       (update :form-params dissoc "password")
       (update :params dissoc :password)))
 
-(defn- cleanup-req
+(defn cleanup-req
   [req [_ auth?]]
   (if auth? req (remove-login-data req)))
 
-(defn- inject-goto
+(defn inject-goto
   "Injects go-to data into a request. Form data is merged only if go-to URI matches
   current page URI and session ID matches. Go-to URI is always injected. When the
   given gmap is broken it will set :goto-injected? to true but :goto-uri and :goto to
@@ -122,14 +94,6 @@
                (update :params      #(delay (merge (kw-form-data form-data) %))))
            req))))))
 
-(defn check-password
-  [user password auth-config]
-  (when (and user password)
-    (auth/check-password-json password
-                              (get user :shared)
-                              (get user :intrinsic)
-                              auth-config)))
-
 (defn login-data?
   "Returns true if :form-params map of a request contains login data."
   [req]
@@ -137,45 +101,21 @@
     (and (contains? fparams "password")
          (contains? fparams "login"))))
 
-(defn account-locked?
-  "Returns true if an account associated with the session is hard-locked.
-  Uses cached property."
-  ([req session]
-   (when-some [db (web/auth-db req)]
-     (account-locked? req session db)))
-  ([req session db]
-   (some?
-    (some->> session :user/id (user/prop-get-locked db)))))
-
-(defn lock-remaining-mins
-  "Returns the time of the remaining minutes of a soft account lock when the visited
-  page ID is :login/account-soft-locked. Otherwise it returns nil. Uses cached user
-  properties."
-  ([req auth-db smap time-fn]
-   (lock-remaining-mins req auth-db smap time-fn "login"))
-  ([req auth-db smap time-fn id-form-field]
-   (when auth-db
-     (when-some [user (or (user/props-by-session auth-db smap)
-                          (user/props-by-email auth-db (get (get req :form-params) id-form-field)))]
-       (when-some [auth-config (http/get-route-data req :auth/config)]
-         (when-some [mins (time/minutes (web/soft-lock-remains user auth-config (time-fn)))]
-           (if (zero? mins) 1 mins)))))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions
 
-(defn- get-goto+
+(defn get-goto+
   "Gets go-to map from a session variable even if the session expired."
   [smap sess-opts]
   (user/get-session-var sess-opts (web/allow-soft-expired smap) :goto))
 
-(defn- get-goto-for-valid+
+(defn get-goto-for-valid+
   "Gets go-to map from session variable if the session is valid (and not expired)."
   [smap sess-opts]
   (when (and smap (get smap :valid?))
     (get-goto+ smap sess-opts)))
 
-(defn- populate-goto+
+(defn populate-goto+
   "Gets go-to data from session variable if it does not yet exist in req
   structure. Works also for expired session and only if go-to URI (:uri key of a map)
   is the same as currently visited page. Uses inject-goto to inject goto data from a
@@ -188,105 +128,17 @@
      req
      (inject-goto req (get-goto+ smap sess-opts) smap))))
 
-(defn- prolongation?
-  "Returns true if session is expired (but not hard expired) and a user is not logged
-  in and there is no login data present and we are not authenticating user. In other
-  words: this returns true when we are good with redirecting user to a session
-  prolongation page."
-  [sess [login? auth?] login-data?]
-  (or (and (get sess :expired?) (not (get sess :hard-expired?))
-           (not login?)
-           (or (not auth?) (not login-data?)))
-      false))
-
-(defn- prolongation-auth?
-  "Returns true if user is being authenticated to prolongate the soft-expired session."
-  [sess login? auth? login-data?]
-  (or (and login-data? auth? (not login?) (:expired? sess)) false))
-
-(defn- regular-auth?
-  "Returns true if user is being authenticated."
-  [sess login? auth? login-data?]
-  (or (and auth? login-data? (not login?) (not sess)) false))
-
-(defn- hard-expiry?
-  "Returns true if the session is hard-expired and we are not on the hard-expired login
-  page. Uses the given, previously collected session data, does not connect to a
-  database."
-  [req sess]
-  (or (and (get sess :hard-expired?)
-           (not (web/on-page? req :login/session-expired)))
-      false))
-
-(defn auth-user-with-password!
-  "Authentication helper. Expects username and password to be present in form
-  parameters. Used by other controllers. Short-circuits on certain conditions and may
-  emit a redirect or render a response."
-  ([req user-email password sess route-data lang]
-   (let [ipaddr       (get req :remote-ip)
-         ipplain      (get req :remote-ip/str)
-         oplog        (or (get req :oplog/logger) (web/oplog-logger req route-data))
-         auth-config  (or (get route-data :auth/config) (get req :auth/config))
-         auth-db      (web/auth-db req auth-config)
-         user         (user/get-login-data auth-db user-email auth-config)
-         user-id      (get user :id)
-         pwd-suites   (select-keys user [:intrinsic :shared])
-         for-user     (log/for-user user-id user-email ipplain)
-         for-mail     (log/for-user nil user-email ipplain)
-         hard-locked? (fn [] (web/hard-locked? user))
-         soft-locked? (fn [] (web/soft-locked? user auth-config (t/now)))
-         invalid-pwd? (fn [] (not (check-password user password auth-config)))]
-
-     (cond
-
-       (hard-locked?) (do (log/wrn "Account locked permanently" for-user)
-                          (oplog :user-id user-id :op :login :ok? false :msg (str "Permanent lock " for-mail))
-                          (web/move-to req (get route-data :auth/locked :login/account-locked)))
-
-       (soft-locked?) (do (log/msg "Account locked temporarily" for-user)
-                          (oplog :user-id user-id :op :login :ok? false :msg (str "Temporary lock " for-mail))
-                          (web/move-to req (get route-data :auth/soft-locked :login/account-soft-locked)))
-
-       (invalid-pwd?) (do (log/wrn "Incorrect password or user not found" for-user)
-                          (when user-id
-                            (oplog :level :warning :user-id user-id :op :login :ok? false :msg (str "Bad password " for-mail))
-                            (user/update-login-failed auth-db user-id ipaddr
-                                                      (get auth-config :locking/max-attempts)
-                                                      (get auth-config :locking/fail-expires)))
-                          (web/move-to req (get route-data :auth/bad-password :login/bad-password)))
-
-       (do (log/msg "Authentication successful" for-user)
-           (web/oplog req :user-id user-id :op :login :message (str "Login OK " for-mail))
-           (user/update-login-ok auth-db user-id ipaddr)
-           :authenticated!)
-
-       (let [goto-uri  (when (get sess :expired?) (get req :goto-uri))
-             sess-opts (get req :session/config)
-             sess      (if goto-uri
-                         (user/prolong-session sess-opts sess ipaddr)
-                         (user/create-session  sess-opts user-id user-email ipaddr))]
-
-         (if-not (get sess :valid?)
-
-           (let [e      (get sess :error)
-                 r      (:reason e)
-                 action (if goto-uri "prolongation" "creation")]
-
-             (log/wrn "Session invalid after" action (log/for-user user-id user-email))
-             (when r
-               (log/log (:severity e :warn) r)
-               (oplog :level e :user-id user-id :op :session :ok? false :msg r))
-             (web/go-to req (get route-data :auth/session-error :login/session-error)))
-
-           (if goto-uri
-             (resp/temporary-redirect goto-uri)
-             (-> req
-                 (assoc :session sess)
-                 (language/force (or lang (web/pick-language-str req)))
-                 ((get (get req :roles/config) :handler identity))))))))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
+
+(defn auth-user-with-password!
+  "Authentication helper. Used by other controllers. Short-circuits on certain
+  conditions and may emit a redirect or render a response."
+  [req user-email password sess route-data lang]
+  (let [req (common/auth-user-with-password! req user-email password sess route-data)]
+    (if (resp/response? req)
+      req
+      (language/force (or lang (web/pick-language-str req))))))
 
 (defn authenticate!
   "Logs user in when user e-mail and password are given, or checks if the session is
@@ -345,7 +197,7 @@
                                               t/now))))))
 
 (defn prep-request!
-  "Prepares a request before any controller is called."
+  "Prepares a request before any web controller is called."
   [req]
   (let [req         (assoc req :app/data-required [] :app/data web/empty-lazy-map)
         sess        (get req :session)
@@ -421,7 +273,7 @@
             goto?          (get req :goto-injected?)
             goto-uri       (and goto?  (get req :goto-uri))
             goto-failed?   (and goto?  (false? goto-uri))
-            goto-unwanted? (and (some? (get req :goto-uri)) (not auth?))]
+            goto-unwanted? (and (not auth?) (some? (get req :goto-uri)))]
 
         ;; Session is invalid (or just expired without prolongation).
         ;; Notice the fact and go with displaying content.
@@ -464,17 +316,13 @@
           (web/move-to req (or (http/get-route-data :auth/session-error) :login/session-error))
           (cleanup-req req [nil auth?]))))))
 
-(defn render-page!
-  "Renders page after a specific controller was called. The :app/view and :app/layout
-  keys are added to the request data by controllers to indicate which view and layout
-  file should be used. Data passed to the template system is populated with common
-  keys which should be present in :app/data."
+(defn render!
+  "Renders page after a specific web controller was called. The `:app/view` and
+  `:app/layout` keys are added to the request data by controllers to indicate which
+  view and layout file should be used. Data passed to the template system is
+  populated with common keys which should be present in `:app/data`."
   [req]
   (web/render-ok req))
-
-(defn render-api!
-  [req]
-  (api/render-ok req))
 
 (defn default
   [req]

@@ -20,146 +20,102 @@
             [ring.util.response]
             [ring.util.http-response              :as         resp]
             [ring.util.request                    :as          req]
-            [selmer.parser                        :as       selmer]
+            [amelinium.common                     :as       common]
             [amelinium.http                       :as         http]
             [amelinium.http.middleware.roles      :as        roles]
             [amelinium.http.middleware.language   :as     language]
             [amelinium.http.middleware.session    :as      session]
             [amelinium.http.middleware.db         :as       mid-db]
             [amelinium.http.middleware.validators :as   validators]
-            [amelinium.web.oplog.auth             :as   oplog-auth]
-            [amelinium.web.model.user             :as         user]
+            [amelinium.common.oplog.auth          :as   oplog-auth]
+            [amelinium.model.user                 :as         user]
             [amelinium.logging                    :as          log]
-            [amelinium.web                        :as          web]
             [amelinium.db                         :as           db]
             [io.randomseed.utils.time             :as         time]
             [io.randomseed.utils.vec              :as          vec]
             [io.randomseed.utils.map              :as          map]
-            [io.randomseed.utils                  :refer      :all]
-            [hiccup.core                          :refer      :all]
-            [hiccup.table                         :as        table])
+            [io.randomseed.utils                  :refer      :all])
 
   (:import [reitit.core Match]
            [lazy_map.core LazyMapEntry LazyMap]))
 
+
 ;; Database
 
-(p/import-vars [amelinium.web
+(p/import-vars [amelinium.common
                 auth-config auth-db])
 
 ;; Operations logging
 
-(p/import-vars [amelinium.web
+(p/import-vars [amelinium.common
                 oplog-config oplog-logger oplog-logger-populated oplog])
 
 ;; Routing data and settings helpers
 
-(p/import-vars [amelinium.web
-                router-match? on-page? lang-param-id guess-lang-param-id
-                login-page? auth-page? login-auth-state])
+(p/import-vars [amelinium.common
+                router-match? on-page? lang-param guess-lang-param
+                login-page? auth-page? login-auth-state ])
 
 ;; Path parsing
 
-(def ^{:arglists '([path lang-id]
-                   [path lang suffix])}
-  path-variants
-  "Generates a list of all possible language variants of a path."
-  (mem/fifo web/path-variants-core :fifo/threshold 2048))
-
-(p/import-vars [amelinium.web
-                path-param path-params path-language
+(p/import-vars [amelinium.common
+                path-variants path-param path-params path-language
                 split-query-params-simple split-query-params has-param?
-                parameterized-page localized-page localized-or-regular-page page
-                current-page login-page auth-page
+                req-param-path path-template-with-param template-path
+                parameterized-page parameterized-page-core
+                page localized-page localized-or-regular-page
+                current-page current-page-id current-page-id-or-path login-page auth-page
                 temporary-redirect localized-temporary-redirect
-                move-to see-other localized-see-other])
+                move-to see-other localized-see-other go-to])
 
 ;; Language
 
-(def ^:const language-pickers-default
-  [language/path-lang-id
-   language/body-lang-id
-   language/form-lang-id
-   :language/user
-   :language/client
-   language/accept-lang-id
-   :language/id])
-
-(def ^:const language-pickers-client-preferred
-  [language/body-lang-id
-   language/form-lang-id
-   :language/user
-   language/accept-lang-id
-   :language/client
-   :language/id
-   language/path-lang-id])
-
-(def ^:const language-pickers-logged-in
-  [language/body-lang-id
-   language/form-lang-id
-   :language/user
-   :language/client
-   language/path-lang-id
-   language/accept-lang-id
-   :language/id])
-
-(defn pick-language-id
-  "Tries to pick the best language for a known user or a visitor. To be used (among
-  other scenarios) after a successful log-in to show the right language version of a
-  welcome page."
-  ([req]
-   (pick-language-id req language-pickers-default))
-  ([req methods]
-   (->> (cons (constantly :en) nil)
-        (concat methods)
-        (map (comp some-keyword #(% req)))
-        (filter identity)
-        first)))
-
-(defn pick-language-str
-  ([req]
-   (some-str (pick-language-id req language-pickers-default)))
-  ([req methods]
-   (some-str (pick-language-id req methods))))
+(p/import-vars [amelinium.common
+                pick-language pick-language-without-fallback
+                pick-language-str pick-language-str-without-fallback])
 
 ;; Special redirects
 
-(p/import-vars [amelinium.web
+(p/import-vars [amelinium.common
                 add-slash slash-redir lang-redir])
 
 ;; Accounts
 
-(p/import-vars [amelinium.web
-                lock-wait-default lock-wait hard-lock-time soft-lock-time
-                soft-lock-passed soft-lock-remains hard-locked? soft-locked?])
+(p/import-vars [amelinium.common
+                lock-wait-default lock-wait
+                hard-lock-time hard-locked?
+                soft-lock-time soft-lock-passed soft-locked? soft-lock-remains])
 
 ;; Sessions
 
-(p/import-vars [amelinium.http.middleware.session
-                session-key])
-
-(p/import-vars [amelinium.web
-                session-variable-get-failed?
+(p/import-vars [amelinium.common
+                session-key session-variable-get-failed?
                 allow-expired allow-soft-expired allow-hard-expired])
 
 ;; Context and roles
 
-(p/import-vars [amelinium.web
-                has-any-role? has-role? role-required! with-role-only!
-                roles-for-context roles-for-contexts
-                default-contexts-labeler roles-matrix])
+(p/import-vars [amelinium.common
+                has-any-role? has-role?
+                role-required! with-role-only!
+                roles-for-context roles-for-contexts default-contexts-labeler
+                roles-matrix roles-tabler])
 
-;; API rendering
+;; Data structures
 
-(p/import-vars [amelinium.web
-                empty-lazy-map get-missing-app-data-from-req
-                no-app-data prep-app-data get-app-data
+(p/import-vars [amelinium.common
+                empty-lazy-map])
+
+;; Filesystem operations
+
+(p/import-vars [amelinium.common
                 some-resource])
 
 ;; Language helpers
 
-(p/import-vars [amelinium.web
-                lang-url lang-id lang-str lang-config])
+(p/import-vars [amelinium.common
+                lang-id lang-str lang-config])
+
+;; Response rendering
 
 (defn render
   ([]
@@ -203,53 +159,13 @@
 
 ;; Linking helpers
 
-(defn path
-  "Creates a URL on a basis of route name or a path."
-  ([req name-or-path]
-   (page req name-or-path))
-  ([req name-or-path lang]
-   (localized-page nil name-or-path lang
-                   nil nil true false
-                   (get req ::r/router)
-                   (lang-param-id req)))
-  ([name-or-path lang params query-params router language-settings-or-param]
-   (localized-page nil name-or-path lang
-                   params query-params
-                   true false router
-                   language-settings-or-param)))
-
-(defn localized-path
-  "Creates a URL on a basis of route name or a path. Uses very optimistic matching
-  algorithm. Tries to obtain language from user settings and client settings if the
-  path does not contain language information."
-  ([req name-or-path]
-   (let [rtr           (get req ::r/router)
-         lang-settings (get req :language/settings)
-         lang-param    (guess-lang-param-id lang-settings)
-         lang          (pick-language-str req)]
-     (localized-page nil name-or-path lang
-                     nil nil true true
-                     rtr lang-param)))
-  ([req name-or-path lang]
-   (localized-page nil name-or-path lang
-                   nil nil true true
-                   (get req ::r/router)
-                   (lang-param-id req)))
-  ([name-or-path lang params query-params router language-settings-or-param]
-   (localized-page nil name-or-path lang
-                   params query-params
-                   true true
-                   router language-settings-or-param)))
+(p/import-vars [amelinium.common
+                path localized-path])
 
 ;; Anti-spam
 
-(defn- random-uuid-or-empty
-  ([]
-   (random-uuid-or-empty nil))
-  ([rng]
-   (if (zero? (get-rand-int 2 rng))
-     (random-uuid)
-     "")))
+(p/import-vars [amelinium.common
+                random-uuid-or-empty])
 
 (defn anti-spam-code
   "Generates anti-spam value pairs string containing randomly selected fields and
@@ -270,59 +186,8 @@
      (when (seq r)
        (into {} r)))))
 
-;; Template helpers
+;; Other helpers
 
-(selmer/add-tag!
- :lang-url
- (fn [args ctx]
-   (let [path-or-name    (first args)
-         args            (rest args)
-         args            (if (map? (first args)) (cons nil args) args)
-         [lang params
-          query-params
-          lang-settings] args]
-     (lang-url true ctx path-or-name lang params query-params lang-settings))))
-
-(selmer/add-tag!
- :link
- (fn [args ctx content]
-   (let [sid             (get (get ctx :session) :id)
-         skey            (session-key ctx)
-         path-or-name    (first args)
-         args            (rest args)
-         args            (if (map? (first args)) (cons nil args) args)
-         [lang params
-          query-params
-          lang-settings] args
-         out-path        (lang-url false ctx path-or-name lang params query-params lang-settings)]
-     (if (and sid skey)
-       (str "<form name=\"sessionLink\" class=\"formlink\" action=\"" out-path "\" method=\"post\">"
-            (anti-spam-code (get ctx :validators/config))
-            "<button type=\"submit\" class=\"link\" name=\"" skey "\" value=\"" sid "\">"
-            (get-in content [:link :content])
-            "</button></form>")
-       (str "<a href=\"" out-path "\" class=\"link\">" (get-in content [:link :content]) "</a>"))))
- :endlink)
-
-(selmer/add-tag!
- :slink
- (fn [args ctx content]
-   (let [url  (selmer/render (first args) ctx {:tag-open \[ :tag-close \]})
-         sid  (get (get ctx :session) :id)
-         skey (session-key ctx)]
-     (if (and sid skey)
-       (str "<form name=\"sessionLink\" class=\"formlink\" action=\"" url "\" method=\"post\">"
-            (anti-spam-code (get ctx :validators/config))
-            "<button type=\"submit\" class=\"link\" name=\"" skey "\" value=\"" sid "\">"
-            (get-in content [:slink :content])
-            "</button></form>")
-       (str "<a href=\"" url  "\" class=\"link\">" (get-in content [:slink :content]) "</a>"))))
- :endslink)
-
-(selmer/add-tag!
- :session-data
- (fn [args ctx]
-   (let [skey (session-key ctx)]
-     (str (anti-spam-code (get ctx :validators/config))
-          "<input type=\"hidden\" name=\"" skey "\" value=\"" (get (get ctx :session) :id) "\" />"))))
-
+(defn lang-url
+  [req path-or-name lang params query-params lang-settings]
+  (common/lang-url true req path-or-name lang params query-params lang-settings))
