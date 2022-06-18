@@ -25,7 +25,7 @@
             [amelinium.app                    :as              app]
             [amelinium.system                 :as           system]
             [amelinium.web                    :as              web]
-            [amelinium.web.model.user         :as             user]
+            [amelinium.model.user             :as             user]
             [amelinium.http                   :as             http]
             [amelinium.http.middleware        :as       middleware]
             [amelinium.http.router            :as           router]

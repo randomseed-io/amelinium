@@ -5,7 +5,7 @@
       :added  "1.0.0"
       :no-doc true}
 
-    amelinium.web.model.user
+    amelinium.model.user
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
