@@ -84,4 +84,6 @@
 (system/add-halt! ::default [k config] (var/make k nil))
 
 (derive ::web        ::default)
+(derive ::api        ::default)
 (derive ::web-routes ::routes)
+(derive ::api-routes ::routes)

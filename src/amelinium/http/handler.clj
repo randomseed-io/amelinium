@@ -52,3 +52,4 @@
 (system/add-halt! ::default [k config] (var/make k nil))
 
 (derive ::web ::default)
+(derive ::api ::default)
