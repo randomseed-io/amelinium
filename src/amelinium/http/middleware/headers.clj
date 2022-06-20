@@ -7,6 +7,7 @@
     amelinium.http.middleware.headers
 
   (:require [clojure.string      :as    str]
+            [reitit.core         :as      r]
             [io.randomseed.utils :as  utils]
             [amelinium.logging   :as    log]
             [amelinium.system    :as system]))
@@ -54,7 +55,7 @@
         (into headers entries)
         entries-map))))
 
-(defn transformer
+(defn make-transformer
   [& fns]
   (->> fns (filter identity) reverse (apply comp)))
 
@@ -68,7 +69,7 @@
           to-map (into {} to-add)
           del-fn (deleter to-del)
           add-fn (adder   to-add to-map)]
-      {:fn/transformer (transformer add-fn del-fn)
+      {:fn/transformer (make-transformer add-fn del-fn)
        :fn/adder       (or add-fn identity)
        :fn/deleter     (or del-fn identity)
        :headers/add    (when to-add (vec to-add))
@@ -79,13 +80,20 @@
   "Headers handler wrapper."
   [handler trf]
   (fn [req]
-    (update (handler req) :headers trf)))
+    (if-some [local-trf (get (get (get req ::r/match) :data) :headers)]
+      (update (handler req) :headers (comp local-trf trf))
+      (update (handler req) :headers trf))))
+
+(defn transformer
+  "Parses headers configuration and returns a transformer."
+  [config]
+  (:fn/transformer (prep-config config)))
 
 (defn init-headers
   "Server headers middleware."
   [k config]
   (log/msg "Initializing HTTP server headers:" k)
-  (let [trf (:fn/transformer (prep-config config))]
+  (let [trf (transformer config)]
     {:name    k
      :compile (fn [_ _]
                 (fn [handler]
@@ -94,9 +102,17 @@
                       (handler req)))))}))
 
 (system/add-init  ::default [k config] (init-headers k config))
-(system/add-prep  ::default [k config] (prep-config config))
+(system/add-prep  ::default [_ config] (prep-config config))
 (system/add-halt! ::default [_ config] nil)
+
+(system/add-init  ::handler [_ config] (transformer config))
+(system/add-prep  ::handler [_ config] (prep-config config))
+(system/add-halt! ::handler [_ config] nil)
 
 (derive ::web ::default)
 (derive ::api ::default)
 (derive ::all ::default)
+
+(derive ::web-handler ::handler)
+(derive ::api-handler ::handler)
+(derive ::all-handler ::handler)
