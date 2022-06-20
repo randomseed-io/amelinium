@@ -41,6 +41,10 @@
   (map-entry (prep-hdr-key el)
              (prep-hdr-val el)))
 
+(defn- add-missing
+  [m entries-map]
+  (reduce-kv (fn [m k v] (if (contains? m k) m (assoc m k v))) m entries-map))
+
 (defn deleter
   [delete-list]
   (when (seq delete-list)
@@ -48,12 +52,17 @@
       (apply dissoc headers delete-list))))
 
 (defn adder
-  [entries entries-map]
+  [entries entries-map replace?]
   (when (seq entries)
-    (fn [headers]
-      (if headers
-        (into headers entries)
-        entries-map))))
+    (if replace?
+      (fn [headers]
+        (if headers
+          (into headers entries)
+          entries-map))
+      (fn [headers]
+        (if headers
+          (add-missing headers entries-map)
+          entries-map)))))
 
 (defn make-transformer
   [& fns]
@@ -63,18 +72,21 @@
   [config]
   (if (fn? (:fn/transformer config))
     config
-    (let [config (group-by (comp #{:header/remove} val) (seq config))
-          to-del (seq (map utils/some-str-simple (keys (get config :header/remove))))
-          to-add (seq (map prep-hdr-entry (get config nil)))
-          to-map (into {} to-add)
-          del-fn (deleter to-del)
-          add-fn (adder   to-add to-map)]
-      {:fn/transformer (make-transformer add-fn del-fn)
-       :fn/adder       (or add-fn identity)
-       :fn/deleter     (or del-fn identity)
-       :headers/add    (when to-add (vec to-add))
-       :headers/del    (when to-del (vec to-del))
-       :headers/map    (when (seq to-map) to-map)})))
+    (let [replace? (boolean (:headers/replace? config))
+          config   (dissoc config :headers/replace?)
+          config   (group-by (comp #{:header/remove} val) (seq config))
+          to-del   (seq (map utils/some-str-simple (keys (get config :header/remove))))
+          to-add   (seq (map prep-hdr-entry (get config nil)))
+          to-map   (into {} to-add)
+          del-fn   (deleter to-del)
+          add-fn   (adder   to-add to-map replace?)]
+      {:fn/transformer   (make-transformer add-fn del-fn)
+       :fn/adder         (or add-fn identity)
+       :fn/deleter       (or del-fn identity)
+       :headers/add      (when to-add (vec to-add))
+       :headers/del      (when to-del (vec to-del))
+       :headers/map      (when (seq to-map) to-map)
+       :headers/replace? replace?})))
 
 (defn wrap-headers
   "Headers handler wrapper."
@@ -85,7 +97,8 @@
       (update (handler req) :headers trf))))
 
 (defn transformer
-  "Parses headers configuration and returns a transformer."
+  "Parses headers configuration and returns a transformer. Helpful when generating
+  a non-Reitit handler."
   [config]
   (:fn/transformer (prep-config config)))
 
