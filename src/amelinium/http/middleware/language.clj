@@ -68,8 +68,8 @@
    (pick-without-fallback req (get req :language/pickers) :default))
   ([req pickers-or-picker-id]
    (if (map? pickers-or-picker-id)
-     (pick-without-fallback pickers-or-picker-id :default)
-     (pick-without-fallback (get req :language/pickers) pickers-or-picker-id)))
+     (pick-without-fallback req pickers-or-picker-id :default)
+     (pick-without-fallback req (get req :language/pickers) pickers-or-picker-id)))
   ([req pickers picker-id]
    (when-some [picker (get pickers picker-id)]
      (picker req))))
@@ -102,8 +102,8 @@
        (default-lang-id req)))
   ([req pickers-or-picker-id]
    (or (if (map? pickers-or-picker-id)
-         (pick-without-fallback pickers-or-picker-id :default)
-         (pick-without-fallback (get req :language/pickers) pickers-or-picker-id))
+         (pick-without-fallback req pickers-or-picker-id :default)
+         (pick-without-fallback req (get req :language/pickers) pickers-or-picker-id))
        (default-lang-id req)))
   ([req pickers picker-id]
    (or (when-some [picker (get pickers picker-id)] (picker req))
