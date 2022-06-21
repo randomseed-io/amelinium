@@ -300,32 +300,35 @@
   (first {k v}))
 
 (defn init-pickers
-  [pickers-map config]
-  (if (system/ref? pickers-map)
-    pickers-map
-    (some->> pickers-map
-             (map #(map-entry (key %) (init-picker-chain config (val %))))
-             (remove (comp nil? val))
-             (into {}))))
+  [config]
+  (let [pickers-map (get config :pickers)]
+    (if (system/ref? pickers-map)
+      config
+      (some->> pickers-map
+               (map #(map-entry (key %) (init-picker-chain config (val %))))
+               (remove (comp nil? val))
+               (into {})
+               (assoc config :pickers)))))
 
 (defn prep-supported
   [v]
   (when-valuable v
     (if (system/ref? v) v
         (let [v (if (coll? v) v (cons v nil))
-              v (filter identity (map some-keyword-simple v))]
-          (valuable (vec v))))))
+              v (filter identity (map some-keyword-simple v))
+              v (valuable (vec v))]
+          v))))
 
 (defn prep-language
   [config]
   (let [default (or (some-keyword-simple (:default config)) default-fallback-language)]
     (-> config
         (assoc  :default   default)
-        (update :pickers   init-pickers config)
         (update :supported #(when % (if (system/ref? %) % (map some-keyword-simple (if (coll? %) % (cons % nil))))))
         (update :supported #(when % (if (system/ref? %) % (disj (conj (set %) default) nil))))
         (update :supported #(if (system/ref? %) % (or (not-empty %) #{default})))
-        (update :param     (fnil some-keyword-simple :lang)))))
+        (update :param     (fnil some-keyword-simple :lang))
+        init-pickers)))
 
 (defn wrap-language
   "Language wrapping middleware."
