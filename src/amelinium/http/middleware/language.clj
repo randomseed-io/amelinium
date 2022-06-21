@@ -285,7 +285,8 @@
             handler-fn (var/deref-symbol (:handler p))
             picker-fn  (if compile-fn (compile-fn config) #(handler-fn config %))]
         (when (ifn? picker-fn) picker-fn))
-      (when (ifn? p) (comp supported some-keyword p)))))
+      (when (ifn? p)
+        (comp (supported nil config) some-keyword p)))))
 
 (defn init-picker-chain
   [config pickers]
