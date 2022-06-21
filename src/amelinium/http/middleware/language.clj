@@ -16,7 +16,7 @@
             [io.randomseed.utils.var :as     var]
             [io.randomseed.utils     :refer :all]))
 
-(def default-lang-param        "lang")
+(def default-lang-param         :lang)
 (def default-fallback-language    :en)
 
 (def ^:const re-lang (re-pattern "[A-Za-z_\\-\\:\\.]{2,7}"))
@@ -168,12 +168,12 @@
 
 (def req-picker
   {:compile (fn [config]
-              (let [lang-param        (param config)
+              (let [lang-param        (param nil config)
                     last-key          (when (some? lang-param) (cons lang-param nil))
                     supported         (supported nil config)
                     key-path          (get config :key-path)
                     key-path          (when (valuable? key-path) (if (seqable? key-path) key-path (cons key-path nil)))
-                    path              (seq (concat (seq key-path) lang-param))
+                    path              (seq (concat (seq key-path) last-key))
                     [k1 k2 k3 & rest] path]
                 (case (count path)
                   0 (constantly nil)
