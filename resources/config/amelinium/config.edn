@@ -119,17 +119,17 @@
 
  :amelinium.http.middleware.language/web-supported [:en :pl]
  :amelinium.http.middleware.language/web-pickers   {:default [amelinium.http.middleware.language/path-picker
-                                                              amelinium.http.middleware.language/form-params-picker
+                                                              amelinium.http.middleware.language/form-params-picker-str
                                                               :language/user
                                                               :language/client
                                                               amelinium.http.middleware.language/accept-picker]
-                                                    :browser [amelinium.http.middleware.language/form-params-picker
+                                                    :browser [amelinium.http.middleware.language/form-params-picker-str
                                                               :language/user
                                                               amelinium.http.middleware.language/accept-picker
                                                               :language/client
                                                               :language/id
                                                               amelinium.http.middleware.language/path-picker]
-                                                    :user    [amelinium.http.middleware.language/form-params-picker
+                                                    :user    [amelinium.http.middleware.language/form-params-picker-str
                                                               :language/user
                                                               :language/client
                                                               amelinium.http.middleware.language/path-picker
