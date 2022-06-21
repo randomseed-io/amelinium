@@ -471,11 +471,11 @@
 (defn localized-page
   "Generates a page path for the given page identifier and language identifier. When
   called with just a request map, returns a path of the current page but re-generated
-  to support current language in use (taken from :language/str key of the request
+  to support current language in use (taken from `:language/str` key of the request
   map).
 
   The optional lang-required? argument (the last one in a quaternary variant, set to
-  true when not given) enables extra check which eliminates the resulting pages not
+  `true` when not given) enables extra check which eliminates the resulting pages not
   supporting the language parameter (yet were matched by their names).
 
   When the given path is already localized then re-localized path is generated and
