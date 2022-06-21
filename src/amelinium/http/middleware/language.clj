@@ -266,7 +266,10 @@
   When a language-picking function is created on a basis of a map (specified by
   `:handler` or `:compile`) then it has the responsibility of transforming its result
   to a keyword and checking if the chosen language identifier belongs to a supported
-  languages expressed in a configuration as a set under the `:supported` key.
+  languages expressed in a configuration as a set under the `:supported` key. Note
+  that picker compiling function will receive configuration under the `config` key
+  and should generate a function which takes a single argument (request map) whereas
+  handler should take two arguments, the first being a configuration.
 
   When a language-picking function is not a map but a function (or a symbolic,
   resolvable identifier of a function) then it will be wrapped in another function
@@ -280,7 +283,7 @@
             config     (into config (dissoc p :compile :handler))
             compile-fn (var/deref-symbol (:compile p))
             handler-fn (var/deref-symbol (:handler p))
-            picker-fn  (if compile-fn (compile-fn config) handler-fn)]
+            picker-fn  (if compile-fn (compile-fn config) #(handler-fn config %))]
         (when (ifn? picker-fn) picker-fn))
       (when (ifn? p) (comp supported some-keyword p)))))
 
