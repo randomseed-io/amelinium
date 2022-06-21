@@ -182,10 +182,6 @@
                   3 (fn [req] (get-in-req req supported k1 k2 k3))
                   (fn [req] (apply get-in-req req supported k1 k2 k3 rest)))))})
 
-(def form-params-picker
-  (-> req-picker
-      (assoc :key-path :form-params)))
-
 (def body-picker
   (-> req-picker
       (assoc :key-path :body)))
@@ -193,6 +189,20 @@
 (def accept-picker
   (-> req-picker
       (assoc :key-path :accept, :param :language)))
+
+(def form-params-picker-str
+  {:compile (fn [config]
+              (let [lang-param (some-str (param nil config))
+                    supported  (supported nil config)]
+                (fn [req]
+                  (get-in-req req supported :form-params lang-param))))})
+
+(def form-params-picker
+  {:compile (fn [config]
+              (let [lang-param (some-keyword-simple (param nil config))
+                    supported  (supported nil config)]
+                (fn [req]
+                  (get-in-req req supported :form-params lang-param))))})
 
 (def path-picker
   {:compile (fn [config]
@@ -229,7 +239,7 @@
 
 (def ^:const default-picker-chain
   [path-picker
-   form-params-picker
+   form-params-picker-str
    body-picker
    :language/user
    :language/client
