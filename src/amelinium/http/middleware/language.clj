@@ -206,8 +206,8 @@
 
 (def path-picker
   {:compile (fn [config]
-              (let [lang-param (param config)
-                    supported  (supported config)]
+              (let [lang-param (param nil config)
+                    supported  (supported nil config)]
                 (fn [req]
                   (or (get-in-req req supported :path-params lang-param)
                       (get-in-req req supported ::r/match :path-params lang-param)))))})
