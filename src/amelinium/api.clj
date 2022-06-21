@@ -121,7 +121,7 @@
   ([]
    (render nil))
   ([req]
-   (let [body (get req :response)]
+   (let [body (get req :response/body)]
      (if (map? body)
        body
        (if (sequential? body)
@@ -143,7 +143,11 @@
   ([resp-fn]
    (render-response resp-fn nil))
   ([resp-fn req]
-   (if (response? req) req (resp-fn (render req)))))
+   (if (response? req)
+     req
+     (if-some [headers (get req :response/headers)]
+       (assoc (resp-fn (render req)) :headers headers)
+       (resp-fn (render req))))))
 
 (defn render-ok
   ([]

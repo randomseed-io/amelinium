@@ -288,9 +288,9 @@
   ([resp-fn req data views-subdir layouts-subdir lang sess]
    (if (resp/response? req)
      req
-     (-> (render req data views-subdir layouts-subdir lang sess)
-         resp-fn
-         (resp/content-type "text/html")))))
+     (if-some [headers (get req :response/headers)]
+       (-> (render req data views-subdir layouts-subdir lang sess) resp-fn (update :headers conj headers))
+       (-> (render req data views-subdir layouts-subdir lang sess) resp-fn)))))
 
 (defn render-ok
   ([]
