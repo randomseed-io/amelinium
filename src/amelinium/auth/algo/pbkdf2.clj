@@ -11,7 +11,7 @@
 
   (:import com.lambdaworks.crypto.PBKDF)
 
-  (:require [amelinium.auth.pwd        :as     pwd]
+  (:require [amelinium.auth.pwd      :as     pwd]
             [io.randomseed.utils     :refer :all]
             [io.randomseed.utils.map :as     map]))
 
@@ -30,7 +30,9 @@
    (encrypt plain options {}))
   ([plain options settings]
    (let [options (if (or (nil? options) (map? options)) options {:salt options})
-         options (merge default-options (map/remove-empty-values (select-keys options required-keys)))
+         options (merge default-options
+                        (map/remove-empty-values (select-keys settings required-keys))
+                        (map/remove-empty-values (select-keys options required-keys)))
          options (map/update-existing options :algorithm normalize-name)
          salt    (to-bytes (map/lazy-get options :salt (pwd/salt-bytes 8)))
          result  (PBKDF/pbkdf2

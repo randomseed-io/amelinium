@@ -11,7 +11,7 @@
 
   (:import com.lambdaworks.crypto.SCrypt)
 
-  (:require [amelinium.auth.pwd         :as      pwd]
+  (:require [amelinium.auth.pwd       :as      pwd]
             [io.randomseed.utils      :refer  :all]
             [io.randomseed.utils.map  :as      map]))
 
@@ -31,8 +31,10 @@
    (encrypt plain options {}))
   ([plain options settings]
    (let [options (if (or (nil? options) (map? options)) options {:salt options})
-         options (merge default-options (map/remove-empty-values (select-keys options required-keys)))
-         salt    (to-bytes (map/lazy-get options :salt (pwd/salt-bytes 16)))
+         options (merge default-options
+                        (map/remove-empty-values (select-keys settings required-keys))
+                        (map/remove-empty-values (select-keys options required-keys)))
+         salt    (to-bytes (or (get options :salt) (pwd/salt-bytes 16)))
          result  (SCrypt/scrypt
                   (text-to-bytes plain)
                   salt
