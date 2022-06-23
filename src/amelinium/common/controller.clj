@@ -191,11 +191,8 @@
 
         (if-not (get sess :valid?)
 
-          (let [e      (get sess :error)
-                r      (:reason e)
-                action (if goto-uri "prolongation" "creation")]
-
-            (log/wrn "Session invalid after" action (log/for-user user-id user-email))
+          (let [e (get sess :error)
+                r (:reason e)]
             (when r
               (log/log (:severity e :warn) r)
               (oplog :level e :user-id user-id :op :session :ok? false :msg r))
