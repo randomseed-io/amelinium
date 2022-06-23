@@ -138,7 +138,7 @@
   (let [req (common/auth-user-with-password! req user-email password sess route-data)]
     (if (resp/response? req)
       req
-      (language/force (or lang (web/pick-language-str req))))))
+      (language/force req (or lang (web/pick-language-str req))))))
 
 (defn authenticate!
   "Logs user in when user e-mail and password are given, or checks if the session is
