@@ -10,6 +10,7 @@
 
   (:require [clojure.set                  :as        set]
             [clojure.string               :as        str]
+            [crypto.equality              :as     crypto]
             [tick.core                    :as          t]
             [buddy.core.hash              :as       hash]
             [buddy.core.codecs            :as     codecs]
@@ -18,6 +19,7 @@
             [amelinium.db                 :as         db]
             [amelinium.logging            :as        log]
             [amelinium.system             :as     system]
+            [amelinium.auth.algo.scrypt   :as     scrypt]
             [io.randomseed.utils          :refer    :all]
             [io.randomseed.utils.time     :as       time]
             [io.randomseed.utils.var      :as        var]
@@ -25,9 +27,124 @@
             [io.randomseed.utils.ip       :as         ip]
             [io.randomseed.utils.db.types :as      types]))
 
-(def ^:const sid-match (re-pattern "[a-f0-9]{30,128}"))
+(def ^:const sid-match (re-pattern "[a-f0-9]{30,128}(-[a-f0-9]{30,128})?"))
+
+;; Secure sessions
+
+(def ^:const scrypt-options
+  {:cpu-cost 512
+   :mem-cost 2
+   :parallel 1})
+
+(def ^:const token-splitter (re-pattern "-"))
+(def ^:const salt-splitter  (re-pattern "\\$"))
+
+(defn- bytes->b64u
+  [v]
+  (try (when v (codecs/bytes->str (codecs/bytes->b64u v)))
+       (catch Throwable _
+         nil)))
+
+(defn- b64u->bytes
+  [v]
+  (try (when v (codecs/b64u->bytes (codecs/str->bytes v)))
+       (catch Throwable _
+         nil)))
+
+(defn encrypt
+  [plain-token]
+  (when plain-token
+    (when-some [enc (scrypt/encrypt plain-token scrypt-options)]
+      (str (bytes->b64u (bytes (get enc :salt))) "$"
+           (bytes->b64u (bytes (get enc :password)))))))
+
+(defn check-encrypted
+  ([plain-token encrypted-token-b64-str]
+   (when (and plain-token encrypted-token-b64-str)
+     (when-some [salt-pass (str/split encrypted-token-b64-str salt-splitter 2)]
+       (crypto/eq? (b64u->bytes (nth salt-pass 1 nil))
+                   (get (scrypt/encrypt plain-token
+                                        (b64u->bytes (nth salt-pass 0 nil))
+                                        scrypt-options) :password))))))
+
+(defn split-secure-sid
+  [session-id]
+  (str/split session-id token-splitter 2))
+
+(defn parse-secure-sid
+  [session-id]
+  (let [[sid token] (split-secure-sid session-id)]
+    [sid (b64u->bytes token)]))
+
+(defn db-sid
+  [smap-or-sid]
+  (if (map? smap-or-sid)
+    (or (get smap-or-sid :db/id)
+        (db-sid (get smap-or-sid :id)))
+    (nth (split-secure-sid smap-or-sid) 0 nil)))
+
+(defn db-sid-smap
+  [smap]
+  (or (get smap :db/id)
+      (nth (split-secure-sid (get smap :id) 0 nil))))
+
+(defn db-sid-str
+  [sid]
+  (nth (split-secure-sid sid) 0 nil))
+
+(defn sectoken
+  [smap-or-sid]
+  (if (map? smap-or-sid)
+    (or (get smap-or-sid :secure/token)
+        (sectoken (get smap-or-sid :id)))
+    (nth (split-secure-sid smap-or-sid) 1 nil)))
+
+;; SID generation
+
+(defn gen-session-id
+  [smap secured? & args]
+  (let [rnd (str (apply str args) (time/timestamp) (gen-digits 8))
+        sid (-> rnd hash/md5 codecs/bytes->hex)]
+    (if secured?
+      (let [pass (-> (gen-digits 10) hash/md5 codecs/bytes->hex)
+            stok (encrypt pass)
+            ssid (str sid "-" pass)]
+        (if (not-empty stok)
+          (assoc smap :id ssid :db/id sid :db/token stok :secure? true :security/passed? true)
+          (assoc smap :id  sid :db/id sid :secure? false)))
+      (assoc smap :id sid :db/id sid :secure? false))))
 
 ;; Session validation
+
+(defn secure?
+  "Checks if session is secure. If `:secured?` option is not enabled in configuration,
+  it always returns `true`. If `:secure?` flag is set to a truthy value, it returns
+  it."
+  [smap opts]
+  (or (not (get opts :secured?))
+      (boolean (get smap :secure?))))
+
+(defn insecure?
+  "Checks if session is not secure where it should be. If `:secured?` option is not
+  enabled in configuration, it always returns `false`. If `:secure?` flag is set to a
+  falsy value, it returns `false`."
+  [smap opts]
+  (and (get opts :secured?)
+       (not (get smap :secure?))))
+
+(defn security-passed?
+  "Checks if the additional security token was validated correctly unless the session
+  is not secured (in such case returns `true`)."
+  [smap]
+  (or (not (get smap :secure?))
+      (get smap :security/passed?)))
+
+(defn security-failed?
+  "Checks if the additional security token was validated incorrectly unless the session
+  is not secured (in such case returns `false`)."
+  [smap]
+  (and (get smap :secure?)
+       (not (get smap :security/passed?))))
 
 (defn ip-state
   [smap user-id user-email remote-ip]
@@ -83,7 +200,10 @@
 
 (defn sid-valid?
   [sid]
-  (and sid (string? sid) (<= 30 (count sid) 128) (re-matches sid-match sid)))
+  (or (and sid (string? sid)
+           (<= 30 (count sid) 256)
+           (re-matches sid-match sid))
+      (println sid (re-matches sid-match sid))))
 
 (defn created-valid?
   [smap]
@@ -135,6 +255,12 @@
          (expired? smap opts)        {:cause    :expired
                                       :reason   (str "Session expired " @for-user)
                                       :severity :info}
+         (insecure? smap opts)       {:cause    :insecure
+                                      :reason   (str "Session not secured with encrypted token " @for-user)
+                                      :severity :warn}
+         (security-failed? smap)     {:cause    :bad-security-token
+                                      :reason   (str "Bad session security token " @for-user)
+                                      :severity :warn}
          :ip-address-check           (ip-state smap user-id user-email ip-address ))))))
 
 (defn correct?
@@ -145,41 +271,40 @@
   [smap]
   (boolean (get smap :valid?)))
 
-;; SID generation
-
-(defn gen-session-id
-  [& args]
-  (codecs/bytes->hex
-   (hash/md5
-    (str (apply str args) (time/timestamp) (gen-digits 10)))))
-
 ;; SQL
 
 (defn get-session-by-id
   "Standard session getter. Uses `db` to connect to a database and gets data identified
   by `sid` from a table `table`. Returns a map."
-  [opts db table sid remote-ip]
-  (sql/get-by-id db table sid db/opts-slashed-map))
+  [opts db table sid-db remote-ip]
+  (sql/get-by-id db table sid-db db/opts-slashed-map))
 
 (defn get-last-active
-  [opts db table sid remote-ip]
+  [opts db table sid-db remote-ip]
   (first (jdbc/execute-one! db
-                            [(str "SELECT active FROM " table " WHERE id = ?") sid]
+                            [(str "SELECT active FROM " table " WHERE id = ?") sid-db]
                             db/opts-simple-vec)))
 
 (defn update-last-active
-  ([opts db table sid remote-ip]
+  ([opts db table sid-db remote-ip]
    (::jdbc/update-count
-    (sql/update! db table {:active (t/now)} {:id sid} db/opts-simple-map)))
-  ([opts db table sid remote-ip t]
+    (sql/update! db table {:active (t/now)} {:id sid-db} db/opts-simple-map)))
+  ([opts db table sid-db remote-ip t]
    (::jdbc/update-count
-    (sql/update! db table {:active (t/instant t)} {:id sid} db/opts-simple-map))))
+    (sql/update! db table {:active (t/instant t)} {:id sid-db} db/opts-simple-map))))
 
 (defn set-session
   [opts db table smap]
-  (let [sess-db (set/rename-keys smap {:user/id :user_id :user/email :user_email})]
-    (::jdbc/update-count
-     (db/replace! db table sess-db db/opts-simple-map))))
+  (::jdbc/update-count
+   (db/replace! db table
+                (-> smap
+                    (set/rename-keys {:db/id      :id
+                                      :db/token   :secure_token
+                                      :user/id    :user_id
+                                      :user/email :user_email})
+                    (select-keys [:user_id :user_email :secure_token
+                                  :id :ip :active :created]))
+                db/opts-simple-map)))
 
 (defn delete-user-vars
   [opts db sessions-table variables-table user-id]
@@ -217,11 +342,11 @@
 
 (defn session-key
   "Returns a string of configured session ID field name by extracting it from `opts`
-  which can be a map containing `:session-id-field`, a request map containing the given
-  `result-key` associated with a map with `:session-id-field`, a request map containing
-  the given `config-key` associated with a map with `:session-id-field` or a
-  keyword (returned immediately). Optional `other` map can be provided which will be
-  used as a second try when `opts` lookup will fail. The function returns
+  which can be a map containing `:session-id-field`, a request map containing the
+  given `result-key` associated with a map with `:session-id-field`, a request map
+  containing the given `config-key` associated with a map with `:session-id-field` or
+  a keyword (returned immediately). Optional `other` map can be provided which will
+  be used as a second try when `opts` lookup will fail. The function returns
   \"session-id\" string when other methods fail."
   ([opts]
    (session-key opts :session :session/config))
@@ -245,21 +370,30 @@
          (get (config-key other)    :session-id-field)
          "session-id"))))
 
-(def session-field session-key)
+(def ^{:arglists '([opts]
+                   [opts other]
+                   [opts result-key config-key]
+                   [opts other result-key config-key])}
+  session-field
+  session-key)
 
 (defn- config-options
-  ([req opts-or-config-key]
-   (if (map? opts-or-config-key)
-     opts-or-config-key
-     (get req (or opts-or-config-key :session/config)))))
+  [req opts-or-config-key]
+  (if (map? opts-or-config-key)
+    opts-or-config-key
+    (get req (or opts-or-config-key :session/config))))
 
 ;; Session variables
 
 (defn- prep-opts
-  [opts id-or-smap]
-  (if (map? id-or-smap)
-    [id-or-smap opts (get id-or-smap :id)]
-    [nil opts id-or-smap]))
+  ([opts _ smap-or-user-id]
+   (if (map? smap-or-user-id)
+     [smap-or-user-id opts (get smap-or-user-id :user/id)]
+     [nil opts smap-or-user-id]))
+  ([opts id-or-smap]
+   (if (map? id-or-smap)
+     [id-or-smap opts (db-sid-smap id-or-smap)]
+     [nil opts (db-sid-str id-or-smap)])))
 
 (defn- prep-names
   [coll]
@@ -271,10 +405,10 @@
   {:arglists '([opts sid var-name]
                [opts smap var-name])}
   ([opts sid-or-smap var-name]
-   (let [[smap opts sid] (prep-opts opts sid-or-smap)]
+   (let [[smap opts db-sid] (prep-opts opts sid-or-smap)]
      (if (and smap (not (valid? smap)))
        (log/err "Cannot get session variable" var-name "because session is not valid")
-       ((get opts :fn/var-get) sid var-name)))))
+       ((get opts :fn/var-get) db-sid var-name)))))
 
 (defn get-variable-failed?
   "Returns `true` if the value `v` obtained from a session variable indicates that it
@@ -290,13 +424,13 @@
   {:arglists '([opts sid var-name value & pairs]
                [opts smap var-name value & pairs])}
   [opts sid-or-smap var-name value & pairs]
-  (let [[smap opts sid] (prep-opts opts sid-or-smap)]
-    (if-not sid
+  (let [[smap opts db-sid] (prep-opts opts sid-or-smap)]
+    (if-not db-sid
       (log/err "Cannot store session variable" var-name
                "because session ID is not valid")
       (if pairs
-        ((get opts :fn/var-set) sid var-name value)
-        (apply (get opts :fn/var-set) sid var-name value pairs)))))
+        ((get opts :fn/var-set) db-sid var-name value)
+        (apply (get opts :fn/var-set) db-sid var-name value pairs)))))
 
 (defn del-var!
   "Deletes from a session variable `var-name` assigned to a session of the given
@@ -305,13 +439,13 @@
   {:arglists '([opts sid var-name & names]
                [opts smap var-name & names])}
   [opts sid-or-smap var-name & names]
-  (let [[smap opts sid] (prep-opts opts sid-or-smap)]
-    (if-not sid
+  (let [[smap opts db-sid] (prep-opts opts sid-or-smap)]
+    (if-not db-sid
       (log/err "Cannot delete session variable" var-name
                "because session ID is not valid")
       (if names
-        ((get opts :fn/var-del) sid var-name)
-        (apply (get opts :fn/var-del) sid var-name names)))))
+        ((get opts :fn/var-del) db-sid var-name)
+        (apply (get opts :fn/var-del) db-sid var-name names)))))
 
 (defn del-vars!
   "Deletes all session variables which belong to a session of the given ID (`sid`) or a
@@ -319,19 +453,19 @@
   {:arglists '([opts sid]
                [opts smap])}
   [opts sid-or-smap]
-  (let [[smap opts sid] (prep-opts opts sid-or-smap)]
-    (if-not sid
+  (let [[smap opts db-sid] (prep-opts opts sid-or-smap)]
+    (if-not db-sid
       (log/err "Cannot delete session variables"
                "because session ID is not valid")
-      ((get opts :fn/var-del) sid))))
+      ((get opts :fn/var-del) db-sid))))
 
 (defn del-user-vars!
-  "Deletes all session variables which belong to a user. The user can be specified as
-  `user-id`, `sid` (indirectly) or `smap` (indirectly)."
+  "Deletes all session variables which belong to a user. The user may be specified as
+  `user-id` or `smap` (indirectly)."
   {:arglists '([opts user-id]
                [opts smap])}
   [opts smap-or-user-id]
-  (let [[smap opts user-id] (prep-opts opts smap-or-user-id)
+  (let [[smap opts user-id] (prep-opts opts nil smap-or-user-id)
         del-fn              (get opts :fn/vars-del-user)]
     (if user-id
       (del-fn user-id)
@@ -357,11 +491,11 @@
   ([req opts-or-config-key]
    (let [opts (config-options req opts-or-config-key)]
      (when-some [invalidator (get opts :fn/invalidator)]
-       (invalidator (get (get req (or (get opts :session-key) :session)) :id)
+       (invalidator (db-sid-smap (get req (or (get opts :session-key) :session)))
                     (get req :remote-ip)))))
-  ([opts-or-fn sid ip-address]
+  ([opts-or-fn sid-db ip-address]
    (when-some [invalidator (if (map? opts-or-fn) (get opts-or-fn :fn/invalidator) opts-or-fn)]
-     (invalidator sid ip-address))))
+     (invalidator sid-db ip-address))))
 
 ;; Cache invalidation when time-sensitive value (last active time) exceeds TTL.
 
@@ -381,9 +515,9 @@
          (when-some [last-active (get smap :active)]
            (let [inactive-for (t/between last-active (t/now))]
              (when (t/> inactive-for cache-expires)
-               (let [sid (get smap :id)]
-                 (invalidator-fn sid remote-ip)
-                 (when-some [last-active (last-active-fn sid remote-ip)]
+               (let [sid-db (db-sid-smap smap)]
+                 (invalidator-fn sid-db remote-ip)
+                 (when-some [last-active (last-active-fn sid-db remote-ip)]
                    (assoc smap :active last-active)))))))
        smap)))
 
@@ -414,11 +548,16 @@
             (get opts :session-id-field)
             sid remote-ip))
   ([opts getter-fn session-id-field sid remote-ip]
-   (let [smap (getter-fn sid remote-ip)
-         smap (update smap :ip ip/to-address)
-         smap (if (and (not (get smap :id)) (not (get smap :err/id))) (assoc smap :err/id sid) smap)
-         smap (map/assoc-missing smap :session-id-field session-id-field)
-         stat (state smap opts remote-ip)]
+   (let [[sid-db pass] (split-secure-sid sid)
+         secure?       (some? (not-empty pass))
+         smap          (getter-fn sid-db remote-ip)
+         token         (when secure? (not-empty (get smap :secure/token)))
+         smap          (assoc smap :db/id sid-db :secure? secure? :secure/token pass)
+         smap          (if secure? (assoc smap :security/passed? (check-encrypted pass token)) smap)
+         smap          (update smap :ip ip/to-address)
+         smap          (if (and (not (get smap :id)) (not (get smap :err/id))) (assoc smap :err/id sid) smap)
+         smap          (map/assoc-missing smap :session-id-field session-id-field)
+         stat          (state smap opts remote-ip)]
      (if (get stat :cause)
        (mkbad smap opts :error stat)
        (mkgood smap)))))
@@ -426,7 +565,8 @@
 (defn process
   "Takes a session handler, last active time getter, last active time updater, a
   request map and an optional session options or a config key and validates session
-  against database or memoized session data. Returns a session map."
+  against a database or memoized session data (since `handler-fn` can use a
+  cache). Returns a session map."
   {:arglists '([req]
                [req config]
                [req config-key]
@@ -452,7 +592,7 @@
   ([handler-fn refresh-fn update-active-fn req opts-or-config-key session-id-field]
    (let [opts             (config-options req opts-or-config-key)
          session-id-field (or (some-str (or session-id-field (get opts :session-id-field))) "session-id")]
-     (if-some [sid (some-str (get (get req :form-params) session-id-field))]
+     (if-some [sid (some-str (get (get req :form-params) session-id-field))] ;; todo: config option for 1st level
        (if-not (sid-valid? sid)
          (mkbad {:id sid} opts
                 :session-id-field session-id-field
@@ -460,13 +600,14 @@
                         :cause    :malformed-session-id
                         :severity :info})
          (let [remote-ip (get req :remote-ip)
-               smap      (handler-fn sid remote-ip)]
+               smap      (handler-fn sid remote-ip)
+               _         (println "w process:" smap)]
            (if-not (valid? smap)
              smap
              (let [smap (refresh-fn smap remote-ip)]
                (if-not (valid? smap)
                  smap
-                 (if (pos-int? (update-active-fn sid remote-ip))
+                 (if (pos-int? (update-active-fn (db-sid-smap smap) remote-ip))
                    (mkgood smap)
                    (mkbad smap opts
                           :error {:severity :error
@@ -501,19 +642,20 @@
    (when-some [sid (or (get smap :err/id) (get smap :id))]
      (let [ip-address (ip/to-address ip-address)
            ipplain    (ip/plain-ip-str ip-address)
-           new-time   (t/now)]
+           new-time   (t/now)
+           sid-db     (or (db-sid-smap smap) (db-sid-str sid))]
        (log/msg "Prolonging session" (log/for-user (get smap :user/id) (get smap :user/email) ipplain))
        (let [test-smap (assoc smap :id sid :active new-time)
              stat      (state test-smap opts ip-address)]
-         (invalidator-fn sid ip-address)
+         (invalidator-fn sid-db ip-address)
          (if (correct? (get stat :cause))
-           (do (update-active-fn sid ip-address (t/instant new-time))
+           (do (update-active-fn sid-db ip-address (t/instant new-time))
                (assoc (handler-fn sid ip-address) :prolonged? true))
            (do (log/wrn "Session re-validation error" (log/for-user (:user/id smap) (:user/email smap) ipplain))
                (mkbad smap opts :error stat))))))))
 
 (defn create
-  "Creates a session and puts it into a database. Returns the created session map."
+  "Creates a new session and puts it into a database. Returns the created session map."
   {:arglists '([req user-id user-email ip-address]
                [opts user-id user-email ip-address]
                [req opts-or-config-key user-id user-email ip-address]
@@ -525,7 +667,7 @@
   ([req opts-or-config-key user-id user-email ip-address]
    (let [opts (config-options req opts-or-config-key)]
      ((get opts :fn/create) user-id user-email ip-address)))
-  ([opts setter-fn invalidator-fn var-del-fn var-del-user-fn single-session?
+  ([opts setter-fn invalidator-fn var-del-fn var-del-user-fn single-session? secured?
     user-id user-email ip-address]
    (let [user-id    (valuable user-id)
          user-email (some-str user-email)]
@@ -536,13 +678,14 @@
        (let [t       (t/now)
              ip      (ip/to-address ip-address)
              ipplain (ip/plain-ip-str ip)
-             sid     (gen-session-id user-id t (ip/to-str-v6 ip))
              sess    {:user/id    user-id
                       :user/email user-email
-                      :id         sid
                       :ip         ip
                       :created    t
                       :active     t}
+             sess    (gen-session-id sess secured? user-id ipplain)
+             _       (println sess)
+             sid-db  (db-sid-smap sess)
              stat    (state sess opts ip)]
          (log/msg "Opening session" (log/for-user user-id user-email ipplain))
          (if-not (correct? (get stat :cause))
@@ -550,11 +693,11 @@
                (mkbad sess opts :error stat))
            (let [updated-count (setter-fn sess)
                  sess          (assoc sess :session-id-field (or (some-str (get opts :session-id-field)) "session-id"))]
-             (invalidator-fn sid ip)
+             (invalidator-fn sid-db ip)
              (if (pos-int? updated-count)
                (do (if single-session?
                      (var-del-user-fn user-id)
-                     (var-del-fn sid))
+                     (var-del-fn sess))
                    (mkgood sess))
                (do (log/err "Problem saving session" (log/for-user user-id user-email ipplain))
                    (mkbad sess opts
@@ -602,6 +745,7 @@
                                (update :config-key       #(or (some-keyword %) :session/config))
                                (update :session-id-field #(or (some-str %) "session-id"))
                                (update :single-session?  boolean)
+                               (update :secured?         boolean)
                                (calc-cache-expires))
         db                 (get config :db)
         session-key        (get config :session-key)
@@ -611,6 +755,7 @@
         session-id-field   (get config :session-id-field)
         cache-expires      (get config :expires)
         single-session?    (get config :single-session?)
+        secured?           (get config :secured?)
         getter-fn          (setup-fn config :fn/getter get-session-by-id)
         getter-fn-w        #(getter-fn config db sessions-table %1 %2)
         config             (assoc config :fn/getter getter-fn-w)
@@ -660,7 +805,7 @@
                                   :fn/vars-del-user var-del-user-fn-w)
         create-fn          #(create config
                                     setter-fn-w invalidator-fn var-del-fn var-del-user-fn-w
-                                    single-session? %1 %2 %3)
+                                    single-session? secured? %1 %2 %3)
         config             (assoc config :fn/create create-fn)]
     (log/msg "Installing session handler:" k)
     (when dbname (log/msg "Using database" dbname "for storing sessions"))

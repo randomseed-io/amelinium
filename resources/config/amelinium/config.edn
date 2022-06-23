@@ -83,6 +83,7 @@
                                          :cache-size       256
                                          :wrong-ip-expires true
                                          :single-session?  true
+                                         :secured?         false
                                          :handler          amelinium.http.middleware.session/handler
                                          :expires          [15 minutes]
                                          :hard-expires     [1 hour]

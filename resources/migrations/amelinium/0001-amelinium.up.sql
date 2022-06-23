@@ -79,12 +79,13 @@ CREATE INDEX IF NOT EXISTS authlog_client_index ON authlog(client_id);
 CREATE INDEX IF NOT EXISTS authlog_user_id_index ON authlog(user_id);
 --;;
 CREATE TABLE IF NOT EXISTS sessions (
-  id          CHAR(64)  PRIMARY KEY,
-  user_id     INTEGER UNSIGNED NOT NULL UNIQUE KEY,
-  user_email  CHAR(128),
-  created     TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  active      TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  ip          INET6,
+  id           CHAR(64) PRIMARY KEY,
+  user_id      INTEGER UNSIGNED NOT NULL,
+  user_email   CHAR(128),
+  created      TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  active       TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ip           INET6,
+  secure_token CHAR(128),
   CONSTRAINT FK_sessions_user_id_users
     FOREIGN KEY(user_id)
     REFERENCES users(id)
