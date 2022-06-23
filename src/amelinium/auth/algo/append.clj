@@ -10,7 +10,7 @@
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require [clojure.string          :as       str]
-            [amelinium.auth.pwd        :as       pwd]
+            [amelinium.auth.pwd      :as       pwd]
             [io.randomseed.utils     :refer   :all]
             [io.randomseed.utils.map :as       map]))
 
