@@ -324,7 +324,7 @@
          expired?      (or (= :expired cause)
                            (and (= :bad-ip cause) (get opts :wrong-ip-expires)))
          hard-expired? (and expired? (hard-expired? smap opts))
-         err-id        (if-some [sid (get smap :id)] sid (get smap :err/id))]
+         err-id        (or (get smap :id) (get smap :err/id))]
      (-> (update-in smap [:error :severity] (fnil identity :warn))
          (assoc :valid?        false
                 :err/id        err-id
@@ -479,17 +479,23 @@
                [req opts]
                [req config-key]
                [opts sid ip-address]
-               [invalidator-fn sid ip-address])}
+               [invalidator-fn sid ip-address]
+               [invalidator-fn smap ip-address])}
   ([req]
    (invalidate-cache! req :session/config))
   ([req opts-or-config-key]
    (let [opts (config-options req opts-or-config-key)]
      (when-some [invalidator (get opts :fn/invalidator)]
-       (invalidator (db-sid-smap (get req (or (get opts :session-key) :session)))
-                    (get req :remote-ip)))))
-  ([opts-or-fn sid-db ip-address]
+       (let [smap (get req (or (get opts :session-key) :session))]
+         (invalidator (or (get smap :id) (get smap :err/id))
+                      (get req :remote-ip))))))
+  ([opts-or-fn sid-or-smap ip-address]
    (when-some [invalidator (if (map? opts-or-fn) (get opts-or-fn :fn/invalidator) opts-or-fn)]
-     (invalidator sid-db ip-address))))
+     (invalidator (if (map? sid-or-smap)
+                    (or (get sid-or-smap :id)
+                        (get sid-or-smap :err/id))
+                    sid-or-smap)
+                  ip-address))))
 
 ;; Cache invalidation when time-sensitive value (last active time) exceeds TTL.
 
@@ -509,10 +515,9 @@
          (when-some [last-active (get smap :active)]
            (let [inactive-for (t/between last-active (t/now))]
              (when (t/> inactive-for cache-expires)
-               (let [sid-db (db-sid-smap smap)]
-                 (invalidator-fn sid-db remote-ip)
-                 (when-some [last-active (last-active-fn sid-db remote-ip)]
-                   (assoc smap :active last-active)))))))
+               (invalidator-fn (or (get smap :id) (get smap :err/id)) remote-ip)
+               (when-some [last-active (last-active-fn (db-sid-smap smap) remote-ip)]
+                 (assoc smap :active last-active))))))
        smap)))
 
 ;; Session handling, creation and prolongation
@@ -546,10 +551,12 @@
          secure?       (some? (not-empty pass))
          smap          (getter-fn sid-db remote-ip)
          token         (when secure? (not-empty (get smap :secure/token)))
-         smap          (assoc smap :db/id sid-db :secure? secure? :secure/token pass)
-         smap          (if secure? (assoc smap :security/passed? (check-encrypted pass token)) smap)
+         smap          (assoc smap :id sid :db/id sid-db :secure? secure?)
+         smap          (if secure? (assoc smap
+                                          :secure/token pass
+                                          :security/passed? (check-encrypted pass token))
+                           smap)
          smap          (update smap :ip ip/to-address)
-         smap          (if (and (not (get smap :id)) (not (get smap :err/id))) (assoc smap :err/id sid) smap)
          smap          (map/assoc-missing smap :session-id-field session-id-field)
          stat          (state smap opts remote-ip)]
      (if (get stat :cause)
@@ -641,7 +648,7 @@
        (log/msg "Prolonging session" (log/for-user (get smap :user/id) (get smap :user/email) ipplain))
        (let [test-smap (assoc smap :id sid :active new-time)
              stat      (state test-smap opts ip-address)]
-         (invalidator-fn sid-db ip-address)
+         (invalidator-fn sid ip-address)
          (if (correct? (get stat :cause))
            (do (update-active-fn sid-db ip-address (t/instant new-time))
                (assoc (handler-fn sid ip-address) :prolonged? true))
@@ -687,7 +694,7 @@
                (mkbad sess opts :error stat))
            (let [updated-count (setter-fn sess)
                  sess          (assoc sess :session-id-field (or (some-str (get opts :session-id-field)) "session-id"))]
-             (invalidator-fn sid-db ip)
+             (invalidator-fn (or (get sess :id) (get sess :err/id)) ip)
              (if (pos-int? updated-count)
                (do (if single-session?
                      (var-del-user-fn user-id)
