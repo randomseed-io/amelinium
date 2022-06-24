@@ -71,11 +71,6 @@
   [session-id]
   (str/split session-id token-splitter 2))
 
-(defn parse-secure-sid
-  [session-id]
-  (let [[sid token] (split-secure-sid session-id)]
-    [sid (b64u->bytes token)]))
-
 (defn db-sid
   [smap-or-sid]
   (if (map? smap-or-sid)
