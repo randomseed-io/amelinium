@@ -89,7 +89,7 @@
 ;; Sessions
 
 (p/import-vars [amelinium.common
-                session-key session-variable-get-failed?
+                session-field session-variable-get-failed?
                 allow-expired allow-soft-expired allow-hard-expired])
 
 ;; Context and roles

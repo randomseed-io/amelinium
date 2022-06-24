@@ -258,6 +258,19 @@
   [smap]
   (boolean (get smap :valid?)))
 
+;; Request processing
+
+(defn identify-session-path-compile
+  [path]
+  (let [[a b c d & more] path]
+    (case (count path)
+      0 #(get % :session-id)
+      1 #(get % a)
+      2 #(get (get % a) b)
+      3 #(get (get (get % a) b) c)
+      4 #(get (get (get (get % a) b) c) d)
+      #(get-in % path))))
+
 ;; SQL
 
 (defn get-session-by-id
@@ -327,18 +340,19 @@
 
 ;; Configuration
 
-(defn session-key
+(defn session-field
   "Returns a string of configured session ID field name by extracting it from `opts`
-  which can be a map containing `:session-id-field`, a request map containing the
+  which can be a map containing the last (or only) element of `:session-id-path`
+  configuration option (exposed as `:session-id-field`), a request map containing the
   given `result-key` associated with a map with `:session-id-field`, a request map
   containing the given `config-key` associated with a map with `:session-id-field` or
   a keyword (returned immediately). Optional `other` map can be provided which will
   be used as a second try when `opts` lookup will fail. The function returns
-  \"session-id\" string when other methods fail."
+  \"session-id\" string when all methods fail."
   ([opts]
-   (session-key opts :session :session/config))
+   (session-field opts :session :session/config))
   ([opts other]
-   (session-key opts other :session :session/config))
+   (session-field opts other :session :session/config))
   ([opts result-key config-key]
    (if (keyword? opts)
      opts
@@ -352,17 +366,10 @@
      (or (get opts :session-id-field)
          (get (get opts result-key) :session-id-field)
          (get (get opts config-key) :session-id-field)
-         (:session-if-key other)
+         (:session-id-field other)
          (get (result-key other)    :session-id-field)
          (get (config-key other)    :session-id-field)
          "session-id"))))
-
-(def ^{:arglists '([opts]
-                   [opts other]
-                   [opts result-key config-key]
-                   [opts other result-key config-key])}
-  session-field
-  session-key)
 
 (defn- config-options
   [req opts-or-config-key]
@@ -522,18 +529,23 @@
   from a database using `getter-fn` (passing configuration options, database
   connection, table, session ID and remote IP to the call). The database connection
   object should be present in options under the `:db` key or given as an argument. If
-  there is no session ID present in a request (under the `\"session-id\"` form param
-  or under a key passed as `session-id-field` argument), `nil` is returned."
+  there is no session ID present in a request (obtained with `identifier-fn`), `nil`
+  is returned."
   ([req]
    (handler req :session/config))
   ([req opts-or-config-key]
    (let [opts (config-options opts-or-config-key)]
      (handler opts
-              (some-str (get (get req :form-params) (or (some-str (get opts :session-id-field)) "session-id")))
+              (get opts :fn/getter)
+              (get opts :session-id-field)
+              (some-str ((get opts :fn/identifier) req))
               (get req :remote-ip))))
   ([req opts-or-config-key sid remote-ip]
    (let [opts (config-options req opts-or-config-key)]
-     (handler opts sid remote-ip)))
+     (handler opts
+              (get opts :fn/getter)
+              (get opts :session-id-field)
+              sid remote-ip)))
   ([opts sid remote-ip]
    (handler opts
             (get opts :fn/getter)
@@ -544,10 +556,13 @@
          secure?       (some? (not-empty pass))
          smap          (getter-fn sid-db remote-ip)
          passed?       (when secure? (check-encrypted pass (get smap :secure/token)))
-         smap          (assoc smap :id sid :db/id sid-db :secure? secure?)
+         smap          (assoc smap
+                              :id              sid
+                              :db/id           sid-db
+                              :ip              (ip/to-address (get smap :ip))
+                              :secure?          secure?
+                              :session-id-field (or session-id-field (get opts :session-id-field) "session-id"))
          smap          (if secure? (dissoc (assoc smap :security/passed? passed?) :secure/token) smap)
-         smap          (update smap :ip ip/to-address)
-         smap          (map/assoc-missing smap :session-id-field session-id-field)
          stat          (state smap opts remote-ip)]
      (if (get stat :cause)
        (mkbad smap opts :error stat)
@@ -561,54 +576,60 @@
   {:arglists '([req]
                [req config]
                [req config-key]
-               [handler-fn refresh-fn update-active-fn invalidator-fn req]
-               [handler-fn refresh-fn update-active-fn invalidator-fn req config-key]
-               [handler-fn refresh-fn update-active-fn invalidator-fn req opts]
-               [handler-fn refresh-fn update-active-fn invalidator-fn req opts session-id-field]
-               [handler-fn refresh-fn update-active-fn invalidator-fn req config-key session-id-field])}
+               [handler-fn identifier-fn refresh-fn update-active-fn invalidator-fn req]
+               [handler-fn identifier-fn refresh-fn update-active-fn invalidator-fn req config-key]
+               [handler-fn identifier-fn refresh-fn update-active-fn invalidator-fn req opts]
+               [handler-fn identifier-fn refresh-fn update-active-fn invalidator-fn req opts session-id-field]
+               [handler-fn identifier-fn refresh-fn update-active-fn invalidator-fn req config-key session-id-field])}
   ([req]
    (process req :session/config))
   ([req opts-or-config-key]
    (let [opts (config-options req opts-or-config-key)]
      (process (get opts :fn/handler)
+              (get opts :fn/identifier)
               (get opts :fn/refresh)
               (get opts :fn/update-active)
               req
               opts
-              (get opts :session-id-field) "session-id")))
-  ([handler-fn refresh-fn update-active-fn req]
-   (process handler-fn refresh-fn update-active-fn req (get req :session/config)))
-  ([handler-fn refresh-fn update-active-fn req opts-or-config-key]
-   (process handler-fn refresh-fn update-active-fn req opts-or-config-key nil))
-  ([handler-fn refresh-fn update-active-fn req opts-or-config-key session-id-field]
-   (let [opts             (config-options req opts-or-config-key)
-         session-id-field (or (some-str (or session-id-field (get opts :session-id-field))) "session-id")]
-     (if-some [sid (some-str (get (get req :form-params) session-id-field))] ;; todo: config option for 1st level
-       (if-not (sid-valid? sid)
+              (get opts :session-id-field))))
+  ([handler-fn identifier-fn refresh-fn update-active-fn req]
+   (process handler-fn identifier-fn refresh-fn update-active-fn req (get req :session/config)))
+  ([handler-fn identifier-fn refresh-fn update-active-fn req opts-or-config-key]
+   (process handler-fn identifier-fn refresh-fn update-active-fn req opts-or-config-key nil))
+  ([handler-fn identifier-fn refresh-fn update-active-fn req opts-or-config-key session-id-field]
+   (if-some [sid (some-str (identifier-fn req))]
+     (if-not (sid-valid? sid)
+       (let [opts (config-options req opts-or-config-key)]
          (mkbad {:id sid} opts
-                :session-id-field session-id-field
+                :session-id-path  (get opts :session-id-path)
                 :error {:reason   "Malformed session-id parameter"
                         :cause    :malformed-session-id
-                        :severity :info})
-         (let [remote-ip (get req :remote-ip)
-               smap      (handler-fn sid remote-ip)]
-           (if-not (valid? smap)
-             smap
-             (let [smap (refresh-fn smap remote-ip)]
-               (if-not (valid? smap)
-                 smap
-                 (if (pos-int? (update-active-fn (db-sid-smap smap) remote-ip))
-                   (mkgood smap)
+                        :severity :info}))
+       (let [remote-ip (get req :remote-ip)
+             smap      (handler-fn sid remote-ip)]
+         (if-not (valid? smap)
+           smap
+           (let [smap (refresh-fn smap remote-ip)]
+             (if-not (valid? smap)
+               smap
+               (if (pos-int? (update-active-fn (db-sid-smap smap) remote-ip))
+                 (mkgood smap)
+                 (let [opts (config-options req opts-or-config-key)]
                    (mkbad smap opts
                           :error {:severity :error
                                   :cause    :database-problem
-                                  :reason   (some-str-spc "Problem updating session data"
-                                                          (log/for-user
-                                                           (:user/id    smap)
-                                                           (:user/email smap)
-                                                           (or (ip/plain-ip-str (ip/to-address (:ip smap)))
-                                                               (:remote-ip/str req))))})))))))
-       {:id nil :err/id nil :session-id-field session-id-field}))))
+                                  :reason   (some-str-spc
+                                             "Problem updating session data"
+                                             (log/for-user
+                                              (:user/id    smap)
+                                              (:user/email smap)
+                                              (or (ip/plain-ip-str (ip/to-address (:ip smap)))
+                                                  (:remote-ip/str req))))}))))))))
+     {:id               nil
+      :err/id           nil
+      :session-id-field (or session-id-field
+                            (get (config-options req opts-or-config-key) :session-id-field)
+                            "session-id")})))
 
 (defn prolong
   "Re-validates session by updating its timestamp and re-running validation."
@@ -649,7 +670,9 @@
   {:arglists '([req user-id user-email ip-address]
                [opts user-id user-email ip-address]
                [req opts-or-config-key user-id user-email ip-address]
-               [opts setter-fn invalidator-fn user-id user-email ip-address])}
+               [opts setter-fn invalidator-fn var-del-fn var-del-user-fn
+                single-session? secured? session-id-field
+                user-id user-email ip-address])}
   ([opts-or-req user-id user-email ip-address]
    (if-some [create-fn (get opts-or-req :fn/create)]
      (create-fn user-id user-email ip-address)
@@ -658,7 +681,7 @@
    (let [opts (config-options req opts-or-config-key)]
      ((get opts :fn/create) user-id user-email ip-address)))
   ([opts setter-fn invalidator-fn var-del-fn var-del-user-fn single-session? secured?
-    user-id user-email ip-address]
+    session-id-field user-id user-email ip-address]
    (let [user-id    (valuable user-id)
          user-email (some-str user-email)]
      (if-not (and user-id user-email)
@@ -681,7 +704,7 @@
            (do (log/err "Session incorrect after creation" (log/for-user user-id user-email ipplain))
                (mkbad sess opts :error stat))
            (let [updated-count (setter-fn sess)
-                 id-field      (or (some-str (get opts :session-id-field)) "session-id")
+                 id-field      (or session-id-field (get opts :session-id-field) "session-id")
                  sess          (-> sess
                                    (dissoc :db/token)
                                    (assoc :session-id-field id-field))]
@@ -721,6 +744,11 @@
   [config k default]
   (or (var/deref (get config k)) default))
 
+(defn- setup-id-fn
+  [id-path]
+  (let [id-path (if (coll? id-path) id-path (cons id-path nil))]
+    (identify-session-path-compile id-path)))
+
 (defn wrap-session
   "Session maintaining middleware."
   [k config]
@@ -735,7 +763,7 @@
                                (update :cache-size       safe-parse-long)
                                (update :session-key      #(or (some-keyword %) :session))
                                (update :config-key       #(or (some-keyword %) :session/config))
-                               (update :session-id-field #(or (some-str %) "session-id"))
+                               (update :session-id-path  #(if (valuable? %) (if (coll? %) (vec %) %) "session-id"))
                                (update :single-session?  boolean)
                                (update :secured?         boolean)
                                (calc-cache-expires))
@@ -744,10 +772,14 @@
         config-key         (get config :config-key)
         sessions-table     (get config :table/sessions)
         variables-table    (get config :table/variables)
-        session-id-field   (get config :session-id-field)
+        session-id-path    (get config :session-id-path)
         cache-expires      (get config :expires)
         single-session?    (get config :single-session?)
         secured?           (get config :secured?)
+        session-id-field   (if (coll? session-id-path) (last session-id-path) session-id-path)
+        config             (assoc config :session-id-field (or session-id-field "session-id"))
+        identifier-fn      (setup-id-fn session-id-path)
+        config             (assoc config :fn/identifier identifier-fn)
         getter-fn          (setup-fn config :fn/getter get-session-by-id)
         getter-fn-w        #(getter-fn config db sessions-table %1 %2)
         config             (assoc config :fn/getter getter-fn-w)
@@ -797,7 +829,7 @@
                                   :fn/vars-del-user var-del-user-fn-w)
         create-fn          #(create config
                                     setter-fn-w invalidator-fn var-del-fn var-del-user-fn-w
-                                    single-session? secured? %1 %2 %3)
+                                    single-session? secured? session-id-field %1 %2 %3)
         config             (assoc config :fn/create create-fn)]
     (log/msg "Installing session handler:" k)
     (when dbname (log/msg "Using database" dbname "for storing sessions"))
@@ -809,6 +841,7 @@
                       (h
                        (assoc req
                               session-key (delay (process mem-handler
+                                                          identifier-fn
                                                           refresh-fn
                                                           update-active-fn-w
                                                           req config session-id-field))

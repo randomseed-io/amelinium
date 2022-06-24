@@ -107,7 +107,7 @@
 ;; Sessions
 
 (p/import-vars [amelinium.common
-                session-key session-variable-get-failed?
+                session-field session-variable-get-failed?
                 allow-expired allow-soft-expired allow-hard-expired])
 
 ;; Context and roles
@@ -408,8 +408,9 @@
 (selmer/add-tag!
  :link
  (fn [args ctx content]
-   (let [sid             (get (get ctx :session) :id)
-         skey            (session-key ctx)
+   (let [smap            (get ctx :session)
+         sid             (get smap :id)
+         skey            (or (get smap :session-id-field) (get (get ctx :session/config) :session-id-field))
          path-or-name    (first args)
          args            (rest args)
          args            (if (map? (first args)) (cons nil args) args)
@@ -430,8 +431,9 @@
  :slink
  (fn [args ctx content]
    (let [url  (selmer/render (first args) ctx {:tag-open \[ :tag-close \]})
-         sid  (get (get ctx :session) :id)
-         skey (session-key ctx)]
+         smap (get ctx :session)
+         sid  (get smap :id)
+         skey (or (get smap :session-id-field) (get (get ctx :session/config) :session-id-field))]
      (if (and sid skey)
        (str "<form name=\"sessionLink\" class=\"formlink\" action=\"" url "\" method=\"post\">"
             (anti-spam-code (get ctx :validators/config))
@@ -444,7 +446,8 @@
 (selmer/add-tag!
  :session-data
  (fn [args ctx]
-   (let [skey (session-key ctx)]
+   (let [smap (get ctx :session)
+         skey (or (get smap :session-id-field) (get (get ctx :session/config) :session-id-field))]
      (str (anti-spam-code (get ctx :validators/config))
           "<input type=\"hidden\" name=\"" skey "\" value=\"" (get (get ctx :session) :id) "\" />"))))
 

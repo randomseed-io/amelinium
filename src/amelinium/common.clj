@@ -1103,7 +1103,7 @@
 ;; Sessions
 
 (p/import-vars [amelinium.http.middleware.session
-                session-key])
+                session-field])
 
 (defn session-variable-get-failed?
   [v]
