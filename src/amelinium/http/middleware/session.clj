@@ -87,13 +87,6 @@
   [sid]
   (nth (split-secure-sid sid) 0 nil))
 
-(defn sectoken
-  [smap-or-sid]
-  (if (map? smap-or-sid)
-    (or (get smap-or-sid :secure/token)
-        (sectoken (get smap-or-sid :id)))
-    (nth (split-secure-sid smap-or-sid) 1 nil)))
-
 ;; SID generation
 
 (defn gen-session-id
@@ -550,12 +543,9 @@
    (let [[sid-db pass] (split-secure-sid sid)
          secure?       (some? (not-empty pass))
          smap          (getter-fn sid-db remote-ip)
-         token         (when secure? (not-empty (get smap :secure/token)))
+         passed?       (when secure? (check-encrypted pass (get smap :secure/token)))
          smap          (assoc smap :id sid :db/id sid-db :secure? secure?)
-         smap          (if secure? (assoc smap
-                                          :secure/token pass
-                                          :security/passed? (check-encrypted pass token))
-                           smap)
+         smap          (if secure? (dissoc (assoc smap :security/passed? passed?) :secure/token) smap)
          smap          (update smap :ip ip/to-address)
          smap          (map/assoc-missing smap :session-id-field session-id-field)
          stat          (state smap opts remote-ip)]
@@ -691,7 +681,10 @@
            (do (log/err "Session incorrect after creation" (log/for-user user-id user-email ipplain))
                (mkbad sess opts :error stat))
            (let [updated-count (setter-fn sess)
-                 sess          (assoc sess :session-id-field (or (some-str (get opts :session-id-field)) "session-id"))]
+                 id-field      (or (some-str (get opts :session-id-field)) "session-id")
+                 sess          (-> sess
+                                   (dissoc :db/token)
+                                   (assoc :session-id-field id-field))]
              (invalidator-fn (or (get sess :id) (get sess :err/id)) ip)
              (if (pos-int? updated-count)
                (do (if single-session?
