@@ -601,8 +601,7 @@
                         :cause    :malformed-session-id
                         :severity :info})
          (let [remote-ip (get req :remote-ip)
-               smap      (handler-fn sid remote-ip)
-               _         (println "w process:" smap)]
+               smap      (handler-fn sid remote-ip)]
            (if-not (valid? smap)
              smap
              (let [smap (refresh-fn smap remote-ip)]
@@ -685,7 +684,6 @@
                       :created    t
                       :active     t}
              sess    (gen-session-id sess secured? user-id ipplain)
-             _       (println sess)
              sid-db  (db-sid-smap sess)
              stat    (state sess opts ip)]
          (log/msg "Opening session" (log/for-user user-id user-email ipplain))
@@ -769,10 +767,10 @@
         last-active-fn-w   #(last-active-fn config db sessions-table %1 %2)
         config             (assoc config :fn/last-active last-active-fn-w)
         update-active-fn-w (fn
-                             ([sid remote-ip]
-                              (update-active-fn config db sessions-table sid remote-ip))
-                             ([sid remote-ip t]
-                              (update-active-fn config db sessions-table sid remote-ip t)))
+                             ([sid-db remote-ip]
+                              (update-active-fn config db sessions-table sid-db remote-ip))
+                             ([sid-db remote-ip t]
+                              (update-active-fn config db sessions-table sid-db remote-ip t)))
         config             (assoc config :fn/update-active update-active-fn-w)
         refresh-fn         #(refresh-times config last-active-fn-w invalidator-fn cache-expires %1 %2)
         config             (assoc config :fn/refresh refresh-fn)
