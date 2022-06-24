@@ -197,8 +197,7 @@
   [sid]
   (or (and sid (string? sid)
            (<= 30 (count sid) 256)
-           (re-matches sid-match sid))
-      (println sid (re-matches sid-match sid))))
+           (re-matches sid-match sid))))
 
 (defn created-valid?
   [smap]
