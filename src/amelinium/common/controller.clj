@@ -137,9 +137,9 @@
   "Returns true if the session is hard-expired and we are not on the hard-expired login
   page. Uses the given, previously collected session data, does not connect to a
   database."
-  [req sess]
+  [req sess route-data]
   (or (and (get sess :hard-expired?)
-           (not (common/on-page? req :login/session-expired)))
+           (not (common/on-page? req (get route-data :auth/session-expired :login/session-expired))))
       false))
 
 (defn auth-user-with-password!

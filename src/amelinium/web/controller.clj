@@ -178,7 +178,7 @@
                           req
                           ;; Redirect to a proper language version of this very page.
                           (web/move-to req (or (get route-data :name) (get req :uri)) lang))
-      :invalid-session! (web/move-to req (get route-data :auth/login :login) lang))))
+      :invalid-session! (web/move-to req (or (get route-data :auth/login) :login) lang))))
 
 (defn login!
   "Prepares response data to display a login page."
@@ -201,6 +201,7 @@
   [req]
   (let [req         (assoc req :app/data-required [] :app/data web/empty-lazy-map)
         sess        (get req :session)
+        route-data  (http/get-route-data req)
         auth-state  (delay (web/login-auth-state req :login-page? :auth-page?))
         login-data? (delay (login-data? req))
         auth-db     (delay (web/auth-db req))]
@@ -231,12 +232,11 @@
                    :op      :access-denied
                    :level   :warning
                    :msg     (str "Permanent lock " for-mail))
-        (web/go-to req (or (http/get-route-data req :auth/account-locked)
-                           :login/account-locked)))
+        (web/go-to req (or (get route-data :auth/account-locked) :login/account-locked)))
 
       ;; Session expired and the time for prolongation has passed.
 
-      (hard-expiry? req sess)
+      (hard-expiry? req sess route-data)
       (let [user-id  (:user/id      sess)
             email    (:user/email   sess)
             ip-addr  (:remote-ip/str req)
@@ -248,8 +248,7 @@
                    :op      :session
                    :ok?     false
                    :msg     (str "Hard-expired " for-mail))
-        (web/go-to req (or (http/get-route-data req :auth/session-expired)
-                           :login/session-expired)))
+        (web/go-to req (or (get route-data :auth/session-expired) :login/session-expired)))
 
       ;; Session expired and we are not reaching an authentication page nor a login page.
       ;; User can re-validate session using a login page.
@@ -260,8 +259,7 @@
                                 (web/allow-soft-expired sess)
                                 :goto {:uri       (get req :uri)
                                        :form-data (get (cleanup-req req @auth-state) :form-params)})
-          (web/move-to req (or (http/get-route-data req :auth/prolongate)
-                               :login/prolongate)))
+          (web/move-to req (or (get route-data :auth/prolongate) :login/prolongate)))
 
       :----pass
 
@@ -313,7 +311,7 @@
         ;; Take care about broken go-to (move to a login page in such case).
 
         (if goto-failed?
-          (web/move-to req (or (http/get-route-data :auth/session-error) :login/session-error))
+          (web/move-to req (or (get route-data :auth/session-error) :login/session-error))
           (cleanup-req req [nil auth?]))))))
 
 (defn render!
