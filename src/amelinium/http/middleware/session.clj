@@ -537,6 +537,7 @@
    (let [opts (config-options opts-or-config-key)]
      (handler opts
               (get opts :fn/getter)
+              (get opts :fn/checker)
               (get opts :session-id-field)
               (some-str ((get opts :fn/identifier) req))
               (get req :remote-ip))))
@@ -544,18 +545,20 @@
    (let [opts (config-options req opts-or-config-key)]
      (handler opts
               (get opts :fn/getter)
+              (get opts :fn/checker)
               (get opts :session-id-field)
               sid remote-ip)))
   ([opts sid remote-ip]
    (handler opts
             (get opts :fn/getter)
+            (get opts :fn/checker)
             (get opts :session-id-field)
             sid remote-ip))
-  ([opts getter-fn session-id-field sid remote-ip]
+  ([opts getter-fn checker-fn session-id-field sid remote-ip]
    (let [[sid-db pass] (split-secure-sid sid)
          secure?       (some? (not-empty pass))
          smap          (getter-fn sid-db remote-ip)
-         passed?       (when secure? (check-encrypted pass (get smap :secure/token)))
+         passed?       (when secure? (checker-fn pass (get smap :secure/token)))
          smap          (assoc smap
                               :id              sid
                               :db/id           sid-db
@@ -761,6 +764,8 @@
                                (update :hard-expires     time/parse-duration)
                                (update :cache-ttl        time/parse-duration)
                                (update :cache-size       safe-parse-long)
+                               (update :token-cache-ttl  time/parse-duration)
+                               (update :token-cache-size safe-parse-long)
                                (update :session-key      #(or (some-keyword %) :session))
                                (update :config-key       #(or (some-keyword %) :session/config))
                                (update :session-id-path  #(if (valuable? %) (if (coll? %) (vec %) %) "session-id"))
@@ -776,6 +781,7 @@
         cache-expires      (get config :expires)
         single-session?    (get config :single-session?)
         secured?           (get config :secured?)
+        checker-config     (set/rename-keys config {:token-cache-size :cache-size :token-cache-ttl :cache-ttl})
         session-id-field   (if (coll? session-id-path) (last session-id-path) session-id-path)
         config             (assoc config :session-id-field (or session-id-field "session-id"))
         identifier-fn      (setup-id-fn session-id-path)
@@ -783,7 +789,10 @@
         getter-fn          (setup-fn config :fn/getter get-session-by-id)
         getter-fn-w        #(getter-fn config db sessions-table %1 %2)
         config             (assoc config :fn/getter getter-fn-w)
-        pre-handler        #(handler config getter-fn-w session-id-field %1 %2)
+        checker-fn         (setup-fn config :fn/checker check-encrypted)
+        checker-fn-w       (db/memoizer checker-fn checker-config)
+        config             (assoc config :fn/checker checker-fn-w)
+        pre-handler        #(handler config getter-fn-w checker-fn-w session-id-field %1 %2)
         mem-handler        (db/memoizer pre-handler config)
         invalidator-fn     (setup-invalidator pre-handler mem-handler)
         config             (assoc config :fn/invalidator invalidator-fn :fn/handler mem-handler)

@@ -81,6 +81,8 @@
  :amelinium.http.middleware.session/web {:db               #ref :amelinium.db/main
                                          :cache-ttl        [14 seconds]
                                          :cache-size       256
+                                         :token-cache-ttl  [30 minutes]
+                                         :token-cache-size 2048
                                          :wrong-ip-expires true
                                          :single-session?  true
                                          :secured?         false
