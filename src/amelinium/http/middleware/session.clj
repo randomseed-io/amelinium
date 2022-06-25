@@ -558,14 +558,17 @@
    (let [[sid-db pass] (split-secure-sid sid)
          secure?       (some? (not-empty pass))
          smap          (getter-fn sid-db remote-ip)
-         passed?       (when secure? (checker-fn pass (get smap :secure/token)))
+         smap          (if secure?
+                         (-> smap
+                             (assoc  :security/passed? (checker-fn pass (get smap :secure/token)))
+                             (dissoc :secure/token))
+                         smap)
          smap          (assoc smap
                               :id              sid
                               :db/id           sid-db
                               :ip              (ip/to-address (get smap :ip))
                               :secure?          secure?
                               :session-id-field (or session-id-field (get opts :session-id-field) "session-id"))
-         smap          (if secure? (dissoc (assoc smap :security/passed? passed?) :secure/token) smap)
          stat          (state smap opts remote-ip)]
      (if (get stat :cause)
        (mkbad smap opts :error stat)
