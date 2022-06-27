@@ -175,3 +175,7 @@
 (defn render!
   [req]
   (api/render-ok req))
+
+(defn not-found!
+  [req]
+  (api/render-not-found req))

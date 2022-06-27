@@ -161,6 +161,13 @@
   ([req]
    (render-response resp/unprocessable-entity req)))
 
+(defn render-not-found
+  ([]
+   (render-response resp/not-found nil))
+  ([req]
+   (render-response resp/not-found req)))
+
+
 ;; Linking helpers
 
 (p/import-vars [amelinium.common
