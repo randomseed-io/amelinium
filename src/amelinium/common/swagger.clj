@@ -4,7 +4,7 @@
       :author "Paweł Wilk"
       :added  "1.0.0"}
 
-    amelinium.web.swagger
+    amelinium.common.swagger
 
   (:refer-clojure :exclude [parse-long uuid random-uuid run!])
 

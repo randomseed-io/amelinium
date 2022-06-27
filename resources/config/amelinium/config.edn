@@ -63,8 +63,8 @@
 
  ;; Swagger support
 
- :amelinium.web.swagger/handler    {:enabled? true}
- :amelinium.web.swagger/handler-ui {:enabled? true}
+ :amelinium.common.swagger/handler    {:enabled? true}
+ :amelinium.common.swagger/handler-ui {:enabled? true}
 
  ;; HTTP middleware
 
