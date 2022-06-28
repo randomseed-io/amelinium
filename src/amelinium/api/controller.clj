@@ -73,7 +73,9 @@
   (let [body-params    (get req :body)
         user-email     (some-str (get body-params :login))
         password       (when user-email (some-str (get body-params :password)))
-        sess           (get req :session)
+        sess-opts      (get req :session/config)
+        sess-key       (or (get sess-opts :session-key) :session)
+        sess           (get req sess-key)
         valid-session? (get sess :valid?)
         route-data     (http/get-route-data req)]
     (cond
@@ -84,10 +86,12 @@
 (defn login!
   "Returns login information."
   [req]
-  (let [sess       (get req :session)
+  (let [sess-opts  (get req :session/config)
+        sess-key   (or (get sess-opts :session-key) :session)
+        sess       (get req sess-key)
         prolonged? (delay (some? (and (get sess :expired?) (get req :goto-uri))))]
     (-> req
-        (assoc :session
+        (assoc sess-key
                (delay (if @prolonged?
                         (assoc sess :id (or (get sess :id) (get sess :err/id)) :prolonged? true)
                         (assoc sess :prolonged? false))))
@@ -100,7 +104,9 @@
 (defn prep-request!
   "Prepares a request before any controller is called."
   [req]
-  (let [sess        (get req :session)
+  (let [sess-opts   (get req :session/config)
+        sess-key    (or (get sess-opts :session-key) :session)
+        sess        (get req sess-key)
         auth-state  (delay (api/login-auth-state req :login-page? :auth-page?))
         login-data? (delay (login-data? req))
         auth-db     (delay (api/auth-db req))]

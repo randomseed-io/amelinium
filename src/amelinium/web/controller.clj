@@ -59,9 +59,10 @@
    (when (and gmap (= (get req :uri) (get gmap :uri)))
      (when-some [form-data (get gmap :form-data)]
        (when (and (map? form-data) (pos-int? (count form-data)))
-         (let [smap      (or smap (get req :session))
-               sess-opts (get req :session/config)
-               sid-key   (web/session-field smap sess-opts :session :session/config)]
+         (let [sess-opts (get req :session/config)
+               sess-key  (or (get sess-opts :session-key) :session)
+               smap      (or smap (get req sess-key))
+               sid-key   (web/session-field smap sess-opts sess-key :session/config)]
            (dissoc form-data sid-key)))))))
 
 (defn remove-login-data
@@ -166,7 +167,9 @@
   (let [form-params    (get req :form-params)
         user-email     (some-str (get form-params "login"))
         password       (when user-email (some-str (get form-params "password")))
-        sess           (get req :session)
+        sess-opts      (get req :session/config)
+        sess-key       (or (get sess-opts :session-key) :session)
+        sess           (get req sess-key)
         lang           (web/pick-language-str req :user)
         valid-session? (get sess :valid?)
         ring-match     (get req ::r/match)
@@ -183,10 +186,12 @@
 (defn login!
   "Prepares response data to display a login page."
   [req]
-  (let [sess       (get req :session)
+  (let [sess-opts  (get req :session/config)
+        sess-key   (or (get sess-opts :session-key) :session)
+        sess       (get req sess-key)
         prolonged? (delay (some? (and (get sess :expired?) (get req :goto-uri))))]
     (-> req
-        (assoc :session
+        (assoc sess-key
                (delay (if @prolonged?
                         (assoc sess :id (or (get sess :id) (get sess :err/id)) :prolonged? true)
                         (assoc sess :prolonged? false))))
@@ -200,7 +205,9 @@
   "Prepares a request before any web controller is called."
   [req]
   (let [req         (assoc req :app/data-required [] :app/data web/empty-lazy-map)
-        sess        (get req :session)
+        sess-opts   (get req :session/config)
+        sess-key    (or (get sess-opts :session-key) :session)
+        sess        (get req sess-key)
         route-data  (http/get-route-data req)
         auth-state  (delay (web/login-auth-state req :login-page? :auth-page?))
         login-data? (delay (login-data? req))

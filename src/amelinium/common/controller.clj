@@ -58,9 +58,10 @@
   [req _]
   (delay
     (when-some [db (common/auth-db req)]
-      (when-some [user-id (get (get req :session) :user/id)]
-        (when-some [supported (get (get req :language/settings) :supported)]
-          (supported (user/setting db user-id :language)))))))
+      (let [sess-key (or (get (get req :session/config) :session-key) :session)]
+        (when-some [user-id (get (get req sess-key) :user/id)]
+          (when-some [supported (get (get req :language/settings) :supported)]
+            (supported (user/setting db user-id :language))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Calculations
@@ -200,7 +201,9 @@
 
           (if goto-uri
             (resp/temporary-redirect goto-uri)
-            (-> req (assoc :session sess) ((get (get req :roles/config) :handler identity)))))))))
+            (-> req
+                (assoc (or (get sess-opts :session-key) :session) sess)
+                ((get (get req :roles/config) :handler identity)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
@@ -223,7 +226,8 @@
   [req user-email user-password]
   (let [user-email     (some-str user-email)
         user-password  (when user-email (some-str user-password))
-        sess           (get req  :session)
+        sess-opts      (get req  :session/config)
+        sess           (get req  (or (get sess-opts :session-key) :session))
         valid-session? (get sess :valid?)
         route-data     (http/get-route-data req)]
 

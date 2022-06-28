@@ -408,9 +408,11 @@
 (selmer/add-tag!
  :link
  (fn [args ctx content]
-   (let [smap            (get ctx :session)
+   (let [scfg            (get ctx :session/config)
+         skey            (or (get scfg :session-key) :session)
+         smap            (get ctx skey)
          sid             (get smap :id)
-         skey            (or (get smap :session-id-field) (get (get ctx :session/config) :session-id-field))
+         sfld            (or (get smap :session-id-field) (get scfg :session-id-field))
          path-or-name    (first args)
          args            (rest args)
          args            (if (map? (first args)) (cons nil args) args)
@@ -418,10 +420,10 @@
           query-params
           lang-settings] args
          out-path        (lang-url ctx path-or-name lang false params query-params lang-settings)]
-     (if (and sid skey)
+     (if (and sid sfld)
        (str "<form name=\"sessionLink\" class=\"formlink\" action=\"" out-path "\" method=\"post\">"
             (anti-spam-code (get ctx :validators/config))
-            "<button type=\"submit\" class=\"link\" name=\"" skey "\" value=\"" sid "\">"
+            "<button type=\"submit\" class=\"link\" name=\"" sfld "\" value=\"" sid "\">"
             (get-in content [:link :content])
             "</button></form>")
        (str "<a href=\"" out-path "\" class=\"link\">" (get-in content [:link :content]) "</a>"))))
@@ -431,13 +433,14 @@
  :slink
  (fn [args ctx content]
    (let [url  (selmer/render (first args) ctx {:tag-open \[ :tag-close \]})
-         smap (get ctx :session)
+         skey (or (get (get ctx :session/config) :session-key) :session)
+         smap (get ctx skey)
          sid  (get smap :id)
-         skey (or (get smap :session-id-field) (get (get ctx :session/config) :session-id-field))]
-     (if (and sid skey)
+         sfld (or (get smap :session-id-field) (get (get ctx :session/config) :session-id-field))]
+     (if (and sid sfld)
        (str "<form name=\"sessionLink\" class=\"formlink\" action=\"" url "\" method=\"post\">"
             (anti-spam-code (get ctx :validators/config))
-            "<button type=\"submit\" class=\"link\" name=\"" skey "\" value=\"" sid "\">"
+            "<button type=\"submit\" class=\"link\" name=\"" sfld "\" value=\"" sid "\">"
             (get-in content [:slink :content])
             "</button></form>")
        (str "<a href=\"" url  "\" class=\"link\">" (get-in content [:slink :content]) "</a>"))))
@@ -446,10 +449,12 @@
 (selmer/add-tag!
  :session-data
  (fn [args ctx]
-   (let [smap (get ctx :session)
-         skey (or (get smap :session-id-field) (get (get ctx :session/config) :session-id-field))]
+   (let [scfg (get ctx :session/config)
+         skey (or (get scfg :session-key) :session)
+         smap (get ctx skey)
+         sfld (or (get smap :session-id-field) (get scfg :session-id-field))]
      (str (anti-spam-code (get ctx :validators/config))
-          "<input type=\"hidden\" name=\"" skey "\" value=\"" (get (get ctx :session) :id) "\" />"))))
+          "<input type=\"hidden\" name=\"" sfld "\" value=\"" (get smap :id) "\" />"))))
 
 ;; Language helpers
 
