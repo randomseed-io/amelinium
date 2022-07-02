@@ -230,7 +230,7 @@
   If there is no e-mail or password given (the value is `nil`, `false` or an empty
   string) then authentication is not performed but instead validity of a session is
   tested. If the session is invalid redirect to a login page is performed. The
-  destination URL is obtained via the route name taken from the `:auth/login` key of
+  destination URL is obtained via the route name taken from the `:auth/info` key of
   a route data, or from `:login` route identifier as default. If the session is valid
   then the given request map is returned as is."
   [req user-email user-password]
@@ -250,7 +250,7 @@
       (if-not valid-session?
 
         ;; Invalid session causes a redirect to a login page.
-        (common/move-to req (get route-data :auth/login :login))
+        (common/move-to req (get route-data :auth/info :auth/info))
 
         ;; Valid session causes page to be served.
         req))))

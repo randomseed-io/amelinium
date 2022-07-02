@@ -65,8 +65,8 @@
   If there is no e-mail nor password given (the value is `nil`, `false` or an empty
   string) then authentication is not performed but instead validity of a session is
   tested. If the session is invalid then redirect to a login page is performed. The
-  destination URL is obtained via the route name taken from the `:auth/login` key of
-  a route data, or from the `:login` route identifier (as a default).
+  destination URL is obtained via the route name taken from the `:auth/info` key of
+  a route data, or from the `:auth/info` route identifier (as a default).
 
   If the session is valid then the given request map is returned as is."
   [req]
@@ -81,7 +81,7 @@
     (cond
       password          (auth-user-with-password! req user-email password sess route-data)
       valid-session?    req
-      :invalid-session! (api/move-to req (get route-data :auth/login :login)))))
+      :invalid-session! (api/move-to req (get route-data :auth/info :auth/info)))))
 
 (defn info!
   "Returns login information."
@@ -138,7 +138,7 @@
                    :level   :warning
                    :msg     (str "Permanent lock " for-mail))
         (api/go-to req (or (http/get-route-data req :auth/account-locked)
-                           :login/account-locked)))
+                           :auth/account-locked)))
 
       :----pass
 
