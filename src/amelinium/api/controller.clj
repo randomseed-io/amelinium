@@ -95,11 +95,11 @@
                (delay (if @prolonged?
                         (assoc sess :id (or (get sess :id) (get sess :err/id)) :prolonged? true)
                         (assoc sess :prolonged? false))))
-        (assoc-in [:app/data :lock-remains]
-                  (delay (lock-remaining-mins req
-                                              (api/auth-db req)
-                                              (when @prolonged? sess)
-                                              t/now))))))
+        (assoc-in [:response/body :lock-remains]
+                  (lock-remaining-mins req
+                                       (api/auth-db req)
+                                       (when @prolonged? sess)
+                                       t/now)))))
 
 (defn prep-request!
   "Prepares a request before any controller is called."
