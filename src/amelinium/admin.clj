@@ -67,17 +67,17 @@
    (set-password nil user-spec nil))
   ([user-spec plain-password]
    (set-password nil user-spec plain-password))
-  ([auth-config user-spec plain-password]
-   (if-some [auth-config (or auth-config (::auth/config app/state) auth/config)]
-     (if-some [db (:db auth-config)]
+  ([auth-config-global user-spec plain-password]
+   (if-some [auth-config-global (or auth-config-global (::auth/config app/state) auth/config)]
+     (if-some [db (:db auth-config-global)]
        (if-some [user-id (user/find-id db user-spec)]
          (if-some [user (user/props db user-id)]
            (let [atype       (:account-type user)
                  atexp       (when-not atype " (default)")
-                 auth-config (auth/config-by-type auth-config atype)
+                 atype       (or atype (:default-type auth-config-global))
+                 auth-config (auth/config-by-type auth-config-global atype)
                  db          (or (:db auth-config) db)
-                 auth-model  (some-str (:id auth-config))
-                 atype       (or atype (:default-type auth-config))]
+                 auth-model  (some-str (:id auth-config))]
              (println (str "Changing password for user " user-id "." \newline
                            "Account type is " atype atexp
                            ", chosen auth model is " auth-model "." \newline))
@@ -97,16 +97,16 @@
 (defn prop-do-account
   ([f user-spec]
    (prop-do-account nil f user-spec))
-  ([auth-config f user-spec & args]
-   (if-some [auth-config (or auth-config (::auth/config app/state) auth/config)]
-     (if-some [db (:db auth-config)]
+  ([auth-config-global f user-spec & args]
+   (if-some [auth-config-global (or auth-config-global (::auth/config app/state) auth/config)]
+     (if-some [db (:db auth-config-global)]
        (if-some [user-id (user/find-id db user-spec)]
          (if-some [user (user/props db user-id)]
            (let [user        (user/props db user-id)
                  atype       (:account-type user)
-                 auth-config (auth/config-by-type auth-config atype)
-                 db          (or (:db auth-config) db)
-                 atype       (or atype (:default-type auth-config))]
+                 atype       (or atype (:default-type auth-config-global))
+                 auth-config (auth/config-by-type auth-config-global atype)
+                 db          (or (:db auth-config) db)]
              (apply f db user-id args))
            (println "Cannot retrieve user properties."))
          (println "Cannot find user in a database."))
@@ -116,11 +116,11 @@
 (defn lock-account
   ([user-spec]
    (prop-do-account user/prop-set user-spec))
-  ([auth-config user-spec]
-   (prop-do-account auth-config user/prop-set user-spec :locked (t/now))))
+  ([auth-config-global user-spec]
+   (prop-do-account auth-config-global user/prop-set user-spec :locked (t/now))))
 
 (defn unlock-account
   ([user-spec]
    (prop-do-account user/prop-set user-spec))
-  ([auth-config user-spec]
-   (prop-do-account auth-config user/prop-del user-spec :locked)))
+  ([auth-config-global user-spec]
+   (prop-do-account auth-config-global user/prop-del user-spec :locked)))

@@ -46,7 +46,9 @@
 (defn auth-db+
   "Injects authorization data source directly into a request map."
   [req _]
-  (get (get (get req :route/data) :auth/config) :db))
+  (get (or (get (get req :route/data) :auth/config)
+           (get req :auth/config))
+       :db))
 
 (defn auth-types+
   "Injects authorization configurations directly into a request map."
@@ -114,7 +116,7 @@
    (when auth-db
      (when-some [user (or (user/props-by-session auth-db smap)
                           (user/props-by-email auth-db (get (get req :form-params) id-form-field)))]
-       (when-some [auth-config (http/get-route-data req :auth/config)]
+       (when-some [auth-config (common/auth-config req (get user :account-type))]
          (when-some [mins (time/minutes (common/soft-lock-remains user auth-config (time-fn)))]
            (if (zero? mins) 1 mins)))))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -157,11 +159,12 @@
   (let [ipaddr       (get req :remote-ip)
         ipplain      (get req :remote-ip/str)
         oplog        (or (get req :oplog/logger) (common/oplog-logger req route-data))
-        auth-config  (or (get route-data :auth/config) (get req :auth/config))
-        auth-db      (common/auth-db req auth-config)
-        user         (user/get-login-data auth-db user-email auth-config)
+        auth-db      (common/auth-db req)
+        user         (user/get-login-data auth-db user-email)
         user-id      (get user :id)
         pwd-suites   (select-keys user [:intrinsic :shared])
+        auth-config  (common/auth-config req (get user :account-type))
+        auth-db      (get auth-config :db)
         for-user     (log/for-user user-id user-email ipplain)
         for-mail     (log/for-user nil user-email ipplain)
         hard-locked? (fn [] (common/hard-locked? user))

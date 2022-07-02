@@ -39,26 +39,29 @@
 ;; Database
 
 (defn auth-config
-  [req-or-match]
-  (http/get-route-data req-or-match :auth/config))
+  "Gets authentication configuration for the given account type or a default one if the
+  account type was not given or is `nil`."
+  ([req-or-match auth-type]
+   (when-some [types-map (or (when-not (instance? Match req-or-match)
+                               (get req-or-match :auth/types))
+                             (get (http/get-route-data req-or-match :auth/config) :types)
+                             (when-not (instance? Match req-or-match)
+                               (get (get req-or-match :auth/config) :types)))]
+     (get types-map (some-keyword auth-type))))
+  ([req-or-match]
+   (get (or (http/get-route-data req-or-match :auth/config)
+            (when-not (instance? Match req-or-match) (get req-or-match :auth/config)))
+        :default)))
 
 (defn auth-db
-  "Retrieves authentication database from a current route data (via `:auth/config` key
-  and then the `:db` key), and if that fails, tries to retrieve it using
-  `:amelinium.middleware.db/auth` key of the request map and later using :auth and
-  `:db` key path of the request map. When everything fails it will fall back to a
-  global variable `amelinium.db/auth`. The given argument can be either a request map
-  or a `Match` object. In its binary variant the second argument is tested first and
-  it should be an authentication configuration map containing the `:db` key."
+  "Returns an authentication database connection object for the given authentication
+  type or, if the type is not given, for a common authentication database (top-level,
+  not assigned to any particular authentication type)."
+  ([req-or-match auth-type]
+   (get (auth-config req-or-match (some-keyword auth-type)) :db))
   ([req-or-match]
-   (or (get req-or-match :auth/db)
-       (get (http/get-route-data req-or-match :auth/config) :db)
-       (when-not (instance? Match req-or-match)
-         (or (get req-or-match ::mid-db/auth)
-             (get (get req-or-match :auth/config) :db)))))
-  ([req-or-match auth-config-arg]
-   (or (get auth-config-arg :db)
-       (auth-db req-or-match))))
+   (or (when-not (instance? Match req-or-match) (get req-or-match :auth/db))
+       (get (auth-config req-or-match) :db))))
 
 ;; Operations logging
 

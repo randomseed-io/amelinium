@@ -22,7 +22,8 @@
 ;; Password authentication
 
 (defn check-password
-  "Checks password for a user against the encrypted password given in password suites."
+  "Checks password for a user against the encrypted password given in password
+  suites. Specific authentication configuration map must be given."
   ([password pwd-suites auth-config]
    (when (and password pwd-suites auth-config)
      (when-some [checker (get auth-config :passwords/check-fn)]
@@ -35,7 +36,8 @@
        (checker password pwd-shared-suite pwd-user-suite)))))
 
 (defn check-password-json
-  "Checks password for a user against JSON-encoded password suites."
+  "Checks password for a user against JSON-encoded password suites. Specific
+  authentication configuration map must be given."
   ([password json-pwd-suites auth-config]
    (when (and password json-pwd-suites auth-config)
      (when-some [checker (get auth-config :passwords/check-json-fn)]
@@ -48,14 +50,16 @@
        (checker password json-pwd-shared-suite json-pwd-user-suite)))))
 
 (defn make-password
-  "Creates new password for a user."
+  "Creates new password for a user. Specific authentication configuration map must be
+  given."
   [password auth-config]
   (when (and password auth-config)
     (when-some [encryptor (get auth-config :passwords/encrypt-fn)]
       (encryptor password))))
 
 (defn make-password-json
-  "Creates new password for a user in JSON format."
+  "Creates new password for a user in JSON format. Specific authentication
+  configuration map must be given."
   [password auth-config]
   (when (and password auth-config)
     (when-some [encryptor (get auth-config :passwords/encrypt-json-fn)]
@@ -111,9 +115,9 @@
               prep-account-types
               (assoc  :id k)
               (update :db db/ds)
-              (update :locking/max-attempts  safe-parse-long 10)
-              (update :locking/lock-wait     (fnil time/parse-duration [10 :minutes]))
-              (update :locking/fail-expires  (fnil time/parse-duration [1  :minutes])))]
+              (update :locking/max-attempts safe-parse-long 10)
+              (update :locking/lock-wait    (fnil time/parse-duration [10 :minutes]))
+              (update :locking/fail-expires (fnil time/parse-duration [1  :minutes])))]
     (log/msg "Configuring auth engine" k
              (str "(attempts: "  (:locking/max-attempts s)
                   ", lock wait: "    (time/seconds  (:locking/lock-wait    s)) " s"
@@ -126,7 +130,7 @@
   [config account-type]
   (when-some [types-map (:types config)]
     (or (get types-map (some-keyword-simple account-type))
-        (get types-map (:default-type config)))))
+        (get types-map :default))))
 
 (defn config-by-type-with-var
   "Returns authentication configuration for the given account type using an
@@ -139,17 +143,20 @@
 
 (defn init-by-type
   "Prepares static authentication preference map."
-  [config]
+  [config db]
   (->> config
        (map/map-keys some-keyword-simple)
-       map/remove-empty-values))
+       map/remove-empty-values
+       (map/map-vals #(map/assoc-missing % :db db))))
 
 (defn init-config
   "Initializes authentication configuration."
   [config]
-  (-> config
-      (map/update-existing :db db/ds)
-      (map/update-existing :types init-by-type)))
+  (let [config (map/update-existing config :db db/ds)
+        db     (get config :db)
+        dtype  (get config :default-type)
+        config (map/update-existing config :types init-by-type db)]
+    (assoc config :default (get (get config :types) dtype))))
 
 (system/add-init  ::auth [k config] (wrap-auth k config))
 (system/add-halt! ::auth [_ config] nil)

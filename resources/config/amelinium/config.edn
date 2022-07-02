@@ -290,7 +290,7 @@
                          :locking/fail-expires [3 minutes]  ; time for 1 failed attempt to be forgotten
                          }
 
- ;; Preferred authentication types by account type
+ ;; Main authentication configuration
 
  :amelinium.auth/config {:db           #ref :amelinium.db/main
                          :default-type :user

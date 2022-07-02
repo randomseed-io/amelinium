@@ -79,7 +79,7 @@
      (get-password-suites db email))))
 
 (def ^:const login-query
-  (str-spc "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked"
+  (str-spc "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
            "FROM users, password_suites"
            "WHERE users.email = ? AND password_suites.id = users.password_suite_id"))
 
@@ -95,14 +95,15 @@
   ([db email]
    (when (and db email)
      (jdbc/execute-one! db [login-query email] db/opts-simple-map)))
-  ([db email account-types-config]
-   (if-some [ac-types (get account-types-config :account-types/names)]
-     (when (and db email)
-       (let [ac-sql (get account-types-config :account-types/sql)
-             query  (str login-query-atypes-pre
-                         (if ac-sql ac-sql (db/braced-join-? ac-types))
-                         login-query-atypes-post)]
-         (jdbc/execute-one! db (cons query (cons email ac-types)) db/opts-simple-map)))
+  ([db email auth-config]
+   (if-some [ac-types (get auth-config :account-types/names)]
+     (let [db (or db (get auth-config :db))]
+       (when (and db email)
+         (let [ac-sql (get auth-config :account-types/sql)
+               query  (str login-query-atypes-pre
+                           (if ac-sql ac-sql (str "IN " (db/braced-join-? ac-types)))
+                           login-query-atypes-post)]
+           (jdbc/execute-one! db (cons query (cons email ac-types)) db/opts-simple-map))))
      (get-login-data db email))))
 
 (def ^:const insert-shared-suite-query
