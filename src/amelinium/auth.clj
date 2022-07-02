@@ -147,7 +147,7 @@
   (->> config
        (map/map-keys some-keyword-simple)
        map/remove-empty-values
-       (map/map-vals #(map/assoc-missing % :db db))))
+       (map/map-vals #(update % :db (fnil identity db)))))
 
 (defn init-config
   "Initializes authentication configuration."
