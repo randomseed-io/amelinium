@@ -22,7 +22,7 @@
 ;; Data population
 
 (p/import-vars [amelinium.common.controller
-                route-data+ auth-db+ oplog-logger+ user-lang+])
+                route-data+ auth-db+ auth-types+ oplog-logger+ user-lang+])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Authentication

@@ -151,10 +151,11 @@
 
  :amelinium.http.middleware.validators/web {}
 
- :amelinium.http.middleware.populators/web [[:route/data    amelinium.web.controller/route-data+]
-                                            [:auth/db       amelinium.web.controller/auth-db+]
-                                            [:language/user amelinium.web.controller/user-lang+]
-                                            [:oplog/logger  amelinium.web.controller/oplog-logger+]]
+ :amelinium.http.middleware.populators/web [[:route/data    amelinium.common.controller/route-data+]
+                                            [:auth/db       amelinium.common.controller/auth-db+]
+                                            [:auth/types    amelinium.common.controller/auth-types+]
+                                            [:language/user amelinium.common.controller/user-lang+]
+                                            [:oplog/logger  amelinium.common.controller/oplog-logger+]]
 
  :amelinium.http.middleware/web-renderer amelinium.web.controller/render!
  :amelinium.http.middleware/web-preparer amelinium.web.controller/prep!

@@ -48,6 +48,13 @@
   [req _]
   (get (get (get req :route/data) :auth/config) :db))
 
+(defn auth-types+
+  "Injects authorization configurations directly into a request map."
+  [req _]
+  (get (or (get (get req :route/data) :auth/config)
+           (get req :auth/config))
+       :types))
+
 (defn oplog-logger+
   "Injects operations logger function into a request map."
   [req _]
