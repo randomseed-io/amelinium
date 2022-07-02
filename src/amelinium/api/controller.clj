@@ -9,14 +9,14 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [potemkin.namespaces         :as          p]
-            [tick.core                   :as          t]
-            [amelinium.logging           :as        log]
-            [amelinium.common.controller :as     common]
-            [io.randomseed.utils.map     :as        map]
-            [io.randomseed.utils         :refer    :all]
-            [amelinium.api               :as        api]
-            [amelinium.http              :as       http]))
+  (:require [potemkin.namespaces         :as             p]
+            [tick.core                   :as             t]
+            [amelinium.logging           :as           log]
+            [amelinium.common.controller :as    controller]
+            [io.randomseed.utils.map     :as           map]
+            [io.randomseed.utils         :refer       :all]
+            [amelinium.api               :as           api]
+            [amelinium.http              :as          http]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Data population
@@ -30,9 +30,7 @@
 (p/import-vars [amelinium.common.controller
                 check-password lock-remaining-mins
                 account-locked? prolongation? prolongation-auth?
-                regular-auth? hard-expiry?
-                auth-user-with-password!
-                keywordize-params? kw-form-data])
+                regular-auth? hard-expiry? keywordize-params? kw-form-data])
 
 (defn remove-login-data
   "Removes login data from the form params and body part of a request map."
@@ -70,18 +68,17 @@
 
   If the session is valid then the given request map is returned as is."
   [req]
-  (let [body-params    (get req :body)
-        user-email     (some-str (get body-params :login))
-        password       (when user-email (some-str (get body-params :password)))
-        sess-opts      (get req :session/config)
-        sess-key       (or (get sess-opts :session-key) :session)
-        sess           (get req sess-key)
-        valid-session? (get sess :valid?)
-        route-data     (http/get-route-data req)]
+  (let [body-params (get req :body)
+        user-email  (some-str (get body-params :login))
+        password    (when user-email (some-str (get body-params :password)))
+        sess-opts   (get req :session/config)
+        sess-key    (or (get sess-opts :session-key) :session)
+        sess        (get req sess-key)
+        route-data  (http/get-route-data req)]
     (cond
-      password          (auth-user-with-password! req user-email password sess route-data)
-      valid-session?    req
-      :invalid-session! (api/move-to req (get route-data :auth/info :auth/info)))))
+      password           (controller/auth-user-with-password! req user-email password sess route-data)
+      (get sess :valid?) req
+      :invalid!          (api/move-to req (get route-data :auth/info :auth/info)))))
 
 (defn info!
   "Returns login information."
