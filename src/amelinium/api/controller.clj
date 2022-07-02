@@ -83,7 +83,7 @@
       valid-session?    req
       :invalid-session! (api/move-to req (get route-data :auth/login :login)))))
 
-(defn login!
+(defn info!
   "Returns login information."
   [req]
   (let [sess-opts  (get req :session/config)
