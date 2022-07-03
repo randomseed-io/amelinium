@@ -167,6 +167,17 @@
   ([req]
    (render-response resp/not-found req)))
 
+(defn render-created
+  ([]
+   (render-response resp/created nil))
+  ([req]
+   (render-response resp/created req)))
+
+(defn render-continue
+  ([]
+   (render-response resp/continue))
+  ([req]
+   (render-response resp/continue)))
 
 ;; Linking helpers
 
