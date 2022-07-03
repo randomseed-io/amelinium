@@ -97,7 +97,7 @@
                                        :cache-ttl             [2 minutes]
                                        :cache-size            256
                                        :handler               amelinium.http.middleware.roles/handler
-                                       :session-key           :session
+                                       :session/config        #ref :amelinium.http.middleware.session/web
                                        :query-roles-fn        nil
                                        :context-column        :slug
                                        :authorize-default?    true

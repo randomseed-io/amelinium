@@ -372,6 +372,14 @@
   (when v
     (if (fn? v) v (var/deref-symbol v))))
 
+(defn- setup-session-key
+  [config]
+  (if-some [sk (get config :session-key)]
+    config
+    (assoc config :session-key
+           (or (get (or (get config :session/config) (get config :session)) :session-key)
+               :session))))
+
 (defn prep-config
   [config]
   (-> config
@@ -389,7 +397,7 @@
       (update            :req-context-fn     (fnil identity get-req-context))
       (update            :req-self-role-fn   (fnil identity get-req-self))
       (update            :query-roles-fn     (fnil identity query-roles))
-      (update            :session-key        (fnil some-keyword :session))
+      (update            :session-key        some-keyword)
       (map/assoc-missing :keep-unknown?      true)
       (update            :keep-unknown?      boolean)
       (map/assoc-missing :authorize-default? true)
@@ -429,7 +437,7 @@
   (when-some [processor (var/deref-symbol (:handler config))]
     (let [handler-name     (:handler config)
           dbname           (db/db-name db)
-          config           (-> config (dissoc :handler) (update :db db/ds) prep-config)
+          config           (-> config (dissoc :handler) (update :db db/ds) prep-config setup-session-key)
           db               (get config :db)
           config           (dissoc config :req-context-fn :req-self-role-fn)
           req-context-fn   #(req-context-fn   % config req-context-path)
