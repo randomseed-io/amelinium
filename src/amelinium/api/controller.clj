@@ -12,6 +12,7 @@
   (:require [potemkin.namespaces         :as             p]
             [tick.core                   :as             t]
             [amelinium.logging           :as           log]
+            [amelinium.common            :as        common]
             [amelinium.common.controller :as    controller]
             [io.randomseed.utils.map     :as           map]
             [io.randomseed.utils         :refer       :all]
@@ -71,9 +72,7 @@
   (let [body-params (get req :body)
         user-email  (some-str (get body-params :login))
         password    (when user-email (some-str (get body-params :password)))
-        sess-opts   (get req :session/config)
-        sess-key    (or (get sess-opts :session-key) :session)
-        sess        (get req sess-key)
+        sess        (common/session req)
         route-data  (http/get-route-data req)]
     (cond
       password           (controller/auth-user-with-password! req user-email password sess route-data)
@@ -101,9 +100,7 @@
 (defn prep-request!
   "Prepares a request before any controller is called."
   [req]
-  (let [sess-opts   (get req :session/config)
-        sess-key    (or (get sess-opts :session-key) :session)
-        sess        (get req sess-key)
+  (let [sess        (common/session req)
         auth-state  (delay (api/login-auth-state req :login-page? :auth-page?))
         login-data? (delay (login-data? req))
         auth-db     (delay (api/auth-db req))]

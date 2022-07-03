@@ -67,10 +67,10 @@
   [req _]
   (delay
     (when-some [db (common/auth-db req)]
-      (let [sess-key (or (get (get req :session/config) :session-key) :session)]
-        (when-some [user-id (get (get req sess-key) :user/id)]
-          (when-some [supported (get (get req :language/settings) :supported)]
-            (supported (user/setting db user-id :language))))))))
+      (let [smap (common/session req)]
+        (when-some [user-id (get smap :user/id)]
+          (let [supported (get (get req :language/settings) :supported)]
+            (contains? supported (user/setting db user-id :language))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Calculations
@@ -236,8 +236,7 @@
   [req user-email user-password]
   (let [user-email     (some-str user-email)
         user-password  (when user-email (some-str user-password))
-        sess-opts      (get req  :session/config)
-        sess           (get req  (or (get sess-opts :session-key) :session))
+        sess           (common/session req)
         valid-session? (get sess :valid?)
         route-data     (http/get-route-data req)]
 

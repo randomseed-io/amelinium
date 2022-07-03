@@ -408,11 +408,9 @@
 (selmer/add-tag!
  :link
  (fn [args ctx content]
-   (let [scfg            (get ctx :session/config)
-         skey            (or (get scfg :session-key) :session)
-         smap            (get ctx skey)
+   (let [smap            (common/session ctx)
          sid             (get smap :id)
-         sfld            (or (get smap :session-id-field) (get scfg :session-id-field))
+         sfld            (get smap :session-id-field)
          path-or-name    (first args)
          args            (rest args)
          args            (if (map? (first args)) (cons nil args) args)
@@ -433,10 +431,9 @@
  :slink
  (fn [args ctx content]
    (let [url  (selmer/render (first args) ctx {:tag-open \[ :tag-close \]})
-         skey (or (get (get ctx :session/config) :session-key) :session)
-         smap (get ctx skey)
+         smap (common/session ctx)
          sid  (get smap :id)
-         sfld (or (get smap :session-id-field) (get (get ctx :session/config) :session-id-field))]
+         sfld (get smap :session-id-field)]
      (if (and sid sfld)
        (str "<form name=\"sessionLink\" class=\"formlink\" action=\"" url "\" method=\"post\">"
             (anti-spam-code (get ctx :validators/config))
@@ -449,10 +446,8 @@
 (selmer/add-tag!
  :session-data
  (fn [args ctx]
-   (let [scfg (get ctx :session/config)
-         skey (or (get scfg :session-key) :session)
-         smap (get ctx skey)
-         sfld (or (get smap :session-id-field) (get scfg :session-id-field))]
+   (let [smap (common/session ctx)
+         sfld (get smap :session-id-field)]
      (str (anti-spam-code (get ctx :validators/config))
           "<input type=\"hidden\" name=\"" sfld "\" value=\"" (get smap :id) "\" />"))))
 

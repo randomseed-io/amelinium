@@ -1108,6 +1108,11 @@
 (p/import-vars [amelinium.http.middleware.session
                 session-field])
 
+(defn session
+  "Gets a session map from the given request map."
+  [req]
+  (get req (or (get (get req :session/config) :session-key) :session)))
+
 (defn session-variable-get-failed?
   [v]
   (session/get-variable-failed? v))

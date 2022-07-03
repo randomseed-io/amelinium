@@ -24,7 +24,8 @@
             [amelinium.i18n                     :refer    [tr]]
             [amelinium.logging                  :as        log]
             [amelinium.model.user               :as       user]
-            [amelinium.common.controller        :as     common]
+            [amelinium.common                   :as     common]
+            [amelinium.common.controller        :as controller]
             [io.randomseed.utils.time           :as       time]
             [io.randomseed.utils.var            :as        var]
             [io.randomseed.utils.map            :as        map]
@@ -59,11 +60,12 @@
    (when (and gmap (= (get req :uri) (get gmap :uri)))
      (when-some [form-data (get gmap :form-data)]
        (when (and (map? form-data) (pos-int? (count form-data)))
-         (let [sess-opts (get req :session/config)
-               sess-key  (or (get sess-opts :session-key) :session)
-               smap      (or smap (get req sess-key))
-               sid-key   (web/session-field smap sess-opts sess-key :session/config)]
-           (dissoc form-data sid-key)))))))
+         (if-some [smap (or smap (common/session req))]
+           (dissoc form-data (or (get smap :session-id-field) "session-id"))
+           (let [sess-opts (get req :session/config)
+                 sess-key  (or (get sess-opts :session-key) :session)
+                 sid-key   (web/session-field nil sess-opts sess-key :session/config)]
+             (dissoc form-data (or sid-key "session-id")))))))))
 
 (defn remove-login-data
   "Removes login data from the form params part of a request map."
@@ -136,7 +138,7 @@
   "Authentication helper. Used by other controllers. Short-circuits on certain
   conditions and may emit a redirect or render a response."
   [req user-email password sess route-data lang]
-  (let [req (common/auth-user-with-password! req user-email password sess route-data)]
+  (let [req (controller/auth-user-with-password! req user-email password sess route-data)]
     (if (resp/response? req)
       req
       (language/force req (or lang (web/pick-language-str req))))))
@@ -167,9 +169,7 @@
   (let [form-params    (get req :form-params)
         user-email     (some-str (get form-params "login"))
         password       (when user-email (some-str (get form-params "password")))
-        sess-opts      (get req :session/config)
-        sess-key       (or (get sess-opts :session-key) :session)
-        sess           (get req sess-key)
+        sess           (common/session req)
         lang           (web/pick-language-str req :user)
         valid-session? (get sess :valid?)
         ring-match     (get req ::r/match)
@@ -205,9 +205,7 @@
   "Prepares a request before any web controller is called."
   [req]
   (let [req         (assoc req :app/data-required [] :app/data web/empty-lazy-map)
-        sess-opts   (get req :session/config)
-        sess-key    (or (get sess-opts :session-key) :session)
-        sess        (get req sess-key)
+        sess        (common/session req)
         route-data  (http/get-route-data req)
         auth-state  (delay (web/login-auth-state req :login-page? :auth-page?))
         login-data? (delay (login-data? req))
