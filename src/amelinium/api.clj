@@ -135,6 +135,17 @@
        (or (map?  (:headers req))
            (coll? (:body req)))))
 
+(defn render-response-force
+  "Universal response renderer. Uses the render function to render the response body."
+  ([]
+   (render-response-force resp/ok nil))
+  ([resp-fn]
+   (render-response-force resp-fn nil))
+  ([resp-fn req]
+   (if-some [headers (get req :response/headers)]
+     (assoc (resp-fn (render req)) :headers headers)
+     (resp-fn (render req)))))
+
 (defn render-response
   "Universal response renderer. Uses the render function to render the response body
   unless the `req` is already a valid response (then it is returned as-is)."
@@ -149,35 +160,147 @@
        (assoc (resp-fn (render req)) :headers headers)
        (resp-fn (render req))))))
 
+;; OK response
+
 (defn render-ok
-  ([]
-   (render-response resp/ok nil))
-  ([req]
-   (render-response resp/ok req)))
+  ([]    (render-response resp/ok nil))
+  ([req] (render-response resp/ok req)))
+
+;; Responses with bodies
+
+(defn render-accepted
+  ([]    (render-response resp/accepted nil))
+  ([req] (render-response resp/accepted req)))
+
+(defn render-non-authoritative-information
+  ([]    (render-response resp/non-authoritative-information nil))
+  ([req] (render-response resp/non-authoritative-information req)))
+
+(defn render-partial-content
+  ([]    (render-response resp/partial-content nil))
+  ([req] (render-response resp/partial-content req)))
+
+(defn render-multi-status
+  ([]    (render-response resp/multi-status nil))
+  ([req] (render-response resp/multi-status req)))
+
+(defn render-already-reported
+  ([]    (render-response resp/already-reported nil))
+  ([req] (render-response resp/already-reported req)))
+
+(defn render-im-used
+  ([]    (render-response resp/im-used nil))
+  ([req] (render-response resp/im-used req)))
+
+;; Error responses with possible bodies
+
+(defn render-bad-request
+  ([]    (render-response resp/bad-request nil))
+  ([req] (render-response resp/bad-request req)))
 
 (defn render-bad-params
-  ([]
-   (render-response resp/unprocessable-entity nil))
-  ([req]
-   (render-response resp/unprocessable-entity req)))
+  ([]    (render-response resp/unprocessable-entity nil))
+  ([req] (render-response resp/unprocessable-entity req)))
+
+(defn render-unprocessable-entity
+  ([]    (render-response resp/unprocessable-entity nil))
+  ([req] (render-response resp/unprocessable-entity req)))
 
 (defn render-not-found
-  ([]
-   (render-response resp/not-found nil))
-  ([req]
-   (render-response resp/not-found req)))
+  ([]    (render-response resp/not-found nil))
+  ([req] (render-response resp/not-found req)))
+
+(defn render-unauthorized
+  ([]    (render-response resp/unauthorized nil))
+  ([req] (render-response resp/unauthorized req)))
+
+(defn render-payment-required
+  ([]    (render-response resp/payment-required nil))
+  ([req] (render-response resp/payment-required req)))
+
+(defn render-forbidden
+  ([]    (render-response resp/forbidden nil))
+  ([req] (render-response resp/forbidden req)))
+
+(defn render-method-not-allowed
+  ([]    (render-response resp/method-not-allowed nil))
+  ([req] (render-response resp/method-not-allowed req)))
+
+(defn render-not-acceptable
+  ([]    (render-response resp/not-acceptable nil))
+  ([req] (render-response resp/not-acceptable req)))
+
+(defn render-proxy-authentication-required
+  ([]    (render-response resp/proxy-authentication-required nil))
+  ([req] (render-response resp/proxy-authentication-required req)))
+
+;; Redirect with a possible body
 
 (defn render-created
   ([]
-   (render-response resp/created nil))
+   (render-response resp/created))
   ([req]
-   (render-response resp/created req)))
+   (render-response-force
+    (common/created req)))
+  ([req name-or-path]
+   (render-response-force
+    (common/created req name-or-path)))
+  ([req name-or-path lang]
+   (render-response-force
+    (common/created req name-or-path lang)))
+  ([req name-or-path lang params]
+   (render-response-force
+    (common/created req name-or-path lang params)))
+  ([req name-or-path lang params query-params]
+   (render-response-force
+    (common/created req name-or-path lang params query-params)))
+  ([req name-or-path lang params query-params & more]
+   (render-response-force
+    (apply common/created req name-or-path lang params query-params more))))
+
+(defn render-localized-created
+  ([]
+   (render-response resp/created))
+  ([req]
+   (render-response-force
+    (common/localized-created req)))
+  ([req name-or-path]
+   (render-response-force
+    (common/localized-created req name-or-path)))
+  ([req name-or-path lang]
+   (render-response-force
+    (common/localized-created req name-or-path lang)))
+  ([req name-or-path lang params]
+   (render-response-force
+    (common/localized-created req name-or-path lang params)))
+  ([req name-or-path lang params query-params]
+   (render-response-force
+    (common/localized-created req name-or-path lang params query-params)))
+  ([req name-or-path lang params query-params & more]
+   (render-response-force
+    (apply common/localized-created req name-or-path lang params query-params more))))
+
+;; Responses without a body
 
 (defn render-continue
-  ([]
-   (render-response resp/continue))
-  ([req]
-   (render-response resp/continue)))
+  ([]    (resp/continue))
+  ([req] (resp/continue)))
+
+(defn render-switching-protocols
+  ([]    (resp/switching-protocols))
+  ([req] (resp/switching-protocols)))
+
+(defn render-processing
+  ([]    (resp/processing))
+  ([req] (resp/processing)))
+
+(defn render-no-content
+  ([]    (resp/no-content))
+  ([req] (resp/no-content)))
+
+(defn render-not-modified
+  ([]    (resp/not-modified))
+  ([req] (resp/not-modified)))
 
 ;; Linking helpers
 

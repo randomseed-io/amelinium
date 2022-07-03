@@ -956,13 +956,24 @@
         (~'[req name-or-path lang params query-params & more]
          (f# (apply localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more)))))))
 
-(def-redirect           temporary-redirect resp/temporary-redirect)
-(def-redirect           see-other          resp/see-other)
-(def-redirect           found              resp/found)
+(def-redirect moved-permanently  resp/moved-permanently)
+(def-redirect permanent-redirect resp/permanent-redirect)
+(def-redirect temporary-redirect resp/temporary-redirect)
+(def-redirect see-other          resp/see-other)
+(def-redirect found              resp/found)
+(def-redirect created            resp/created)
+(def-redirect multiple-choices   resp/multiple-choices)
+(def-redirect use-proxy          resp/use-proxy)
 
+(def-localized-redirect localized-moved-permanently  resp/moved-permanently)
+(def-localized-redirect localized-permanent-redirect resp/permanent-redirect)
 (def-localized-redirect localized-temporary-redirect resp/temporary-redirect)
 (def-localized-redirect localized-see-other          resp/see-other)
 (def-localized-redirect localized-found              resp/found)
+(def-localized-redirect localized-created            resp/created)
+(def-localized-redirect localized-multiple-choices   resp/multiple-choices)
+(def-localized-redirect localized-use-proxy          resp/use-proxy)
+
 (def-localized-redirect move-to                      resp/temporary-redirect)
 (def-localized-redirect go-to                        resp/see-other)
 
