@@ -168,10 +168,10 @@
                                  reitit.ring.middleware.parameters/parameters-middleware
                                  #ref :amelinium.http.middleware.remote-ip/all
                                  #ref :amelinium.http.middleware.session/web
-                                 #ref :amelinium.http.middleware.language/web
                                  #ref :amelinium.http.middleware.roles/web
                                  #ref :amelinium.http.middleware.validators/web
                                  #ref :amelinium.http.middleware.populators/web
+                                 #ref :amelinium.http.middleware.language/web
                                  #ref :amelinium.http.middleware.headers/web
                                  #ref :amelinium.http.middleware/web-preparer
                                  #ref :amelinium.http.middleware/web-renderer
