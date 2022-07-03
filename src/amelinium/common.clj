@@ -845,128 +845,126 @@
   ([req]         (page req :welcome))
   ([req lang-id] (page req :welcome lang-id)))
 
-(defn temporary-redirect
-  "Uses the page function to calculate the destination path on a basis of page
-  name (identifier) or a path (a string) and performs temporary redirect on it. If
-  the language is given it uses the localized-page function. If there is no language
-  given but the page identified by its name requires a language parameter to be set,
-  it will be obtained from the given request map (under the key :language/str)."
-  ([]
-   (resp/temporary-redirect "/"))
-  ([req]
-   (resp/temporary-redirect (page req)))
-  ([req name-or-path]
-   (resp/temporary-redirect (page req name-or-path)))
-  ([req name-or-path lang]
-   (resp/temporary-redirect (page req name-or-path lang)))
-  ([req name-or-path lang params]
-   (resp/temporary-redirect (page req name-or-path lang params)))
-  ([req name-or-path lang params query-params]
-   (resp/temporary-redirect (page req name-or-path lang params query-params)))
-  ([req name-or-path lang params query-params & more]
-   (resp/temporary-redirect
-    (apply page req name-or-path lang params query-params more))))
+(defn redirect
+  "Generic response wrapper. The `f` should be a function which takes a request map and
+  returns a response; should take at least one single argument which should be a
+  URL. The URL will be parameterized with a language if required. If the language is
+  given it uses the `localized-page` function. If there is no language given but the
+  page identified by its name requires a language parameter to be set, it will be
+  obtained from the given request map (under the key `:language/str`)."
+  ([f]
+   (f "/"))
+  ([f req]
+   (f (page req)))
+  ([f req name-or-path]
+   (f (page req name-or-path)))
+  ([f req name-or-path lang]
+   (f (page req name-or-path lang)))
+  ([f req name-or-path lang params]
+   (f (page req name-or-path lang params)))
+  ([f req name-or-path lang params query-params]
+   (f (page req name-or-path lang params query-params)))
+  ([f req name-or-path lang params query-params & more]
+   (f (apply page req name-or-path lang params query-params more))))
 
-(defn localized-temporary-redirect
-  "Uses the localized-page function to calculate the destination path on a basis of
+(defn localized-redirect
+  "Generic response wrapper. The `f` should be a function which takes a request map and
+  returns a response; should take at least one single argument which should be a
+  URL. The URL will be parameterized with a language. Works almost the same way as
+  the `redirect` will generate a localized path using a language obtained from a
+  request (under `:language/str` key) and if there will be no language-parameterized
+  variant of the path, it will fail. Use this function to make sure that localized
+  path will be produced, or `nil`."
+  ([f]
+   (f "/"))
+  ([f req]
+   (f (localized-page req)))
+  ([f req name-or-path]
+   (f (localized-page req name-or-path)))
+  ([f req name-or-path lang]
+   (f (localized-page req name-or-path lang)))
+  ([f req name-or-path lang params]
+   (f (localized-page req name-or-path lang params)))
+  ([f req name-or-path lang params query-params]
+   (f (localized-page req name-or-path lang params query-params)))
+  ([f req name-or-path lang params query-params & more]
+   (f (apply localized-page req name-or-path lang params query-params more))))
+
+(defmacro def-redirect
+  "Generates a language-parameterized redirect function which acts like `redirect`."
+  ([name f]
+   (#'def-redirect &form &env name
+                   (str "Uses the page function to calculate the destination path on a basis of page
+  name (identifier) or a path (a string) and performs a redirect on it using
+  `" f "`. If the language is given it uses the `localized-page`
+  function. If there is no language given but the page identified by its name
+  requires a language parameter to be set, it will be obtained from the given request
+  map (under the key `:language/str`).") f))
+  ([name doc f]
+   `(let [f# ~f]
+      (defn ~name ~doc
+        ([]
+         (f# "/"))
+        (~'[req]
+         (f# (page ~'req)))
+        (~'[req name-or-path]
+         (f# (page ~'req ~'name-or-path)))
+        (~'[req name-or-path lang]
+         (f# (page ~'req ~'name-or-path ~'lang)))
+        (~'[req name-or-path lang params]
+         (f# (page ~'req ~'name-or-path ~'lang ~'params)))
+        (~'[req name-or-path lang params query-params]
+         (f# (page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
+        (~'[req name-or-path lang params query-params & more]
+         (f# (apply page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more)))))))
+
+(defmacro def-localized-redirect
+  "Generates a language-parameterized redirect function which acts like
+  `localized-redirect`."
+  ([name f]
+   (#'def-redirect &form &env name
+                   (str "Uses the localized-page function to calculate the destination path on a basis of
   page name (identifier) or a path (a string) and performs temporary redirect on
-  it. If the language is not given it will use a value from the given request
-  map (under the key :language/str).
+  it using `" f "`. If the language is given it uses the `localized-page` function.
+  If there is no language given but the page identified by its name requires
+  a language parameter to be set, it will be obtained from the given request map
+  (under the key `:language/str`).
 
-  The difference between this function and the temporary-redirect function is in
+  The difference between this function and its regular counterpart (if defined) is in
   binary variants of them (when a request map and a name or a path are given as
-  arguments). The temporary-redirect function will fail to generate a redirect if
-  there is no language parameter and the given path does not point to an existing
+  arguments). The regular function will fail to generate a redirect if there is
+  no language parameter and the given path does not point to an existing
   page. On the contrary, this function will generate a localized path using a
-  language obtained from a request (under :language/str key) and if there will be no
+  language obtained from a request (under `:language/str` key) and if there will be no
   language-parameterized variant of the path, it will fail. Use this function to make
-  sure that localized path will be produced, or nil."
-  ([]
-   (resp/temporary-redirect "/"))
-  ([req]
-   (resp/temporary-redirect (localized-page req)))
-  ([req name-or-path]
-   (resp/temporary-redirect (localized-page req name-or-path)))
-  ([req name-or-path lang]
-   (resp/temporary-redirect (localized-page req name-or-path lang)))
-  ([req name-or-path lang params]
-   (resp/temporary-redirect (localized-page req name-or-path lang params)))
-  ([req name-or-path lang params query-params]
-   (resp/temporary-redirect (localized-page req name-or-path lang params query-params)))
-  ([req name-or-path lang params query-params & more]
-   (resp/temporary-redirect
-    (apply localized-page req name-or-path lang params query-params more))))
+  sure that a localized path will be produced, or `nil`.") f))
+  ([name doc f]
+   `(let [f# ~f]
+      (defn ~name ~doc
+        ([]
+         (f# "/"))
+        (~'[req]
+         (f# (localized-page ~'req)))
+        (~'[req name-or-path]
+         (f# (localized-page ~'req ~'name-or-path)))
+        (~'[req name-or-path lang]
+         (f# (localized-page ~'req ~'name-or-path ~'lang)))
+        (~'[req name-or-path lang params]
+         (f# (localized-page ~'req ~'name-or-path ~'lang ~'params)))
+        (~'[req name-or-path lang params query-params]
+         (f# (localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
+        (~'[req name-or-path lang params query-params & more]
+         (f# (apply localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more)))))))
 
-(def ^{:arglists '([req]
-                   [req name-or-path]
-                   [req name-or-path lang]
-                   [req name-or-path lang params]
-                   [req name-or-path lang params query-params]
-                   [req name-or-path lang params query-params & more])}
-  move-to
-  localized-temporary-redirect)
+(def-redirect           temporary-redirect resp/temporary-redirect)
+(def-redirect           see-other          resp/see-other)
+(def-redirect           found              resp/found)
 
-(defn see-other
-  "Uses the page function to calculate the destination path on a basis of page
-  name (identifier) or a path (a string) and performs a 303 (see other) redirect on
-  it. If the language is given it uses the localized-page function. If there is no
-  language given but the page identified by its name requires a language parameter to
-  be set, it will be obtained from the given request map (under the
-  key :language/str)."
-  ([]
-   (resp/see-other "/"))
-  ([req]
-   (resp/see-other (page req)))
-  ([req name-or-path]
-   (resp/see-other (page req name-or-path)))
-  ([req name-or-path lang]
-   (resp/see-other (page req name-or-path lang)))
-  ([req name-or-path lang params]
-   (resp/see-other (page req name-or-path lang params)))
-  ([req name-or-path lang params query-params]
-   (resp/see-other (page req name-or-path lang params query-params)))
-  ([req name-or-path lang params query-params & more]
-   (resp/see-other
-    (apply page req name-or-path lang params query-params more))))
-
-(defn localized-see-other
-  "Uses the localized-page function to calculate the destination path on a basis of
-  page name (identifier) or a path (a string) and performs a 303 (see other) redirect
-  on it. If the language is not given it will use a value from the given request
-  map (under the key :language/str).
-
-  The difference between this function and the see-other function is in
-  binary variants of them (when a request map and a name or a path are given as
-  arguments). The see-other function will fail to generate a redirect if
-  there is no language parameter and the given path does not point to an existing
-  page. On the contrary, this function will generate a localized path using a
-  language obtained from a request (under :language/str key) and if there will be no
-  language-parameterized variant of the path, it will fail. Use this function to make
-  sure that localized path will be produced, or nil."
-  ([]
-   (resp/see-other "/"))
-  ([req]
-   (resp/see-other (localized-page req)))
-  ([req name-or-path]
-   (resp/see-other (localized-page req name-or-path)))
-  ([req name-or-path lang]
-   (resp/see-other (localized-page req name-or-path lang)))
-  ([req name-or-path lang params]
-   (resp/see-other (localized-page req name-or-path lang params)))
-  ([req name-or-path lang params query-params]
-   (resp/see-other (localized-page req name-or-path lang params query-params)))
-  ([req name-or-path lang params query-params & more]
-   (resp/see-other
-    (apply localized-page req name-or-path lang params query-params more))))
-
-(def ^{:arglists '([req]
-                   [req name-or-path]
-                   [req name-or-path lang]
-                   [req name-or-path lang params]
-                   [req name-or-path lang params query-params]
-                   [req name-or-path lang params query-params & more])}
-  go-to
-  localized-see-other)
+(def-localized-redirect localized-temporary-redirect resp/temporary-redirect)
+(def-localized-redirect localized-see-other          resp/see-other)
+(def-localized-redirect localized-found              resp/found)
+(def-localized-redirect move-to                      resp/temporary-redirect)
+(def-localized-redirect go-to                        resp/see-other)
 
 ;; Language
 
