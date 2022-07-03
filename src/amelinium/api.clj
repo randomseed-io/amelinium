@@ -39,7 +39,6 @@
   (:import [reitit.core Match]
            [lazy_map.core LazyMapEntry LazyMap]))
 
-
 ;; Database
 
 (p/import-vars [amelinium.common
@@ -166,7 +165,7 @@
   ([]    (render-response resp/ok nil))
   ([req] (render-response resp/ok req)))
 
-;; Responses with bodies
+;; Success responses with bodies
 
 (defn render-accepted
   ([]    (render-response resp/accepted nil))
@@ -198,18 +197,6 @@
   ([]    (render-response resp/bad-request nil))
   ([req] (render-response resp/bad-request req)))
 
-(defn render-bad-params
-  ([]    (render-response resp/unprocessable-entity nil))
-  ([req] (render-response resp/unprocessable-entity req)))
-
-(defn render-unprocessable-entity
-  ([]    (render-response resp/unprocessable-entity nil))
-  ([req] (render-response resp/unprocessable-entity req)))
-
-(defn render-not-found
-  ([]    (render-response resp/not-found nil))
-  ([req] (render-response resp/not-found req)))
-
 (defn render-unauthorized
   ([]    (render-response resp/unauthorized nil))
   ([req] (render-response resp/unauthorized req)))
@@ -221,6 +208,10 @@
 (defn render-forbidden
   ([]    (render-response resp/forbidden nil))
   ([req] (render-response resp/forbidden req)))
+
+(defn render-not-found
+  ([]    (render-response resp/not-found nil))
+  ([req] (render-response resp/not-found req)))
 
 (defn render-method-not-allowed
   ([]    (render-response resp/method-not-allowed nil))
@@ -234,7 +225,155 @@
   ([]    (render-response resp/proxy-authentication-required nil))
   ([req] (render-response resp/proxy-authentication-required req)))
 
-;; Redirect with a possible body
+(defn render-request-timeout
+  ([]    (render-response resp/request-timeout nil))
+  ([req] (render-response resp/request-timeout req)))
+
+(defn render-conflict
+  ([]    (render-response resp/conflict nil))
+  ([req] (render-response resp/conflict req)))
+
+(defn render-gone
+  ([]    (render-response resp/gone nil))
+  ([req] (render-response resp/gone req)))
+
+(defn render-length-required
+  ([]    (render-response resp/length-required nil))
+  ([req] (render-response resp/length-required req)))
+
+(defn render-precondition-failed
+  ([]    (render-response resp/precondition-failed nil))
+  ([req] (render-response resp/precondition-failed req)))
+
+(defn render-request-entity-too-large
+  ([]    (render-response resp/request-entity-too-large nil))
+  ([req] (render-response resp/request-entity-too-large req)))
+
+(defn render-request-uri-too-long
+  ([]    (render-response resp/request-uri-too-long nil))
+  ([req] (render-response resp/request-uri-too-long req)))
+
+(defn render-unsupported-media-type
+  ([]    (render-response resp/unsupported-media-type nil))
+  ([req] (render-response resp/unsupported-media-type req)))
+
+(defn render-requested-range-not-satisfiable
+  ([]    (render-response resp/requested-range-not-satisfiable nil))
+  ([req] (render-response resp/requested-range-not-satisfiable req)))
+
+(defn render-expectation-failed
+  ([]    (render-response resp/expectation-failed nil))
+  ([req] (render-response resp/expectation-failed req)))
+
+(defn render-enhance-your-calm
+  ([]    (render-response resp/enhance-your-calm nil))
+  ([req] (render-response resp/enhance-your-calm req)))
+
+(defn render-unprocessable-entity
+  ([]    (render-response resp/unprocessable-entity nil))
+  ([req] (render-response resp/unprocessable-entity req)))
+
+(defn render-bad-params
+  ([]    (render-response resp/unprocessable-entity nil))
+  ([req] (render-response resp/unprocessable-entity req)))
+
+(defn render-locked
+  ([]    (render-response resp/locked nil))
+  ([req] (render-response resp/locked req)))
+
+(defn render-failed-dependency
+  ([]    (render-response resp/failed-dependency nil))
+  ([req] (render-response resp/failed-dependency req)))
+
+(defn render-unordered-collection
+  ([]    (render-response resp/unordered-collection nil))
+  ([req] (render-response resp/unordered-collection req)))
+
+(defn render-upgrade-required
+  ([]    (render-response resp/upgrade-required nil))
+  ([req] (render-response resp/upgrade-required req)))
+
+(defn render-precondition-required
+  ([]    (render-response resp/precondition-required nil))
+  ([req] (render-response resp/precondition-required req)))
+
+(defn render-too-many-requests
+  ([]    (render-response resp/too-many-requests nil))
+  ([req] (render-response resp/too-many-requests req)))
+
+(defn render-request-header-fields-too-large
+  ([]    (render-response resp/request-header-fields-too-large nil))
+  ([req] (render-response resp/request-header-fields-too-large req)))
+
+(defn render-retry-with
+  ([]    (render-response resp/retry-with nil))
+  ([req] (render-response resp/retry-with req)))
+
+(defn render-blocked-by-windows-parental-controls
+  ([]    (render-response resp/blocked-by-windows-parental-controls nil))
+  ([req] (render-response resp/blocked-by-windows-parental-controls req)))
+
+(defn render-unavailable-for-legal-reasons
+  ([]    (render-response resp/unavailable-for-legal-reasons nil))
+  ([req] (render-response resp/unavailable-for-legal-reasons req)))
+
+(defn render-internal-server-error
+  ([]    (render-response resp/internal-server-error nil))
+  ([req] (render-response resp/internal-server-error req)))
+
+(defn render-not-implemented
+  ([]    (render-response resp/not-implemented nil))
+  ([req] (render-response resp/not-implemented req)))
+
+(defn render-bad-gateway
+  ([]    (render-response resp/bad-gateway nil))
+  ([req] (render-response resp/bad-gateway req)))
+
+(defn render-service-unavailable
+  ([]    (render-response resp/service-unavailable nil))
+  ([req] (render-response resp/service-unavailable req)))
+
+(defn render-gateway-timeout
+  ([]    (render-response resp/gateway-timeout nil))
+  ([req] (render-response resp/gateway-timeout req)))
+
+(defn render-http-version-not-supported
+  ([]    (render-response resp/http-version-not-supported nil))
+  ([req] (render-response resp/http-version-not-supported req)))
+
+(defn render-variant-also-negotiates
+  ([]    (render-response resp/variant-also-negotiates nil))
+  ([req] (render-response resp/variant-also-negotiates req)))
+
+(defn render-insufficient-storage
+  ([]    (render-response resp/insufficient-storage nil))
+  ([req] (render-response resp/insufficient-storage req)))
+
+(defn render-loop-detected
+  ([]    (render-response resp/loop-detected nil))
+  ([req] (render-response resp/loop-detected req)))
+
+(defn render-bandwidth-limit-exceeded
+  ([]    (render-response resp/bandwidth-limit-exceeded nil))
+  ([req] (render-response resp/bandwidth-limit-exceeded req)))
+
+(defn render-not-extended
+  ([]    (render-response resp/not-extended nil))
+  ([req] (render-response resp/not-extended req)))
+
+(defn render-network-authentication-required
+  ([]    (render-response resp/network-authentication-required nil))
+  ([req] (render-response resp/network-authentication-required req)))
+
+(defn render-network-read-timeout
+  ([]    (render-response resp/network-read-timeout nil))
+  ([req] (render-response resp/network-read-timeout req)))
+
+(defn render-network-connect-timeout
+  ([]    (render-response resp/network-connect-timeout nil))
+  ([req] (render-response resp/network-connect-timeout req)))
+
+;; Resource creation success, redirect with a possible body
 
 (defn render-created
   ([]
@@ -297,6 +436,10 @@
 (defn render-no-content
   ([]    (resp/no-content))
   ([req] (resp/no-content)))
+
+(defn render-reset-content
+  ([]    (resp/reset-content))
+  ([req] (resp/reset-content)))
 
 (defn render-not-modified
   ([]    (resp/not-modified))

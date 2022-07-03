@@ -977,6 +977,16 @@
 (def-localized-redirect move-to                      resp/temporary-redirect)
 (def-localized-redirect go-to                        resp/see-other)
 
+(defn not-modified
+  ([]           (resp/not-modified))
+  ([req]        (resp/not-modified))
+  ([req & more] (resp/not-modified)))
+
+(defn localized-not-modified
+  ([]           (resp/not-modified))
+  ([req]        (resp/not-modified))
+  ([req & more] (resp/not-modified)))
+
 ;; Language
 
 (def ^{:arglists '([req]
