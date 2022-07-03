@@ -638,9 +638,9 @@
                                                   (:remote-ip/str req))))}))))))))
      {:id               nil
       :err/id           nil
-      :session-keyu     (or session-key
-                            (get (config-options req opts-or-config-key) :session-key)
-                            :session)
+      :session-key      (or session-key
+                           (get (config-options req opts-or-config-key) :session-key)
+                           :session)
       :session-id-field (or session-id-field
                             (get (config-options req opts-or-config-key) :session-id-field)
                             "session-id")})))
@@ -804,7 +804,7 @@
         checker-fn         (setup-fn config :fn/checker check-encrypted)
         checker-fn-w       (db/memoizer checker-fn checker-config)
         config             (assoc config :fn/checker checker-fn-w)
-        pre-handler        #(handler config getter-fn-w checker-fn-w session-id-field %1 %2)
+        pre-handler        #(handler config getter-fn-w checker-fn-w session-id-field session-key %1 %2)
         mem-handler        (db/memoizer pre-handler config)
         invalidator-fn     (setup-invalidator pre-handler mem-handler)
         config             (assoc config :fn/invalidator invalidator-fn :fn/handler mem-handler)
