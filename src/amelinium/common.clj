@@ -866,6 +866,8 @@
     :headers {}
     :body    body}))
 
+;; Redirects
+
 (defn redirect
   "Generic response wrapper. The `f` should be a function which takes a request map and
   returns a response; should take at least one single argument which should be a
@@ -913,39 +915,53 @@
 
 (defmacro def-redirect
   "Generates a language-parameterized redirect function which acts like `redirect`."
+  {:arglists '([name f]
+               [name f http-code]
+               [name doc f])}
   ([name f]
+   (#'def-redirect &form &env name f nil nil))
+  ([name f code _]
    (#'def-redirect &form &env name
                    (str "Uses the page function to calculate the destination path on a basis of page
-  name (identifier) or a path (a string) and performs a redirect on it using
+  name (identifier) or a path (a string) and performs a redirect"
+                        (when code (str " with code " code)) " to it using
   `" f "`. If the language is given it uses the `localized-page`
   function. If there is no language given but the page identified by its name
   requires a language parameter to be set, it will be obtained from the given request
   map (under the key `:language/str`).") f))
-  ([name doc f]
-   `(let [f# ~f]
-      (defn ~name ~doc
-        ([]
-         (f# "/"))
-        (~'[req]
-         (f# (page ~'req)))
-        (~'[req name-or-path]
-         (f# (page ~'req ~'name-or-path)))
-        (~'[req name-or-path lang]
-         (f# (page ~'req ~'name-or-path ~'lang)))
-        (~'[req name-or-path lang params]
-         (f# (page ~'req ~'name-or-path ~'lang ~'params)))
-        (~'[req name-or-path lang params query-params]
-         (f# (page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
-        (~'[req name-or-path lang params query-params & more]
-         (f# (apply page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more)))))))
+  ([name doc-or-f f-or-code]
+   (if (pos-int? f-or-code)
+     (#'def-redirect &form &env name doc-or-f f-or-code nil)
+     `(let [f# ~f-or-code]
+        (defn ~name ~doc-or-f
+          ([]
+           (f# "/"))
+          (~'[req]
+           (f# (page ~'req)))
+          (~'[req name-or-path]
+           (f# (page ~'req ~'name-or-path)))
+          (~'[req name-or-path lang]
+           (f# (page ~'req ~'name-or-path ~'lang)))
+          (~'[req name-or-path lang params]
+           (f# (page ~'req ~'name-or-path ~'lang ~'params)))
+          (~'[req name-or-path lang params query-params]
+           (f# (page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
+          (~'[req name-or-path lang params query-params & more]
+           (f# (apply page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
 
 (defmacro def-localized-redirect
   "Generates a language-parameterized redirect function which acts like
   `localized-redirect`."
+  {:arglists '([name f]
+               [name f http-code]
+               [name doc f])}
   ([name f]
-   (#'def-redirect &form &env name
-                   (str "Uses the localized-page function to calculate the destination path on a basis of
-  page name (identifier) or a path (a string) and performs temporary redirect on
+   (#'def-localized-redirect &form &env name f nil nil))
+  ([name f code _]
+   (#'def-localized-redirect &form &env name
+                             (str "Uses the localized-page function to calculate the destination path on a basis of
+  page name (identifier) or a path (a string) and performs a redirect"
+                                  (when code (str " with code " code)) " to
   it using `" f "`. If the language is given it uses the `localized-page` function.
   If there is no language given but the page identified by its name requires
   a language parameter to be set, it will be obtained from the given request map
@@ -959,44 +975,46 @@
   language obtained from a request (under `:language/str` key) and if there will be no
   language-parameterized variant of the path, it will fail. Use this function to make
   sure that a localized path will be produced, or `nil`.") f))
-  ([name doc f]
-   `(let [f# ~f]
-      (defn ~name ~doc
-        ([]
-         (f# "/"))
-        (~'[req]
-         (f# (localized-page ~'req)))
-        (~'[req name-or-path]
-         (f# (localized-page ~'req ~'name-or-path)))
-        (~'[req name-or-path lang]
-         (f# (localized-page ~'req ~'name-or-path ~'lang)))
-        (~'[req name-or-path lang params]
-         (f# (localized-page ~'req ~'name-or-path ~'lang ~'params)))
-        (~'[req name-or-path lang params query-params]
-         (f# (localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
-        (~'[req name-or-path lang params query-params & more]
-         (f# (apply localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more)))))))
+  ([name doc-or-f f-or-code]
+   (if (pos-int? f-or-code)
+     (#'def-localized-redirect &form &env name doc-or-f f-or-code nil)
+     `(let [f# ~f-or-code]
+        (defn ~name ~doc-or-f
+          ([]
+           (f# "/"))
+          (~'[req]
+           (f# (localized-page ~'req)))
+          (~'[req name-or-path]
+           (f# (localized-page ~'req ~'name-or-path)))
+          (~'[req name-or-path lang]
+           (f# (localized-page ~'req ~'name-or-path ~'lang)))
+          (~'[req name-or-path lang params]
+           (f# (localized-page ~'req ~'name-or-path ~'lang ~'params)))
+          (~'[req name-or-path lang params query-params]
+           (f# (localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
+          (~'[req name-or-path lang params query-params & more]
+           (f# (apply localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
 
-(def-redirect moved-permanently  resp/moved-permanently)
-(def-redirect permanent-redirect resp/permanent-redirect)
-(def-redirect temporary-redirect resp/temporary-redirect)
-(def-redirect see-other          resp/see-other)
-(def-redirect found              resp/found)
-(def-redirect created            resp/created)
-(def-redirect multiple-choices   resp/multiple-choices)
-(def-redirect use-proxy          resp/use-proxy)
+(def-redirect created            resp/created                                 201)
+(def-redirect multiple-choices   resp/multiple-choices                        300)
+(def-redirect moved-permanently  resp/moved-permanently                       301)
+(def-redirect found              resp/found                                   302)
+(def-redirect see-other          resp/see-other                               303)
+(def-redirect use-proxy          resp/use-proxy                               305)
+(def-redirect temporary-redirect resp/temporary-redirect                      307)
+(def-redirect permanent-redirect resp/permanent-redirect                      308)
 
-(def-localized-redirect localized-moved-permanently  resp/moved-permanently)
-(def-localized-redirect localized-permanent-redirect resp/permanent-redirect)
-(def-localized-redirect localized-temporary-redirect resp/temporary-redirect)
-(def-localized-redirect localized-see-other          resp/see-other)
-(def-localized-redirect localized-found              resp/found)
-(def-localized-redirect localized-created            resp/created)
-(def-localized-redirect localized-multiple-choices   resp/multiple-choices)
-(def-localized-redirect localized-use-proxy          resp/use-proxy)
+(def-localized-redirect localized-created            resp/created             201)
+(def-localized-redirect localized-multiple-choices   resp/multiple-choices    300)
+(def-localized-redirect localized-moved-permanently  resp/moved-permanently   301)
+(def-localized-redirect localized-found              resp/found               302)
+(def-localized-redirect localized-see-other          resp/see-other           303)
+(def-localized-redirect localized-use-proxy          resp/use-proxy           305)
+(def-localized-redirect localized-temporary-redirect resp/temporary-redirect  307)
+(def-localized-redirect localized-permanent-redirect resp/permanent-redirect  308)
 
-(def-localized-redirect move-to                      resp/temporary-redirect)
-(def-localized-redirect go-to                        resp/see-other)
+(def-localized-redirect move-to                      resp/temporary-redirect  307)
+(def-localized-redirect go-to                        resp/see-other           303)
 
 (defn not-modified
   ([]           (resp/not-modified))
