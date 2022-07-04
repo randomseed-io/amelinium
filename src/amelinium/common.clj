@@ -845,6 +845,27 @@
   ([req]         (page req :welcome))
   ([req lang-id] (page req :welcome lang-id)))
 
+;; Additional responses
+
+(defn im-a-teapot
+  "418 I'm a teapot
+  The server cannot brew coffee because it is, permanently, a teapot."
+  ([] (im-a-teapot nil))
+  ([body]
+   {:status  418
+    :headers {}
+    :body    body}))
+
+(defn misdirected-request
+  "421 Misdirected Request
+  The request was directed at a server that is not able to produce a response
+  (e.g. network balancer forwarded traffic to a wrong server)."
+  ([] (misdirected-request nil))
+  ([body]
+   {:status  421
+    :headers {}
+    :body    body}))
+
 (defn redirect
   "Generic response wrapper. The `f` should be a function which takes a request map and
   returns a response; should take at least one single argument which should be a
