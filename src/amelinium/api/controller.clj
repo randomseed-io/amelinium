@@ -174,7 +174,9 @@
 
 (defn render!
   [req]
-  (api/render-ok req))
+  (if (contains? req :response/fn)
+    ((get req :response/fn) req)
+    (api/render-ok req)))
 
 (defn not-found!
   [req]
