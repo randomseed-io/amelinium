@@ -175,11 +175,11 @@
 
       (hard-locked?) (do (log/wrn "Account locked permanently" for-user)
                          (oplog :user-id user-id :op :login :ok? false :msg (str "Permanent lock " for-mail))
-                         (common/move-to req (get route-data :auth/locked :login/account-locked)))
+                         (assoc req :authentication/ok? false :authentication/status :locked))
 
       (soft-locked?) (do (log/msg "Account locked temporarily" for-user)
                          (oplog :user-id user-id :op :login :ok? false :msg (str "Temporary lock " for-mail))
-                         (common/move-to req (get route-data :auth/soft-locked :login/account-soft-locked)))
+                         (assoc req :authentication/ok? false :authentication/status :soft-locked))
 
       (invalid-pwd?) (do (log/wrn "Incorrect password or user not found" for-user)
                          (when user-id
@@ -187,7 +187,7 @@
                            (user/update-login-failed auth-db user-id ipaddr
                                                      (get auth-config :locking/max-attempts)
                                                      (get auth-config :locking/fail-expires)))
-                         (common/move-to req (get route-data :auth/bad-password :login/bad-password)))
+                         (assoc req :authentication/ok? false :authentication/status :bad-password))
 
       (do (log/msg "Authentication successful" for-user)
           (common/oplog req :user-id user-id :op :login :message (str "Login OK " for-mail))
@@ -207,12 +207,13 @@
             (when r
               (log/log (:severity e :warn) r)
               (oplog :level e :user-id user-id :op :session :ok? false :msg r))
-            (common/go-to req (get route-data :auth/session-error :login/session-error)))
+            (assoc req :authentication/ok? false :authentication/status :session-error))
 
           (if goto-uri
             (resp/temporary-redirect goto-uri)
             (-> req
-                (assoc (or (get sess-opts :session-key) :session) sess)
+                (assoc (or (get sess-opts :session-key) :session) sess
+                       :authentication/ok? true :authentication/status :ok)
                 ((get (get req :roles/config) :handler identity)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

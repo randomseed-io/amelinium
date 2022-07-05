@@ -141,7 +141,13 @@
   (let [req (controller/auth-user-with-password! req user-email password sess route-data)]
     (if (resp/response? req)
       req
-      (language/force req (or lang (web/pick-language-str req))))))
+      (case (get req :authentication/status)
+        :ok            (language/force req (or lang (web/pick-language-str req)))
+        :locked        (common/move-to req (get route-data :auth/locked        :login/account-locked))
+        :soft-locked   (common/move-to req (get route-data :auth/soft-locked   :login/account-soft-locked))
+        :bad-password  (common/move-to req (get route-data :auth/bad-password  :login/bad-password))
+        :session-error (common/go-to   req (get route-data :auth/session-error :login/session-error))
+        (common/go-to req (get route-data :auth/error :login/error))))))
 
 (defn authenticate!
   "Logs user in when user e-mail and password are given, or checks if the session is
