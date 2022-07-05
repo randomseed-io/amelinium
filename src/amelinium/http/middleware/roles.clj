@@ -432,13 +432,14 @@
            req-self-role-fn req-context-fn query-roles-fn
            global-context context-column
            self-role logged-in-role anonymous-role known-user-role roles
-           authorize-default? keep-unknown? session-key]
+           authorize-default? keep-unknown?]
     :as   config}]
   (when-some [processor (var/deref-symbol (:handler config))]
     (let [handler-name     (:handler config)
           dbname           (db/db-name db)
           config           (-> config (dissoc :handler) (update :db db/ds) prep-config setup-session-key)
           db               (get config :db)
+          session-key      (get config :session-key)
           config           (dissoc config :req-context-fn :req-self-role-fn)
           req-context-fn   #(req-context-fn   % config req-context-path)
           req-self-role-fn #(req-self-role-fn % config self-role req-self-path req-self-check-path)
