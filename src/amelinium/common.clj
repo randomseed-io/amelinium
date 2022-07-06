@@ -1429,6 +1429,10 @@
         out-path      (if out-path out-path (when-not (ident? path-or-name) (some-str path-or-name)))]
     out-path))
 
+(defn lang-param
+  [req]
+  (or (get (get req :language/settings) :param) :lang))
+
 (defn lang-id
   [req]
   (or (get req :language/id)
