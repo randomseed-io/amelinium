@@ -141,7 +141,7 @@
   (let [req (controller/auth-user-with-password! req user-email password sess route-data)]
     (if (resp/response? req)
       req
-      (case (get req :authentication/status)
+      (case (get req :auth/status)
         :ok            (language/force req (or lang (web/pick-language-str req)))
         :locked        (common/move-to req (get route-data :auth/locked        :login/account-locked))
         :soft-locked   (common/move-to req (get route-data :auth/soft-locked   :login/account-soft-locked))
