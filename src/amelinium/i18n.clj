@@ -25,9 +25,9 @@
   object and if that fails from a request map itself. Falls back to a global variable
   `amelinium.i18n/translations`."
   [req-or-match]
-  (or (http/get-route-data req-or-match ::translations)
+  (or (http/get-route-data req-or-match :translations)
       (when-not (http/match? req-or-match)
-        (get req-or-match ::translations))
+        (get req-or-match :translations))
       translations))
 
 (defn lang
