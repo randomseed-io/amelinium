@@ -27,10 +27,10 @@
 (def ^:dynamic *ns-reload-watch-dirs*             ["src" "test"])
 (def ^:dynamic *local-config*                                nil)
 (def ^:dynamic *local-dev-config*                   "config.edn")
-(def ^:dynamic *resource-config-dirs* ["config/amelinium"
-                                       "translations/amelinium"])
-(def ^:dynamic *resource-admin-dirs*  ["config/amelinium"
-                                       "translations/amelinium"
+(def ^:dynamic *resource-config-dirs* ["translations/amelinium"
+                                       "config/amelinium"])
+(def ^:dynamic *resource-admin-dirs*  ["translations/amelinium"
+                                       "config/amelinium"
                                        "config/amelinium-admin"])
 
 (defmacro with-config-dirs
