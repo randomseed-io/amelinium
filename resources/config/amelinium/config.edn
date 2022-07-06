@@ -144,7 +144,7 @@
                                           :pickers   #ref :amelinium.http.middleware.language/web-pickers
                                           :supported #ref :amelinium.http.middleware.language/supported}
 
- :amelinium.http.middleware.content/web {:language #ref :amelinium.http.middleware.language/web
+ :amelinium.http.middleware.content/web {:language #ref :amelinium.http.middleware.language/supported
                                          :mime     ["text/html"]
                                          :charset  :utf-8
                                          :encoding ["deflate" "gzip" "identity"]}

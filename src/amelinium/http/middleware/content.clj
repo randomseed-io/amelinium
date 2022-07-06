@@ -42,7 +42,9 @@
                                 (some #(and (some? %) (= default %)) supported))
                           supported
                           (conj (or supported []) default))]
-          (assoc config :default-language default :language supported))))))
+          (-> config
+              (dissoc :init :default-language)
+              (assoc :language supported)))))))
 
 (defn prep-accept
   [config]
