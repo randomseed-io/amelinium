@@ -9,15 +9,17 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [potemkin.namespaces         :as             p]
-            [tick.core                   :as             t]
-            [amelinium.logging           :as           log]
-            [amelinium.common            :as        common]
-            [amelinium.common.controller :as    controller]
-            [io.randomseed.utils.map     :as           map]
-            [io.randomseed.utils         :refer       :all]
-            [amelinium.api               :as           api]
-            [amelinium.http              :as          http]))
+  (:require [potemkin.namespaces                :as             p]
+            [tick.core                          :as             t]
+            [amelinium.logging                  :as           log]
+            [amelinium.common                   :as        common]
+            [amelinium.common.controller        :as    controller]
+            [io.randomseed.utils.map            :as           map]
+            [io.randomseed.utils                :refer       :all]
+            [amelinium.i18n                     :as          i18n]
+            [amelinium.api                      :as           api]
+            [amelinium.http                     :as          http]
+            [amelinium.http.middleware.language :as      language]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Data population
@@ -42,8 +44,8 @@
       (update              :body-params dissoc :password)))
 
 (defn cleanup-req
-  [req [_ auth?]]
-  (if auth? req (remove-login-data req)))
+  [req auth-state]
+  (if (nth auth-state 1 false) req (remove-login-data req)))
 
 (defn login-data?
   "Returns true if :body map of a request contains login data."
@@ -51,6 +53,36 @@
   (when-some [bparams (get req :body-params)]
     (and (contains? bparams :password)
          (contains? bparams :login))))
+
+(defn auth-user-with-password!
+  "Authentication helper. Used by other controllers. Short-circuits on certain
+  conditions and may render a response."
+  [req user-email password sess route-data lang]
+  (let [req (controller/auth-user-with-password! req user-email password sess route-data)]
+    (if (api/response? req)
+      req
+      (let [lang       (or lang (api/pick-language req))
+            smap       (common/session req)
+            astatus    (get req :auth/status)
+            status     (controller/auth-status-to-status astatus)
+            resp-fn    (controller/auth-status-to-resp   astatus)
+            amessage   (i18n/translate-sub req lang :auth  astatus)
+            message    (i18n/translate-sub req lang :error status)
+            sess-err?  (= status :error/session)
+            substatus  (if sess-err? :session/status  :auth/status)
+            submessage (if sess-err? :session/message :auth/message)
+            req        (-> req
+                           (assoc :response/body {:status       status
+                                                  :message      message
+                                                  :status/sub   substatus
+                                                  :message/sub  submessage
+                                                  :auth/status  astatus
+                                                  :auth/message amessage})
+                           (language/force lang)
+                           (api/body-add-lang lang))]
+        (api/render-response resp-fn (if sess-err?
+                                       (api/body-add-session-errors req smap lang)
+                                       (api/body-add-session-id req smap)))))))
 
 (defn authenticate!
   "Logs user in when user e-mail and password are given, or checks if the session is
