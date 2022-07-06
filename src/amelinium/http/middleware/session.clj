@@ -628,7 +628,7 @@
                  (let [opts (config-options req opts-or-config-key)]
                    (mkbad smap opts
                           :error {:severity :error
-                                  :cause    :database-problem
+                                  :cause    :db-problem
                                   :reason   (some-str-spc
                                              "Problem updating session data"
                                              (log/for-user
