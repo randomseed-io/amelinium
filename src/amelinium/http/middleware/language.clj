@@ -151,9 +151,9 @@
   ([req _ lang-param supp] (get-in-req req supp :form-params lang-param)))
 
 (defn from-body
-  ([req]                   (get-in-req req (supported req) :body (param req)))
-  ([req config]            (get-in-req req (supported nil config) :body (param nil config)))
-  ([req _ lang-param supp] (get-in-req req supp :body lang-param)))
+  ([req]                   (get-in-req req (supported req) :body-params (param req)))
+  ([req config]            (get-in-req req (supported nil config) :body-params (param nil config)))
+  ([req _ lang-param supp] (get-in-req req supp :body-params lang-param)))
 
 (defn from-accept
   ([req]                   (get-in-req req (supported req) :accept :language))
@@ -184,7 +184,7 @@
 
 (def body-picker
   (-> req-picker
-      (assoc :key-path :body)))
+      (assoc :key-path :body-params)))
 
 (def accept-picker
   (-> req-picker

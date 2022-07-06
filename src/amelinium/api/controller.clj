@@ -39,7 +39,7 @@
   (-> req
       (map/update-existing :form-params dissoc "password")
       (map/update-existing :params      dissoc :password)
-      (update              :body        dissoc :password)))
+      (update              :body-params dissoc :password)))
 
 (defn cleanup-req
   [req [_ auth?]]
@@ -48,7 +48,7 @@
 (defn login-data?
   "Returns true if :body map of a request contains login data."
   [req]
-  (when-some [bparams (get req :body)]
+  (when-some [bparams (get req :body-params)]
     (and (contains? bparams :password)
          (contains? bparams :login))))
 
@@ -58,7 +58,7 @@
 
   Takes a request map and obtains database connection, client IP address and
   authentication configuration from it. Also gets a user e-mail and a password from a
-  map associated with the `:body` key of the `req`. Calls `auth-user-with-password!`
+  map associated with the `:body-params` key of the `req`. Calls `auth-user-with-password!`
   to get a result or a redirect if authentication was not successful.
 
   If there is no e-mail nor password given (the value is `nil`, `false` or an empty
@@ -69,7 +69,7 @@
 
   If the session is valid then the given request map is returned as is."
   [req]
-  (let [body-params (get req :body)
+  (let [body-params (get req :body-params)
         user-email  (some-str (get body-params :login))
         password    (when user-email (some-str (get body-params :password)))
         sess        (common/session req)
