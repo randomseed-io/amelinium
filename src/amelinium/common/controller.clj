@@ -152,6 +152,26 @@
            (not (common/on-page? req (get route-data :auth/session-expired :login/session-expired))))
       false))
 
+(defn auth-status-to-resp
+  "Returns rendering function which matches authentication error code."
+  [astatus]
+  (case astatus
+    :ok            resp/ok
+    :bad-password  resp/unauthorized
+    :locked        resp/forbidden
+    :soft-locked   resp/forbidden
+    :session-error resp/forbidden
+    resp/forbidden))
+
+(defn auth-status-to-status
+  "Returns generic status on a basis of auth status."
+  [astatus]
+  (case astatus
+    :ok            :ok
+    :bad-password  :error/authentication
+    :session-error :error/session
+    :error/authorization))
+
 (defn auth-user-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
   conditions and may emit a redirect or render a response."
