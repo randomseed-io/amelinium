@@ -856,6 +856,7 @@
     (log/msg "Installing session handler:" k)
     (when dbname (log/msg "Using database" dbname "for storing sessions"))
     {:name    (keyword k)
+     :config  config
      :compile (fn [{:keys [no-session?]} opts]
                 (when (and (not no-session?) db)
                   (fn [h]
