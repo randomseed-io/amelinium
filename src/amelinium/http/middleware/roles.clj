@@ -377,7 +377,8 @@
   (if-some [sk (get config :session-key)]
     config
     (assoc config :session-key
-           (or (get (or (get config :session/config) (get config :session)) :session-key)
+           (or (get (get (or (get config :session/config) (get config :session)) :config) :session-key)
+               (get (or (get config :session/config) (get config :session)) :session-key)
                :session))))
 
 (defn prep-config
