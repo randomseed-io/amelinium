@@ -31,12 +31,11 @@
       translations))
 
 (defn lang
-  "Tries to obtain a language from a request map (`:language/id` key) or returns the
-  value of the given argument if it is not a map."
-  [locale-or-req]
-  (if (map? locale-or-req)
-    (get locale-or-req :language/id)
-    locale-or-req))
+  "Tries to obtain a language from a request map (`:language/id` key). Falls back to a
+  default language (`:language/default`) if the first one is `nil`. Returns a keyword."
+  [req]
+  (or (get req :language/id)
+      (get req :language/default)))
 
 (defn idname
   "If the given value `v` is an ident, it returns its name. Otherwise it returns the
@@ -93,8 +92,8 @@
    (apply (translator req) locale (keyword (idname key-ns) (idname key-name)) x more)))
 
 (defn tr
-  "Returns a translation string for the given locale (obtained from a request map or a
-  `Match` object) and the keyword `key` using a translation function (obtained from a
+  "Returns a translation string for the given locale (obtained from a request map)
+  and the keyword `key` using a translation function (obtained from a
   request map or a `Match` object). Any optional arguments are passed as they are."
   ([req key]
    ((translator req) (lang req) key))
@@ -104,11 +103,11 @@
    (apply (translator req) (lang req) key x more)))
 
 (defn tr-sub
-  "Returns a translation string for the given `locale` (language ID), the namespace name
-  `ns-name` and the key name `key-name`. Useful to translate nested keys which are
-  translated to fully-qualified keywords. The translation function will be obtained
-  by calling `translator` on `req` (which may be a request map or a `Match`
-  object). Any additional arguments are passed as they are."
+  "Returns a translation string for the given locale (obtained from a request map),
+  the namespace name `key-ns` and the key name `key-name`. Useful to translate nested
+  keys which are translated to fully-qualified keywords. The translation function
+  will be obtained by calling `translator` on `req` (which may be a request map or a
+  `Match` object). Any additional arguments are passed as they are."
   ([req key-ns key-name]
    ((translator req) (lang req) (keyword (idname key-ns) (idname key-name))))
   ([req key-ns key-name x]
