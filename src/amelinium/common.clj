@@ -1035,7 +1035,8 @@
   pick-language
   "Tries to pick the best language for a known user or a visitor. To be used (among
   other scenarios) after a successful log-in to show the right language version of a
-  welcome page. Returns a keyword."
+  welcome page. Does not use pre-calculated values from a request map, instead
+  triggers configured pickers from a default or given chain. Returns a keyword."
   language/pick)
 
 (def ^{:arglists '([req]
@@ -1045,7 +1046,8 @@
   pick-language-str
   "Tries to pick the best language for a known user or a visitor. To be used (among
   other scenarios) after a successful log-in to show the right language version of a
-  welcome page. Returns a string."
+  welcome page. Does not use pre-calculated values from a request map, instead
+  triggers configured pickers from a default or given chain. Returns a string."
   (comp some-str language/pick))
 
 (def ^{:arglists '([req]
@@ -1055,8 +1057,9 @@
   pick-language-without-fallback
   "Tries to pick the best language for a known user or a visitor. To be used (among
   other scenarios) after a successful log-in to show the right language version of a
-  welcome page. When a language cannot be found it simply returns `nil` instead of
-  a default language. Returns a keyword."
+  welcome page. Does not use pre-calculated values from a request map, instead
+  triggers configured pickers from a default or given chain. When a language cannot
+  be found it simply returns `nil` instead of a default language. Returns a keyword."
   language/pick-without-fallback)
 
 (def ^{:arglists '([req]
@@ -1066,8 +1069,9 @@
   pick-language-str-without-fallback
   "Tries to pick the best language for a known user or a visitor. To be used (among
   other scenarios) after a successful log-in to show the right language version of a
-  welcome page. When a language cannot be found it simply returns `nil` instead of
-  a default language. Returns a string."
+  welcome page. Does not use pre-calculated values from a request map, instead
+  triggers configured pickers from a default or given chain. When a language cannot
+  be found it simply returns `nil` instead of a default language. Returns a string."
   (comp some-str language/pick-without-fallback))
 
 ;; Special redirects
@@ -1427,9 +1431,19 @@
 
 (defn lang-id
   [req]
+  (or (get req :language/id)
+      (get req :language/default)))
+
+(defn lang-id-or-nil
+  [req]
   (get req :language/id))
 
 (defn lang-str
+  [req]
+  (or (get req :language/str)
+      (str (get req :language/default))))
+
+(defn lang-str-or-nil
   [req]
   (get req :language/str))
 
