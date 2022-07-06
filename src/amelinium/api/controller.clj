@@ -132,17 +132,25 @@
 (defn prep-request!
   "Prepares a request before any controller is called."
   [req]
-  (let [sess        (common/session req)
-        auth-state  (delay (api/login-auth-state req :login-page? :auth-page?))
-        login-data? (delay (login-data? req))
-        auth-db     (delay (api/auth-db req))]
+  (let [sess           (common/session req)
+        auth-state     (delay (common/login-auth-state req :login-page? :auth-page?))
+        auth?          (delay (nth @auth-state 1 false))
+        login-data?    (delay (login-data? req))
+        auth-db        (delay (api/auth-db req))
+        valid-session? (delay (get sess :valid?))]
 
     (cond
 
       ;; Request is invalid.
 
       (not (get req :validators/params-valid?))
-      (-> req api/render-bad-params)
+      (let [lang (common/lang-id req)]
+        (-> req
+            (assoc :response/body
+                   {:status  :error/bad-parameters
+                    :message (i18n/translate req lang :error/bad-parameters)})
+            (api/body-add-lang lang)
+            api/render-bad-params))
 
       ;; There is no session. Short-circuit.
 
@@ -156,53 +164,76 @@
             email    (:user/email   sess)
             ip-addr  (:remote-ip/str req)
             for-user (log/for-user user-id email ip-addr)
-            for-mail (log/for-user nil email ip-addr)]
+            for-mail (log/for-user nil email ip-addr)
+            lang     (common/lang-id req)]
         (log/wrn "Hard-locked account access attempt" for-user)
         (api/oplog req
                    :user-id user-id
                    :op      :access-denied
                    :level   :warning
                    :msg     (str "Permanent lock " for-mail))
-        (api/go-to req (or (http/get-route-data req :auth/account-locked)
-                           :auth/account-locked)))
+        (-> req
+            (assoc :response/body
+                   {:status       :error/authorization
+                    :message      (i18n/translate req lang :error/authorization)
+                    :status/sub   :auth/status
+                    :message/sub  :auth/message
+                    :auth/status  :locked
+                    :auth/message (i18n/translate req lang :auth/locked)})
+            (api/body-add-lang lang)
+            api/render-unauthorized))
+
+      ;; Session is not valid.
+
+      (and (not @valid-session?) (not (and @auth? @login-data?)))
+      (let [req      (cleanup-req req @auth-state)
+            expired? (get sess :expired?)
+            user-id  (:user/id      sess)
+            email    (:user/email   sess)
+            ip-addr  (:remote-ip/str req)
+            for-user (log/for-user user-id email ip-addr)
+            for-mail (log/for-user nil email ip-addr)
+            lang     (common/lang-id req)]
+
+        ;; Log the event.
+
+        (if expired?
+          ;; Session expired.
+          (do (log/msg "Session expired" for-user)
+              (api/oplog req
+                         :user-id (:user/id sess)
+                         :op      :session
+                         :ok?     false
+                         :msg     (str "Expired " for-mail)))
+          ;; Session invalid in another way.
+          (when-some [reason (:reason (:error sess))]
+            (api/oplog req
+                       :user-id (:user/id sess)
+                       :op      :session
+                       :ok?     false
+                       :level   (:error sess)
+                       :msg     reason)
+            (log/log (:severity (:error sess) :warn) reason)))
+
+        ;; Generate a response describing invalid session.
+
+        (-> req
+            (assoc :response/body {:status      :error/session
+                                   :status/sub  :session/status
+                                   :message/sub :session/message
+                                   :message     (i18n/translate req lang :error/session)})
+            (api/body-add-lang lang)
+            (api/body-add-session-errors sess lang)
+            api/render-forbidden))
 
       :----pass
 
-      (let [valid-session? (get sess :valid?)
-            auth-state     @auth-state
-            [_ auth?]      auth-state
-            req            (cleanup-req req auth-state)]
+      ;; We have a valid session.
+      ;;
+      ;; Remove login data from the request if we are not authenticating a user.
+      ;; Take care about broken go-to (move to a login page in such case).
 
-        ;; Session is invalid (or just expired).
-        ;; Notice the fact and go with displaying content.
-        ;; Checking for a valid session is the responsibility of each controller.
-
-        (and (not valid-session?) (not (and auth? @login-data?))
-             (if (get sess :expired?)
-               (let [user-id  (:user/id      sess)
-                     email    (:user/email   sess)
-                     ip-addr  (:remote-ip/str req)
-                     for-user (log/for-user user-id email ip-addr)
-                     for-mail (log/for-user nil email ip-addr)]
-                 (log/msg "Session expired" for-user)
-                 (api/oplog req
-                            :user-id (:user/id sess)
-                            :op      :session
-                            :ok?     false
-                            :msg     (str "Expired " for-mail)))
-               (when-some [reason (:reason (:error sess))]
-                 (api/oplog req
-                            :user-id (:user/id sess)
-                            :op      :session
-                            :ok?     false
-                            :level   (:error sess)
-                            :msg     reason)
-                 (log/log (:severity (:error sess) :warn) reason))))
-
-        ;; Remove login data from the request if we are not authenticating a user.
-        ;; Take care about broken go-to (move to a login page in such case).
-
-        (cleanup-req req [nil auth?])))))
+      (cleanup-req req [nil @auth?]))))
 
 (defn render!
   [req]
