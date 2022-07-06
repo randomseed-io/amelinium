@@ -42,7 +42,7 @@
 (def ^:const remote-ip-keys  [:remote-ip :remote-ip/str :remote-ip/by-proxy? :remote-ip/proxy])
 (def ^:const language-keys   [:language/id :language/str :accept :language/settings])
 (def ^:const roles-keys      [:roles :roles/in-context :roles/context
-                              :roles/user-authorized? :roles/user-authenticated?])
+                              :user/authorized? :user/authenticated?])
 
 (def ^:const common-auth-keys (vec (concat session-keys remote-ip-keys roles-keys)))
 

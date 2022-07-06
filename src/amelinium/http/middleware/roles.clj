@@ -312,11 +312,11 @@
          unauth-redir   (get config :unauthorized-redirect)
          req            (-> req
                             (map/assoc-missing :roles/config config)
-                            (assoc :roles                     roles
-                                   :roles/context             context
-                                   :roles/in-context          in-context
-                                   :roles/user-authorized?    authorized?
-                                   :roles/user-authenticated? authenticated?))]
+                            (assoc :roles               roles
+                                   :roles/context       context
+                                   :roles/in-context    in-context
+                                   :user/authorized?    authorized?
+                                   :user/authenticated? authenticated?))]
      (if (and unauth-redir (not @authorized?))
        (resp/see-other unauth-redir)
        req))))
