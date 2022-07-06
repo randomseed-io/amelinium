@@ -639,8 +639,8 @@
      {:id               nil
       :err/id           nil
       :session-key      (or session-key
-                           (get (config-options req opts-or-config-key) :session-key)
-                           :session)
+                            (get (config-options req opts-or-config-key) :session-key)
+                            :session)
       :session-id-field (or session-id-field
                             (get (config-options req opts-or-config-key) :session-id-field)
                             "session-id")})))
