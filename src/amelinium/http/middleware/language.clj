@@ -176,7 +176,7 @@
                     path              (seq (concat (seq key-path) last-key))
                     [k1 k2 k3 & rest] path]
                 (case (count path)
-                  0 (constantly nil)
+                  0 (fn [req] nil)
                   1 (fn [req] (get-in-req req supported k1))
                   2 (fn [req] (get-in-req req supported k1 k2))
                   3 (fn [req] (get-in-req req supported k1 k2 k3))
@@ -334,10 +334,11 @@
   "Language wrapping middleware."
   [k config]
   (log/msg "Installing language handler")
-  (let [picker-chain (get-in config [:pickers :default])
-        picker-fn    (or picker-chain (init-picker-chain config default-picker-chain))
-        lang-pickers (get config :pickers)
-        config       (dissoc config :pickers)]
+  (let [picker-chain    (get-in config [:pickers :default])
+        picker-fn       (or picker-chain (init-picker-chain config default-picker-chain))
+        lang-pickers    (get config :pickers)
+        default-lang-id (get config :default)
+        config          (dissoc config :pickers)]
     {:name    k
      :compile (fn [_ _]
                 (fn [handler]
@@ -347,6 +348,7 @@
                       (handler (assoc req
                                       :language/settings config
                                       :language/pickers  lang-pickers
+                                      :language/default  default-lang-id
                                       :language/id       lang-id
                                       :language/str      lang-str))))))}))
 
