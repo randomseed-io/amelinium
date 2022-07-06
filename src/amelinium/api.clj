@@ -21,6 +21,7 @@
             [ring.util.http-response              :as         resp]
             [ring.util.request                    :as          req]
             [amelinium.common                     :as       common]
+            [amelinium.i18n                       :as         i18n]
             [amelinium.http                       :as         http]
             [amelinium.http.middleware.roles      :as        roles]
             [amelinium.http.middleware.language   :as     language]
@@ -53,7 +54,7 @@
 
 (p/import-vars [amelinium.common
                 router-match? on-page? lang-param guess-lang-param
-                login-page? auth-page? login-auth-state ])
+                login-page? auth-page? login-auth-state])
 
 ;; Path parsing
 
@@ -612,3 +613,52 @@
 (defn lang-url
   [req path-or-name lang params query-params lang-settings]
   (common/lang-url true req path-or-name lang params query-params lang-settings))
+
+(defn body-add-lang
+  ([req]
+   (update req :response/body assoc
+           (common/lang-param req)
+           (common/lang-id req)))
+  ([req lang]
+   (update req :response/body assoc
+           (common/lang-param req)
+           (or lang (common/lang-id req))))
+  ([req lang field]
+   (update req :response/body assoc
+           (or field (common/lang-param req))
+           (or lang (common/lang-id req)))))
+
+(defn body-add-session-id
+  ([req]
+   (if-some [smap (common/session req)]
+     (body-add-session-id req smap)
+     req))
+  ([req smap]
+   (update req :response/body assoc
+           (or (get smap :session-id-field) :session-id)
+           (get smap :id)))
+  ([req smap field]
+   (update req :response/body assoc
+           (or field (get smap :session-id-field) :session-id)
+           (get smap :id))))
+
+(defn session-status
+  [smap]
+  (if-not smap
+    :missing
+    (or (some-keyword-simple (get (get smap :error) :cause)) :unknown-error)))
+
+(defn body-add-session-errors
+  ([req]
+   (body-add-session-errors req (common/session req) nil))
+  ([req smap]
+   (body-add-session-errors req smap nil))
+  ([req smap lang]
+   (if (get smap :valid?)
+     req
+     (let [lang    (or lang (common/lang-id req))
+           status  (session-status smap)
+           message (i18n/translate-sub req lang :session status)]
+       (update req :response/body assoc
+               :session/status  status
+               :session/message message)))))
