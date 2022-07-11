@@ -20,11 +20,11 @@
             [io.randomseed.utils.var      :as        var]
             [io.randomseed.utils.map      :as        map]))
 
-(def ^:const config-tag (re-pattern ":([a-zA-Z][a-zA-Z0-9]+)"))
+(def ^:const config-tag (re-pattern ":([a-zA-Z][a-zA-Z0-9_\\-]+)"))
 
-(defn prep-base-url
-  [config url]
-  (when-some [url (some-str url)]
+(defn replace-tags
+  [config s]
+  (when-some [url (some-str s)]
     (str/replace url config-tag #(get config (keyword (nth % 1)) (nth % 0)))))
 
 (defn prep-twilio
@@ -46,43 +46,48 @@
         (assoc  :auth-key     (or (:api-key config) (:auth-token  config)))
         (update :client-opts  #(if (and (map? %) (valuable? %)) % {}))
         (update :parameters   #(when (and (map? %) (valuable? %)) %))
-        (update :url (partial prep-base-url config)))))
+        (update :url          (partial replace-tags config))
+        (update :parameters   (partial map/map-vals (partial replace-tags config)))
+        (update :parameters   (partial map/map-keys some-str)))))
 
 (defn init-twilio
   [config]
   (if-not (:enabled? config)
     (constantly nil)
-    (let [config     (-> config
-                         (update-in [:client-opts :authenticator]
-                                    #(or % {:user (:auth-pub config)
-                                            :pass (:auth-key config)}))
-                         (update-in [:client-opts :connect-timeout]
-                                    time/parse-duration))
+    (let [cli-opts   (-> (or (:client-opts config) {})
+                         (update :authenticator #(or % {:user (:auth-pub config)
+                                                        :pass (:auth-key config)}))
+                         (map/update-existing :connect-timeout #(when %
+                                                                  (time/milliseconds
+                                                                   (time/parse-duration % :second)))))
+          config     (assoc config :client-opts cli-opts)
           url        (get config :url)
-          cli-opts   (get config :client-opts)
           req-method (or (get cli-opts :request-method) :post)
-          req-opts   {:url url :request-method req-method}
-          client     (hc/build-http-client (:client-opts config))]
+          client     (hc/build-http-client (:client-opts config))
+          req-opts   {:url url :request-method req-method :http-client client}]
       (if-some [default-params (:parameters config)]
         (fn twilio-request
           ([opts parameters]
-           (hc/request
-            (update (into req-opts opts) :form-params
-                    #(if %
-                       (into (into default-params %) parameters)
-                       (into default-params parameters)))))
+           (let [parameters (map/map-keys some-str parameters)
+                 opts       (-> (into req-opts opts)
+                                (update :form-params #(if %
+                                                        (into (into default-params %) parameters)
+                                                        (into default-params parameters))))]
+             (hc/request opts)))
           ([parameters]
-           (hc/request
-            (assoc req-opts :form-params
-                   (into default-params parameters)))))
+           (let [parameters (map/map-keys some-str parameters)
+                 opts       (assoc req-opts :form-params (into default-params parameters))]
+             (hc/request opts))))
         (fn twilio-request
           ([opts parameters]
-           (hc/request
-            (update (into req-opts opts) :form-params
-                    #(if % (into % parameters) parameters))))
+           (let [parameters (map/map-keys some-str parameters)
+                 opts       (-> (into req-opts opts)
+                                (update :form-params #(if % (into % parameters) parameters)))]
+             (hc/request opts)))
           ([parameters]
-           (hc/request
-            (assoc req-opts :form-params parameters))))))))
+           (let [parameters (map/map-keys some-str parameters)
+                 opts       (assoc req-opts :form-params parameters)]
+             (hc/request opts))))))))
 
 (system/add-init  ::default [k config] (var/make k (init-twilio (prep-twilio config))))
 (system/add-prep  ::default [_ config] (prep-twilio config))
