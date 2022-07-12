@@ -13,6 +13,7 @@
            camel-snake-kebab/camel-snake-kebab  {:mvn/version "0.4.2"}        ;; case conversions
            com.intuitiveexplanations/lazy-map   {:mvn/version "1.0.0"}        ;; lazy maps
            metosin/jsonista                     {:mvn/version "0.3.4"}        ;; JSON parser
+           cheshire/cheshire                    {:mvn/version "5.11.0"}       ;; JSON parser for hato
            com.github.seancfoley/ipaddress      {:mvn/version "5.3.3"}        ;; IP ranges matching
            hato/hato                            {:mvn/version "0.8.2"}        ;; HTTP client
            clojurewerkz/balagan                 {:mvn/version "1.0.5"}        ;; advanced map transformations

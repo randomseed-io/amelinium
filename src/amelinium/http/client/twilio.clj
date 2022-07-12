@@ -24,8 +24,9 @@
 
 (defn replace-tags
   [config s]
-  (when-some [url (some-str s)]
-    (str/replace url config-tag #(get config (keyword (nth % 1)) (nth % 0)))))
+  (if (string? s)
+    (str/replace s config-tag #(get config (keyword (nth % 1)) (nth % 0)))
+    s))
 
 (defn prep-auth
   [{:keys [api-sid api-key api-token account-sid account-key account-token username password]
@@ -43,23 +44,23 @@
     account-key                     (assoc config :auth-key account-key)
     account-sid                     (assoc config :auth-pub account-sid)))
 
+(def ^:const json-types #{:json :application/json "application/json" "json"})
+
 (defn is-json?
   [config]
-  (-> (get config :content-type)
-      #{:json :application/json "application/json" "json"}
-      boolean))
+  (if (map? config)
+    (or (contains? json-types (get config :accept))
+        (contains? json-types (get config :content-type)))
+    (contains? json-types config)))
 
 (defn prep-params
   [{:keys [parameters]
     :as   config}]
   (if-not (and parameters (map? parameters) (valuable? parameters))
     (dissoc config :parameters)
-    (if (is-json? config)
-      config
-      (assoc config :parameters
-             (-> parameters
-                 (update (partial map/map-vals (partial replace-tags config)))
-                 (update (partial map/map-keys some-str)))))))
+    (update config :parameters (partial map/map-vals (partial replace-tags config)))))
+
+;;  (partial map/map-keys some-str)
 
 (defn prep-twilio
   [{:keys [enabled? prepared?]
@@ -70,6 +71,7 @@
     (-> config
         (assoc  :prepared?    true)
         (assoc  :enabled?     (boolean enabled?))
+        (map/update-existing  :url           some-str)
         (map/update-existing  :account-sid   some-str)
         (map/update-existing  :account-key   some-str)
         (map/update-existing  :account-token some-str)
@@ -89,30 +91,30 @@
   [config]
   (if-not (:enabled? config)
     (constantly nil)
-    (let [auth-pub   (:auth-pub config)
-          auth-key   (:auth-key config)
-          auth-tok   (:auth-tok config)
-          cli-opts   (-> (or (:client-opts config) {})
-                         (map/assoc-missing
-                          :authenticator (when (and auth-pub auth-key)
-                                           {:user auth-pub :pass auth-key}))
-                         (map/update-existing
-                          :connect-timeout #(when %
-                                              (time/milliseconds
-                                               (time/parse-duration % :second)))))
-          config     (assoc config :client-opts cli-opts)
-          url        (get config :url)
-          req-method (or (get cli-opts :request-method) :post)
-          accept     (or (get config :accept) :json)
-          client     (hc/build-http-client (:client-opts config))
-          req-opts   {:url            url
-                      :accept         accept
-                      :request-method req-method
-                      :http-client    client}
-          req-opts   (if auth-tok (assoc req-opts :oauth-token auth-tok) req-opts)
-          req-opts   (if content-type
-                       (assoc req-opts :content-type content-type)
-                       req-opts)]
+    (let [auth-pub     (:auth-pub config)
+          auth-key     (:auth-key config)
+          auth-tok     (:auth-tok config)
+          cli-opts     (-> (or (:client-opts config) {})
+                           (map/assoc-missing
+                            :authenticator (when (and auth-pub auth-key)
+                                             {:user auth-pub :pass auth-key}))
+                           (map/update-existing
+                            :connect-timeout #(when %
+                                                (time/milliseconds
+                                                 (time/parse-duration % :second)))))
+          config       (assoc config :client-opts cli-opts)
+          url          (get config :url)
+          req-method   (or (get cli-opts :request-method) :post)
+          accept       (or (get config :accept) :json)
+          content-type (get config :content-type)
+          client       (hc/build-http-client (:client-opts config))
+          req-opts     {:url            url
+                        :accept         accept
+                        :request-method req-method
+                        :http-client    client}
+          req-opts     (if (is-json? accept) (assoc req-opts :as :json) req-opts)
+          req-opts     (if auth-tok          (assoc req-opts :oauth-token auth-tok) req-opts)
+          req-opts     (if content-type      (assoc req-opts :content-type content-type) req-opts)]
       (if-some [default-params (:parameters config)]
         (fn twilio-request
           ([opts parameters]
@@ -145,9 +147,11 @@
 
 (defn sendmail
   ([f email]
+   (f {:personalizations [{:to [{:email (str email)}]}]}))
+  ([f email template-id]
    (f {:personalizations [{:to          [{:email (str email)}]
                            :template-id (str template-id)}]}))
-  ([f email template-data]
+  ([f email template-id template-data]
    (f {:personalizations [{:to                    [{:email (str email)}]
                            :template-id           (str template-id)
                            :dynamic_template_data template-data}]})))
