@@ -34,6 +34,7 @@
            commons-validator/commons-validator  {:mvn/version "1.6"}          ;; validators for e-mail, URL and date
            meta-merge/meta-merge                {:mvn/version "1.0.0"}        ;; deep merging of maps
            integrant/integrant                  {:mvn/version "0.8.0"}        ;; system management via multimethods
+           metosin/potpuri                      {:mvn/version "0.5.3"}        ;; common stuff
            metosin/maailma                      {:mvn/version "1.1.0"}        ;; configuration reading (delivers data to integrant)
            io.netty/netty-handler               {:mvn/version "4.1.70.Final"} ;; SSL context management
            metosin/reitit                       {:mvn/version "0.5.18"}       ;; HTTP router
