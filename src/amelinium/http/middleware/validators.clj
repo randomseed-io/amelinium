@@ -8,15 +8,18 @@
 
   (:refer-clojure :exclude [uuid random-uuid parse-long])
 
-  (:require [clojure.string                 :as     str]
-            [clojure.set                    :as     set]
-            [amelinium.logging              :as     log]
-            [amelinium.system               :as  system]
-            [io.randomseed.utils.validators :as       v]
-            [io.randomseed.utils.var        :as     var]
-            [io.randomseed.utils.vec        :as     vec]
-            [io.randomseed.utils.map        :as     map]
-            [io.randomseed.utils            :refer :all]))
+  (:require [clojure.string                        :as     str]
+            [clojure.set                           :as     set]
+            [amelinium.http.middleware.session     :as session]
+            [amelinium.logging                     :as     log]
+            [amelinium.system                      :as  system]
+            [phone-number.core                     :as   phone]
+            [io.randomseed.utils.validators        :as       v]
+            [io.randomseed.utils.validators.common :as      cv]
+            [io.randomseed.utils.var               :as     var]
+            [io.randomseed.utils.vec               :as     vec]
+            [io.randomseed.utils.map               :as     map]
+            [io.randomseed.utils                   :refer :all]))
 
 ;; Default validation strategy.
 ;; If `true` then parameters without validators assigned are considered valid.
@@ -32,9 +35,11 @@
 ;; Validation map.
 
 (def ^:const default-validators
-  {"login"      #"|(^[a-zA-Z0-9_\.+\-]{1,64}@[a-zA-Z0-9\-]{1,64}\.[a-zA-Z0-9\-\.]{1,128}$)"
+  {"login"      cv/valid-email?
+   "phone"      cv/valid-phone?
+   "url"        cv/valid-url?
    "password"   #"|.{5,256}"
-   "session-id" #"|[a-f0-9]{30,128}"})
+   "session-id" session/sid-match})
 
 (def ^:const default-required
   ["some-antispam-val" "other-antispam-val"])
