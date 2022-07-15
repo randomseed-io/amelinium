@@ -12,6 +12,7 @@
             [reitit.core             :as       r]
             [amelinium.logging       :as     log]
             [amelinium.system        :as  system]
+            [phone-number.core       :as   phone]
             [io.randomseed.utils.map :as     map]
             [io.randomseed.utils.var :as     var]
             [io.randomseed.utils     :refer :all]))
@@ -186,6 +187,22 @@
   (-> req-picker
       (assoc :key-path :body-params)))
 
+(def body-phone-picker
+  {:compile (fn [config]
+              (let [supported (supported nil config)]
+                (fn [req]
+                  (when-some [phone (some-str (get (get req :body-params) :phone))]
+                    (when (phone/has-region? phone)
+                      (-> (phone/region phone) name some-keyword (get supported)))))))})
+
+(def body-phone-picker-str
+  {:compile (fn [config]
+              (let [supported (supported nil config)]
+                (fn [req]
+                  (when-some [phone (some-str (get (get req :body-params) "phone"))]
+                    (when (phone/has-region? phone)
+                      (-> (phone/region phone) name some-keyword (get supported)))))))})
+
 (def accept-picker
   (-> req-picker
       (assoc :key-path :accept, :param :language)))
@@ -203,6 +220,22 @@
                     supported  (supported nil config)]
                 (fn [req]
                   (get-in-req req supported :form-params lang-param))))})
+
+(def form-param-phone-picker-str
+  {:compile (fn [config]
+              (let [supported (supported nil config)]
+                (fn [req]
+                  (when-some [phone (some-str (get (get req :form-params) "phone"))]
+                    (when (phone/has-region? phone)
+                      (-> (phone/region phone) name some-keyword (get supported)))))))})
+
+(def form-param-phone-picker
+  {:compile (fn [config]
+              (let [supported (supported nil config)]
+                (fn [req]
+                  (when-some [phone (some-str (get (get req :form-params) :phone))]
+                    (when (phone/has-region? phone)
+                      (-> (phone/region phone) name some-keyword (get supported)))))))})
 
 (def path-picker
   {:compile (fn [config]
