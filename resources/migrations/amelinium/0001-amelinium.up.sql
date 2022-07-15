@@ -123,3 +123,17 @@ CREATE TABLE IF NOT EXISTS session_variables (
 ) ENGINE=Aria TRANSACTIONAL=0 ROW_FORMAT=FIXED;
 --;;
 CREATE INDEX IF NOT EXISTS session_variables_index ON session_variables(session_id);
+--;;
+CREATE TABLE IF NOT EXISTS confirmations (
+  id       CHAR(128) NOT NULL,
+  user_id  INTEGER UNSIGNED NULL,
+  code     CHAR(16) NULL,
+  token    CHAR(128) NULL,
+  reason   ENUM('creation', 'recovery', 'unlock') NOT NULL,
+  attempts SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  created  TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  expires  TIMESTAMP(6) NULL,
+  status   CHAR(32) NULL,
+  req_id   CHAR(128) NULL,
+  PRIMARY KEY(id, reason)
+) ENGINE=Aria TRANSACTIONAL=0 ROW_FORMAT=FIXED;
