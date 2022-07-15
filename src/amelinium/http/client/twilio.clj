@@ -36,26 +36,36 @@
   [to body]
   (sms {:Body (str body) :To (str to)}))
 
+(defn- get-template-id
+  [config template-group lang fallback-template]
+  (some-str
+   (or (-> (get config :localized-templates)
+           (get (some-keyword template-group))
+           (get (some-keyword-simple lang)))
+       fallback-template)))
+
 (defn- localize-sendmail-params
-  ([lang params]
-   (localize-sendmail-params lang params nil))
-  ([lang params fallback-template]
+  ([lang params template-group]
+   (localize-sendmail-params lang params template-group nil))
+  ([lang params template-group fallback-template]
    (if lang
-     (if-some [template-id (some-str (or (get (get (email :config) :localized-templates)
-                                              (some-keyword-simple lang))
-                                         fallback-template))]
+     (if-some [template-id (get-template-id (email :config)
+                                            template-group
+                                            lang
+                                            fallback-template)]
        (assoc params :template_id template-id)
        params)
      params)))
 
 (defn sendmail-localized-template
-  ([lang to]
+  ([lang to template-group]
    (when-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
      (email (localize-sendmail-params
              lang
              {:personalizations [{:to to}]}
+             template-group
              nil))))
-  ([lang to fallback-template-id-or-template-data]
+  ([lang to template-group fallback-template-id-or-template-data]
    (when-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
      (if (map? fallback-template-id-or-template-data)
        (email (localize-sendmail-params
@@ -63,24 +73,27 @@
                {:personalizations
                 [{:to                    to
                   :dynamic_template_data fallback-template-id-or-template-data}]}
+               template-group
                nil))
        (email (localize-sendmail-params
                lang
                {:personalizations [{:to to}]}
+               template-group
                fallback-template-id-or-template-data)))))
-  ([lang to fallback-template-id template-data]
+  ([lang to template-group fallback-template-id template-data]
    (when-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
      (email (localize-sendmail-params
              lang
              {:personalizations
               [{:to                    to
                 :dynamic_template_data template-data}]}
+             template-group
              fallback-template-id)))))
 
 (defn sendmail-template
-  ([to]                 (sendmail-localized-template nil to))
-  ([to fb-tpl-or-tdata] (sendmail-localized-template nil to fb-tpl-or-tdata))
-  ([to fb-tpl tdata]    (sendmail-localized-template nil to fb-tpl tdata)))
+  ([to tpl-gr]                 (sendmail-localized-template nil to tpl-gr))
+  ([to tpl-gr fb-tpl-or-tdata] (sendmail-localized-template nil to tpl-gr fb-tpl-or-tdata))
+  ([to tpl-gr fb-tpl tdata]    (sendmail-localized-template nil to tpl-gr fb-tpl tdata)))
 
 ;; Initialization helpers
 
