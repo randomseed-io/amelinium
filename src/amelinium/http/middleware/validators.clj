@@ -15,7 +15,7 @@
             [amelinium.system                      :as  system]
             [phone-number.core                     :as   phone]
             [io.randomseed.utils.validators        :as       v]
-            [io.randomseed.utils.validators.common :as      cv]
+            [io.randomseed.utils.validators.common :as      vc]
             [io.randomseed.utils.var               :as     var]
             [io.randomseed.utils.vec               :as     vec]
             [io.randomseed.utils.map               :as     map]
@@ -35,9 +35,9 @@
 ;; Validation map.
 
 (def ^:const default-validators
-  {"login"      cv/valid-email?
-   "phone"      cv/valid-phone?
-   "url"        cv/valid-url?
+  {"login"      vc/valid-email?
+   "phone"      vc/valid-phone?
+   "url"        vc/valid-url?
    "password"   #"|.{5,256}"
    "session-id" session/sid-match})
 
