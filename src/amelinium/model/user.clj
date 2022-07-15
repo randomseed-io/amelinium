@@ -51,6 +51,16 @@
   (when-some [uid (db/some-uuid-str)]
     (sql/get-by-id db :users uid :uid db/opts-simple-map)))
 
+(def ^:const create-minimal-sql
+  (str-spc
+   "INSERT IGNORE INTO users (email,account_type)"))
+
+(defn create-minimal
+  "Creates a new user identified by the given e-mail with generated ID, UID and without
+  setting any additional information."
+  ([db email account-type]
+   (jdbc/execute-one! db [create-minimal-sql (some-str email) (some-str account-type)])))
+
 ;; Passwords
 
 (def ^:const password-query
@@ -65,6 +75,8 @@
   " AND password_suites.id = users.password_suite_id")
 
 (defn get-password-suites
+  "Gets intrinsic and shared password suites for the given user, identified by an
+  e-mail address."
   ([db email]
    (when (and db email)
      (jdbc/execute-one! db [password-query email] db/opts-simple-map)))
@@ -92,6 +104,8 @@
   " AND password_suites.id = users.password_suite_id")
 
 (defn get-login-data
+  "Gets data required for user to be authenticated, including intrinsic and shared
+  password suites."
   ([db email]
    (when (and db email)
      (jdbc/execute-one! db [login-query email] db/opts-simple-map)))
