@@ -20,6 +20,8 @@
 
 (defonce translations nil)
 
+;; Accessors
+
 (defn translator
   "Tries to obtain translation function from a route data in a request map or a `Match`
   object and if that fails from a request map itself. Falls back to a global variable
@@ -42,6 +44,8 @@
   string representation of the given object."
   [v]
   (if (ident? v) (name v) (str v)))
+
+;; Translators
 
 (defn translate-with
   "Returns a translation string for the given `locale` (language ID) and the keyword
@@ -115,9 +119,30 @@
   ([req key-ns key-name x & more]
    (apply (translator req) (lang req) (keyword (idname key-ns) (idname key-name)) x more)))
 
+;; Initialization
+
+(defn prep-pluralizer
+  [config lang translations]
+  (when-some [pluralizer-fn (some-> config (get lang) (get :tongue/pluralizer) var/deref-symbol)]
+    (let [[a b c d e & more] translations]
+      (case (count translations)
+        0 (fn pluralize [n] (pluralizer-fn n))
+        1 (fn pluralize [n] (pluralizer-fn n a))
+        2 (fn pluralize [n] (pluralizer-fn n a b))
+        3 (fn pluralize [n] (pluralizer-fn n a b c))
+        4 (fn pluralize [n] (pluralizer-fn n a b c d))
+        5 (fn pluralize [n] (pluralizer-fn n a b c d e))
+        (fn pluralize [n] (apply pluralizer-fn n a b c d e more))))))
+
+(defn- handle-val
+  [config v kpath]
+  (if (and (sequential? v) (= (first v) 'p))
+    (prep-pluralizer config (first kpath) (rest v))
+    (var/deref-symbol v)))
+
 (defn prep-translations
   [config]
-  (map/map-values var/deref-symbol config))
+  (map/map-values-with-path (partial handle-val config) config))
 
 (defn init-translations
   [config]
