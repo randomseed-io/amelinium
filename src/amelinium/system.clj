@@ -13,6 +13,7 @@
             [maailma.core             :as       conf]
             [cambium.core             :as        log]
             [amelinium                :as  amelinium]
+            [amelinium.readers        :as    readers]
             [tick.core                :as          t]
             [clojure.java.io          :as         io]
             [clojure.string           :as        str]
@@ -116,14 +117,10 @@
     (ex-info (str "Invalid reference: " ref ". Must be a qualified keyword.")
              {:reason ::invalid-ref, :ref ref})))
 
-(defn- regex-reader
-  [rgx]
-  (re-pattern rgx))
-
 (def ^:private integrant-readers
   {:readers {'ref    ig/ref
              'refset ig/refset
-             're     regex-reader}})
+             're     readers/regex}})
 
 ;; parsing configuration files and returning a merged map
 ;; for the given profile
