@@ -125,18 +125,20 @@
   [config lang translations]
   (when-some [pluralizer-fn (some-> config (get lang) (get :tongue/pluralizer) var/deref-symbol)]
     (let [[a b c d e & more] translations]
-      (case (count translations)
-        0 (fn pluralize [n] (pluralizer-fn n))
-        1 (fn pluralize [n] (pluralizer-fn n a))
-        2 (fn pluralize [n] (pluralizer-fn n a b))
-        3 (fn pluralize [n] (pluralizer-fn n a b c))
-        4 (fn pluralize [n] (pluralizer-fn n a b c d))
-        5 (fn pluralize [n] (pluralizer-fn n a b c d e))
-        (fn pluralize [n] (apply pluralizer-fn n a b c d e more))))))
+      (if (map? a)
+        (prep-pluralizer config lang (pluralizer-fn :parse-args a))
+        (case (count translations)
+          0 (fn pluralize [n] (pluralizer-fn n))
+          1 (fn pluralize [n] (pluralizer-fn n a))
+          2 (fn pluralize [n] (pluralizer-fn n a b))
+          3 (fn pluralize [n] (pluralizer-fn n a b c))
+          4 (fn pluralize [n] (pluralizer-fn n a b c d))
+          5 (fn pluralize [n] (pluralizer-fn n a b c d e))
+          (fn pluralize [n] (apply pluralizer-fn n a b c d e more)))))))
 
 (defn- handle-val
   [config v kpath]
-  (if (and (sequential? v) (= (first v) 'p))
+  (if (and (sequential? v) (= (first v) :pluralize))
     (prep-pluralizer config (first kpath) (rest v))
     (var/deref-symbol v)))
 
