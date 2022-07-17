@@ -77,10 +77,10 @@
   "UPDATE confirmations SET attempts = attempts + 1 WHERE id = ?")
 
 (def ^:const email-exists-query
-  "SELECT 1 FROM users WHERE email = ?")
+  "SELECT uid FROM users WHERE email = ?")
 
 (def ^:const phone-exists-query
-  "SELECT 1 FROM users WHERE phone = ?")
+  "SELECT uid FROM users WHERE phone = ?")
 
 (defn gen-code
   []
@@ -95,41 +95,44 @@
   (when db
     (when-some [phone (some-str phone)]
       (-> (jdbc/execute-one! db [phone-exists-query phone] db/opts-simple-vec)
-          first pos-int?))))
+          first some?))))
 
 (defn email-exists?
   [db email]
   (when db
     (when-some [email (some-str email)]
       (-> (jdbc/execute-one! db [email-exists-query email] db/opts-simple-vec)
-          first pos-int?))))
+          first some?))))
 
 (defn- new-confirmation-core
   "Creates a confirmation code for a new user identified by the given e-mail
   address. When the confirmation was already generated and it hasn't expired, it is
   returned with an existing code and token. When the given identity (`id`) is already
-  assigned to a registered user the returned map will contain 3 keys: `:exists?` set
-  to `true`, `:id` set to the given identity (as a string) and `:reason` set to the
-  given reason (as a keyword or `nil` if not given)."
+  assigned to a registered user the returned map will contain 4 keys: `:exists?` set
+  to `true`, `:uid` set to UID of existing user, `:id` set to the given identity (as
+  a string) and `:reason` set to the given reason (as a keyword or `nil` if not
+  given)."
   [db id exp query exists-query]
   (when db
     (when-some [id (some-str id)]
-      (let [exists? (pos-int? (first (jdbc/execute-one! db [exists-query id] db/opts-simple-vec)))
+      (let [uid     (first (jdbc/execute-one! db [exists-query id] db/opts-simple-vec))
+            exists? (some? uid)
             code    (when-not exists? (gen-code))
             token   (when-not exists? (gen-token))
             exp     (or exp (t/new-duration 2 :seconds))
             exp     (if (t/duration? exp) (t/hence exp) exp)]
         (when-some [r (jdbc/execute-one! db [query id code token "creation" exp] db/opts-simple-map)]
           (-> (map/update-existing r :reason some-keyword)
-              (assoc :exists? exists?)))))))
+              (assoc :exists? exists? :uid uid)))))))
 
 (defn new-email
   "Creates a confirmation code for a new user identified by the given e-mail
   address. When the confirmation was already generated and it hasn't expired, it is
   returned with an existing code and token. When the given e-mail is already assigned
-  to a registered user the returned map will contain 3 keys: `:exists?` set to
-  `true`, `:id` set to the given e-mail (as a string) and `:reason` set to the given
-  reason (as a keyword or `nil` if not given)."
+  to a registered user the returned map will contain 4 keys: `:exists?` set to
+  `true`, `:uid` set to UID of existing user, `:id` set to the given e-mail (as a
+  string) and `:reason` set to the given reason (as a keyword or `nil` if not
+  given)."
   ([db email]
    (new-email db email nil))
   ([db email exp]
@@ -141,10 +144,10 @@
   "Creates a confirmation code for a new user identified by the given e-mail
   address. When the confirmation was already generated and it hasn't expired, it is
   returned with an existing code and token. When the given e-mail is already assigned
-  to a registered user the returned map will contain 3 keys: `:exists?` set to
-  `true`, `:id` set to the given e-mail (as a string) and `:reason` set to the given
-  reason (as a keyword or `nil` if not given). Attempts counter is increased each
-  time this function is called."
+  to a registered user the returned map will contain 4 keys: `:exists?` set to
+  `true`, `:uid` set to UID of existing user, `:id` set to the given e-mail (as a
+  string) and `:reason` set to the given reason (as a keyword or `nil` if not
+  given). Attempts counter is increased each time this function is called."
   ([db email]
    (new-email-with-attempt db email nil))
   ([db email exp]
@@ -156,10 +159,10 @@
   "Creates a confirmation code for a new user identified by the given phone
   number. When the confirmation was already generated and it hasn't expired, it is
   returned with an existing code and token. When the given e-mail is already assigned
-  to a registered user the returned map will contain 3 keys: `:exists?` set to
-  `true`, `:id` set to the given phone number (as a string) and `:reason` set to the
-  given reason (as a keyword or `nil` if not given). Attempts counter is increased
-  each time this function is called."
+  to a registered user the returned map will contain 4 keys: `:exists?` set to
+  `true`, `uid` set to UID of existing user, `:id` set to the given phone number (as
+  a string) and `:reason` set to the given reason (as a keyword or `nil` if not
+  given). Attempts counter is increased each time this function is called."
   ([db phone]
    (new-phone db phone nil))
   ([db phone exp]
@@ -171,9 +174,10 @@
   "Creates a confirmation code for a new user identified by the given phone
   number. When the confirmation was already generated and it hasn't expired, it is
   returned with an existing code and token. When the given e-mail is already assigned
-  to a registered user the returned map will contain 3 keys: `:exists?` set to
-  `true`, `:id` set to the given phone number (as a string) and `:reason` set to the
-  given reason (as a keyword or `nil` if not given)."
+  to a registered user the returned map will contain 4 keys: `:exists?` set to
+  `true`, `:uid` set to UID of existing user, `:id` set to the given phone number (as
+  a string) and `:reason` set to the given reason (as a keyword or `nil` if not
+  given)."
   ([db phone]
    (new-phone-with-attempt db phone nil))
   ([db phone exp]
