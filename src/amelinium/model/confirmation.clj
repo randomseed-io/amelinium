@@ -119,7 +119,7 @@
             exists? (some? uid)
             code    (when-not exists? (gen-code))
             token   (when-not exists? (gen-token))
-            exp     (or exp (t/new-duration 2 :seconds))
+            exp     (or exp (t/new-duration 10 :minutes))
             exp     (if (t/duration? exp) (t/hence exp) exp)]
         (when-some [r (jdbc/execute-one! db [query id code token "creation" exp] db/opts-simple-map)]
           (-> (map/update-existing r :reason some-keyword)
