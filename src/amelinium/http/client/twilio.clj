@@ -90,6 +90,43 @@
              template-group
              fallback-template-id)))))
 
+(defn sendmail-l10n-template-async
+  ([respond raise lang to template-group]
+   (when-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+     (email {:async? true} (localize-sendmail-params
+                            lang
+                            {:personalizations [{:to to}]}
+                            template-group
+                            nil)
+            respond raise)))
+  ([respond raise lang to template-group fallback-template-id-or-template-data]
+   (when-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+     (if (map? fallback-template-id-or-template-data)
+       (email {:async? true} (localize-sendmail-params
+                              lang
+                              {:personalizations
+                               [{:to                    to
+                                 :dynamic_template_data fallback-template-id-or-template-data}]}
+                              template-group
+                              nil)
+              respond raise)
+       (email {:async? true} (localize-sendmail-params
+                              lang
+                              {:personalizations [{:to to}]}
+                              template-group
+                              fallback-template-id-or-template-data)
+              respond raise))))
+  ([respond raise lang to template-group fallback-template-id template-data]
+   (when-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+     (email {:async true} (localize-sendmail-params
+                           lang
+                           {:personalizations
+                            [{:to                    to
+                              :dynamic_template_data template-data}]}
+                           template-group
+                           fallback-template-id)
+            respond raise))))
+
 (defn sendmail-template
   ([to tpl-gr]                 (sendmail-l10n-template nil to tpl-gr))
   ([to tpl-gr fb-tpl-or-tdata] (sendmail-l10n-template nil to tpl-gr fb-tpl-or-tdata))
@@ -220,7 +257,7 @@
       (log/msg "Registering Twilio client:" k)
       (if-some [default-params (:parameters config)]
         (fn twilio-request
-          ([opts params]
+          ([opts params  & [respond raise]]
            (let [opts   (into req-opts opts)
                  json?  (sending-json? opts)
                  params (or params {})
@@ -231,7 +268,7 @@
                                    (deep-merge :into default-params params)))]
              (if (= :config params)
                config
-               (hc/request opts))))
+               (hc/request opts respond raise))))
           ([params]
            (let [params (or params {})
                  params (if (sending-json? req-opts) params (stringify-params params))
@@ -243,7 +280,7 @@
            (let [opts (assoc req-opts :form-params default-params)]
              (hc/request opts))))
         (fn twilio-request
-          ([opts params]
+          ([opts params & [respond raise]]
            (let [opts   (into req-opts opts)
                  json?  (sending-json? opts)
                  params (or params {})
@@ -255,7 +292,7 @@
                                      params))]
              (if (= :config params)
                config
-               (hc/request opts))))
+               (hc/request opts respond raise))))
           ([params]
            (let [params (or params {})
                  params (if (sending-json? req-opts) params (stringify-params params))
