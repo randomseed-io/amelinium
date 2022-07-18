@@ -57,7 +57,7 @@
        params)
      params)))
 
-(defn sendmail-localized-template
+(defn sendmail-l10n-template
   ([lang to template-group]
    (when-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
      (email (localize-sendmail-params
@@ -91,9 +91,9 @@
              fallback-template-id)))))
 
 (defn sendmail-template
-  ([to tpl-gr]                 (sendmail-localized-template nil to tpl-gr))
-  ([to tpl-gr fb-tpl-or-tdata] (sendmail-localized-template nil to tpl-gr fb-tpl-or-tdata))
-  ([to tpl-gr fb-tpl tdata]    (sendmail-localized-template nil to tpl-gr fb-tpl tdata)))
+  ([to tpl-gr]                 (sendmail-l10n-template nil to tpl-gr))
+  ([to tpl-gr fb-tpl-or-tdata] (sendmail-l10n-template nil to tpl-gr fb-tpl-or-tdata))
+  ([to tpl-gr fb-tpl tdata]    (sendmail-l10n-template nil to tpl-gr fb-tpl tdata)))
 
 ;; Initialization helpers
 
