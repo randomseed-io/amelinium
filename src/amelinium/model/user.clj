@@ -51,16 +51,6 @@
   (when-some [uid (db/some-uuid-str)]
     (sql/get-by-id db :users uid :uid db/opts-simple-map)))
 
-(def ^:const create-minimal-sql
-  (str-spc
-   "INSERT IGNORE INTO users (email,account_type)"))
-
-(defn create-minimal
-  "Creates a new user identified by the given e-mail with generated ID, UID and without
-  setting any additional information."
-  ([db email account-type]
-   (jdbc/execute-one! db [create-minimal-sql (some-str email) (some-str account-type)])))
-
 ;; Passwords
 
 (def ^:const password-query
@@ -511,6 +501,111 @@
   [db email]
   (when (and email (email-exists? db email))
     email))
+
+;; Creation
+
+(def ^:const confirmation-report-error-token-query
+  (str-spc
+   "SELECT (confirmed <> TRUE) AS not_confirmed,"
+   "(reason <> ?) AS bad_reason,"
+   "(SELECT 1 FROM users WHERE user.email = confirmations.id) AS registered,"
+   "(expires < NOW()) AS expired"
+   "FROM confirmations WHERE token = ?"))
+
+(def ^:const confirmation-report-error-code-query
+  (str-spc
+   "SELECT (confirmed <> TRUE) AS not_confirmed,"
+   "(reason <> ?) AS bad_reason,"
+   "(SELECT 1 FROM users WHERE user.email = confirmations.id) AS registered,"
+   "(expires < NOW()) AS expired"
+   "FROM confirmations WHERE code = ? AND id = ?"))
+
+(defn- confirmation-report-error
+  ([r]
+   (cond
+     (nil? r)                      :verify/bad-token
+     (pos-int? (:registered    r)) :verify/registered
+     (pos-int? (:bad_reason    r)) :verify/bad-reason
+     (pos-int? (:expired       r)) :verify/expired
+     (pos-int? (:not_confirmed r)) :verify/unconfirmed
+     :bad-token                    :verify/bad-token))
+  ([db code email reason]
+   (let [r (confirmation-report-error
+            (jdbc/execute-one! db [confirmation-report-error-code-query
+                                   (or reason "creation") code email]
+                               db/opts-simple-map))]
+     (if (= :verify/bad-token r) :verify/bad-code r)))
+  ([db token reason]
+   (confirmation-report-error
+    (jdbc/execute-one! db [confirmation-report-error-token-query
+                           (or reason "creation") token]
+                       db/opts-simple-map))))
+
+(def ^:const create-with-token-query
+  (str-spc
+   "INSERT IGNORE INTO users(email,uid,first_name,middle_name,last_name)"
+   "SELECT id,UUID(),?,?,? FROM confirmations"
+   "WHERE token = ? AND confirmed = TRUE AND reason = 'creation' AND expires >= NOW()"
+   "RETURNING id,uid,email"))
+
+(defn create-with-token
+  ([db token]
+   (create-with-token db token nil nil nil))
+  ([db token first-name]
+   (create-with-token db token first-name nil nil))
+  ([db token first-name last-name]
+   (create-with-token db token first-name nil last-name))
+  ([db token first-name middle-name last-name]
+   (when-some [token (some-str token)]
+     (if-some [r (jdbc/execute-one!
+                  db [create-with-token-query
+                      (some-str first-name)
+                      (some-str middle-name)
+                      (some-str last-name)
+                      token]
+                  db/opts-simple-map)]
+       (assoc r :created? true :uid (db/as-uuid (get r :uid)))
+       {:created? false :error (confirmation-report-error db token "creation")}))))
+
+(def ^:const create-with-code-query
+  (str-spc
+   "INSERT IGNORE INTO users(email,uid,first_name,middle_name,last_name)"
+   "SELECT id,UUID(),?,?,? FROM confirmations"
+   "WHERE id = ? AND code = ? AND confirmed = TRUE AND reason = 'creation' AND  expires >= NOW()"
+   "RETURNING id,uid,email"))
+
+(defn create-with-code
+  ([db code email]
+   (create-with-code db code email nil nil nil))
+  ([db code email first-name]
+   (create-with-code db code email first-name nil nil))
+  ([db code email first-name last-name]
+   (create-with-code db code email first-name nil last-name))
+  ([db code email first-name middle-name last-name]
+   (let [code  (some-str code)
+         email (some-str email)]
+     (when (and code email)
+       (if-some [r (jdbc/execute-one!
+                    db [create-with-code-query
+                        (some-str first-name)
+                        (some-str middle-name)
+                        (some-str last-name)
+                        email code]
+                    db/opts-simple-map)]
+         (assoc r :created? true :uid (db/as-uuid (get r :uid)))
+         {:created? false :error (confirmation-report-error db code email "creation")})))))
+
+(defn create-with-token-or-code
+  ([db token code email]
+   (create-with-token-or-code db token code email nil nil nil))
+  ([db token code email first-name]
+   (create-with-token-or-code db token code email first-name nil nil))
+  ([db token code email first-name last-name]
+   (create-with-token-or-code db token code email first-name nil last-name))
+  ([db token code email first-name middle-name last-name]
+   (if-some [token (some-str token)]
+     (create-with-token db token first-name middle-name last-name)
+     (create-with-code  db code email first-name middle-name last-name))))
 
 ;; Other
 
