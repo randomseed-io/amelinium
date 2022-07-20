@@ -125,15 +125,19 @@ CREATE TABLE IF NOT EXISTS session_variables (
 CREATE INDEX IF NOT EXISTS session_variables_index ON session_variables(session_id);
 --;;
 CREATE TABLE IF NOT EXISTS confirmations (
-  id       CHAR(128) NOT NULL,
-  user_id  INTEGER UNSIGNED NULL,
-  code     CHAR(16) NULL,
-  token    CHAR(128) NULL,
-  reason   ENUM('creation', 'recovery', 'unlock') NOT NULL,
-  attempts SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-  created  TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  expires  TIMESTAMP(6) NULL,
-  status   CHAR(32) NULL,
-  req_id   CHAR(128) NULL,
+  id        CHAR(128) NOT NULL,
+  user_id   INTEGER UNSIGNED NULL,
+  code      CHAR(16) NULL,
+  token     CHAR(128) NULL,
+  reason    ENUM('creation', 'recovery', 'unlock') NOT NULL,
+  attempts  SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  created   TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  expires   TIMESTAMP(6) NULL,
+  confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+  req_id    CHAR(128) NULL,
   PRIMARY KEY(id, reason)
 ) ENGINE=Aria TRANSACTIONAL=0 ROW_FORMAT=FIXED;
+--;;
+CREATE UNIQUE INDEX IF NOT EXISTS confirmations_token_index   ON confirmations(token);
+CREATE UNIQUE INDEX IF NOT EXISTS confirmations_code_id_index ON confirmations(code,id);
+CREATE UNIQUE INDEX IF NOT EXISTS confirmations_dates_index   ON confirmations(created,expires);
