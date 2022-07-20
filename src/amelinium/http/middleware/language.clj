@@ -170,6 +170,7 @@
 (def req-picker
   {:compile (fn [config]
               (let [lang-param        (param nil config)
+                    lang-param        (if (get config :stringify-lang-param?) (some-str lang-param) lang-param)
                     last-key          (when (some? lang-param) (cons lang-param nil))
                     supported         (supported nil config)
                     key-path          (get config :key-path)
@@ -206,6 +207,14 @@
 (def accept-picker
   (-> req-picker
       (assoc :key-path :accept, :param :language)))
+
+(def query-params-picker
+  (-> req-picker
+      (assoc :key-path :params)))
+
+(def query-params-picker-str
+  (-> req-picker
+      (assoc :key-path :params :stringify-lang-param? true)))
 
 (def form-params-picker-str
   {:compile (fn [config]

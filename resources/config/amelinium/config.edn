@@ -121,8 +121,9 @@
                                                                :banned  "Banned User"}}
 
  :amelinium.http.middleware.language/web-supported [:en :pl]
- :amelinium.http.middleware.language/web-pickers   {:default [amelinium.http.middleware.language/path-picker
-                                                              amelinium.http.middleware.language/form-params-picker-str
+ :amelinium.http.middleware.language/web-pickers   {:default [amelinium.http.middleware.language/form-params-picker-str
+                                                              amelinium.http.middleware.language/query-params-picker-str
+                                                              amelinium.http.middleware.language/path-picker
                                                               :language/user
                                                               :language/client
                                                               amelinium.http.middleware.language/accept-picker]
