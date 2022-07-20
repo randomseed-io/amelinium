@@ -119,6 +119,7 @@
               (update :locking/lock-wait    (fnil time/parse-duration [10 :minutes]))
               (update :locking/fail-expires (fnil time/parse-duration [1  :minutes]))
               (update :confirmation/expires (fnil time/parse-duration [10 :minutes]))
+              (update :registration/expires (fnil time/parse-duration [10 :minutes]))
               (update :confirmation/max-attempts safe-parse-long 3))]
     (log/msg "Configuring auth engine" k
              (str "(attempts: "  (:locking/max-attempts s)
