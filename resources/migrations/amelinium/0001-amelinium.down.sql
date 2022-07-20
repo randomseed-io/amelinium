@@ -1,5 +1,7 @@
 use amelinium;
 --;;
+DROP EVENT IF EXISTS confirmations_cleanup;
+--;;
 ALTER TABLE user_settings DROP FOREIGN KEY IF EXISTS FK_user_settings_user_id_users;
 --;;
 ALTER TABLE users DROP FOREIGN KEY IF EXISTS FK_created_by_id_users;

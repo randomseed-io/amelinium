@@ -141,3 +141,11 @@ CREATE TABLE IF NOT EXISTS confirmations (
 CREATE UNIQUE INDEX IF NOT EXISTS confirmations_token_index   ON confirmations(token);
 CREATE UNIQUE INDEX IF NOT EXISTS confirmations_code_id_index ON confirmations(code,id);
 CREATE UNIQUE INDEX IF NOT EXISTS confirmations_dates_index   ON confirmations(created,expires);
+--;;
+CREATE OR REPLACE EVENT confirmations_cleanup
+  ON SCHEDULE EVERY 1 HOUR
+              STARTS CURRENT_TIMESTAMP + INTERVAL 1 MINUTE
+  ON COMPLETION PRESERVE
+  DO
+    DELETE LOW_PRIORITY IGNORE FROM mana.confirmations WHERE expires < (CURRENT_TIMESTAMP - INTERVAL 2 HOUR);
+--;;
