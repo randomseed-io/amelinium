@@ -2,7 +2,7 @@
  {:en
   {:ok                "Success!"
    :error             {:ok             "Success!"
-                       :authorization  "Authorization error."
+                       :authorization  "Access denied."
                        :authentication "Authentication error."
                        :session        "Session error."
                        :bad-parameters "Your application has sent bad parameters."}

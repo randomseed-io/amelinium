@@ -2,7 +2,7 @@
  {:pl
   {:ok                "Sukces!"
    :error             {:ok             "Sukces!"
-                       :authorization  "Błąd autoryzacji dostępu."
+                       :authorization  "Brak dostępu."
                        :authentication "Błąd uwierzytelniania."
                        :session        "Błąd sesji."
                        :bad-parameters "Twoja aplikacja wysłała błędne parametry."}
