@@ -52,11 +52,11 @@
   `key` using a translation function `tf`. Any optional arguments are passed as they
   are."
   ([tf locale key]
-   (tf locale key))
+   (tf (keyword locale) key))
   ([tf locale key x]
-   (tf locale key x))
+   (tf (keyword locale) key x))
   ([tf locale key x & more]
-   (apply tf locale key x more)))
+   (apply tf (keyword locale) key x more)))
 
 (defn translate-sub-with
   "Returns a translation string for the given `locale` (language ID), the namespace
@@ -64,11 +64,11 @@
   `tf`. Useful to translate nested keys which are translated to fully-qualified
   keywords. Any additional arguments are passed as they are."
   ([tf locale key-ns key-name]
-   (tf locale (keyword (idname key-ns) (idname key-name))))
+   (tf (keyword locale) (keyword (idname key-ns) (idname key-name))))
   ([tf locale key-ns key-name x]
-   (tf locale (keyword (idname key-ns) (idname key-name)) x))
+   (tf (keyword locale) (keyword (idname key-ns) (idname key-name)) x))
   ([tf locale key-ns key-name x & more]
-   (apply tf locale (keyword (idname key-ns) (idname key-name)) x more)))
+   (apply tf (keyword locale) (keyword (idname key-ns) (idname key-name)) x more)))
 
 (defn translate
   "Returns a translation string for the given `locale` (language ID) and the keyword
@@ -76,11 +76,11 @@
   calling `translator` function on it. Any optional arguments are passed as they
   are."
   ([req locale key]
-   ((translator req) locale key))
+   ((translator req) (keyword locale) key))
   ([req locale key x]
-   ((translator req) locale key x))
+   ((translator req) (keyword locale) key x))
   ([req locale key x & more]
-   (apply (translator req) locale key x more)))
+   (apply (translator req) (keyword locale) key x more)))
 
 (defn translate-sub
   "Returns a translation string for the given `locale` (language ID), the namespace
@@ -89,22 +89,22 @@
   obtained by calling `translator` on `req` (which may be a request map or a `Match`
   object). Any additional arguments are passed as they are."
   ([req locale key-ns key-name]
-   ((translator req) locale (keyword (idname key-ns) (idname key-name))))
+   ((translator req) (keyword locale) (keyword (idname key-ns) (idname key-name))))
   ([req locale key-ns key-name x]
-   ((translator req) locale (keyword (idname key-ns) (idname key-name)) x))
+   ((translator req) (keyword locale) (keyword (idname key-ns) (idname key-name)) x))
   ([req locale key-ns key-name x & more]
-   (apply (translator req) locale (keyword (idname key-ns) (idname key-name)) x more)))
+   (apply (translator req) (keyword locale) (keyword (idname key-ns) (idname key-name)) x more)))
 
 (defn tr
   "Returns a translation string for the given locale (obtained from a request map)
   and the keyword `key` using a translation function (obtained from a
   request map or a `Match` object). Any optional arguments are passed as they are."
   ([req key]
-   ((translator req) (lang req) key))
+   ((translator req) (keyword (lang req)) key))
   ([req key x]
-   ((translator req) (lang req) key x))
+   ((translator req) (keyword (lang req)) key x))
   ([req key x & more]
-   (apply (translator req) (lang req) key x more)))
+   (apply (translator req) (keyword (lang req)) key x more)))
 
 (defn tr-sub
   "Returns a translation string for the given locale (obtained from a request map),
@@ -113,11 +113,11 @@
   will be obtained by calling `translator` on `req` (which may be a request map or a
   `Match` object). Any additional arguments are passed as they are."
   ([req key-ns key-name]
-   ((translator req) (lang req) (keyword (idname key-ns) (idname key-name))))
+   ((translator req) (keyword (lang req)) (keyword (idname key-ns) (idname key-name))))
   ([req key-ns key-name x]
-   ((translator req) (lang req) (keyword (idname key-ns) (idname key-name)) x))
+   ((translator req) (keyword (lang req)) (keyword (idname key-ns) (idname key-name)) x))
   ([req key-ns key-name x & more]
-   (apply (translator req) (lang req) (keyword (idname key-ns) (idname key-name)) x more)))
+   (apply (translator req) (keyword (lang req)) (keyword (idname key-ns) (idname key-name)) x more)))
 
 ;; Initialization
 
