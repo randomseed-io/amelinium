@@ -337,6 +337,39 @@
      (-> (render req data views-subdir layouts-subdir lang sess) resp-fn (update :headers conj headers))
      (-> (render req data views-subdir layouts-subdir lang sess) resp-fn))))
 
+;; Rendering functions generation
+
+(defmacro def-render
+  "Generates a rendering function."
+  {:arglists '([name f]
+               [name f http-code]
+               [name doc f])}
+  ([name f]
+   (#'def-render &form &env name f nil nil))
+  ([name f code _]
+   (#'def-render &form &env name
+                 (str "Renders a " (when code (str code " ")) "response with a possible body generated with views, layouts and data
+  obtained from a request map (`:app/layout`, `:app/view`, `:app/data` keys).
+  Uses `" f "` to set the response code.") f))
+  ([name doc-or-f f-or-code]
+   (if (pos-int? f-or-code)
+     (#'def-render &form &env name doc-or-f f-or-code nil)
+     `(let [f# ~f-or-code]
+        (defn ~name ~doc-or-f
+          ([]
+           (render-response f# nil nil nil nil nil nil))
+          (~'[req]
+           (render-response f# ~'req nil nil nil nil nil))
+          (~'[req data]
+           (render-response f# ~'req ~'data nil nil nil nil))
+          (~'[req data views-subdir]
+           (render-response f# ~'req ~'data ~'views-subdir nil nil nil))
+          (~'[req data views-subdir layouts-subdir]
+           (render-response f# ~'req ~'data ~'views-subdir ~'layouts-subdir nil nil))
+          (~'[req data views-subdir layouts-subdir lang]
+           (render-response f# ~'req ~'data ~'views-subdir ~'layouts-subdir ~'lang nil))
+          (~'[req data views-subdir layouts-subdir lang session-map]
+           (render-response f# ~'req ~'data ~'views-subdir ~'layouts-subdir ~'lang ~'session-map)))))))
   ([req]
    (render-response resp/ok req nil nil nil nil nil))
   ([req data]
