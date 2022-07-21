@@ -118,6 +118,8 @@
 ;; Response rendering
 
 (defn render
+  "Returns response body on a basis of a value associated with the `:response/body` key
+  of the `req`."
   ([]
    (render nil))
   ([req]
@@ -129,26 +131,16 @@
          body)))))
 
 (defn response?
+  "Returns `true` if the `req` context map is already an API response."
   [req]
   (and (map? req)
        (integer?  (:status req))
        (or (map?  (:headers req))
            (coll? (:body req)))))
 
-(defn render-response-force
-  "Universal response renderer. Uses the render function to render the response body."
-  ([]
-   (render-response-force resp/ok nil))
-  ([resp-fn]
-   (render-response-force resp-fn nil))
-  ([resp-fn req]
-   (if-some [headers (get req :response/headers)]
-     (assoc (resp-fn (render req)) :headers headers)
-     (resp-fn (render req)))))
-
 (defn render-response
-  "Universal response renderer. Uses the render function to render the response body
-  unless the `req` is already a valid response (then it is returned as-is)."
+  "API response renderer. Uses the `render` function to render the response body unless
+  the `req` is already a valid response (then it is returned as-is)."
   ([]
    (render-response resp/ok nil))
   ([resp-fn]
@@ -159,6 +151,17 @@
      (if-some [headers (get req :response/headers)]
        (assoc (resp-fn (render req)) :headers headers)
        (resp-fn (render req))))))
+
+(defn render-response-force
+  "API response renderer. Uses the `render` function to render the response body."
+  ([]
+   (render-response-force resp/ok nil))
+  ([resp-fn]
+   (render-response-force resp-fn nil))
+  ([resp-fn req]
+   (if-some [headers (get req :response/headers)]
+     (assoc (resp-fn (render req)) :headers headers)
+     (resp-fn (render req)))))
 
 ;; OK response
 
@@ -551,33 +554,33 @@
 
 (defn render-continue
   "Renders 100 response without a body."
-  ([]    (resp/continue))
-  ([req] (resp/continue)))
+  ([]           (resp/continue))
+  ([req]        (common/render resp/continue req))
+  ([req & more] (common/render resp/continue req)))
 
 (defn render-switching-protocols
   "Renders 101 response without a body."
-  ([]    (resp/switching-protocols))
-  ([req] (resp/switching-protocols)))
+  ([]           (resp/switching-protocols))
+  ([req]        (common/render resp/switching-protocols req))
+  ([req & more] (common/render resp/switching-protocols req)))
 
 (defn render-processing
   "Renders 102 response without a body."
-  ([]    (resp/processing))
-  ([req] (resp/processing)))
+  ([]           (resp/processing))
+  ([req]        (common/render resp/processing req))
+  ([req & more] (common/render resp/processing req)))
 
 (defn render-no-content
   "Renders 204 response without a body."
-  ([]    (resp/no-content))
-  ([req] (resp/no-content)))
+  ([]           (resp/no-content))
+  ([req]        (common/render resp/no-content req))
+  ([req & more] (common/render resp/no-content req)))
 
 (defn render-reset-content
   "Renders 205 response without a body."
-  ([]    (resp/reset-content))
-  ([req] (resp/reset-content)))
-
-(defn render-not-modified
-  "Renders 206 response without a body."
-  ([]    (resp/not-modified))
-  ([req] (resp/not-modified)))
+  ([]           (resp/reset-content))
+  ([req]        (common/render resp/reset-content req))
+  ([req & more] (common/render resp/reset-content req)))
 
 ;; Linking helpers
 
