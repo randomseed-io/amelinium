@@ -280,6 +280,11 @@
              rndr (assoc data :body [:safe html])]
          (selmer/render-file layt rndr))))))
 
+(defn response?
+  "Returns `true` if the given context map `req` is a response."
+  [req]
+  (resp/response? req))
+
 (defn render-response
   "Universal response renderer. Uses the render function to render the response unless
   the req is already a valid response."
