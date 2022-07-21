@@ -329,9 +329,13 @@
   "Renders page after a specific web controller was called. The `:app/view` and
   `:app/layout` keys are added to the request data by controllers to indicate which
   view and layout file should be used. Data passed to the template system is
-  populated with common keys which should be present in `:app/data`."
+  populated with common keys which should be present in `:app/data`. If the
+  `:response/fn` is set then it will be used instead of `web/render-ok` to render an
+  HTML response."
   [req]
-  (web/render-ok req))
+  (if (contains? req :response/fn)
+    ((get req :response/fn) req)
+    (web/render-ok req)))
 
 (defn default
   [req]
