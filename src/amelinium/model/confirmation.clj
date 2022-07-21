@@ -58,12 +58,13 @@
    "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id)"
    "SELECT ?,?,?,?,?,0,(SELECT users.id FROM users WHERE users.email = ?)"
    "ON DUPLICATE KEY UPDATE"
+   "user_id   = VALUE(user_id),"
    "attempts  = IF(NOW()>expires, 1, attempts),"
    "code      = IF(NOW()>expires, VALUE(code), code),"
    "token     = IF(NOW()>expires, VALUE(token), token),"
    "created   = IF(NOW()>expires, NOW(), created),"
-   "expires   = IF(NOW()>expires, VALUE(expires), expires),"
-   "user_id   = VALUE(user_id)"
+   "confirmed = IF(NOW()>expires, VALUE(confirmed), confirmed),"
+   "expires   = IF(NOW()>expires, VALUE(expires), expires)"
    "RETURNING *"))
 
 (def ^:const new-email-confirmation-query-with-attempt
@@ -71,12 +72,13 @@
    "INSERT INTO confirmations(id,code,token,reason,expires,attempts,confirmed,user_id)"
    "SELECT ?,?,?,?,?,1,0,(SELECT users.id FROM users WHERE users.email = ?)"
    "ON DUPLICATE KEY UPDATE"
+   "user_id   = VALUE(user_id),"
    "attempts  = IF(NOW()>expires, 1, attempts + 1),"
    "code      = IF(NOW()>expires, VALUE(code), code),"
    "token     = IF(NOW()>expires, VALUE(token), token),"
    "created   = IF(NOW()>expires, NOW(), created),"
-   "expires   = IF(NOW()>expires, VALUE(expires), expires),"
-   "user_id   = VALUE(user_id)"
+   "confirmed = IF(NOW()>expires, VALUE(confirmed), confirmed),"
+   "expires   = IF(NOW()>expires, VALUE(expires), expires)"
    "RETURNING *"))
 
 (def ^:const new-phone-confirmation-query
@@ -84,12 +86,13 @@
    "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id)"
    "SELECT ?,?,?,?,?,0,(SELECT users.id FROM users WHERE users.phone = ?)"
    "ON DUPLICATE KEY UPDATE"
+   "user_id   = VALUE(user_id),"
    "attempts  = IF(NOW()>expires, 1, attempts),"
    "code      = IF(NOW()>expires, VALUE(code), code),"
    "token     = IF(NOW()>expires, VALUE(token), token),"
    "created   = IF(NOW()>expires, NOW(), created),"
-   "expires   = IF(NOW()>expires, VALUE(expires), expires),"
-   "user_id   = VALUE(user_id)"
+   "confirmed = IF(NOW()>expires, VALUE(confirmed), confirmed),"
+   "expires   = IF(NOW()>expires, VALUE(expires), expires)"
    "RETURNING *"))
 
 (def ^:const new-phone-confirmation-query-with-attempt
@@ -97,12 +100,13 @@
    "INSERT INTO confirmations(id,code,token,reason,expires,attempts,confirmed,user_id)"
    "SELECT ?,?,?,?,?,1,0,(SELECT users.id FROM users WHERE users.phone = ?)"
    "ON DUPLICATE KEY UPDATE"
+   "user_id   = VALUE(user_id),"
    "attempts  = IF(NOW()>expires, 1, attempts + 1),"
    "code      = IF(NOW()>expires, VALUE(code), code),"
    "token     = IF(NOW()>expires, VALUE(token), token),"
    "created   = IF(NOW()>expires, NOW(), created),"
-   "expires   = IF(NOW()>expires, VALUE(expires), expires),"
-   "user_id   = VALUE(user_id)"
+   "confirmed = IF(NOW()>expires, VALUE(confirmed), confirmed),"
+   "expires   = IF(NOW()>expires, VALUE(expires), expires)"
    "RETURNING *"))
 
 (defn- gen-confirmation-core
