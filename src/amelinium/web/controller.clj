@@ -222,7 +222,7 @@
       ;; Request is invalid.
 
       (not (get req :validators/params-valid?))
-      (-> req web/no-app-data web/render-bad-params)
+      (-> req (web/render-bad-params false "bad-params"))
 
       ;; There is no session. Short-circuit.
 
