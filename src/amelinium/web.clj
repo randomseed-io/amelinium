@@ -249,7 +249,7 @@
 ;; Response rendering
 
 (defn render
-  "Universal page renderer. Takes a request, a data map to be used in templates, a
+  "HTML web page renderer. Takes a request, a data map to be used in templates, a
   subdirectory for the view file (defaults to `nil`), a subdirectory for the template
   file (defaults to `nil`), a language string (guessed if not given, unless
   explicitly set to `false`) and a session map (used only when the language cannot be
@@ -277,8 +277,9 @@
              data (prep-app-data req data)
              data (map/assoc-missing data :url (delay (req/request-url req)) :lang dlng)
              html (selmer/render-file view data)
-             rndr (assoc data :body [:safe html])]
-         (selmer/render-file layt rndr))))))
+             rndr (assoc data :body [:safe html])
+             resp (selmer/render-file layt rndr)]
+         resp)))))
 
 (defn response?
   "Returns `true` if the given context map `req` is a response."
@@ -286,8 +287,10 @@
   (resp/response? req))
 
 (defn render-response
-  "Universal response renderer. Uses the render function to render the response unless
-  the req is already a valid response."
+  "Web response renderer. Uses the `render` function to render a response body (using
+  values associated with the `:app/data`, `:app/view` and `:app/layout` in the `req`
+  map, or provided as arguments) and response headers (using the `:response/headers`
+  value), unless the `req` is already a valid response."
   ([]
    (render-response resp/ok nil nil nil nil nil nil))
   ([resp-fn]
@@ -307,11 +310,33 @@
      req
      (if-some [headers (get req :response/headers)]
        (-> (render req data views-subdir layouts-subdir lang sess) resp-fn (update :headers conj headers))
-       (-> (render req data views-subdir layouts-subdir lang sess) resp-fn)))))
+       (resp-fn (render req data views-subdir layouts-subdir lang sess))))))
 
-(defn render-ok
+(defn render-response-force
+  "Web response renderer. Uses the `render` function to render a response body
+  (using values associated with the `:app/data`, `:app/view` and `:app/layout` in the
+  `req` map, or provided as arguments) and the response headers (using the
+  `:response/headers` value), regardless if the `req` is already a valid response or
+  not."
   ([]
    (render-response resp/ok nil nil nil nil nil nil))
+  ([resp-fn]
+   (render-response resp-fn nil nil nil nil nil nil))
+  ([resp-fn req]
+   (render-response resp-fn req nil nil nil nil nil))
+  ([resp-fn req data]
+   (render-response resp-fn req data nil nil nil nil))
+  ([resp-fn req data views-subdir]
+   (render-response resp-fn req data views-subdir nil nil nil))
+  ([resp-fn req data views-subdir layouts-subdir]
+   (render-response resp-fn req data views-subdir layouts-subdir nil nil))
+  ([resp-fn req data views-subdir layouts-subdir lang]
+   (render-response resp-fn req data views-subdir layouts-subdir lang nil))
+  ([resp-fn req data views-subdir layouts-subdir lang sess]
+   (if-some [headers (get req :response/headers)]
+     (-> (render req data views-subdir layouts-subdir lang sess) resp-fn (update :headers conj headers))
+     (-> (render req data views-subdir layouts-subdir lang sess) resp-fn))))
+
   ([req]
    (render-response resp/ok req nil nil nil nil nil))
   ([req data]
