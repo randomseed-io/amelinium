@@ -866,10 +866,68 @@
     :headers {}
     :body    body}))
 
+;; Rendering
+
+(defn render
+  "Universal, response renderer. Returns the result of calling the `resp-fn` with
+  headers attached (from `:response/headers` key of the `req`) unless the req is
+  already a valid response. Arguments from the third are passed to `resp-fn`
+  function."
+  ([resp-fn]
+   (resp-fn))
+  ([resp-fn req]
+   (if (resp/response? req)
+     req
+     (if-some [headers (get req :response/headers)]
+       (update (resp-fn) :headers conj headers)
+       (resp-fn))))
+  ([resp-fn req a]
+   (if (resp/response? req)
+     req
+     (if-some [headers (get req :response/headers)]
+       (update (resp-fn a) :headers conj headers)
+       (resp-fn a))))
+  ([resp-fn req a b]
+   (if (resp/response? req)
+     req
+     (if-some [headers (get req :response/headers)]
+       (update (resp-fn a b) :headers conj headers)
+       (resp-fn a b))))
+  ([resp-fn req a b & more]
+   (if (resp/response? req)
+     req
+     (if-some [headers (get req :response/headers)]
+       (update (resp-fn a b more) :headers conj headers)
+       (resp-fn a b more)))))
+
+(defn render-force
+  "Universal, body-less response renderer. Returns the result of calling the `resp-fn`
+  with headers attached (from `:response/headers` key of the `req`). Arguments from
+  the third are passed to `resp-fn` function."
+  ([resp-fn]
+   (resp-fn))
+  ([resp-fn req]
+   (if-some [headers (get req :response/headers)]
+     (update (resp-fn) :headers conj headers)
+     (resp-fn)))
+  ([resp-fn req a]
+   (if-some [headers (get req :response/headers)]
+     (update (resp-fn a) :headers conj headers)
+     (resp-fn a)))
+  ([resp-fn req a b]
+   (if-some [headers (get req :response/headers)]
+     (update (resp-fn a b) :headers conj headers)
+     (resp-fn a b)))
+  ([resp-fn req a b & more]
+   ([resp-fn req a b]
+    (if-some [headers (get req :response/headers)]
+      (update (apply resp-fn a b more) :headers conj headers)
+      (apply resp-fn a b more)))))
+
 ;; Redirects
 
 (defn redirect
-  "Generic response wrapper. The `f` should be a function which takes a request map and
+  "Generic redirect wrapper. The `f` should be a function which takes a request map and
   returns a response; should take at least one single argument which should be a
   URL. The URL will be parameterized with a language if required. If the language is
   given it uses the `localized-page` function. If there is no language given but the
@@ -878,40 +936,40 @@
   ([f]
    (f "/"))
   ([f req]
-   (f (page req)))
+   (render-force f req (page req)))
   ([f req name-or-path]
-   (f (page req name-or-path)))
+   (render-force f req (page req name-or-path)))
   ([f req name-or-path lang]
-   (f (page req name-or-path lang)))
+   (render-force f req (page req name-or-path lang)))
   ([f req name-or-path lang params]
-   (f (page req name-or-path lang params)))
+   (render-force f req (page req name-or-path lang params)))
   ([f req name-or-path lang params query-params]
-   (f (page req name-or-path lang params query-params)))
+   (render-force f req (page req name-or-path lang params query-params)))
   ([f req name-or-path lang params query-params & more]
-   (f (apply page req name-or-path lang params query-params more))))
+   (render-force f req (apply page req name-or-path lang params query-params more))))
 
 (defn localized-redirect
-  "Generic response wrapper. The `f` should be a function which takes a request map and
+  "Generic redirect wrapper. The `f` should be a function which takes a request map and
   returns a response; should take at least one single argument which should be a
   URL. The URL will be parameterized with a language. Works almost the same way as
-  the `redirect` will generate a localized path using a language obtained from a
-  request (under `:language/str` key) and if there will be no language-parameterized
-  variant of the path, it will fail. Use this function to make sure that localized
-  path will be produced, or `nil`."
+  the `redirect` but it will generate a localized path using a language obtained from
+  a request (under `:language/str` key) and if there will be no
+  language-parameterized variant of the path, it will fail. Use this function to make
+  sure that localized path will be produced, or `nil`."
   ([f]
    (f "/"))
   ([f req]
-   (f (localized-page req)))
+   (render-force f req (localized-page req)))
   ([f req name-or-path]
-   (f (localized-page req name-or-path)))
+   (render-force f req (localized-page req name-or-path)))
   ([f req name-or-path lang]
-   (f (localized-page req name-or-path lang)))
+   (render-force f req (localized-page req name-or-path lang)))
   ([f req name-or-path lang params]
-   (f (localized-page req name-or-path lang params)))
+   (render-force f req (localized-page req name-or-path lang params)))
   ([f req name-or-path lang params query-params]
-   (f (localized-page req name-or-path lang params query-params)))
+   (render-force f req (localized-page req name-or-path lang params query-params)))
   ([f req name-or-path lang params query-params & more]
-   (f (apply localized-page req name-or-path lang params query-params more))))
+   (render-force f req (apply localized-page req name-or-path lang params query-params more))))
 
 (defmacro def-redirect
   "Generates a language-parameterized redirect function which acts like `redirect`."
@@ -937,17 +995,17 @@
           ([]
            (f# "/"))
           (~'[req]
-           (f# (page ~'req)))
+           (render-force f# ~'req (page ~'req)))
           (~'[req name-or-path]
-           (f# (page ~'req ~'name-or-path)))
+           (render-force f# ~'req (page ~'req ~'name-or-path)))
           (~'[req name-or-path lang]
-           (f# (page ~'req ~'name-or-path ~'lang)))
+           (render-force f# ~'req (page ~'req ~'name-or-path ~'lang)))
           (~'[req name-or-path lang params]
-           (f# (page ~'req ~'name-or-path ~'lang ~'params)))
+           (render-force f# ~'req (page ~'req ~'name-or-path ~'lang ~'params)))
           (~'[req name-or-path lang params query-params]
-           (f# (page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
+           (render-force f# ~'req (page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
           (~'[req name-or-path lang params query-params & more]
-           (f# (apply page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
+           (render-force f# ~'req (apply page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
 
 (defmacro def-localized-redirect
   "Generates a language-parameterized redirect function which acts like
@@ -983,48 +1041,47 @@
           ([]
            (f# "/"))
           (~'[req]
-           (f# (localized-page ~'req)))
+           (render-force f# ~'req (localized-page ~'req)))
           (~'[req name-or-path]
-           (f# (localized-page ~'req ~'name-or-path)))
+           (render-force f# ~'req (localized-page ~'req ~'name-or-path)))
           (~'[req name-or-path lang]
-           (f# (localized-page ~'req ~'name-or-path ~'lang)))
+           (render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang)))
           (~'[req name-or-path lang params]
-           (f# (localized-page ~'req ~'name-or-path ~'lang ~'params)))
+           (render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang ~'params)))
           (~'[req name-or-path lang params query-params]
-           (f# (localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
+           (render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
           (~'[req name-or-path lang params query-params & more]
-           (f# (apply localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
+           (render-force f# ~'req (apply localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
 
-(def-redirect created            resp/created                                 201)
-(def-redirect multiple-choices   resp/multiple-choices                        300)
-(def-redirect moved-permanently  resp/moved-permanently                       301)
-(def-redirect found              resp/found                                   302)
-(def-redirect see-other          resp/see-other                               303)
-(def-redirect use-proxy          resp/use-proxy                               305)
-(def-redirect temporary-redirect resp/temporary-redirect                      307)
-(def-redirect permanent-redirect resp/permanent-redirect                      308)
+(def-redirect           created                      resp/created             201)
+(def-redirect           multiple-choices             resp/multiple-choices    300)
+(def-redirect           moved-permanently            resp/moved-permanently   301)
+(def-redirect           found                        resp/found               302)
+(def-redirect           see-other                    resp/see-other           303)
+(def-redirect           use-proxy                    resp/use-proxy           305)
+(def-redirect           temporary-redirect           resp/temporary-redirect  307)
+(def-redirect           permanent-redirect           resp/permanent-redirect  308)
 
 (def-localized-redirect localized-created            resp/created             201)
 (def-localized-redirect localized-multiple-choices   resp/multiple-choices    300)
 (def-localized-redirect localized-moved-permanently  resp/moved-permanently   301)
 (def-localized-redirect localized-found              resp/found               302)
 (def-localized-redirect localized-see-other          resp/see-other           303)
+(def-localized-redirect go-to                        resp/see-other           303)
 (def-localized-redirect localized-use-proxy          resp/use-proxy           305)
 (def-localized-redirect localized-temporary-redirect resp/temporary-redirect  307)
-(def-localized-redirect localized-permanent-redirect resp/permanent-redirect  308)
-
 (def-localized-redirect move-to                      resp/temporary-redirect  307)
-(def-localized-redirect go-to                        resp/see-other           303)
+(def-localized-redirect localized-permanent-redirect resp/permanent-redirect  308)
 
 (defn not-modified
   ([]           (resp/not-modified))
-  ([req]        (resp/not-modified))
-  ([req & more] (resp/not-modified)))
+  ([req]        (render-force resp/not-modified req))
+  ([req & more] (render-force resp/not-modified req)))
 
 (defn localized-not-modified
   ([]           (resp/not-modified))
-  ([req]        (resp/not-modified))
-  ([req & more] (resp/not-modified)))
+  ([req]        (render-force resp/not-modified req))
+  ([req & more] (render-force resp/not-modified req)))
 
 ;; Language
 
@@ -1090,7 +1147,7 @@
   "Redirects to a slash-trailed version of the same URI. If the URI already has a
   slash, it returns a req."
   [req]
-  (resp/temporary-redirect (add-slash (get req :uri))))
+  (temporary-redirect req (add-slash (get req :uri))))
 
 (defn lang-redir
   "Redirects to a best-suited language version of the URI. Uses `:browser` pickers
