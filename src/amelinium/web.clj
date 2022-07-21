@@ -156,6 +156,8 @@
             (seq keyz))))
 
 (defn no-app-data
+  "Disables processing of the `:app/data` key for the given request `req` by
+  associating it with the `false` value."
   [req]
   (assoc req :app/data false))
 
@@ -208,20 +210,28 @@
   (or (some-str (http/req-or-route-param req :app/layout))
       "default"))
 
+(def ^:const views-str           "views")
+(def ^:const layouts-str       "layouts")
+(def ^:const dot-html            ".html")
+(def ^:const default-html "default.html")
+
 (defn resolve-generic
   [uri pre dir lang core]
-  (let [pre  (or (some-str pre) "views")
-        prep (when pre  (str pre  "/"))
-        dir  (when dir  (str dir  "/"))
-        lang (when lang (str lang "/"))
-        pths (lazy-cat [[prep lang dir core ".html"]]
-                       [[prep dir core ".html"]]
-                       [[prep lang dir "default.html"]]
-                       [[prep dir "default.html"]]
-                       [[prep lang "default.html"]]
-                       [[prep "default.html"]])]
+  (let [pre     (or (some-str pre) "views")
+        prep-sl (when pre  (str pre  "/"))
+        dir-sl  (when dir  (str dir  "/"))
+        lang-sl (when lang (str lang "/"))
+        pths    (lazy-cat [[prep-sl lang-sl dir-sl core dot-html]]
+                          [[prep-sl dir-sl core dot-html]]
+                          [[prep-sl lang-sl dir-sl default-html]]
+                          [[prep-sl lang-sl dir dot-html]]
+                          [[prep-sl dir-sl default-html]]
+                          [[prep-sl dir dot-html]]
+                          [[prep-sl lang-sl default-html]]
+                          [[prep-sl default-html]])]
     (or (first (keep #(apply common/some-resource %) pths))
-        (do (log/wrn "Cannot find" pre "for" uri)
+        (do (when (nil? uri) (log/wrn "Empty URI while resolving" pre))
+            (log/wrn "Cannot find" pre (when uri (str " for" uri)))
             (doseq [path pths] (log/wrn (apply str "Tried: [resources]/" path)))))))
 
 (def ^{:arglists '([uri pre dir lang core])}
@@ -230,11 +240,13 @@
 
 (defn resolve-layout
   [req lang dir]
-  (resolve-cached (get req :uri) "layouts" dir lang (get-layout req)))
+  (resolve-cached (get req :uri) layouts-str dir lang (get-layout req)))
 
 (defn resolve-view
   [req lang dir]
-  (resolve-cached (get req :uri) "views" dir lang (get-view req)))
+  (resolve-cached (get req :uri) views-str dir lang (get-view req)))
+
+;; Response rendering
 
 (defn render
   "Universal page renderer. Takes a request, a data map to be used in templates, a
