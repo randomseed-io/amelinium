@@ -10,29 +10,14 @@
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require [potemkin.namespaces                :as          p]
-            [reitit.ring                        :as       ring]
-            [ring.util.http-response            :as       resp]
-            [ring.util.request                  :as        req]
-            [ring.util.codec                    :as      codec]
             [reitit.core                        :as          r]
-            [reitit.ring                        :as       ring]
-            [selmer.filters                     :as    filters]
-            [selmer.parser                      :as       tmpl]
-            [lazy-map.core                      :as   lazy-map]
             [tick.core                          :as          t]
-            [amelinium.i18n                     :as       i18n]
-            [amelinium.i18n                     :refer    [tr]]
             [amelinium.logging                  :as        log]
             [amelinium.model.user               :as       user]
             [amelinium.common                   :as     common]
             [amelinium.common.controller        :as controller]
-            [io.randomseed.utils.time           :as       time]
-            [io.randomseed.utils.var            :as        var]
-            [io.randomseed.utils.map            :as        map]
             [io.randomseed.utils                :refer    :all]
             [amelinium.web                      :as        web]
-            [amelinium.api                      :as        api]
-            [amelinium.auth                     :as       auth]
             [amelinium.http                     :as       http]
             [amelinium.http.middleware.language :as   language]))
 
@@ -139,7 +124,7 @@
   conditions and may emit a redirect or render a response."
   [req user-email password sess route-data lang]
   (let [req (controller/auth-user-with-password! req user-email password sess route-data)]
-    (if (resp/response? req)
+    (if (web/response? req)
       req
       (case (get req :auth/status)
         :ok            (language/force req (or lang (web/pick-language-str req)))
