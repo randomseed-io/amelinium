@@ -370,40 +370,195 @@
            (render-response f# ~'req ~'data ~'views-subdir ~'layouts-subdir ~'lang nil))
           (~'[req data views-subdir layouts-subdir lang session-map]
            (render-response f# ~'req ~'data ~'views-subdir ~'layouts-subdir ~'lang ~'session-map)))))))
-  ([req]
-   (render-response resp/ok req nil nil nil nil nil))
-  ([req data]
-   (render-response resp/ok req data nil nil nil nil))
-  ([req data views-subdir]
-   (render-response resp/ok req data views-subdir nil nil nil))
-  ([req data views-subdir layouts-subdir]
-   (render-response resp/ok req data views-subdir layouts-subdir nil nil))
-  ([req data views-subdir layouts-subdir lang]
-   (render-response resp/ok req data views-subdir layouts-subdir lang nil))
-  ([req data views-subdir layouts-subdir lang sess]
-   (render-response resp/ok req data views-subdir layouts-subdir lang sess)))
 
-(defn render-bad-params
+;; OK response
+
+(def-render render-ok resp/ok 200)
+
+;; Success responses with bodies
+
+(def-render render-accepted                        resp/accepted                        202)
+(def-render render-non-authoritative-information   resp/non-authoritative-information   203)
+(def-render render-partial-content                 resp/partial-content                 206)
+(def-render render-multi-status                    resp/multi-status                    207)
+(def-render render-already-reported                resp/already-reported                208)
+(def-render render-im-used                         resp/im-used                         226)
+
+;; Error responses with possible bodies
+
+(def-render render-bad-request                     resp/bad-request                     400)
+(def-render render-unauthorized                    resp/unauthorized                    401)
+(def-render render-payment-required                resp/payment-required                402)
+(def-render render-forbidden                       resp/forbidden                       403)
+(def-render render-not-found                       resp/not-found                       404)
+(def-render render-method-not-allowed              resp/method-not-allowed              405)
+(def-render render-not-acceptable                  resp/not-acceptable                  406)
+(def-render render-proxy-authentication-required   resp/proxy-authentication-required   407)
+(def-render render-request-timeout                 resp/request-timeout                 408)
+(def-render render-conflict                        resp/conflict                        409)
+(def-render render-gone                            resp/gone                            410)
+(def-render render-length-required                 resp/length-required                 411)
+(def-render render-precondition-failed             resp/precondition-failed             412)
+(def-render render-request-entity-too-large        resp/request-entity-too-large        413)
+(def-render render-request-uri-too-long            resp/request-uri-too-long            414)
+(def-render render-unsupported-media-type          resp/unsupported-media-type          415)
+(def-render render-requested-range-not-satisfiable resp/requested-range-not-satisfiable 416)
+(def-render render-expectation-failed              resp/expectation-failed              417)
+(def-render render-im-a-teapot                     common/im-a-teapot                   418)
+(def-render render-enhance-your-calm               resp/enhance-your-calm               420)
+(def-render render-misdirected-request             common/misdirected-request           421)
+(def-render render-unprocessable-entity            resp/unprocessable-entity            422)
+(def-render render-bad-params                      resp/unprocessable-entity            422)
+(def-render render-locked                          resp/locked                          423)
+(def-render render-failed-dependency               resp/failed-dependency               424)
+(def-render render-unordered-collection            resp/unordered-collection            425)
+(def-render render-too-early                       resp/unordered-collection            425)
+(def-render render-upgrade-required                resp/upgrade-required                426)
+(def-render render-precondition-required           resp/precondition-required           428)
+(def-render render-too-many-requests               resp/too-many-requests               429)
+(def-render render-request-header-fields-too-large resp/request-header-fields-too-large 431)
+(def-render render-retry-with                      resp/retry-with                      449)
+(def-render render-blocked-by-windows-parental-controls resp/blocked-by-windows-parental-controls 450)
+(def-render render-unavailable-for-legal-reasons   resp/unavailable-for-legal-reasons   451)
+(def-render render-internal-server-error           resp/internal-server-error           500)
+(def-render render-not-implemented                 resp/not-implemented                 501)
+(def-render render-bad-gateway                     resp/bad-gateway                     502)
+(def-render render-service-unavailable             resp/service-unavailable             503)
+(def-render render-gateway-timeout                 resp/gateway-timeout                 504)
+(def-render render-http-version-not-supported      resp/http-version-not-supported      505)
+(def-render render-variant-also-negotiates         resp/variant-also-negotiates         506)
+(def-render render-insufficient-storage            resp/insufficient-storage            507)
+(def-render render-loop-detected                   resp/loop-detected                   508)
+(def-render render-bandwidth-limit-exceeded        resp/bandwidth-limit-exceeded        509)
+(def-render render-not-extended                    resp/not-extended                    510)
+(def-render render-network-authentication-required resp/network-authentication-required 511)
+(def-render render-network-read-timeout            resp/network-read-timeout            598)
+(def-render render-network-connect-timeout         resp/network-connect-timeout         599)
+
+;; Resource creation success, redirect with a possible body
+
+(defn render-created
+  "Renders 201 response with a redirect (possibly localized if a destination path is
+  language-parameterized) and a possible body."
   ([]
-   (render-response resp/unprocessable-entity
-                    {:app/view "bad-params"}
-                    nil nil nil nil nil))
+   (common/render resp/created))
   ([req]
-   (render-response resp/unprocessable-entity
-                    (assoc req :app/view "bad-params")
-                    nil nil nil nil nil))
-  ([req data]
-   (render-response resp/unprocessable-entity
-                    (assoc req :app/view "bad-params")
-                    data nil nil nil nil))
-  ([req data lang]
-   (render-response resp/unprocessable-entity
-                    (assoc req :app/view "bad-params")
-                    data nil nil lang nil))
-  ([req data lang sess]
-   (render-response resp/unprocessable-entity
-                    (assoc req :app/view "bad-params")
-                    data nil nil lang sess)))
+   (common/render resp/created req
+                  (common/page req)
+                  (render req nil nil nil nil nil)))
+  ([req name-or-path]
+   (common/render resp/created req
+                  (common/page req name-or-path)
+                  (render req nil nil nil nil nil)))
+  ([req name-or-path lang]
+   (common/render resp/created req
+                  (common/page req name-or-path lang)
+                  (render req nil nil nil lang nil)))
+  ([req name-or-path lang params]
+   (common/render resp/created req
+                  (common/page req name-or-path lang params)
+                  (render req nil nil nil lang nil)))
+  ([req name-or-path lang params query-params]
+   (common/render resp/created req
+                  (common/page req name-or-path lang params query-params)
+                  (render req nil nil nil lang nil)))
+  ([req name-or-path lang params query-params data]
+   (common/render resp/created req
+                  (common/page req name-or-path lang params query-params)
+                  (render req data nil nil lang nil)))
+  ([req name-or-path lang params query-params data views-subdir]
+   (common/render resp/created req
+                  (common/page req name-or-path lang params query-params)
+                  (render req data views-subdir nil lang nil)))
+  ([req name-or-path lang params query-params data views-subdir layouts-subdir]
+   (common/render resp/created req
+                  (common/page req name-or-path lang params query-params)
+                  (render req data views-subdir layouts-subdir lang nil)))
+  ([req name-or-path lang params query-params data views-subdir layouts-subdir session-map]
+   (common/render resp/created req
+                  (common/page req name-or-path lang params query-params)
+                  (render req data views-subdir layouts-subdir lang session-map))))
+
+(defn localized-render-created
+  "Renders 201 response with a redirect (possibly localized if a destination path is
+  language-parameterized) and a possible body. Requires the destination
+  URL (specified by arguments before `data`) to be language parameterized."
+  ([]
+   (common/render resp/created))
+  ([req]
+   (common/render resp/created req
+                  (common/localized-page req)
+                  (render req nil nil nil nil nil)))
+  ([req name-or-path]
+   (common/render resp/created req
+                  (common/localized-page req name-or-path)
+                  (render req nil nil nil nil nil)))
+  ([req name-or-path lang]
+   (common/render resp/created req
+                  (common/localized-page req name-or-path lang)
+                  (render req nil nil nil lang nil)))
+  ([req name-or-path lang params]
+   (common/render resp/created req
+                  (common/localized-page req name-or-path lang params)
+                  (render req nil nil nil lang nil)))
+  ([req name-or-path lang params query-params]
+   (common/render resp/created req
+                  (common/localized-page req name-or-path lang params query-params)
+                  (render req nil nil nil lang nil)))
+  ([req name-or-path lang params query-params data]
+   (common/render resp/created req
+                  (common/localized-page req name-or-path lang params query-params)
+                  (render req data nil nil lang nil)))
+  ([req name-or-path lang params query-params data views-subdir]
+   (common/render resp/created req
+                  (common/localized-page req name-or-path lang params query-params)
+                  (render req data views-subdir nil lang nil)))
+  ([req name-or-path lang params query-params data views-subdir layouts-subdir]
+   (common/render resp/created req
+                  (common/localized-page req name-or-path lang params query-params)
+                  (render req data views-subdir layouts-subdir lang nil)))
+  ([req name-or-path lang params query-params data views-subdir layouts-subdir session-map]
+   (common/render resp/created req
+                  (common/localized-page req name-or-path lang params query-params)
+                  (render req data views-subdir layouts-subdir lang session-map))))
+
+;; Responses without a body
+
+(defn render-continue
+  "Renders 100 response without a body."
+  ([]           (resp/continue))
+  ([req]        (common/render resp/continue req))
+  ([req & more] (common/render resp/continue req)))
+
+(defn render-switching-protocols
+  "Renders 101 response without a body."
+  ([]           (resp/switching-protocols))
+  ([req]        (common/render resp/switching-protocols req))
+  ([req & more] (common/render resp/switching-protocols req)))
+
+(defn render-processing
+  "Renders 102 response without a body."
+  ([]           (resp/processing))
+  ([req]        (common/render resp/processing req))
+  ([req & more] (common/render resp/processing req)))
+
+(defn render-no-content
+  "Renders 204 response without a body."
+  ([]           (resp/no-content))
+  ([req]        (common/render resp/no-content req))
+  ([req & more] (common/render resp/no-content req)))
+
+(defn render-reset-content
+  "Renders 205 response without a body."
+  ([]           (resp/reset-content))
+  ([req]        (common/render resp/reset-content req))
+  ([req & more] (common/render resp/reset-content req)))
+
+(defn render-not-modified
+  "Renders 206 response without a body."
+  ([]           (resp/not-modified))
+  ([req]        (common/render resp/not-modified req))
+  ([req & more] (common/render resp/not-modified req)))
 
 ;; Linking helpers
 
