@@ -224,14 +224,14 @@
         pths    (lazy-cat [[prep-sl lang-sl dir-sl core dot-html]]
                           [[prep-sl dir-sl core dot-html]]
                           [[prep-sl lang-sl dir-sl default-html]]
-                          [[prep-sl lang-sl dir dot-html]]
+                          (when dir [[prep-sl lang-sl dir dot-html]])
                           [[prep-sl dir-sl default-html]]
-                          [[prep-sl dir dot-html]]
+                          (when dir [[prep-sl dir dot-html]])
                           [[prep-sl lang-sl default-html]]
                           [[prep-sl default-html]])]
     (or (first (keep #(apply common/some-resource %) pths))
         (do (when (nil? uri) (log/wrn "Empty URI while resolving" pre))
-            (log/wrn "Cannot find" pre (when uri (str " for" uri)))
+            (log/wrn "Cannot find" pre (when uri (str "for " uri)))
             (doseq [path pths] (log/wrn (apply str "Tried: [resources]/" path)))))))
 
 (def ^{:arglists '([uri pre dir lang core])}
