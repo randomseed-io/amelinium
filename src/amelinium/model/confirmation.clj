@@ -255,4 +255,4 @@
            {:confirmed? true}
            (when (int? r)
              (let [err (confirmation-report-error db token reason)]
-               {:confirmed? (= err :verify/confirmed) :error err}))))))))
+               {:confirmed? false :error err}))))))))
