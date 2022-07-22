@@ -36,11 +36,11 @@
                 regular-auth? hard-expiry?
                 keywordize-params? kw-form-data])
 
-(defn extract-form-data
+(defn restore-form-data
   "Gets go-to data from for a valid (and not expired) session. Returns form data as a
   map. The resulting map has session-id entry removed (if found)."
   ([req gmap]
-   (extract-form-data req gmap nil))
+   (restore-form-data req gmap nil))
   ([req gmap smap]
    (when (and gmap (= (get req :uri) (get gmap :uri)))
      (when-some [form-data (get gmap :form-data)]
@@ -76,7 +76,7 @@
      (if (web/session-variable-get-failed? gmap)
        (assoc req :goto-injected? true :goto-uri false :goto false)
        (let [req (assoc req :goto-injected? true :goto-uri (get gmap :uri))]
-         (if-some [form-data (extract-form-data req gmap smap)]
+         (if-some [form-data (restore-form-data req gmap smap)]
            (-> req
                (update :form-params #(delay (merge form-data %)))
                (update :params      #(delay (merge (kw-form-data form-data) %))))
@@ -207,7 +207,7 @@
       ;; Request is invalid.
 
       (not (get req :validators/params-valid?))
-      (-> req (web/render-bad-params false "bad-params"))
+      (-> req (assoc :app/view "error/bad-params") (web/render-bad-params false))
 
       ;; There is no session. Short-circuit.
 
