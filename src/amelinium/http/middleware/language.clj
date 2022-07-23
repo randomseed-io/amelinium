@@ -382,6 +382,7 @@
         default-lang-id (get config :default)
         config          (dissoc config :pickers)]
     {:name    k
+     :config  config
      :compile (fn [_ _]
                 (fn [handler]
                   (fn [req]

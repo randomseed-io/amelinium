@@ -164,6 +164,12 @@
  :amelinium.http.middleware.debug/web {:enabled?     false
                                        :request-keys [:accept]}
 
+ :amelinium.web.taggers/web {:enabled?     true
+                             :router       #ref :lawyert.app/http-router-web
+                             :language     #ref :amelinium.http.middleware.language/web
+                             :validators   #ref :amelinium.http.middleware.validators/all
+                             :translations #ref :amelinium.i18n/translations}
+
  :amelinium.http.middleware/web [#ref :amelinium.http.middleware.lazy-req/all
                                  #ref :amelinium.http.middleware.content/web
                                  reitit.ring.middleware.parameters/parameters-middleware

@@ -335,6 +335,7 @@
   (log/msg "Installing validators:" k)
   (let [disabled? (not enabled?)]
     {:name    k
+     :config  config
      :compile (fn [_ _]
                 (fn [handler]
                   (fn [req]
