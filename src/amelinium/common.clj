@@ -1440,14 +1440,14 @@
 (defn localized-path
   "Creates a URL on a basis of route name or a path. Uses very optimistic matching
   algorithm. Tries to obtain language from user settings and client settings if the
-  path does not contain language information. Uses the `:default` language picker."
+  path does not contain language information. Uses the `:default` language picker. "
   ([]
    nil)
   ([req]
    (localized-path req (current-page req)))
   ([req name-or-path]
    (localized-page nil name-or-path
-                   (pick-language-str req :default)
+                   (or (get req :language/id) (pick-language-str req :default))
                    nil nil true true
                    (get req ::r/router)
                    (lang-param req)))
