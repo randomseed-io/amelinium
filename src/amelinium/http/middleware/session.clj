@@ -27,7 +27,7 @@
             [io.randomseed.utils.ip       :as         ip]
             [io.randomseed.utils.db.types :as      types]))
 
-(def ^:const sid-match (re-pattern "|[a-f0-9]{30,128}(-[a-f0-9]{30,128})?"))
+(def ^:const sid-match (re-pattern "|^[a-f0-9]{30,128}(-[a-f0-9]{30,128})?$"))
 
 ;; Secure sessions
 
