@@ -272,12 +272,14 @@
   (if-some [hcode (get data :http/code)]
     (-> data
         (map/assoc-missing :http/code-name
-                           (delay (let [s (i18n/translate req lang hcode)]
-                                    (or (when (not= "---" s) s)))))
+                           (delay (i18n/nil-missing (i18n/translate req lang hcode))))
         (map/assoc-missing :http/code-description
-                           (delay (let [k (keyword (namespace hcode) (str (name hcode) ".full"))
-                                        s (i18n/translate req lang k)]
-                                    (or (when (not= "---" s) s))))))))
+                           (delay (i18n/nil-missing
+                                   (i18n/translate
+                                    req lang
+                                    (keyword (namespace hcode)
+                                             (str (name hcode) ".full")))))))
+    data))
 
 (defn render
   "HTML web page renderer. Takes a request, a data map to be used in templates, a name
