@@ -1,6 +1,6 @@
 {:amelinium.i18n/translations
  {:pl
-  {:tongue/missing-key "---"
+  {:amelinium/missing-key "Brakujący klucz: {1}"
    :http-code          {:100 "Kontynuacja"
                         :101 "Zmiana protokołów"
                         :102 "Przetwarzanie"

@@ -20,6 +20,8 @@
 
 (defonce translations nil)
 
+(def ^:dynamic *handle-missing-keys* true)
+
 ;; Accessors
 
 (defn translator
@@ -121,6 +123,22 @@
 
 ;; Initialization
 
+(defn wrap-translate
+  [f]
+  (fn translate
+    ([locale k]
+     (or (f locale k)
+         (when *handle-missing-keys* (f locale :amelinium/missing-key k))))
+    ([locale k a]
+     (or (f locale k a)
+         (when *handle-missing-keys* (f locale :amelinium/missing-key k))))
+    ([locale k a b]
+     (or (f locale k a b)
+         (when *handle-missing-keys* (f locale :amelinium/missing-key k))))
+    ([locale k a b & more]
+     (or (apply f locale k a b more)
+         (when *handle-missing-keys* (f locale :amelinium/missing-key k))))))
+
 (defn prep-pluralizer
   [config lang translations]
   (when-some [pluralizer-fn (some-> config (get lang) (get :tongue/pluralizer) var/deref-symbol)]
@@ -136,6 +154,10 @@
           5 (fn pluralize [n] (pluralizer-fn n a b c d e))
           (fn pluralize [n] (apply pluralizer-fn n a b c d e more)))))))
 
+(defn- zero-missing-keys
+  [config]
+  (reduce #(update %1 (key %2) assoc :tongue/missing-key nil) config config))
+
 (defn- handle-val
   [config v kpath]
   (if (and (sequential? v) (= (first v) :pluralize))
@@ -144,13 +166,16 @@
 
 (defn prep-translations
   [config]
-  (map/map-values-with-path (partial handle-val config) config))
+  (->> config
+       (map/map-values-with-path (partial handle-val config))
+       zero-missing-keys))
 
 (defn init-translations
   [config]
   (-> config
       prep-translations
-      tongue/build-translate))
+      tongue/build-translate
+      wrap-translate))
 
 (system/add-prep  ::translations [_ config] (prep-translations config))
 (system/add-init  ::translations [k config] (var/make k (init-translations config)))

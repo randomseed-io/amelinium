@@ -1,6 +1,6 @@
 {:amelinium.i18n/translations
  {:en
-  {:tongue/missing-key "---"
+  {:amelinium/missing-key "Missing key: {1}"
    :http-code          {:100 "Continue"
                         :101 "Switching Protocols"
                         :102 "Processing"
