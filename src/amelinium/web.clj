@@ -212,8 +212,9 @@
 (defn get-view-dir
   "Gets view optional subdirectory for the current route using :app/layout-dir route
   data. If it cannot be extracted, returns `nil`."
-  [req]
-  (some-str (http/req-or-route-param req :app/view-dir)))
+  [req view-dir]
+  (some-str
+   (or view-dir (http/req-or-route-param req :app/view-dir))))
 
 (defn get-layout-dir
   "Gets layout optional subdirectory for the current route using :app/layout-dir route
@@ -259,11 +260,12 @@
 
 (defn resolve-view
   [req lang view]
-  (resolve-cached (get req :uri)
-                  views-str
-                  (get-view-dir req)
-                  lang
-                  (or view (get-view req))))
+  (let [[vdir view] (if (coll? view) view [nil view])]
+    (resolve-cached (get req :uri)
+                    views-str
+                    (get-view-dir req vdir)
+                    lang
+                    (or view (get-view req)))))
 
 ;; Response rendering
 
