@@ -121,6 +121,11 @@
   ([req key-ns key-name x & more]
    (apply (translator req) (keyword (lang req)) (keyword (idname key-ns) (idname key-name)) x more)))
 
+(defmacro nil-missing
+  [& body]
+  `(binding [*handle-missing-keys* false]
+     ~@body))
+
 ;; Initialization
 
 (defn wrap-translate
