@@ -200,6 +200,19 @@
                            token]
                        db/opts-simple-map))))
 
+(defn code-to-token
+  "Returns a confirmation token associated with the given confirmation code and
+  identity."
+  [db id code]
+  (when-some [r (first
+                 (sql/find-by-keys db :confirmations
+                                   {:id id :code code}
+                                   (assoc db/opts-simple-map
+                                          :columns [:token :confirmed])))]
+    (-> r
+        (assoc  :confirmed? (pos-int? (get r :confirmed)))
+        (dissoc :confirmed))))
+
 (def confirm-token-query
   (str-spc
    "UPDATE confirmations"
@@ -236,11 +249,12 @@
        (when-some [r (::jdbc/update-count
                       (jdbc/execute-one! db [confirm-code-query exp-inc id code reason]
                                          db/opts-simple-map))]
-         (if (pos-int? r)
-           {:confirmed? true}
-           (when (int? r)
-             (let [err (confirmation-report-error db id code reason)]
-               {:confirmed? (= err :verify/confirmed) :error err})))))))
+         (when (int? r)
+           (let [r     (when (pos-int? r) (code-to-token db id code))
+                 token (when r (get r :token))]
+             (or (when (and r (get r :confirmed?)) r)
+                 (let [err (confirmation-report-error db id code reason)]
+                   {:confirmed? (= err :verify/confirmed) :error err}))))))))
   ([db id code token exp-inc reason]
    (if-some [token (some-str token)]
      (establish db token exp-inc reason)
@@ -251,8 +265,10 @@
        (when-some [r (::jdbc/update-count
                       (jdbc/execute-one! db [confirm-token-query exp-inc token reason]
                                          db/opts-simple-map))]
-         (if (pos-int? r)
-           {:confirmed? true}
-           (when (int? r)
+         (when (int? r)
+           (if (pos-int? r)
+             {:confirmed? true :token token}
              (let [err (confirmation-report-error db token reason)]
-               {:confirmed? false :error err}))))))))
+               {:confirmed? (= err :verify/confirmed)
+                :token      token
+                :error      err}))))))))
