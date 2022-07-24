@@ -17,6 +17,7 @@
             [ring.util.http-response              :as         resp]
             [ring.util.request                    :as          req]
             [selmer.parser                        :as       selmer]
+            [amelinium.i18n                       :as         i18n]
             [amelinium.common                     :as       common]
             [amelinium.http                       :as         http]
             [amelinium.http.middleware.language   :as     language]
@@ -266,6 +267,18 @@
 
 ;; Response rendering
 
+(defn- update-http-code-name
+  [req lang data]
+  (if-some [hcode (get data :http/code)]
+    (-> data
+        (map/assoc-missing :http/code-name
+                           (delay (let [s (i18n/translate req lang hcode)]
+                                    (or (when (not= "---" s) s)))))
+        (map/assoc-missing :http/code-description
+                           (delay (let [k (keyword (namespace hcode) (str (name hcode) ".full"))
+                                        s (i18n/translate req lang k)]
+                                    (or (when (not= "---" s) s))))))))
+
 (defn render
   "HTML web page renderer. Takes a request, a data map to be used in templates, a name
   of the view file (defaults to `:app/view` from the `req`), a name of the template
@@ -298,6 +311,7 @@
                                      :url  (delay (req/request-url req))
                                      :path (delay (common/page req))
                                      :lang dlng)
+             data (update-http-code-name req dlng data)
              html (selmer/render-file view data)
              rndr (assoc data :body [:safe html])
              resp (selmer/render-file layt rndr)]
@@ -495,47 +509,58 @@
 
 ;; Resource creation success, redirect with a possible body
 
+(def http-code-201 (keyword "http-code" (str 201)))
+
 (defn render-created
   "Renders 201 response with a redirect (possibly localized if a destination path is
   language-parameterized) and a possible body."
   ([]
    (common/render resp/created))
   ([req]
-   (common/render resp/created req
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/page req)
                   (render req nil nil nil nil nil)))
   ([req name-or-path]
-   (common/render resp/created req
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/page req name-or-path)
                   (render req nil nil nil nil nil)))
   ([req name-or-path lang]
-   (common/render resp/created req
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/page req name-or-path lang)
                   (render req nil nil nil lang nil)))
   ([req name-or-path lang params]
-   (common/render resp/created req
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/page req name-or-path lang params)
                   (render req nil nil nil lang nil)))
   ([req name-or-path lang params query-params]
-   (common/render resp/created req
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/page req name-or-path lang params query-params)
                   (render req nil nil nil lang nil)))
   ([req name-or-path lang params query-params data]
-   (common/render resp/created req
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/page req name-or-path lang params query-params)
                   (render req data nil nil lang nil)))
-  ([req name-or-path lang params query-params data views-subdir]
-   (common/render resp/created req
+  ([req name-or-path lang params query-params data view]
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/page req name-or-path lang params query-params)
-                  (render req data views-subdir nil lang nil)))
-  ([req name-or-path lang params query-params data views-subdir layouts-subdir]
-   (common/render resp/created req
+                  (render req data view nil lang nil)))
+  ([req name-or-path lang params query-params data view layout]
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/page req name-or-path lang params query-params)
-                  (render req data views-subdir layouts-subdir lang nil)))
-  ([req name-or-path lang params query-params data views-subdir layouts-subdir session-map]
-   (common/render resp/created req
+                  (render req data view layout lang nil)))
+  ([req name-or-path lang params query-params data view layout session-map]
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/page req name-or-path lang params query-params)
-                  (render req data views-subdir layouts-subdir lang session-map))))
+                  (render req data view layout lang session-map))))
 
 (defn localized-render-created
   "Renders 201 response with a redirect (possibly localized if a destination path is
@@ -544,79 +569,113 @@
   ([]
    (common/render resp/created))
   ([req]
-   (common/render resp/created req
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/localized-page req)
                   (render req nil nil nil nil nil)))
   ([req name-or-path]
-   (common/render resp/created req
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/localized-page req name-or-path)
                   (render req nil nil nil nil nil)))
   ([req name-or-path lang]
-   (common/render resp/created req
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/localized-page req name-or-path lang)
                   (render req nil nil nil lang nil)))
   ([req name-or-path lang params]
-   (common/render resp/created req
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/localized-page req name-or-path lang params)
                   (render req nil nil nil lang nil)))
   ([req name-or-path lang params query-params]
-   (common/render resp/created req
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/localized-page req name-or-path lang params query-params)
                   (render req nil nil nil lang nil)))
   ([req name-or-path lang params query-params data]
-   (common/render resp/created req
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/localized-page req name-or-path lang params query-params)
                   (render req data nil nil lang nil)))
-  ([req name-or-path lang params query-params data views-subdir]
-   (common/render resp/created req
+  ([req name-or-path lang params query-params data view]
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/localized-page req name-or-path lang params query-params)
-                  (render req data views-subdir nil lang nil)))
-  ([req name-or-path lang params query-params data views-subdir layouts-subdir]
-   (common/render resp/created req
+                  (render req data view nil lang nil)))
+  ([req name-or-path lang params query-params data view layout]
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/localized-page req name-or-path lang params query-params)
-                  (render req data views-subdir layouts-subdir lang nil)))
-  ([req name-or-path lang params query-params data views-subdir layouts-subdir session-map]
-   (common/render resp/created req
+                  (render req data view layout lang nil)))
+  ([req name-or-path lang params query-params data view layout session-map]
+   (common/render resp/created
+                  (update req :app/data assoc :http/code http-code-201)
                   (common/localized-page req name-or-path lang params query-params)
-                  (render req data views-subdir layouts-subdir lang session-map))))
+                  (render req data view layout lang session-map))))
 
 ;; Responses without a body
 
+(def http-code-100 (keyword "http-code" (str 100)))
+(def http-code-101 (keyword "http-code" (str 101)))
+(def http-code-102 (keyword "http-code" (str 102)))
+(def http-code-204 (keyword "http-code" (str 204)))
+(def http-code-205 (keyword "http-code" (str 205)))
+
 (defn render-continue
   "Renders 100 response without a body."
-  ([]           (resp/continue))
-  ([req]        (common/render resp/continue req))
-  ([req & more] (common/render resp/continue req)))
+  ([]
+   (resp/continue))
+  ([req]
+   (common/render resp/continue
+                  (update req :app/data assoc :http/code http-code-100)))
+  ([req & more]
+   (common/render resp/continue
+                  (update req :app/data assoc :http/code http-code-100))))
 
 (defn render-switching-protocols
   "Renders 101 response without a body."
-  ([]           (resp/switching-protocols))
-  ([req]        (common/render resp/switching-protocols req))
-  ([req & more] (common/render resp/switching-protocols req)))
+  ([]
+   (resp/switching-protocols))
+  ([req]
+   (common/render resp/switching-protocols
+                  (update req :app/data assoc :http/code http-code-101)))
+  ([req & more]
+   (common/render resp/switching-protocols
+                  (update req :app/data assoc :http/code http-code-101))))
 
 (defn render-processing
   "Renders 102 response without a body."
-  ([]           (resp/processing))
-  ([req]        (common/render resp/processing req))
-  ([req & more] (common/render resp/processing req)))
+  ([]
+   (resp/processing))
+  ([req]
+   (common/render resp/processing
+                  (update req :app/data assoc :http/code http-code-102)))
+  ([req & more]
+   (common/render resp/processing
+                  (update req :app/data assoc :http/code http-code-102))))
 
 (defn render-no-content
   "Renders 204 response without a body."
-  ([]           (resp/no-content))
-  ([req]        (common/render resp/no-content req))
-  ([req & more] (common/render resp/no-content req)))
+  ([]
+   (resp/no-content))
+  ([req]
+   (common/render resp/no-content
+                  (update req :app/data assoc :http/code http-code-204)))
+  ([req & more]
+   (common/render resp/no-content
+                  (update req :app/data assoc :http/code http-code-204))))
 
 (defn render-reset-content
   "Renders 205 response without a body."
-  ([]           (resp/reset-content))
-  ([req]        (common/render resp/reset-content req))
-  ([req & more] (common/render resp/reset-content req)))
-
-(defn render-not-modified
-  "Renders 206 response without a body."
-  ([]           (resp/not-modified))
-  ([req]        (common/render resp/not-modified req))
-  ([req & more] (common/render resp/not-modified req)))
+  ([]
+   (resp/reset-content))
+  ([req]
+   (common/render resp/reset-content
+                  (update req :app/data assoc :http/code http-code-205)))
+  ([req & more]
+   (common/render resp/reset-content
+                  (update req :app/data assoc :http/code http-code-205))))
 
 ;; Linking helpers
 
