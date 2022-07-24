@@ -207,7 +207,7 @@
       ;; Request is invalid.
 
       (not (get req :validators/params-valid?))
-      (-> req (assoc :app/view "error/bad-params") (web/render-bad-params false))
+      (-> req (web/render-bad-params nil "error/bad-params" "error"))
 
       ;; There is no session. Short-circuit.
 

@@ -208,6 +208,18 @@
   (or (some-str (http/req-or-route-param req :app/layout))
       "default"))
 
+(defn get-view-dir
+  "Gets view optional subdirectory for the current route using :app/layout-dir route
+  data. If it cannot be extracted, returns `nil`."
+  [req]
+  (some-str (http/req-or-route-param req :app/view-dir)))
+
+(defn get-layout-dir
+  "Gets layout optional subdirectory for the current route using :app/layout-dir route
+  data. If it cannot be extracted, returns `nil`."
+  [req]
+  (some-str (http/req-or-route-param req :app/layout-dir)))
+
 (def ^:const views-str           "views")
 (def ^:const layouts-str       "layouts")
 (def ^:const dot-html            ".html")
@@ -237,43 +249,55 @@
   (mem/fifo resolve-generic :fifo/threshold 2048))
 
 (defn resolve-layout
-  [req lang dir]
-  (resolve-cached (get req :uri) layouts-str dir lang (get-layout req)))
+  [req lang layout]
+  (resolve-cached (get req :uri)
+                  layouts-str
+                  (get-layout-dir req)
+                  lang
+                  (or layout (get-layout req))))
 
 (defn resolve-view
-  [req lang dir]
-  (resolve-cached (get req :uri) views-str dir lang (get-view req)))
+  [req lang view]
+  (resolve-cached (get req :uri)
+                  views-str
+                  (get-view-dir req)
+                  lang
+                  (or view (get-view req))))
 
 ;; Response rendering
 
 (defn render
-  "HTML web page renderer. Takes a request, a data map to be used in templates, a
-  subdirectory for the view file (defaults to `nil`), a subdirectory for the template
-  file (defaults to `nil`), a language string (guessed if not given, unless
-  explicitly set to `false`) and a session map (used only when the language cannot be
-  established otherwise and taken from the request if not given). Template filename
-  and view filename are taken from the request map (under the keys `:app/template`
-  and `:app/view`)."
+  "HTML web page renderer. Takes a request, a data map to be used in templates, a name
+  of the view file (defaults to `:app/view` from the `req`), a name of the template
+  file (defaults to `:app/layout` from the `req`), a language string (guessed if not
+  given, unless explicitly set to `false`) and a session map (used only when the
+  language cannot be established otherwise and taken from the request if not
+  given). Uses values associated with the `:layout/dir` and `:view/dir` keys of the
+  `req` to obtain optional subdirectories to be looked up when searching for views
+  and layouts."
   ([]
    (render nil nil nil nil nil nil))
   ([req]
    (render req nil nil nil nil nil))
   ([req data]
    (render req data nil nil nil nil))
-  ([req data views-subdir]
-   (render req data views-subdir nil nil nil))
-  ([req data views-subdir layouts-subdir]
-   (render req data views-subdir layouts-subdir nil nil))
-  ([req data views-subdir layouts-subdir lang]
-   (render req data views-subdir layouts-subdir lang nil))
-  ([req data views-subdir layouts-subdir lang sess]
+  ([req data view]
+   (render req data view nil nil nil))
+  ([req data view layout]
+   (render req data view layout nil nil))
+  ([req data view layout lang]
+   (render req data view layout lang nil))
+  ([req data view layout lang sess]
    (let [lang (or lang (when-not (false? lang) (pick-language-str req)))
-         layt (resolve-layout req lang layouts-subdir)
-         view (resolve-view   req lang views-subdir)]
+         layt (resolve-layout req lang layout)
+         view (resolve-view   req lang view)]
      (when (and layt view)
        (let [dlng (or lang (get req :language/str))
              data (prep-app-data req data)
-             data (map/assoc-missing data :url (delay (req/request-url req)) :lang dlng)
+             data (map/assoc-missing data
+                                     :url  (delay (req/request-url req))
+                                     :path (delay (common/page req))
+                                     :lang dlng)
              html (selmer/render-file view data)
              rndr (assoc data :body [:safe html])
              resp (selmer/render-file layt rndr)]
@@ -286,9 +310,10 @@
 
 (defn render-response
   "Web response renderer. Uses the `render` function to render a response body (using
-  values associated with the `:app/data`, `:app/view` and `:app/layout` in the `req`
-  map, or provided as arguments) and response headers (using the `:response/headers`
-  value), unless the `req` is already a valid response."
+  values associated with the `:app/data`, `:app/view`, `:app/layout`, `:app/view-dir`
+  and `:app/layout-dir` in the `req` map, or provided as arguments) and response
+  headers (using the `:response/headers` value), unless the `req` is already a valid
+  response."
   ([]
    (render-response resp/ok nil nil nil nil nil nil))
   ([resp-fn]
@@ -297,18 +322,18 @@
    (render-response resp-fn req nil nil nil nil nil))
   ([resp-fn req data]
    (render-response resp-fn req data nil nil nil nil))
-  ([resp-fn req data views-subdir]
-   (render-response resp-fn req data views-subdir nil nil nil))
-  ([resp-fn req data views-subdir layouts-subdir]
-   (render-response resp-fn req data views-subdir layouts-subdir nil nil))
-  ([resp-fn req data views-subdir layouts-subdir lang]
-   (render-response resp-fn req data views-subdir layouts-subdir lang nil))
-  ([resp-fn req data views-subdir layouts-subdir lang sess]
+  ([resp-fn req data view]
+   (render-response resp-fn req data view nil nil nil))
+  ([resp-fn req data view layout]
+   (render-response resp-fn req data view layout nil nil))
+  ([resp-fn req data view layout lang]
+   (render-response resp-fn req data view layout lang nil))
+  ([resp-fn req data view layout lang sess]
    (if (resp/response? req)
      req
      (if-some [headers (get req :response/headers)]
-       (-> (render req data views-subdir layouts-subdir lang sess) resp-fn (update :headers conj headers))
-       (resp-fn (render req data views-subdir layouts-subdir lang sess))))))
+       (-> (render req data view layout lang sess) resp-fn (update :headers conj headers))
+       (resp-fn (render req data view layout lang sess))))))
 
 (defn render-response-force
   "Web response renderer. Uses the `render` function to render a response body
@@ -324,50 +349,85 @@
    (render-response resp-fn req nil nil nil nil nil))
   ([resp-fn req data]
    (render-response resp-fn req data nil nil nil nil))
-  ([resp-fn req data views-subdir]
-   (render-response resp-fn req data views-subdir nil nil nil))
-  ([resp-fn req data views-subdir layouts-subdir]
-   (render-response resp-fn req data views-subdir layouts-subdir nil nil))
-  ([resp-fn req data views-subdir layouts-subdir lang]
-   (render-response resp-fn req data views-subdir layouts-subdir lang nil))
-  ([resp-fn req data views-subdir layouts-subdir lang sess]
+  ([resp-fn req data view]
+   (render-response resp-fn req data view nil nil nil))
+  ([resp-fn req data view layout]
+   (render-response resp-fn req data view layout nil nil))
+  ([resp-fn req data view layout lang]
+   (render-response resp-fn req data view layout lang nil))
+  ([resp-fn req data view layout lang sess]
    (if-some [headers (get req :response/headers)]
-     (-> (render req data views-subdir layouts-subdir lang sess) resp-fn (update :headers conj headers))
-     (-> (render req data views-subdir layouts-subdir lang sess) resp-fn))))
+     (-> (render req data view layout lang sess) resp-fn (update :headers conj headers))
+     (-> (render req data view layout lang sess) resp-fn))))
 
 ;; Rendering functions generation
 
 (defmacro def-render
-  "Generates a rendering function."
+  "Generates a web rendering function."
   {:arglists '([name f]
-               [name f http-code]
-               [name doc f])}
+               [name f code]
+               [name doc f]
+               [name doc f code])}
   ([name f]
-   (#'def-render &form &env name f nil nil))
-  ([name f code _]
-   (#'def-render &form &env name
-                 (str "Renders a " (when code (str code " ")) "response with a possible body generated with views, layouts and data
-  obtained from a request map (`:app/layout`, `:app/view`, `:app/data` keys).
-  Uses `" f "` to set the response code.") f))
-  ([name doc-or-f f-or-code]
-   (if (pos-int? f-or-code)
-     (#'def-render &form &env name doc-or-f f-or-code nil)
-     `(let [f# ~f-or-code]
-        (defn ~name ~doc-or-f
+   (#'def-render &form &env name f nil))
+  ([name f-or-doc code-or-f]
+   (let [[f doc code] (if (string? f-or-doc)
+                        [code-or-f f-or-doc nil]
+                        [f-or-doc nil code-or-f])]
+     (if doc
+       (#'def-render &form &env name doc f code)
+       (#'def-render
+        &form &env name
+        (str "Renders a " (when code (str code " "))
+             "response with a possible body generated with views, layouts and data \n"
+             "obtained from a request map (`:app/layout`, `:app/view`, `:app/data` keys).\n"
+             "Uses `" f-or-doc "` to set the response code."
+             (when (and code (not= code 200))
+               (str " Additionaly, sets `:http/code` key\n"
+                    "to `:http-code/" code "` within a map under "
+                    "the `:app/data` of the `req`.")))
+        f (when (not= 200 code) code)))))
+  ([name doc f code]
+   `(let [f# ~f
+          c# ~code
+          c# (when c# (keyword "http-code" (str c#)))]
+      (if c#
+        (defn ~name ~doc
+          ([]
+           (render-response f# nil nil nil nil nil nil))
+          (~'[req]
+           (render-response f# (update ~'req :app/data assoc :http/code c#)
+                            nil nil nil nil nil))
+          (~'[req data]
+           (render-response f# (update ~'req :app/data assoc :http/code c#)
+                            ~'data nil nil nil nil))
+          (~'[req data view]
+           (render-response f# (update ~'req :app/data assoc :http/code c#)
+                            ~'data ~'view nil nil nil))
+          (~'[req data view layout]
+           (render-response f# (update ~'req :app/data assoc :http/code c#)
+                            ~'data ~'view ~'layout nil nil))
+          (~'[req data view layout lang]
+           (render-response f# (update ~'req :app/data assoc :http/code c#)
+                            ~'data ~'view ~'layout ~'lang nil))
+          (~'[req data view layout lang session-map]
+           (render-response f# (update ~'req :app/data assoc :http/code c#)
+                            ~'data ~'view ~'layout ~'lang ~'session-map)))
+        (defn ~name ~doc
           ([]
            (render-response f# nil nil nil nil nil nil))
           (~'[req]
            (render-response f# ~'req nil nil nil nil nil))
           (~'[req data]
            (render-response f# ~'req ~'data nil nil nil nil))
-          (~'[req data views-subdir]
-           (render-response f# ~'req ~'data ~'views-subdir nil nil nil))
-          (~'[req data views-subdir layouts-subdir]
-           (render-response f# ~'req ~'data ~'views-subdir ~'layouts-subdir nil nil))
-          (~'[req data views-subdir layouts-subdir lang]
-           (render-response f# ~'req ~'data ~'views-subdir ~'layouts-subdir ~'lang nil))
-          (~'[req data views-subdir layouts-subdir lang session-map]
-           (render-response f# ~'req ~'data ~'views-subdir ~'layouts-subdir ~'lang ~'session-map)))))))
+          (~'[req data view]
+           (render-response f# ~'req ~'data ~'view nil nil nil))
+          (~'[req data view layout]
+           (render-response f# ~'req ~'data ~'view ~'layout nil nil))
+          (~'[req data view layout lang]
+           (render-response f# ~'req ~'data ~'view ~'layout ~'lang nil))
+          (~'[req data view layout lang session-map]
+           (render-response f# ~'req ~'data ~'view ~'layout ~'lang ~'session-map)))))))
 
 ;; OK response
 
