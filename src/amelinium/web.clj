@@ -219,8 +219,9 @@
 (defn get-layout-dir
   "Gets layout optional subdirectory for the current route using :app/layout-dir route
   data. If it cannot be extracted, returns `nil`."
-  [req]
-  (some-str (http/req-or-route-param req :app/layout-dir)))
+  [req layout-dir]
+  (some-str
+   (or layout-dir (http/req-or-route-param req :app/layout-dir))))
 
 (def ^:const views-str           "views")
 (def ^:const layouts-str       "layouts")
@@ -252,11 +253,12 @@
 
 (defn resolve-layout
   [req lang layout]
-  (resolve-cached (get req :uri)
-                  layouts-str
-                  (get-layout-dir req)
-                  lang
-                  (or layout (get-layout req))))
+  (let [[ldir layout] (if (coll? layout) layout [nil layout])]
+    (resolve-cached (get req :uri)
+                    layouts-str
+                    (get-layout-dir req ldir)
+                    lang
+                    (or layout (get-layout req)))))
 
 (defn resolve-view
   [req lang view]
