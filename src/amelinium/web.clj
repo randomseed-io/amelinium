@@ -223,10 +223,11 @@
   (some-str
    (or layout-dir (http/req-or-route-param req :app/layout-dir))))
 
-(def ^:const views-str           "views")
-(def ^:const layouts-str       "layouts")
-(def ^:const dot-html            ".html")
-(def ^:const default-html "default.html")
+(def ^:const views-str               "views")
+(def ^:const layouts-str           "layouts")
+(def ^:const dot-html                ".html")
+(def ^:const default-html     "default.html")
+(def ^:const sl-default-html "/default.html")
 
 (defn resolve-generic
   [uri pre dir lang core]
@@ -235,6 +236,7 @@
         dir-sl  (when dir  (str dir  "/"))
         lang-sl (when lang (str lang "/"))
         pths    (lazy-cat [[prep-sl lang-sl dir-sl core dot-html]]
+                          [[prep-sl lang-sl dir-sl core sl-default-html]]
                           [[prep-sl dir-sl core dot-html]]
                           [[prep-sl lang-sl dir-sl default-html]]
                           (when dir [[prep-sl lang-sl dir dot-html]])
