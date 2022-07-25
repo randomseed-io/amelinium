@@ -150,8 +150,22 @@
                                          :charset  :utf-8
                                          :encoding ["deflate" "gzip" "identity"]}
 
- :amelinium.http.middleware.validators/all {:enabled? true
-                                            :explain? true}
+ :amelinium.http.middleware.validators/all {:enabled?        true
+                                            :check-required? true
+                                            :explain?        true
+                                            :default-pass?   false
+                                            :required        []
+                                            :required/blank  []
+                                            :required/some   []
+                                            :validators      {:url         io.randomseed.utils.validators.common/valid-url?
+                                                              :login       io.randomseed.utils.validators.common/valid-email?
+                                                              :phone       io.randomseed.utils.validators.common/valid-phone?
+                                                              :password    #re "|.{5,128}"
+                                                              :session-id  amelinium.http.middleware.session/sid-match
+                                                              :lang        amelinium.http.middleware.language/re-lang
+                                                              :first-name  #re "^[\\p{L} ,.'-]+$"
+                                                              :last-name   #re "^[\\p{L} ,.'-]+$"
+                                                              :middle-name #re "|^[\\p{L} ,.'-]+$"}}
 
  :amelinium.http.middleware.populators/web [[:route/data    amelinium.common.controller/route-data+]
                                             [:auth/db       amelinium.common.controller/auth-db+]
