@@ -150,7 +150,8 @@
                                          :charset  :utf-8
                                          :encoding ["deflate" "gzip" "identity"]}
 
- :amelinium.http.middleware.validators/web {}
+ :amelinium.http.middleware.validators/all {:enabled? true
+                                            :explain? true}
 
  :amelinium.http.middleware.populators/web [[:route/data    amelinium.common.controller/route-data+]
                                             [:auth/db       amelinium.common.controller/auth-db+]
@@ -176,7 +177,7 @@
                                  #ref :amelinium.http.middleware.remote-ip/all
                                  #ref :amelinium.http.middleware.session/web
                                  #ref :amelinium.http.middleware.roles/web
-                                 #ref :amelinium.http.middleware.validators/web
+                                 #ref :amelinium.http.middleware.validators/all
                                  #ref :amelinium.http.middleware.populators/web
                                  #ref :amelinium.http.middleware.language/web
                                  #ref :amelinium.http.middleware.headers/web

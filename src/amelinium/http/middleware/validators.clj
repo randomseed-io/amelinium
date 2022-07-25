@@ -32,6 +32,11 @@
 
 (def ^:const default-check-required? false)
 
+;; Explanation messages
+
+(def ^:const default-explain? true)
+(def ^:const default-explain-key :validators/reasons)
+
 ;; Validation map.
 
 (def ^:const default-validators
@@ -208,24 +213,29 @@
     required-blank  :required/blank
     result-key      :result-key
     config-key      :config-key
+    explain-key     :explain-key
     required        :required
     validators      :validators
     enabled?        :enabled?
     check-required? :check-required?
     default-pass?   :default-pass?
+    explain?        :explain?
     :or             {enabled?        true
                      required        default-required
                      required-some   default-required-some
                      required-blank  default-required-blank
                      check-required? default-check-required?
                      default-pass?   default-default-pass?
+                     explain?        default-explain?
                      validators      default-validators
                      result-key      default-result-key
-                     config-key      default-config-key}
+                     config-key      default-config-key
+                     explain-key     default-explain-key}
     :as             config}]
   (let [cr?                 (boolean check-required?)
         default-pass?       (boolean default-pass?)
         enabled?            (boolean enabled?)
+        explain?            (boolean explain?)
         validators          (->> validators (map/map-keys some-str) (map/map-vals var/deref-symbol))
         validators          (apply dissoc validators bad-keys)
         validators          (when (seq validators) validators)
@@ -269,9 +279,11 @@
     (assoc config
            :result-key       (keyword result-key)   ;; results identifier
            :config-key       (keyword config-key)   ;; configuration identifier
+           :explain-key      (keyword explain-key)  ;; explanation message
            :check-required?  cr?                    ;; check for required params
            :enabled?         enabled?               ;; validation enabled
            :default-pass?    default-pass?          ;; default strategy for unknown params
+           :explain?         explain?               ;; explanatory messages enabler
            :required/some    (vec required-some)    ;; required params with non-blank content
            :required/blank   (vec required-blank)   ;; required params with blank content
            :required/any     (vec required-any)     ;; required params with any content
@@ -326,9 +338,11 @@
   logic behind preparing the configuration."
   [k {config-key      :config-key
       result-key      :result-key
+      explain-key     :explain-key
       enabled?        :enabled?
       check-required? :check-required?
       default-pass?   :default-pass?
+      explain?        :explain?
       required-all    :required/all
       validators-all  :validators/all
       :as             config}]
@@ -337,18 +351,32 @@
     {:name    k
      :config  config
      :compile (fn [_ _]
-                (fn [handler]
-                  (fn [req]
-                    (handler
-                     (assoc req
-                            config-key config
-                            result-key
-                            (or (get req :validators/disabled? disabled?)
-                                (v/validate (get req :form-params)
-                                            validators-all
-                                            default-pass?
-                                            (when (get req :validators/check-required? check-required?)
-                                              required-all))))))))}))
+                (if explain?
+                  (fn [handler]
+                    (fn [req]
+                      (handler
+                       (if (get req :validators/disabled?)
+                         (assoc req config-key config result-key true)
+                         (let [reasons (v/explain (get req :form-params)
+                                                  validators-all
+                                                  default-pass?
+                                                  (when (get req :validators/check-required?)
+                                                    required-all))]
+                           (assoc req
+                                  config-key config
+                                  result-key (nil? (first reasons))
+                                  explain-key reasons))))))
+                  (fn [handler]
+                    (fn [req]
+                      (handler
+                       (let [result (or (get req :validators/disabled?)
+                                        (v/validate (get req :form-params)
+                                                    validators-all
+                                                    default-pass?
+                                                    (when (get req :validators/check-required?)
+                                                      required-all)
+                                                    false))]
+                         (assoc req config-key config result-key result)))))))}))
 
 (system/add-prep  ::default [_ config] (prep-validators config))
 (system/add-init  ::default [k config] (wrap-validators k (if (:required/cat config)
