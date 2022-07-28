@@ -47,13 +47,13 @@
 
 (defn deleter
   [delete-list]
-  (when (seq delete-list)
+  (if (seq delete-list)
     (fn [headers]
       (apply dissoc headers delete-list))))
 
 (defn adder
   [entries entries-map replace?]
-  (when (seq entries)
+  (if (seq entries)
     (if replace?
       (fn [headers]
         (if headers
@@ -83,9 +83,9 @@
       {:fn/transformer   (make-transformer add-fn del-fn)
        :fn/adder         (or add-fn identity)
        :fn/deleter       (or del-fn identity)
-       :headers/add      (when to-add (vec to-add))
-       :headers/del      (when to-del (vec to-del))
-       :headers/map      (when (seq to-map) to-map)
+       :headers/add      (if to-add (vec to-add))
+       :headers/del      (if to-del (vec to-del))
+       :headers/map      (if (seq to-map) to-map)
        :headers/replace? replace?})))
 
 (defn wrap-headers

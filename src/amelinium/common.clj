@@ -42,15 +42,14 @@
   "Gets authentication configuration for the given account type or a default one if the
   account type was not given or is `nil`."
   ([req-or-match auth-type]
-   (when-some [types-map (or (when-not (instance? Match req-or-match)
-                               (get req-or-match :auth/types))
-                             (get (http/get-route-data req-or-match :auth/config) :types)
-                             (when-not (instance? Match req-or-match)
-                               (get (get req-or-match :auth/config) :types)))]
+   (if-some [types-map (or (if-not (instance? Match req-or-match) (get req-or-match :auth/types))
+                           (get (http/get-route-data req-or-match :auth/config) :types)
+                           (if-not (instance? Match req-or-match)
+                           (get (get req-or-match :auth/config) :types)))]
      (get types-map (some-keyword auth-type))))
   ([req-or-match]
    (get (or (http/get-route-data req-or-match :auth/config)
-            (when-not (instance? Match req-or-match) (get req-or-match :auth/config)))
+            (if-not (instance? Match req-or-match) (get req-or-match :auth/config)))
         :default)))
 
 (defn auth-db
@@ -60,7 +59,7 @@
   ([req-or-match auth-type]
    (get (auth-config req-or-match (some-keyword auth-type)) :db))
   ([req-or-match]
-   (or (when-not (instance? Match req-or-match) (get req-or-match :auth/db))
+   (or (if-not (instance? Match req-or-match) (get req-or-match :auth/db))
        (get (auth-config req-or-match) :db))))
 
 ;; Operations logging
@@ -70,8 +69,7 @@
   object."
   [req-or-match]
   (or (http/get-route-data req-or-match :oplog/config)
-      (when-not (instance? Match req-or-match)
-        (get req-or-match :oplog/config))
+      (if-not (instance? Match req-or-match) (get req-or-match :oplog/config))
       oplog-auth/log))
 
 (defn oplog-logger
@@ -84,8 +82,7 @@
   configuration map containing the `:fn/reporter` key."
   ([req-or-match]
    (if-some [lgr (or (get (http/get-route-data req-or-match :oplog/config) :fn/reporter)
-                     (when-not (instance? Match req-or-match)
-                       (get (get req-or-match :oplog/config) :fn/reporter))
+                     (if-not (instance? Match req-or-match) (get (get req-or-match :oplog/config) :fn/reporter))
                      oplog-auth/log)]
      (fn [& {:as message}] (lgr message))
      (constantly nil))))
@@ -103,8 +100,7 @@
   `Match` object containing configuration associated with the current route data
   under the `:oplog/config` key."
   [req-or-match & message]
-  (when-some [lgr (oplog-logger-populated req-or-match)]
-    (lgr message)))
+  (if-some [lgr (oplog-logger-populated req-or-match)] (lgr message)))
 
 ;; Routing data and settings helpers
 
@@ -208,8 +204,8 @@
   "Generates a list of all possible language variants of a path."
   {:no-doc true}
   ([path lang-id]
-   (when-some [path (some-str path)]
-     (when-some [lang (some-str lang-id)]
+   (if-some [path (some-str path)]
+     (if-some [lang (some-str lang-id)]
        (let [[p s] (re-seq split-qparams path)]
          (path-variants-core p lang s)))))
   ([path lang suffix]
@@ -283,13 +279,13 @@
   "Splits path into 2 components: path string and location / query params
   string. Returns a sequence."
   [path]
-  (when path (re-seq split-qparams path)))
+  (if path (re-seq split-qparams path)))
 
 (defn split-query-params
   "Splits path into 3 string components: path, location and query params. Returns a
   vector."
   [path]
-  (when path
+  (if path
     (if-some [segs (first (re-seq path-splitter path))]
       (if (and (= 4 (count segs)) (some? (nth segs 1)))
         (subvec segs 1)
@@ -305,15 +301,15 @@
    (if (map? match-or-path)
      (let [path                    (some-> match-or-path (r/match->path query-params))
            [path location qparams] (split-query-params path)]
-       (when (some->> path
-                      (r/match-by-path router)
-                      :path-params param #{pvalue})
+       (if (some->> path
+                    (r/match-by-path router)
+                    :path-params param #{pvalue})
          (str path location qparams)))
-     (when match-or-path
+     (if match-or-path
        (let [[path location qparams] (split-query-params match-or-path)
-             qparams                 (when-not (not-empty query-params) qparams)
+             qparams                 (if-not (not-empty query-params) qparams)
              m                       (r/match-by-path router path)]
-         (when (some-> m :path-params param #{pvalue})
+         (if (some-> m :path-params param #{pvalue})
            (some-> (r/match->path m query-params)
                    (str location qparams))))))))
 
@@ -321,22 +317,21 @@
   "Checks if the given route match can be parameterized with a parameter of the given
   id."
   [match param]
-  (when-some [param (some-keyword-simple param)]
+  (if-some [param (some-keyword-simple param)]
     (or (contains? (get match :required) param)
-        (when-some [t (get match :template)]
-          (some? (some #{(str param)} (re-seq slash-break t)))))))
+        (if-some [t (get match :template)] (some? (some #{(str param)} (re-seq slash-break t)))))))
 
 (defn template-path
   "Replaces parameters in the given path using a template."
   ([match params]
    (template-path match params nil))
   ([match params query-params]
-   (when match
+   (if match
      (template-path (r/match->path match query-params)
                     (get match :template)
                     params nil)))
   ([path template params _]
-   (when-some [template (some-str template)]
+   (if-some [template (some-str template)]
      (->> (map (map/map-keys str params)
                (concat (re-seq slash-break template) (repeat nil))
                (re-seq slash-break (str path)))
@@ -348,11 +343,11 @@
   ([match required-param]
    (path-template-with-param match required-param nil))
   ([match required-param short-circuit]
-   (when-some [required-param (some-keyword-simple required-param)]
-     (when-some [t (get match :template)]
-       (when (or (some? short-circuit)
-                 (contains? (get match :required) required-param)
-                 (some #{(str required-param)} (re-seq slash-break t)))
+   (if-some [required-param (some-keyword-simple required-param)]
+     (if-some [t (get match :template)]
+       (if (or (some? short-circuit)
+               (contains? (get match :required) required-param)
+               (some #{(str required-param)} (re-seq slash-break t)))
          t)))))
 
 (defn parameterized-page-core
@@ -362,19 +357,19 @@
         param  (some-keyword-simple param)]
     (if (ident? id)
       ;; identifier given (route name)
-      (when-some [m (r/match-by-name rtr id (assoc params param pvalue))]
+      (if-some [m (r/match-by-name rtr id (assoc params param pvalue))]
         (if require-param?
           (or (req-param-path rtr m param pvalue query-params)
-              (when name-path-fallback?
-                (when-some [path (some-str (r/match->path m))]
+              (if name-path-fallback?
+                (if-some [path (some-str (r/match->path m))]
                   (parameterized-page-core param rtr path
                                            pvalue params query-params
                                            require-param? false))))
           (r/match->path m query-params)))
       ;; path given
-      (when id
+      (if id
         (let [[id location qparams] (split-query-params id)
-              qparams               (when-not (not-empty query-params) qparams)
+              qparams               (if-not (not-empty query-params) qparams)
               m                     (r/match-by-path rtr id)
               cur-pvalue            (get (get m :path-params) param)]
           (if (= cur-pvalue pvalue)
@@ -384,7 +379,7 @@
             (if-some [template (path-template-with-param m param cur-pvalue)]
               ;; path is parameterized with our parameter
               ;; we can re-parameterize the path by calling template-path
-              (when-some [p (template-path m {param pvalue})]
+              (if-some [p (template-path m {param pvalue})]
                 (if require-param?
                   (some-> (req-param-path  rtr p param pvalue query-params)    (str location qparams))
                   (some-> (r/match-by-path rtr p) (r/match->path query-params) (str location qparams))))
@@ -442,33 +437,33 @@
   ([req]
    (r/match->path (get req ::r/match) (get req :query-params)))
   ([req id-or-path]
-   (when-some [rtr (get req ::r/router)]
+   (if-some [rtr (get req ::r/router)]
      (if (ident? id-or-path)
        (some-> (r/match-by-name rtr id-or-path) r/match->path)
-       (when-some [path (some-str id-or-path)]
+       (if-some [path (some-str id-or-path)]
          (let [[path location qparams] (split-query-params path)]
            (some-> (r/match-by-path rtr path) r/match->path (str location qparams)))))))
   ([req id-or-path param param-value]
-   (when-some [rtr (get req ::r/router)]
+   (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem param rtr id-or-path param-value nil nil true false)))
   ([req id-or-path param param-value params-or-require-param?]
-   (when-some [rtr (get req ::r/router)]
+   (if-some [rtr (get req ::r/router)]
      (if (boolean? params-or-require-param?)
        (parameterized-page-mem param rtr id-or-path param-value nil nil params-or-require-param? false)
        (parameterized-page-mem param rtr id-or-path param-value params-or-require-param? nil true false))))
   ([req id-or-path param param-value params query-params-or-require-param?]
-   (when-some [rtr (get req ::r/router)]
+   (if-some [rtr (get req ::r/router)]
      (if (boolean? query-params-or-require-param?)
        (parameterized-page-mem param rtr id-or-path param-value params nil query-params-or-require-param? false)
        (parameterized-page-mem param rtr id-or-path param-value params query-params-or-require-param? true false))))
   ([req id-or-path param param-value params query-params require-param?]
-   (when-some [rtr (get req ::r/router)]
+   (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem param rtr id-or-path param-value params query-params require-param? false)))
   ([req id-or-path param param-value params query-params require-param? name-path-fallback?]
-   (when-some [rtr (get req ::r/router)]
+   (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem param rtr id-or-path param-value params query-params require-param? name-path-fallback?)))
   ([_ id-or-path param param-value params query-params require-param? name-path-fallback? router]
-   (when (some? router)
+   (if (some? router)
      (parameterized-page-mem param router id-or-path param-value params query-params require-param? name-path-fallback?))))
 
 (defn localized-page
@@ -522,7 +517,7 @@
                    (or lang (get req :language/str))
                    nil nil true false))
   ([req name-or-path lang params-or-lang-required?]
-   (when-some [rtr (get req ::r/router)]
+   (if-some [rtr (get req ::r/router)]
      (if (boolean? params-or-lang-required?)
        (parameterized-page-mem (lang-param req)
                                rtr name-or-path
@@ -536,7 +531,7 @@
                                params-or-lang-required?
                                nil true false))))
   ([req name-or-path lang params query-params-or-lang-required?]
-   (when-some [rtr (get req ::r/router)]
+   (if-some [rtr (get req ::r/router)]
      (if (boolean? query-params-or-lang-required?)
        (parameterized-page-mem (lang-param req)
                                rtr name-or-path
@@ -550,14 +545,14 @@
                                params query-params-or-lang-required?
                                true false))))
   ([req name-or-path lang params query-params lang-required?]
-   (when-some [rtr (get req ::r/router)]
+   (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
                              params query-params
                              lang-required? false)))
   ([req name-or-path lang params query-params lang-required? name-path-fallback?]
-   (when-some [rtr (get req ::r/router)]
+   (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
@@ -565,7 +560,7 @@
                              lang-required?
                              name-path-fallback?)))
   ([req name-or-path lang params query-params lang-required? name-path-fallback? router]
-   (when (some? router)
+   (if (some? router)
      (parameterized-page-mem (lang-param req)
                              router name-or-path
                              (or lang (get req :language/str))
@@ -573,7 +568,7 @@
                              lang-required?
                              name-path-fallback?)))
   ([_ name-or-path lang params query-params lang-required? name-path-fallback? router language-settings-or-param]
-   (when (some? router)
+   (if (some? router)
      (parameterized-page-mem (guess-lang-param language-settings-or-param)
                              router name-or-path lang
                              params query-params
@@ -600,19 +595,19 @@
                    (get req :language/str)
                    nil nil false false))
   ([req name-or-path lang]
-   (when-some [rtr (get req ::r/router)]
+   (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
                              nil nil false false)))
   ([req name-or-path lang params]
-   (when-some [rtr (get req ::r/router)]
+   (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
                              params nil false false)))
   ([req name-or-path lang params query-params]
-   (when-some [rtr (get req ::r/router)]
+   (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
@@ -627,24 +622,24 @@
   ([rtr id params query-params]
    (page-core rtr id params query-params nil))
   ([rtr id params query-params fb-lang-settings]
-   (when rtr
+   (if rtr
      (if (ident? id)
        ;; identifier given (route name)
        (let [params (if fb-lang-settings (apply assoc params fb-lang-settings) params)]
          (some-> (r/match-by-name rtr id params)
                  (r/match->path query-params)))
        ;; path given
-       (when id
+       (if id
          (let [[id location qparams] (split-query-params id)
-               qparams               (when-not (not-empty query-params) qparams)]
+               qparams               (if-not (not-empty query-params) qparams)]
            (some-> (r/match-by-path rtr id)
                    (r/match->path query-params)
                    (str location qparams))))))))
 
 (defn lang-from-req
   [req]
-  (when-some [lang-param (lang-param req)]
-    (when-some [lang-str (get req :language/str)]
+  (if-some [lang-param (lang-param req)]
+    (if-some [lang-str (get req :language/str)]
       [lang-param lang-str])))
 
 (defn page
@@ -982,7 +977,7 @@
    (#'def-redirect &form &env name
                    (str "Uses the page function to calculate the destination path on a basis of page
   name (identifier) or a path (a string) and performs a redirect"
-                        (when code (str " with code " code)) " to it using
+                        (if code (str " with code " code)) " to it using
   `" f "`. If the language is given it uses the `localized-page`
   function. If there is no language given but the page identified by its name
   requires a language parameter to be set, it will be obtained from the given request
@@ -1019,7 +1014,7 @@
    (#'def-localized-redirect &form &env name
                              (str "Uses the localized-page function to calculate the destination path on a basis of
   page name (identifier) or a path (a string) and performs a redirect"
-                                  (when code (str " with code " code)) " to
+                                  (if code (str " with code " code)) " to
   it using `" f "`. If the language is given it uses the `localized-page` function.
   If there is no language given but the page identified by its name requires
   a language parameter to be set, it will be obtained from the given request map
@@ -1176,9 +1171,9 @@
   "Returns the time duration between soft lock and the given moment. If the duration is
   zero or negative, it returns nil."
   [user time]
-  (when-some [lock-time (soft-lock-time user)]
+  (if-some [lock-time (soft-lock-time user)]
     (let [d (t/between lock-time time)]
-      (when (time/pos-duration? d) d))))
+      (if (time/pos-duration? d) d))))
 
 (defn lock-wait
   "Returns lock-wait configuration option taken from the authentication configuration
@@ -1200,27 +1195,27 @@
   from the lock till the given time is lesser than the soft lock wait configuration
   option). Does not connect to a database."
   ([lock-passed auth-config-or-lw]
-   (when lock-passed
-     (when-some [lock-wait (lock-wait auth-config-or-lw)]
+   (if lock-passed
+     (if-some [lock-wait (lock-wait auth-config-or-lw)]
        (t/< lock-passed lock-wait))))
   ([user auth-config-or-lw time]
-   (when auth-config-or-lw
-     (when-some [lock-passed (soft-lock-passed user time)]
-       (when-some [lock-wait (lock-wait auth-config-or-lw)]
+   (if auth-config-or-lw
+     (if-some [lock-passed (soft-lock-passed user time)]
+       (if-some [lock-wait (lock-wait auth-config-or-lw)]
          (t/< lock-passed lock-wait))))))
 
 (defn soft-lock-remains
   "Returns the amount of time left before reaching lock-wait. If the amount is negative
   or zero, it returns nil. Does not connect to a database."
   ([lock-passed auth-config-or-lw]
-   (when lock-passed
-     (when-some [lock-wait (lock-wait auth-config-or-lw)]
+   (if lock-passed
+     (if-some [lock-wait (lock-wait auth-config-or-lw)]
        (t/- lock-wait lock-passed))))
   ([user auth-config-or-lw time]
-   (when-some [lock-passed (soft-lock-passed user time)]
-     (when-some [lock-wait (lock-wait auth-config-or-lw)]
+   (if-some [lock-passed (soft-lock-passed user time)]
+     (if-some [lock-wait (lock-wait auth-config-or-lw)]
        (let [d (t/- lock-wait lock-passed)]
-         (when (time/pos-duration? d) d))))))
+         (if (time/pos-duration? d) d))))))
 
 ;; Sessions
 
@@ -1382,7 +1377,7 @@
          have-gctx?           (and include-global? (= global-context (first gctx-line)))
          labels               (vec (interleave (range) (cons context-label (map str l))))
          roles-labeler        {true present-label, false missing-label, :! global-present-label}
-         gctx-labeler         (when have-gctx? (assoc roles-labeler :! present-label))
+         gctx-labeler         (if have-gctx? (assoc roles-labeler :! present-label))
          ctx-labeler          (contexts-labeler req (map first d))
          data                 (->> (if have-gctx? (next d) d)
                                    (map (partial calc-roles
@@ -1410,11 +1405,9 @@
   "Returns the given path if there is a resource it points to. Otherwise it returns
   nil. Multiple arguments are joined using str."
   ([path]
-   (when-some [path (str path)]
-     (and (io/resource path) path)))
+   (if-some [path (str path)] (and (io/resource path) path)))
   ([path & more]
-   (when-some [path (apply str path more)]
-     (and (io/resource path) path))))
+   (if-some [path (apply str path more)] (and (io/resource path) path))))
 
 ;; Linking helpers
 
@@ -1483,7 +1476,7 @@
         path-or-name  (if (and path-or-name (str/starts-with? path-or-name ":")) (keyword (subs path-or-name 1)) path-or-name)
         path-fn       (if localized? localized-path path)
         out-path      (path-fn path-or-name lang params query-params router lang-settings)
-        out-path      (if out-path out-path (when-not (ident? path-or-name) (some-str path-or-name)))]
+        out-path      (or out-path (if-not (ident? path-or-name) (some-str path-or-name)))]
     out-path))
 
 (defn lang-param

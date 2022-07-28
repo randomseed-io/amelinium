@@ -25,44 +25,44 @@
   "Checks password for a user against the encrypted password given in password
   suites. Specific authentication configuration map must be given."
   ([password pwd-suites auth-config]
-   (when (and password pwd-suites auth-config)
-     (when-some [checker (get auth-config :passwords/check-fn)]
+   (if (and password pwd-suites auth-config)
+     (if-some [checker (get auth-config :passwords/check-fn)]
        (if (map? pwd-suites)
          (checker password pwd-suites)
          (checker password nil pwd-suites)))))
   ([password pwd-shared-suite pwd-user-suite auth-config]
-   (when (and password pwd-shared-suite pwd-user-suite auth-config)
-     (when-some [checker (get auth-config :passwords/check-fn)]
+   (if (and password pwd-shared-suite pwd-user-suite auth-config)
+     (if-some [checker (get auth-config :passwords/check-fn)]
        (checker password pwd-shared-suite pwd-user-suite)))))
 
 (defn check-password-json
   "Checks password for a user against JSON-encoded password suites. Specific
   authentication configuration map must be given."
   ([password json-pwd-suites auth-config]
-   (when (and password json-pwd-suites auth-config)
-     (when-some [checker (get auth-config :passwords/check-json-fn)]
+   (if (and password json-pwd-suites auth-config)
+     (if-some [checker (get auth-config :passwords/check-json-fn)]
        (if (map? json-pwd-suites)
          (checker password json-pwd-suites)
          (checker password nil json-pwd-suites)))))
   ([password json-pwd-shared-suite json-pwd-user-suite auth-config]
-   (when (and password json-pwd-shared-suite json-pwd-user-suite auth-config)
-     (when-some [checker (get auth-config :passwords/check-json-fn)]
+   (if (and password json-pwd-shared-suite json-pwd-user-suite auth-config)
+     (if-some [checker (get auth-config :passwords/check-json-fn)]
        (checker password json-pwd-shared-suite json-pwd-user-suite)))))
 
 (defn make-password
   "Creates new password for a user. Specific authentication configuration map must be
   given."
   [password auth-config]
-  (when (and password auth-config)
-    (when-some [encryptor (get auth-config :passwords/encrypt-fn)]
+  (if (and password auth-config)
+    (if-some [encryptor (get auth-config :passwords/encrypt-fn)]
       (encryptor password))))
 
 (defn make-password-json
   "Creates new password for a user in JSON format. Specific authentication
   configuration map must be given."
   [password auth-config]
-  (when (and password auth-config)
-    (when-some [encryptor (get auth-config :passwords/encrypt-json-fn)]
+  (if (and password auth-config)
+    (if-some [encryptor (get auth-config :passwords/encrypt-json-fn)]
       (encryptor password))))
 
 ;; Settings initialization
@@ -82,7 +82,7 @@
   ([v]
    (parse-account-types some-keyword-simple v))
   ([f v]
-   (when v
+   (if v
      (some->> (if (coll? v) (seq (if (map? v) (keys v) v)) (cons v nil))
               seq (filter #(and % (valuable? %)))
               seq (map f) (filter keyword?) seq))))
@@ -94,12 +94,12 @@
                      (filter identity)
                      (apply concat)
                      distinct seq vec)
-        nms (when ids (mapv name ids))
-        sql (when ids (if (= 1 (count nms)) " = ?" (str " IN " (db/braced-join-? nms))))
+        nms (if ids (mapv name ids))
+        sql (if ids (if (= 1 (count nms)) " = ?" (str " IN " (db/braced-join-? nms))))
         dfl (or (some-keyword-simple (or (:account-types/default m)
                                          (:account-types/default-name m)))
                 (first ids))
-        dfn (when dfl (name dfl))]
+        dfn (if dfl (name dfl))]
     (assoc (dissoc m :account-types)
            :account-types/sql          sql
            :account-types/ids          ids
@@ -131,7 +131,7 @@
   "Returns authentication configuration for the given account type using an
   authentication configuration map."
   [config account-type]
-  (when-some [types-map (:types config)]
+  (if-some [types-map (:types config)]
     (or (get types-map (some-keyword-simple account-type))
         (get types-map :default))))
 

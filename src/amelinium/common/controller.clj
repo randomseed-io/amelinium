@@ -66,9 +66,9 @@
   "Injects user's preferred language into a request map."
   [req _]
   (delay
-    (when-some [db (common/auth-db req)]
+    (if-some [db (common/auth-db req)]
       (let [smap (common/session req)]
-        (when-some [user-id (get smap :user/id)]
+        (if-some [user-id (get smap :user/id)]
           (let [supported (get (get req :language/settings) :supported)]
             (contains? supported (user/setting db user-id :language))))))))
 
@@ -90,7 +90,7 @@
 
 (defn check-password
   [user password auth-config]
-  (when (and user password)
+  (if (and user password)
     (auth/check-password-json password
                               (get user :shared)
                               (get user :intrinsic)
@@ -100,11 +100,10 @@
   "Returns true if an account associated with the session is hard-locked.
   Uses cached property."
   ([req session]
-   (when-some [db (common/auth-db req)]
+   (if-some [db (common/auth-db req)]
      (account-locked? req session db)))
   ([req session db]
-   (some?
-    (some->> session :user/id (user/prop-get-locked db)))))
+   (some? (some->> session :user/id (user/prop-get-locked db)))))
 
 (defn lock-remaining-mins
   "Returns the time of the remaining minutes of a soft account lock when the visited
@@ -113,11 +112,11 @@
   ([req auth-db smap time-fn]
    (lock-remaining-mins req auth-db smap time-fn "login"))
   ([req auth-db smap time-fn id-form-field]
-   (when auth-db
-     (when-some [user (or (user/props-by-session auth-db smap)
+   (if auth-db
+     (if-some [user (or (user/props-by-session auth-db smap)
                           (user/props-by-email auth-db (get (get req :form-params) id-form-field)))]
-       (when-some [auth-config (common/auth-config req (get user :account-type))]
-         (when-some [mins (time/minutes (common/soft-lock-remains user auth-config (time-fn)))]
+       (if-some [auth-config (common/auth-config req (get user :account-type))]
+         (if-some [mins (time/minutes (common/soft-lock-remains user auth-config (time-fn)))]
            (if (zero? mins) 1 mins)))))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions
@@ -214,7 +213,7 @@
           (user/update-login-ok auth-db user-id ipaddr)
           :authenticated!)
 
-      (let [goto-uri  (when (get sess :expired?) (get req :goto-uri))
+      (let [goto-uri  (if (get sess :expired?) (get req :goto-uri))
             sess-opts (get req :session/config)
             sess      (if goto-uri
                         (user/prolong-session sess-opts sess ipaddr)
@@ -256,7 +255,7 @@
   then the given request map is returned as is."
   [req user-email user-password]
   (let [user-email     (some-str user-email)
-        user-password  (when user-email (some-str user-password))
+        user-password  (if user-email (some-str user-password))
         sess           (common/session req)
         valid-session? (get sess :valid?)
         route-data     (http/get-route-data req)]

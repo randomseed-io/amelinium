@@ -36,19 +36,19 @@
 (defn get-user-by-id
   "Given a user ID, return the user record."
   [db id]
-  (when-some [id (parse-long id)]
+  (if-some [id (parse-long id)]
     (sql/get-by-id db :users id db/opts-simple-map)))
 
 (defn get-user-by-email
   "Given an email, return the user record."
   [db email]
-  (when-some [email (some-str email)]
+  (if-some [email (some-str email)]
     (sql/get-by-id db :users email :email db/opts-simple-map)))
 
 (defn get-user-by-uuid
   "Given an UID, return the user record."
   [db uid]
-  (when-some [uid (db/some-uuid-str)]
+  (if-some [uid (db/some-uuid-str)]
     (sql/get-by-id db :users uid :uid db/opts-simple-map)))
 
 ;; Passwords
@@ -68,11 +68,11 @@
   "Gets intrinsic and shared password suites for the given user, identified by an
   e-mail address."
   ([db email]
-   (when (and db email)
+   (if (and db email)
      (jdbc/execute-one! db [password-query email] db/opts-simple-map)))
   ([db email account-types-config]
    (if-some [ac-types (get account-types-config :account-types/names)]
-     (when (and db email)
+     (if (and db email)
        (let [ac-sql (get account-types-config :account-types/sql)
              query  (str password-query-atypes-pre
                          (if ac-sql ac-sql (db/braced-join-? ac-types))
@@ -97,12 +97,12 @@
   "Gets data required for user to be authenticated, including intrinsic and shared
   password suites."
   ([db email]
-   (when (and db email)
+   (if (and db email)
      (jdbc/execute-one! db [login-query email] db/opts-simple-map)))
   ([db email auth-config]
    (if-some [ac-types (get auth-config :account-types/names)]
      (let [db (or db (get auth-config :db))]
-       (when (and db email)
+       (if (and db email)
          (let [ac-sql (get auth-config :account-types/sql)
                query  (str login-query-atypes-pre
                            (if ac-sql ac-sql (str "IN " (db/braced-join-? ac-types)))
@@ -120,7 +120,7 @@
   "Gets shared suite ID on a basis of its JSON content. If it does not exist, it is
   created."
   [db suite]
-  (when (and db suite)
+  (if (and db suite)
     (first
      (or (jdbc/execute-one! db [insert-shared-suite-query suite] db/opts-simple-vec)
          (jdbc/execute-one! db [shared-suite-query suite]        db/opts-simple-vec)))))
@@ -130,11 +130,11 @@
   password in an authorization database. Additionally last_attempt and last_failed_ip
   properties are deleted and login_attempts is set to 0."
   ([db id suites]
-   (when suites
+   (if suites
      (update-password db id (get suites :shared) (get suites :intrinsic))))
   ([db id shared-suite user-suite]
-   (when (and db id shared-suite user-suite)
-     (when-some [shared-id (create-or-get-shared-suite-id db shared-suite)]
+   (if (and db id shared-suite user-suite)
+     (if-some [shared-id (create-or-get-shared-suite-id db shared-suite)]
        (sql/update! db :users
                     {:password_suite_id shared-id
                      :password          user-suite
@@ -145,7 +145,7 @@
 
 (defn update-login-ok
   [db id ip]
-  (when (and db id)
+  (if (and db id)
     (let [login-time (t/now)]
       (sql/update! db :users {:login_attempts 1
                               :soft_locked    nil
@@ -361,15 +361,15 @@
 
 (defn props-by-id
   [db user-id]
-  (when (some? user-id) (props db user-id)))
+  (if (some? user-id) (props db user-id)))
 
 (defn props-by-session
   [db smap]
-  (when-some [user-id (get smap :user/id)] (props db user-id)))
+  (if-some [user-id (get smap :user/id)] (props db user-id)))
 
 (defn props-by-session-or-id
   [db smap user-id]
-  (when db (or (props-by-session db smap) (props-by-id db user-id))))
+  (if db (or (props-by-session db smap) (props-by-id db user-id))))
 
 ;; Email to ID mapping (cached)
 
@@ -462,7 +462,7 @@
 
 (defn get-user-id-exists?
   [db id]
-  (when (and db id)
+  (if (and db id)
     (some? (jdbc/execute-one! db [id-exists-query (db/id-to-db id)] db/opts-simple-map))))
 
 (defn get-user-uid-exists?
@@ -489,18 +489,15 @@
 
 (defn some-id
   [db id]
-  (when (and id (id-exists? db id))
-    id))
+  (if (and id (id-exists? db id)) id))
 
 (defn some-uid
   [db uid]
-  (when (and uid (uid-exists? db uid))
-    uid))
+  (if (and uid (uid-exists? db uid)) uid))
 
 (defn some-email
   [db email]
-  (when (and email (email-exists? db email))
-    email))
+  (if (and email (email-exists? db email)) email))
 
 ;; Creation
 
@@ -556,7 +553,7 @@
   ([db token first-name last-name]
    (create-with-token db token first-name nil last-name))
   ([db token first-name middle-name last-name]
-   (when-some [token (some-str token)]
+   (if-some [token (some-str token)]
      (if-some [r (jdbc/execute-one!
                   db [create-with-token-query
                       (some-str first-name)
@@ -584,7 +581,7 @@
   ([db code email first-name middle-name last-name]
    (let [code  (some-str code)
          email (some-str email)]
-     (when (and code email)
+     (if (and code email)
        (if-some [r (jdbc/execute-one!
                     db [create-with-code-query
                         (some-str first-name)
@@ -627,7 +624,7 @@
   on a basis of a number, a string or a keyword being ID, email or UID. User must
   exist in a database. Uses cached properties if possible."
   [db user-spec]
-  (when (and db user-spec)
+  (if (and db user-spec)
     (if (map? user-spec)
       (let [id    (delay (get user-spec :id))
             uid   (delay (get user-spec :uid))

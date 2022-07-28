@@ -59,9 +59,9 @@
         :or   {success :missing, ok :missing, ok? :missing}
         :as   m}
        ts]]
-  (when-some [operation (or (and operation (some-str operation))
-                            (and op (some-str op))
-                            (when-not (map? m) (some-str m)))]
+  (if-some [operation (or (and operation (some-str operation))
+                          (and op (some-str op))
+                          (if-not (map? m) (some-str m)))]
     (let [user-id   (some-str user-id)
           client-id (valuable client-id)
           executed  (or executed time ts)
@@ -77,7 +77,7 @@
   the queue. Returns empty queue which should be reused by the writing thread."
   [id db table messages]
   (if-some [mseq (seq messages)]
-    (do (when-some [msgs (->> mseq (map #(prep-oplog db %)) (filter identity) seq)]
+    (do (if-some [msgs (->> mseq (map #(prep-oplog db %)) (filter identity) seq)]
           (db/insert-or-ignore-multi! db table authlog-fields msgs db/opts-simple-vec))
         (empty messages))
     messages))
@@ -87,7 +87,7 @@
   [id channel
    {:keys [user-id client-id op operation msg message success ok ok? level executed time]
     :as   m}]
-  (when (and m channel)
+  (if (and m channel)
     (async/>!! channel [m (t/now)])))
 
 (derive ::log ::oplog/log)

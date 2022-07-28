@@ -35,10 +35,10 @@
          k-blank (seq (get r :blank))
          k-any   (seq (get r :any))
          r       (concat
-                  (when k-some  (map vector k-some  (repeatedly random-uuid)))
-                  (when k-blank (map vector k-blank (repeat "")))
-                  (when k-any   (map vector k-any   (repeatedly #(common/random-uuid-or-empty rng)))))]
-     (when (seq r)
+                  (if k-some  (map vector k-some  (repeatedly random-uuid)))
+                  (if k-blank (map vector k-blank (repeat "")))
+                  (if k-any   (map vector k-any   (repeatedly #(common/random-uuid-or-empty rng)))))]
+     (if (seq r)
        (apply str (map #(str "<input type=\"text\" name=\""   (nth % 0)
                              "\" class=\"subspace\" value=\"" (nth % 1)
                              "\"/>")
@@ -69,11 +69,11 @@
          lang         (or lang (get-lang ctx))
          lang-param   (or lang-param (get ctx :language/settings) (get ctx :language-param) (get ctx :param) :lang)
          path-or-name (or (valuable path-or-name) (get ctx :current-path) (common/current-page ctx))
-         path-or-name (when path-or-name (selmer/render path-or-name ctx {:tag-open \[ :tag-close \]}))
+         path-or-name (if path-or-name (selmer/render path-or-name ctx {:tag-open \[ :tag-close \]}))
          path-or-name (if (and path-or-name (str/starts-with? path-or-name ":")) (keyword (subs path-or-name 1)) path-or-name)
          path-fn      (if localized? common/localized-path common/path)
          out-path     (path-fn path-or-name lang params query-params router lang-param)
-         out-path     (if out-path out-path (when-not (ident? path-or-name) (some-str path-or-name)))]
+         out-path     (or out-path (if-not (ident? path-or-name) (some-str path-or-name)))]
      out-path)))
 
 (defn add-taggers

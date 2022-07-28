@@ -30,15 +30,14 @@
   "Parses remote address string to get the string representation of client's IP
   address."
   [addr]
-  (when-some [a (not-empty (str/trim (str/trim-newline (some-str addr))))]
+  (if-some [a (not-empty (str/trim (str/trim-newline (some-str addr))))]
     (not-empty (sa/trim-both {\space \space \[ \] \( \)} a))))
 
 (defn remote-addr-get
   "Parses :remote-addr key of a request to get the string representation of client's IP
   address."
   [req]
-  (when req
-    (remote-addr-parse (get req :remote-addr))))
+  (if req (remote-addr-parse (get req :remote-addr))))
 
 (defn process-proxy
   "Prepares proxy header configuration for address-getting middleware."
@@ -46,7 +45,7 @@
   (when p
     (if (true? p)
       proxy-header
-      (when-some [p (some-str-simple-down p)]
+      (if-some [p (some-str-simple-down p)]
         (not-empty (str/trim (str/trim-newline p)))))))
 
 (defn process-proxy-for
@@ -89,7 +88,7 @@
 
 (defn get-proxy-header
   [headers proxy-setting]
-  (when proxy-setting (some-str (get headers proxy-setting))))
+  (if proxy-setting (some-str (get headers proxy-setting))))
 
 (defn get-ips-from-req-data
   ([pheader addr-string]
@@ -132,7 +131,7 @@
         proxy-setting (process-proxy proxy-setting)
         proxy-for-fn  (process-proxy-for proxy-for)]
     (log/msg "Installing IP analyzer:" ip-getter-sym
-             (when proxy-setting (str "(proxy header: " proxy-setting ")")))
+             (if proxy-setting (str "(proxy header: " proxy-setting ")")))
     {:name    k
      :compile (fn [_ _]
                 (fn [h]

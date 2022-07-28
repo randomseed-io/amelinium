@@ -132,11 +132,11 @@
 (defn roles-table
   ([req]
    (let [{:keys [data labels]} (roles-tabler req nil)]
-     (when (and data labels)
+     (if (and data labels)
        (html (table/to-table1d data labels)))))
   ([req opts]
    (let [{:keys [data labels]} (roles-tabler req opts)]
-     (when (and data labels)
+     (if (and data labels)
        (html (table/to-table1d data labels))))))
 
 ;; HTML rendering
@@ -177,7 +177,7 @@
      (let [req-data (get req :app/data)]
        (if (false? req-data)
          req
-         (let [req-data (when req-data (map/to-lazy req-data))
+         (let [req-data (if req-data (map/to-lazy req-data))
                data     (if req-data (map/merge-lazy req-data data) (map/to-lazy data))
                keyz     (or keyz (concat common-keys (get req :app/data-required)))]
            (if (and data (pos? (count data)))
@@ -188,8 +188,7 @@
   "Gets the value of `:app/data` for the current request. If it does not exist, returns
   an empty map."
   [req]
-  (when-let [ad (get req :app/data empty-lazy-map)]
-    ad))
+  (if-let [ad (get req :app/data empty-lazy-map)] ad))
 
 ;; Layouts and views
 
@@ -232,21 +231,21 @@
 (defn resolve-generic
   [uri pre dir lang core]
   (let [pre     (or (some-str pre) "views")
-        prep-sl (when pre  (str pre  "/"))
-        dir-sl  (when dir  (str dir  "/"))
-        lang-sl (when lang (str lang "/"))
+        prep-sl (if pre  (str pre  "/"))
+        dir-sl  (if dir  (str dir  "/"))
+        lang-sl (if lang (str lang "/"))
         pths    (lazy-cat [[prep-sl lang-sl dir-sl core dot-html]]
                           [[prep-sl lang-sl dir-sl core sl-default-html]]
                           [[prep-sl dir-sl core dot-html]]
                           [[prep-sl lang-sl dir-sl default-html]]
-                          (when dir [[prep-sl lang-sl dir dot-html]])
+                          (if dir [[prep-sl lang-sl dir dot-html]])
                           [[prep-sl dir-sl default-html]]
-                          (when dir [[prep-sl dir dot-html]])
+                          (if dir [[prep-sl dir dot-html]])
                           [[prep-sl lang-sl default-html]]
                           [[prep-sl default-html]])]
     (or (first (keep #(apply common/some-resource %) pths))
-        (do (when (nil? uri) (log/wrn "Empty URI while resolving" pre))
-            (log/wrn "Cannot find" pre (when uri (str "for " uri)))
+        (do (if (nil? uri) (log/wrn "Empty URI while resolving" pre))
+            (log/wrn "Cannot find" pre (if uri (str "for " uri)))
             (doseq [path pths] (log/wrn (apply str "Tried: [resources]/" path)))))))
 
 (def ^{:arglists '([uri pre dir lang core])}
@@ -309,10 +308,10 @@
   ([req data view layout lang]
    (render req data view layout lang nil))
   ([req data view layout lang sess]
-   (let [lang (or lang (when-not (false? lang) (pick-language-str req)))
+   (let [lang (or lang (if-not (false? lang) (pick-language-str req)))
          layt (resolve-layout req lang layout)
          view (resolve-view   req lang view)]
-     (when (and layt view)
+     (if (and layt view)
        (let [dlng (or lang (get req :language/str))
              data (prep-app-data req data)
              data (map/assoc-missing data
@@ -400,19 +399,19 @@
        (#'def-render &form &env name doc f code)
        (#'def-render
         &form &env name
-        (str "Renders a " (when code (str code " "))
+        (str "Renders a " (if code (str code " "))
              "response with a possible body generated with views, layouts and data \n"
              "obtained from a request map (`:app/layout`, `:app/view`, `:app/data` keys).\n"
              "Uses `" f-or-doc "` to set the response code."
-             (when (and code (not= code 200))
+             (if (and code (not= code 200))
                (str " Additionaly, sets `:http/code` key\n"
                     "to `:http-code/" code "` within a map under "
                     "the `:app/data` of the `req`.")))
-        f (when (not= 200 code) code)))))
+        f (if (not= 200 code) code)))))
   ([name doc f code]
    `(let [f# ~f
           c# ~code
-          c# (when c# (keyword "http-code" (str c#)))]
+          c# (if c# (keyword "http-code" (str c#)))]
       (if c#
         (defn ~name ~doc
           ([]

@@ -59,14 +59,14 @@
 
 (defn sendmail-l10n-template
   ([lang to template-group]
-   (when-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+   (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
      (email (localize-sendmail-params
              lang
              {:personalizations [{:to to}]}
              template-group
              nil))))
   ([lang to template-group fallback-template-id-or-template-data]
-   (when-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+   (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
      (if (map? fallback-template-id-or-template-data)
        (email (localize-sendmail-params
                lang
@@ -81,7 +81,7 @@
                template-group
                fallback-template-id-or-template-data)))))
   ([lang to template-group fallback-template-id template-data]
-   (when-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+   (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
      (email (localize-sendmail-params
              lang
              {:personalizations
@@ -92,7 +92,7 @@
 
 (defn sendmail-l10n-template-async
   ([respond raise lang to template-group]
-   (when-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+   (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
      (email {:async? true} (localize-sendmail-params
                             lang
                             {:personalizations [{:to to}]}
@@ -100,7 +100,7 @@
                             nil)
             respond raise)))
   ([respond raise lang to template-group fallback-template-id-or-template-data]
-   (when-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+   (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
      (if (map? fallback-template-id-or-template-data)
        (email {:async? true} (localize-sendmail-params
                               lang
@@ -117,7 +117,7 @@
                               fallback-template-id-or-template-data)
               respond raise))))
   ([respond raise lang to template-group fallback-template-id template-data]
-   (when-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+   (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
      (email {:async true} (localize-sendmail-params
                            lang
                            {:personalizations
@@ -192,7 +192,7 @@
                                                                  :pass auth-key})
                      opts)
         opts     (map/update-existing opts :connect-timeout
-                                      #(when %
+                                      #(if %
                                          (time/milliseconds
                                           (time/parse-duration % :second))))]
     (assoc config :client-opts opts)))
@@ -264,15 +264,15 @@
                  params (if json? params (stringify-params params))
                  opts   (update opts :form-params
                                 #(if %
-                                   (deep-merge :into default-params (if json? % (stringify-params %)) params)
-                                   (deep-merge :into default-params params)))]
+                                   (deep-merge :into default-params (or (if json? % (stringify-params %)) params) {})
+                                   (deep-merge :into default-params (or params {}))))]
              (if (= :config params)
                config
                (hc/request opts respond raise))))
           ([params]
            (let [params (or params {})
                  params (if (sending-json? req-opts) params (stringify-params params))
-                 opts   (assoc req-opts :form-params (deep-merge :into default-params params))]
+                 opts   (assoc req-opts :form-params (deep-merge :into default-params (or params {})))]
              (if (= :config params)
                config
                (hc/request opts))))
@@ -288,7 +288,7 @@
                  opts   (update opts :form-params
                                 #(if % (deep-merge :into
                                                    (if json? % (stringify-params %))
-                                                   params)
+                                                   (or params {}))
                                      params))]
              (if (= :config params)
                config

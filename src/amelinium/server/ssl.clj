@@ -48,7 +48,7 @@
   (^String [path pwd-atom]
    (ask-pass path pwd-atom nil))
   (^String [path pwd-atom ready]
-   (when path
+   (if path
      (if (some? ready)
        (reset! pwd-atom (str ready))
        (get-pass-once pwd-atom (str-spc "Enter" (fs/basename path) "passphrase:"))))))
@@ -75,7 +75,7 @@
 
 (defn keystore-type
   [path]
-  (when-some [ext (fs/extension path)]
+  (if-some [ext (fs/extension path)]
     (get (str/upper-case ext) keystore-types "PKCS12")))
 
 (defn new-store
@@ -94,7 +94,7 @@
        (catch IOException e
          (reset-password! password)
          (throw e)))
-     (when-some [^FileInputStream fis (some-> path fs/resource-file io/input-stream)]
+     (if-some [^FileInputStream fis (some-> path fs/resource-file io/input-stream)]
        (let [ks-type (or (some-str ks-type) (keystore-type path))]
          (if-some [p (some-str password)]
            (doto ^KeyStore (new-store) (.load ^FileInputStream fis ^chars (char-array p)))
@@ -118,12 +118,12 @@
 
 (defn session-info-core
   [req]
-  (when-some [ex (get req :server-exchange)]
+  (if-some [ex (get req :server-exchange)]
     (.getSslSessionInfo ^HttpServerConnection (.getConnection ^HttpServerExchange ex))))
 
 (defn session-info
   [req]
-  (when-some [si (session-info-core req)]
+  (if-some [si (session-info-core req)]
     {:cipher-suite       ^String          (.getCipherSuite          ^ConnectionSSLSessionInfo si)
      :certificate        ^X509Certificate (.getPeerCertificateChain ^ConnectionSSLSessionInfo si)
      :client-certificate ^Certificate     (.getPeerCertificates     ^ConnectionSSLSessionInfo si)
@@ -131,7 +131,7 @@
 
 (defn client-certificates
   [req]
-  (when-some [si (session-info-core req)]
+  (if-some [si (session-info-core req)]
     (.getPeerCertificates ^ConnectionSSLSessionInfo si)))
 
 (defn client-certificate
@@ -141,26 +141,26 @@
 
 (defn client-certificate-subject
   [req]
-  (when-some [cc (client-certificate req)]
+  (if-some [cc (client-certificate req)]
     (.getSubjectX500Principal ^X509Certificate cc)))
 
 (defn client-certificate-subject-canonical
   [req]
-  (when-some [cc (client-certificate req)]
+  (if-some [cc (client-certificate req)]
     (some-str
      (.getName ^X500Principal (.getSubjectX500Principal ^X509Certificate cc)
                X500Principal/CANONICAL))))
 
 (defn client-certificate-subject-rfc1779
   [req]
-  (when-some [cc (client-certificate req)]
+  (if-some [cc (client-certificate req)]
     (some-str
      (.getName ^X500Principal (.getSubjectX500Principal ^X509Certificate cc)
                X500Principal/RFC1779))))
 
 (defn client-certificate-subject-rfc2253
   [req]
-  (when-some [cc (client-certificate req)]
+  (if-some [cc (client-certificate req)]
     (some-str
      (.getName ^X500Principal (.getSubjectX500Principal ^X509Certificate cc)
                X500Principal/RFC2253))))

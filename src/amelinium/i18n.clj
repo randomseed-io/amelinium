@@ -30,8 +30,7 @@
   `amelinium.i18n/translations`."
   [req-or-match]
   (or (http/get-route-data req-or-match :translations)
-      (when-not (http/match? req-or-match)
-        (get req-or-match :translations))
+      (if-not (http/match? req-or-match) (get req-or-match :translations))
       translations))
 
 (defn lang
@@ -133,20 +132,20 @@
   (fn translate
     ([locale k]
      (or (f locale k)
-         (when *handle-missing-keys* (f locale :amelinium/missing-key k))))
+         (if *handle-missing-keys* (f locale :amelinium/missing-key k))))
     ([locale k a]
      (or (f locale k a)
-         (when *handle-missing-keys* (f locale :amelinium/missing-key k))))
+         (if *handle-missing-keys* (f locale :amelinium/missing-key k))))
     ([locale k a b]
      (or (f locale k a b)
-         (when *handle-missing-keys* (f locale :amelinium/missing-key k))))
+         (if *handle-missing-keys* (f locale :amelinium/missing-key k))))
     ([locale k a b & more]
      (or (apply f locale k a b more)
-         (when *handle-missing-keys* (f locale :amelinium/missing-key k))))))
+         (if *handle-missing-keys* (f locale :amelinium/missing-key k))))))
 
 (defn prep-pluralizer
   [config lang translations]
-  (when-some [pluralizer-fn (some-> config (get lang) (get :tongue/pluralizer) var/deref-symbol)]
+  (if-some [pluralizer-fn (some-> config (get lang) (get :tongue/pluralizer) var/deref-symbol)]
     (let [[a b c d e & more] translations]
       (if (map? a)
         (prep-pluralizer config lang (pluralizer-fn :parse-args a))

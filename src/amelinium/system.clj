@@ -113,7 +113,7 @@
 
 (defn- validate-ref
   [ref]
-  (when-not (qualified-keyword? ref)
+  (if-not (qualified-keyword? ref)
     (ex-info (str "Invalid reference: " ref ". Must be a qualified keyword.")
              {:reason ::invalid-ref, :ref ref})))
 
@@ -127,8 +127,7 @@
 
 (defn conf-resource
   ([r]
-   (when r
-     (conf/resource r integrant-readers)))
+   (if r (conf/resource r integrant-readers)))
   ([r & more]
    (->> (cons r more)
         (map conf-resource)
@@ -137,8 +136,7 @@
 
 (defn conf-file
   [f]
-  (when f
-    (conf/file f integrant-readers)))
+  (if f (conf/file f integrant-readers)))
 
 (defn conf-dirs->resource-names
   ([d]
@@ -197,8 +195,8 @@
      (read-configs nil resource-config-dir-or-map)
      (let [config-sources   (::config-sources resource-config-dir-or-map)
            local-file       (:local-file config-sources)
-           file-conf        (when local-file (conf-file local-file))
-           file-confs       (when file-conf (cons file-conf nil))
+           file-conf        (if local-file (conf-file local-file))
+           file-confs       (if file-conf (cons file-conf nil))
            resource-dirs    (seq (filter identity (:resource-dirs  config-sources)))
            resource-files   (seq (filter identity (:resource-files config-sources)))
            resource-files   (or resource-files (apply conf-dirs->resource-names resource-dirs))
@@ -238,7 +236,7 @@
  (let [tz (utils/valuable tz)
        tz (or (:timezone-id tz) tz)
        tz (if (or (string? tz) (ident? tz)) (utils/some-str tz) tz)]
-   (when tz
+   (if tz
      (let [^TimeZone tz (if (true? tz)
                           (TimeZone/getDefault)
                           (let [^TimeZone tznew (TimeZone/getTimeZone ^String (str tz))]

@@ -20,8 +20,8 @@
 (defn new-handler
   [{:keys [router resource-pathname not-found redirect-slash]}]
   (let [not-found         (if not-found (var/deref-symbol not-found) {:status 404 :body "Not found"})
-        not-found         (when not-found   (if (fn? not-found) not-found (constantly not-found)))
-        redirect-slash    (when redirect-slash (if (true? redirect-slash) :both (some-keyword redirect-slash)))
+        not-found         (if not-found (if (fn? not-found) not-found (constantly not-found)))
+        redirect-slash    (if redirect-slash (if (true? redirect-slash) :both (some-keyword redirect-slash)))
         resource-pathname (if (true? resource-pathname) "/" resource-pathname)
         resource-pathname (some-str resource-pathname)
         extra-handlers    nil

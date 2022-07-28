@@ -86,17 +86,17 @@
   [{:keys [enabled? port ssl? ssl-port compress? handler properties server-name
            keystore truststore same-key-passwords? key-password trust-password]
     :as   options}]
-  (when enabled?
+  (if enabled?
     (let [name             (properties :name)
-          server-name      (or (str server-name) (when name (str name "-undertow")))
-          ssl-port         (when ssl-port (utils/safe-parse-long ssl-port 5004))
+          server-name      (or (str server-name) (if name (str name "-undertow")))
+          ssl-port         (if ssl-port (utils/safe-parse-long ssl-port 5004))
           ssl?             (if (and ssl-port (not (contains? options :ssl?))) true ssl?)
           ssl-port         (utils/safe-parse-long (if (and ssl? (not ssl-port)) 5004 ssl-port))
           same-pwd?        (boolean same-key-passwords?)
           compress?        (boolean compress?)
-          key-password     (when ssl? (ssl/ask-pass-keystore keystore key-password))
-          trust-password   (when same-pwd? key-password)
-          trust-password   (when ssl? (ssl/ask-pass-truststore truststore trust-password))
+          key-password     (if ssl? (ssl/ask-pass-keystore keystore key-password))
+          trust-password   (if same-pwd? key-password)
+          trust-password   (if ssl? (ssl/ask-pass-truststore truststore trust-password))
           options          (if ssl? options (dissoc options :keystore :truststore))
           options          (-> options
                                (map/assoc-missing   :name               (properties :name))
@@ -136,9 +136,9 @@
           options          (if custom-handlers? (assoc options :handler-proxy last-handler) options)
           ssl-starts?      (and ssl? ssl-port)
           starts?          (or port ssl-starts?)
-          ports            (when starts? (if ssl-starts? [port ssl-port] [port]))
+          ports            (if starts? (if ssl-starts? [port ssl-port] [port]))
           ports-str        (str (if (next ports) "ports " "port ") (str/join ", " ports))]
-      (when starts? (log/msg "HTTP server (Undertow) is starting on" ports-str))
+      (if starts? (log/msg "HTTP server (Undertow) is starting on" ports-str))
       {:handler handler
        :options options
        :server  (undertow/run-undertow handler options)})))
@@ -168,12 +168,12 @@
         (log/msg "HTTP server (Undertow) connections are resumed")
         old-impl))
     (do
-      (when old-impl (system/halt-key! k old-impl))
+      (if old-impl (system/halt-key! k old-impl))
       (system/init-key k config))))
 
 (defn stop
   [{:keys [server options]}]
-  (when (and server options)
+  (if (and server options)
     (log/msg-with-val
      "HTTP server (Undertow) is stopping on port" (options :port)
-     (when (some? server) (.stop ^Undertow server)))))
+     (if (some? server) (.stop ^Undertow server)))))

@@ -89,8 +89,8 @@
 
 (defn make-ns-tracker
   []
-  (when-some [wdirs *ns-reload-watch-dirs*]
-    (when-some [wdirs (and (sequential? wdirs) (seq wdirs))]
+  (if-some [wdirs *ns-reload-watch-dirs*]
+    (if-some [wdirs (and (sequential? wdirs) (seq wdirs))]
       (ns-tracker/ns-tracker wdirs))))
 
 (def ^:dynamic *ns-tracker*
@@ -98,7 +98,7 @@
 
 (defn reload-namespaces
   []
-  (when-some [nstracker *ns-tracker*]
+  (if-some [nstracker *ns-tracker*]
     (doseq [ns-sym (nstracker)]
       (require ns-sym :reload))))
 
@@ -159,7 +159,7 @@
    (let [rc-dirs (if (coll? rc-dirs) rc-dirs (cons rc-dirs nil))]
      (locking lock
        (if-some [keys (seq keys)]
-         (do (when-not config
+         (do (if-not config
                (var/reset config (apply system/read-configs local-config-file rc-dirs)))
              (var/reset post-config (system/prep config keys)))
          (do (if (and (nil? local-config-file) (nil? rc-dirs))
@@ -176,7 +176,7 @@
      (if (suspended?)
        (apply resume-app keys)
        (try
-         (when-not (configured?)
+         (if-not (configured?)
            (apply configure-app local-config-file rc-dirs keys))
          (if-some [keys (seq keys)]
            (do
@@ -196,14 +196,14 @@
 (defn stop-app
   [& keys]
   (locking lock
-    (when-not (stopped?)
+    (if-not (stopped?)
       (try
         (var/reset phase :stopping)
         (if-some [keys (seq keys)]
-          (do (when-some [s state] (system/halt! s keys))
+          (do (if-some [s state] (system/halt! s keys))
               (var/reset state         (map/nil-existing-keys state keys))
               (var/reset exception     nil))
-          (do (when-some [s state] (system/halt! s))
+          (do (if-some [s state] (system/halt! s))
               (var/reset state         nil)
               (var/reset post-config   nil)
               (var/reset config        nil)
@@ -215,7 +215,7 @@
 (defn suspend-app
   [& keys]
   (locking lock
-    (when (running?)
+    (if (running?)
       (try
         (var/reset phase :suspending)
         (if (seq keys) (system/suspend! state keys) (system/suspend! state))
@@ -233,7 +233,7 @@
         (if (seq keys) (system/resume post-config state keys) (system/resume post-config state))
         (var/reset phase :running)
         (catch Throwable e (state-from-exception e)))
-      (when (stopped?)
+      (if (stopped?)
         (apply start-app nil nil keys)))
     phase))
 

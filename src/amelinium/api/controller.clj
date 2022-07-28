@@ -50,7 +50,7 @@
 (defn login-data?
   "Returns true if :body map of a request contains login data."
   [req]
-  (when-some [bparams (get req :body-params)]
+  (if-some [bparams (get req :body-params)]
     (and (contains? bparams :password)
          (contains? bparams :login))))
 
@@ -103,7 +103,7 @@
   [req]
   (let [body-params (get req :body-params)
         user-email  (some-str (get body-params :login))
-        password    (when user-email (some-str (get body-params :password)))
+        password    (if user-email (some-str (get body-params :password)))
         sess        (common/session req)
         route-data  (http/get-route-data req)]
     (cond
@@ -126,7 +126,7 @@
         (assoc-in [:response/body :lock-remains]
                   (lock-remaining-mins req
                                        (api/auth-db req)
-                                       (when @prolonged? sess)
+                                       (if @prolonged? sess)
                                        t/now)))))
 
 (defn prep-request!

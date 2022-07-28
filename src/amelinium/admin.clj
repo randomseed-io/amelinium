@@ -73,7 +73,7 @@
        (if-some [user-id (user/find-id db user-spec)]
          (if-some [user (user/props db user-id)]
            (let [atype       (:account-type user)
-                 atexp       (when-not atype " (default)")
+                 atexp       (if-not atype " (default)")
                  atype       (or atype (:default-type auth-config-global))
                  auth-config (auth/config-by-type auth-config-global atype)
                  db          (or (:db auth-config) db)
@@ -85,7 +85,7 @@
                (if-some [chains (auth/make-password-json plain-password auth-config)]
                  (let [ret (user/update-password db user-id chains)
                        cnt (or (::jdbc/update-count ret) 0)]
-                   (when (pos-int? cnt) (println "Password changed successfully."))
+                   (if (pos-int? cnt) (println "Password changed successfully."))
                    (println (str "Updated rows: " cnt)))
                  (println "Authentication engine could not produce password chains."))
                (println "Password is empty or blank.")))

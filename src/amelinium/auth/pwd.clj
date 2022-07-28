@@ -37,7 +37,7 @@
   [wait-start wait-randmax]
   (s/assert number? wait-start)
   (s/assert number? wait-randmax)
-  (when (pos? (+ wait-start wait-randmax))
+  (if (pos? (+ wait-start wait-randmax))
     (Thread/sleep
      (long
       (* 1000
@@ -58,10 +58,10 @@
     ^clojure.lang.PersistentVector possible-chars]
    (s/assert :amelinium.auth.settings.cipher/salt-length length)
    (s/assert :amelinium.auth.settings.cipher/salt-charset possible-chars)
-   (when (and (some? length)
-              (some? possible-chars)
-              (> length 0)
-              (> (count possible-chars) 0))
+   (if (and (some? length)
+            (some? possible-chars)
+            (> length 0)
+            (> (count possible-chars) 0))
      (apply str (repeatedly length #(get possible-chars (int (rand (count possible-chars)))))))))
 
 (defn generate-salt
@@ -70,9 +70,9 @@
    prefix suffix]
   (s/assert (s/nilable nat-int?) length)
   (s/assert (s/nilable  vector?) possible-chars)
-  (when (and (some? length) (> length 0))
-    (let [prefix (when (some? prefix) (to-bytes prefix))
-          suffix (when (some? suffix) (to-bytes suffix))
+  (if (and (some? length) (> length 0))
+    (let [prefix (if (some? prefix) (to-bytes prefix))
+          suffix (if (some? suffix) (to-bytes suffix))
           score  (if (seq possible-chars)
                    (to-bytes (salt-string length possible-chars))
                    (salt-bytes length))]
@@ -100,7 +100,7 @@
                               :pwd-plain  :amelinium.auth.plain/password)) opts-or-enc)
    (let [options   (if (or (nil? opts-or-enc) (map? opts-or-enc)) opts-or-enc {:password opts-or-enc})
          passwd    (:password options)
-         encrypted (when passwd (to-bytes passwd))
+         encrypted (if passwd (to-bytes passwd))
          provided  (:password (encrypt-fn plain options settings))]
      (if (and encrypted provided)
        (crypto/eq? encrypted provided)
@@ -112,10 +112,10 @@
   [password-or-cipher]
   (s/assert (s/nilable (s/or :settings-cipher :amelinium.auth.settings/cipher
                              :password-entry  :amelinium.auth/password)) password-or-cipher)
-  (when (some? password-or-cipher)
-    (when-some [h (map/lazy-get password-or-cipher
-                                :handler (var/deref (:handler-id password-or-cipher)))]
-      (when (and (map? h) (seq h)) h))))
+  (if (some? password-or-cipher)
+    (if-some [h (map/lazy-get password-or-cipher
+                              :handler (var/deref (:handler-id password-or-cipher)))]
+      (if (and (map? h) (seq h)) h))))
 
 (defn merge-suites
   ([crypto-suites-dual]
@@ -252,7 +252,7 @@
          settings user-settings]
 
      ;; wait some time
-     (when-not combo?
+     (if-not combo?
        ((:wait-fn settings) user-suite))
 
      (if combo? ; if the suite is a map then extract :shared and :intrinsic
@@ -271,8 +271,8 @@
            (if-some [nextf (next todo)]
              (let [encrypt-fn (:encrypt-fn handler)]
                (recur (:password (if (ifn? encrypt-fn) (encrypt-fn lastpass opts settings) lastpass)) nextf))
-             (when-some [checker-fn (:check-fn handler)]
-               (when (ifn? checker-fn) (checker-fn lastpass opts settings))))))))))
+             (if-some [checker-fn (:check-fn handler)]
+               (if (ifn? checker-fn) (checker-fn lastpass opts settings))))))))))
 
 ;;
 ;; Encode/decode as JSON

@@ -72,7 +72,7 @@
      (pick-without-fallback req pickers-or-picker-id :default)
      (pick-without-fallback req (get req :language/pickers) pickers-or-picker-id)))
   ([req pickers picker-id]
-   (when-some [picker (get pickers picker-id)]
+   (if-some [picker (get pickers picker-id)]
      (picker req))))
 
 (defn pick
@@ -107,7 +107,7 @@
          (pick-without-fallback req (get req :language/pickers) pickers-or-picker-id))
        (default-lang-id req)))
   ([req pickers picker-id]
-   (or (when-some [picker (get pickers picker-id)] (picker req))
+   (or (if-some [picker (get pickers picker-id)] (picker req))
        (default-lang-id req))))
 
 ;; Language pickers
@@ -171,10 +171,10 @@
   {:compile (fn [config]
               (let [lang-param        (param nil config)
                     lang-param        (if (get config :stringify-lang-param?) (some-str lang-param) lang-param)
-                    last-key          (when (some? lang-param) (cons lang-param nil))
+                    last-key          (if (some? lang-param) (cons lang-param nil))
                     supported         (supported nil config)
                     key-path          (get config :key-path)
-                    key-path          (when (valuable? key-path) (if (seqable? key-path) key-path (cons key-path nil)))
+                    key-path          (if (valuable? key-path) (if (seqable? key-path) key-path (cons key-path nil)))
                     path              (seq (concat (seq key-path) last-key))
                     [k1 k2 k3 & rest] path]
                 (case (count path)
@@ -192,16 +192,16 @@
   {:compile (fn [config]
               (let [supported (supported nil config)]
                 (fn [req]
-                  (when-some [phone (some-str (get (get req :body-params) :phone))]
-                    (when (phone/has-region? phone)
+                  (if-some [phone (some-str (get (get req :body-params) :phone))]
+                    (if (phone/has-region? phone)
                       (-> (phone/region phone) name some-keyword (get supported)))))))})
 
 (def body-phone-picker-str
   {:compile (fn [config]
               (let [supported (supported nil config)]
                 (fn [req]
-                  (when-some [phone (some-str (get (get req :body-params) "phone"))]
-                    (when (phone/has-region? phone)
+                  (if-some [phone (some-str (get (get req :body-params) "phone"))]
+                    (if (phone/has-region? phone)
                       (-> (phone/region phone) name some-keyword (get supported)))))))})
 
 (def accept-picker
@@ -234,16 +234,16 @@
   {:compile (fn [config]
               (let [supported (supported nil config)]
                 (fn [req]
-                  (when-some [phone (some-str (get (get req :form-params) "phone"))]
-                    (when (phone/has-region? phone)
+                  (if-some [phone (some-str (get (get req :form-params) "phone"))]
+                    (if (phone/has-region? phone)
                       (-> (phone/region phone) name some-keyword (get supported)))))))})
 
 (def form-param-phone-picker
   {:compile (fn [config]
               (let [supported (supported nil config)]
                 (fn [req]
-                  (when-some [phone (some-str (get (get req :form-params) :phone))]
-                    (when (phone/has-region? phone)
+                  (if-some [phone (some-str (get (get req :form-params) :phone))]
+                    (if (phone/has-region? phone)
                       (-> (phone/region phone) name some-keyword (get supported)))))))})
 
 (def path-picker
@@ -318,7 +318,7 @@
   and its result will be converted to a keyword and tested against existence in the
   aforementioned set of supported languages."
   [config p]
-  (when-some [p (var/deref-symbol p)]
+  (if-some [p (var/deref-symbol p)]
     (if (map? p)
       (let [parent     (var/deref-symbol (:derive p))
             p          (if (map? parent) (into parent (dissoc p :parent)) p)
@@ -326,8 +326,8 @@
             compile-fn (var/deref-symbol (:compile p))
             handler-fn (var/deref-symbol (:handler p))
             picker-fn  (if compile-fn (compile-fn config) #(handler-fn config %))]
-        (when (ifn? picker-fn) picker-fn))
-      (when (ifn? p)
+        (if (ifn? picker-fn) picker-fn))
+      (if (ifn? p)
         (comp (supported nil config) some-keyword p)))))
 
 (defn init-picker-chain
@@ -366,8 +366,8 @@
   (let [default (or (some-keyword-simple (:default config)) default-fallback-language)]
     (-> config
         (assoc  :default   default)
-        (update :supported #(when % (if (system/ref? %) % (map some-keyword-simple (if (coll? %) % (cons % nil))))))
-        (update :supported #(when % (if (system/ref? %) % (disj (conj (set %) default) nil))))
+        (update :supported #(if % (if (system/ref? %) % (map some-keyword-simple (if (coll? %) % (cons % nil))))))
+        (update :supported #(if % (if (system/ref? %) % (disj (conj (set %) default) nil))))
         (update :supported #(if (system/ref? %) % (or (not-empty %) #{default})))
         (update :param     (fnil some-keyword-simple :lang))
         init-pickers)))

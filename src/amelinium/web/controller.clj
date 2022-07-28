@@ -42,9 +42,9 @@
   ([req gmap]
    (restore-form-data req gmap nil))
   ([req gmap smap]
-   (when (and gmap (= (get req :uri) (get gmap :uri)))
-     (when-some [form-data (get gmap :form-data)]
-       (when (and (map? form-data) (pos-int? (count form-data)))
+   (if (and gmap (= (get req :uri) (get gmap :uri)))
+     (if-some [form-data (get gmap :form-data)]
+       (if (and (map? form-data) (pos-int? (count form-data)))
          (if-some [smap (or smap (common/session req))]
            (dissoc form-data (or (get smap :session-id-field) "session-id"))
            (let [sess-opts (get req :session/config)
@@ -85,7 +85,7 @@
 (defn login-data?
   "Returns true if :form-params map of a request contains login data."
   [req]
-  (when-some [fparams (get req :form-params)]
+  (if-some [fparams (get req :form-params)]
     (and (contains? fparams "password")
          (contains? fparams "login"))))
 
@@ -100,7 +100,7 @@
 (defn get-goto-for-valid+
   "Gets go-to map from session variable if the session is valid (and not expired)."
   [smap sess-opts]
-  (when (and smap (get smap :valid?))
+  (if (and smap (get smap :valid?))
     (get-goto+ smap sess-opts)))
 
 (defn populate-goto+
@@ -159,7 +159,7 @@
   [req]
   (let [form-params    (get req :form-params)
         user-email     (some-str (get form-params "login"))
-        password       (when user-email (some-str (get form-params "password")))
+        password       (if user-email (some-str (get form-params "password")))
         sess           (common/session req)
         lang           (web/pick-language-str req :user)
         valid-session? (get sess :valid?)
@@ -189,7 +189,7 @@
         (assoc-in [:app/data :lock-remains]
                   (delay (lock-remaining-mins req
                                               (web/auth-db req)
-                                              (when @prolonged? sess)
+                                              (if @prolonged? sess)
                                               t/now))))))
 
 (defn prep-request!

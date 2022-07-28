@@ -39,15 +39,15 @@
 
 (defn phone-exists?
   [db phone]
-  (when db
-    (when-some [phone (some-str phone)]
+  (if db
+    (if-some [phone (some-str phone)]
       (-> (jdbc/execute-one! db [phone-exists-query phone] db/opts-simple-vec)
           first some?))))
 
 (defn email-exists?
   [db email]
-  (when db
-    (when-some [email (some-str email)]
+  (if db
+    (if-some [email (some-str email)]
       (-> (jdbc/execute-one! db [email-exists-query email] db/opts-simple-vec)
           first some?))))
 
@@ -120,14 +120,14 @@
   ([db query id exp]
    (gen-confirmation-core db id exp query nil))
   ([db query id exp reason]
-   (when db
-     (when-some [id (some-str id)]
+   (if db
+     (if-some [id (some-str id)]
        (let [code   (gen-code)
              token  (gen-token)
              reason (or (some-str reason) "creation")
              exp    (or exp (t/new-duration 10 :minutes))
              exp    (if (t/duration? exp) (t/hence exp) exp)]
-         (when-some [r (jdbc/execute-one! db [query id code token reason exp id] db/opts-simple-map)]
+         (if-some [r (jdbc/execute-one! db [query id code token reason exp id] db/opts-simple-map)]
            (let [user-id    (get r :user-id)
                  exists?    (pos-int? user-id)
                  confirmed? (pos-int? (get r :confirmed))]
@@ -204,11 +204,11 @@
   "Returns a confirmation token associated with the given confirmation code and
   identity."
   [db id code]
-  (when-some [r (first
-                 (sql/find-by-keys db :confirmations
-                                   {:id id :code code}
-                                   (assoc db/opts-simple-map
-                                          :columns [:token :confirmed])))]
+  (if-some [r (first
+               (sql/find-by-keys db :confirmations
+                                 {:id id :code code}
+                                 (assoc db/opts-simple-map
+                                        :columns [:token :confirmed])))]
     (-> r
         (assoc  :confirmed? (pos-int? (get r :confirmed)))
         (dissoc :confirmed))))
@@ -245,14 +245,14 @@
    (let [reason (or (some-str reason) "creation")
          id     (some-str id)
          code   (some-str code)]
-     (when (and id code (pos-int? exp-inc))
-       (when-some [r (::jdbc/update-count
-                      (jdbc/execute-one! db [confirm-code-query exp-inc id code reason]
-                                         db/opts-simple-map))]
-         (when (int? r)
-           (let [r     (when (pos-int? r) (code-to-token db id code))
-                 token (when r (get r :token))]
-             (or (when (and r (get r :confirmed?)) r)
+     (if (and id code (pos-int? exp-inc))
+       (if-some [r (::jdbc/update-count
+                    (jdbc/execute-one! db [confirm-code-query exp-inc id code reason]
+                                       db/opts-simple-map))]
+         (if (int? r)
+           (let [r     (if (pos-int? r) (code-to-token db id code))
+                 token (if r (get r :token))]
+             (or (if (and r (get r :confirmed?)) r)
                  (let [err (confirmation-report-error db id code reason)]
                    {:confirmed? (= err :verify/confirmed) :error err}))))))))
   ([db id code token exp-inc reason]
@@ -260,12 +260,12 @@
      (establish db token exp-inc reason)
      (establish db id code exp-inc reason)))
   ([db token exp-inc reason]
-   (when-some [token (some-str token)]
+   (if-some [token (some-str token)]
      (let [reason (or (some-str reason) "creation")]
-       (when-some [r (::jdbc/update-count
-                      (jdbc/execute-one! db [confirm-token-query exp-inc token reason]
-                                         db/opts-simple-map))]
-         (when (int? r)
+       (if-some [r (::jdbc/update-count
+                    (jdbc/execute-one! db [confirm-token-query exp-inc token reason]
+                                       db/opts-simple-map))]
+         (if (int? r)
            (if (pos-int? r)
              {:confirmed? true :token token}
              (let [err (confirmation-report-error db token reason)]

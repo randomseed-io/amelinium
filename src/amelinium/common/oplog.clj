@@ -31,8 +31,7 @@
 (defn drain!
   "Drains the channel by getting all elements from it until nothing is left to get."
   [chan]
-  (when chan
-    (take-while some? (repeatedly #(async/poll! chan)))))
+  (if chan (take-while some? (repeatedly #(async/poll! chan)))))
 
 ;; Runner
 
@@ -110,7 +109,7 @@
   `amelinium.common.oplog.auth/log-reporter` (reporting) and
   `amelinium.common.oplog.auth/log-writer` (writing). Both must be defined."
   [k {:keys [db table writer reporter buffered-max timeout] :as config}]
-  (when (and db (ident? k) (valuable? table))
+  (if (and db (ident? k) (valuable? table))
     (let [db          (db/ds db)
           writer-id   (some-symbol writer)
           writer-fn   (var/deref writer-id)
@@ -120,7 +119,7 @@
           reporter-fn (var/deref reporter-id)
           reporter-id (if reporter-fn reporter-id (some-symbol (str (some-str k) "-reporter")))
           reporter-fn (or reporter-fn (var/deref reporter-id))]
-      (when (and (fn? writer-fn) (fn? reporter-fn) (db/data-source? db))
+      (if (and (fn? writer-fn) (fn? reporter-fn) (db/data-source? db))
         (let [id            (keyword k)
               table         (some-keyword-simple table)
               buffered-max  (safe-parse-long buffered-max 108)

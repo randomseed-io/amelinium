@@ -116,8 +116,7 @@
 (defn some-uuid-str
   [s]
   (let [s (some-str s)]
-    (when (uuid/uuidable? s)
-      s)))
+    (if (uuid/uuidable? s) s)))
 
 (defn uuidable?
   [v]
@@ -125,7 +124,7 @@
 
 (defn as-uuid
   [v]
-  (when (uuid/uuidable? v)
+  (if (uuid/uuidable? v)
     (uuid/as-uuid v)))
 
 (defn key-as-uuid
@@ -135,12 +134,12 @@
 (defn get-id-by-uid
   [db query uid]
   (let [uid (some-uuid-str uid)]
-    (when (and db uid)
+    (if (and db uid)
       (first (jdbc/execute-one! db [query uid] opts-simple-vec)))))
 
 (defn get-ids-by-uids
   [db query uids]
-  (when (and db uids)
+  (if (and db uids)
     (let [uids  (map some-uuid-str uids)
           query (str query " " (braced-join-? uids))]
       (->> (sql/query db (cons query uids) opts-simple-vec)
@@ -152,12 +151,12 @@
 
 (defn cache-lookup-uuid
   [cache db id-getter uid]
-  (when (and db (uuidable? uid))
+  (if (and db (uuidable? uid))
     (cwr/lookup-or-miss cache (uuid/as-uuid uid) #(id-getter db %))))
 
 (defn cache-lookup-uuids
   [cache uids]
-  (when (seq uids)
+  (if (seq uids)
     (let [uids (map #(when-valuable % (as-uuid %)) uids)]
       (reduce (fn [m uid]
                 (let [id (cwr/lookup cache uid false)]
@@ -172,7 +171,7 @@
 
 (defn uids-to-ids
   [db cache getter uids]
-  (when (and db uids)
+  (if (and db uids)
     (let [looked-up (cache-lookup-uuids cache uids)
           missing   (seq (get looked-up false))]
       (if-not missing
@@ -187,12 +186,12 @@
 (defn get-id-by-email
   [db query email]
   (let [email (some-str email)]
-    (when (and db email)
+    (if (and db email)
       (first (jdbc/execute-one! db [query email] opts-simple-vec)))))
 
 (defn get-ids-by-emails
   [db query emails]
-  (when (and db emails)
+  (if (and db emails)
     (let [emails (map some-str emails)
           query  (str query " " (braced-join-? emails))]
       (->> (sql/query db (cons query emails) opts-simple-vec)
@@ -204,12 +203,12 @@
 
 (defn cache-lookup-email
   [cache db id-getter email]
-  (when (and db (valuable? email))
+  (if (and db (valuable? email))
     (cwr/lookup-or-miss cache (keyword email) #(id-getter db %))))
 
 (defn cache-lookup-emails
   [cache emails]
-  (when (seq emails)
+  (if (seq emails)
     (let [emails (map #(when-valuable % (keyword %)) emails)]
       (reduce (fn [m email]
                 (let [id (cwr/lookup cache email false)]
@@ -224,7 +223,7 @@
 
 (defn emails-to-ids
   [db cache getter emails]
-  (when (and db emails)
+  (if (and db emails)
     (let [looked-up (cache-lookup-emails cache emails)
           missing   (seq (get looked-up false))]
       (if-not missing
@@ -260,7 +259,7 @@
 
 (def dbname-key-finder
   (some-fn (comp some-str :orig-key)
-           #(when (or (string? %) (ident? %)) (some-str %))
+           #(if (or (string? %) (ident? %)) (some-str %))
            (comp some-str :dbkey)
            (comp some-str :dbkey :properties)
            (comp some-str :dbkey :datasource)
@@ -273,7 +272,7 @@
            (comp some-str :dbkey :properties :datastore)))
 
 (def dbname-finder
-  (some-fn #(when (or (string? %) (ident? %)) (some-str %))
+  (some-fn #(if (or (string? %) (ident? %)) (some-str %))
            (comp some-str :dbname :properties)
            (comp some-str :dbname :datasource)
            (comp some-str :dbname)
@@ -294,7 +293,7 @@
   "Obtains the database (data source) name from the given configuration data structure
   by using known patterns."
   ([v]
-   (when v
+   (if v
      (or (and (db-config? v) (some-str (get v :dbname)))
          (dbname-finder v)
          nil)))
@@ -307,7 +306,7 @@
   "Obtains the database (data source) key name from the given configuration data
   structure by using known patterns."
   ([v]
-   (when v
+   (if v
      (or (and (db-config? v) (some-str (get v :dbkey)))
          (dbname-key-finder v)
          nil)))
@@ -336,12 +335,12 @@
   [config]
   (let [db-spec (merge (:properties config) (:datasource (:datastore config)))
         db-name (or (db-name db-spec) (db-name config))]
-    (when (and db-name db-spec)
+    (if (and db-name db-spec)
       (jdbc/execute! (dissoc db-spec :dbname) [(str-spc "CREATE DATABASE IF NOT EXISTS" db-name)]))))
 
 (defn migration-databases
   [config]
-  (when (and config (sequential? config) (seq config))
+  (if (and config (sequential? config) (seq config))
     (->> (filter fn? config)
          (map #(:dbkey (%)))
          (filter identity)
@@ -370,17 +369,17 @@
    (let [mig-key      (migrators-key opts)
          state-pre    (migrators-state mig-key)
          start-admin! (get opts :fn/start-admin app/start-admin!)]
-     (when-not (:migrators? state-pre) (start-admin! mig-key))
+     (if-not (:migrators? state-pre) (start-admin! mig-key))
      (if (fn? opts)
        (ragtime-repl/migrate (opts))
        (doseq [mconfig (get app/state mig-key)]
          (let [config (merge (mconfig) opts)
                dbname (db-name config)
                dbkey  (db-key-name config)]
-           (when (pos-int? (::jdbc/update-count (first (try-initialize-db config))))
+           (if (pos-int? (::jdbc/update-count (first (try-initialize-db config))))
              (log/msg "Created empty database" dbname (str "(" dbkey ")")))
            (ragtime-repl/migrate config))))
-     (when-not (:migrators? state-pre)
+     (if-not (:migrators? state-pre)
        (let [state-post (migrators-state mig-key)
              stop-keys  (concat (set/difference (:dbs-up   state-post) (:dbs-up   state-pre))
                                 (set/difference (:props-up state-post) (:props-up state-pre)))]
@@ -398,13 +397,13 @@
    (let [mig-key      (migrators-key opts)
          state-pre    (migrators-state mig-key)
          start-admin! (get opts :fn/start-admin app/start-admin!)]
-     (when-not (:migrators? state-pre) (start-admin! mig-key))
+     (if-not (:migrators? state-pre) (start-admin! mig-key))
      (if (fn? opts)
        (ragtime-repl/rollback (opts))
        (if (or (not opts) (map? opts))
          (doseq [migrator (get app/state mig-key)] (ragtime-repl/rollback (merge (migrator) opts)))
          (doseq [migrator (get app/state mig-key)] (ragtime-repl/rollback (migrator) opts))))
-     (when-not (:migrators? state-pre)
+     (if-not (:migrators? state-pre)
        (let [state-post (migrators-state mig-key)
              stop-keys  (concat (set/difference (:dbs-up   state-post) (:dbs-up   state-pre))
                                 (set/difference (:props-up state-post) (:props-up state-pre)))]
@@ -413,11 +412,11 @@
    (let [mig-key      (migrators-key opts)
          state-pre    (migrators-state mig-key)
          start-admin! (get opts :fn/start-admin app/start-admin!)]
-     (when-not (:migrators? state-pre) (start-admin! mig-key))
+     (if-not (:migrators? state-pre) (start-admin! mig-key))
      (if (fn? opts)
        (ragtime-repl/rollback (opts) amount-or-id)
        (doseq [migrator (get app/state mig-key)] (ragtime-repl/rollback (merge (migrator) opts) amount-or-id)))
-     (when-not (:migrators? state-pre)
+     (if-not (:migrators? state-pre)
        (let [state-post (migrators-state mig-key)
              stop-keys  (concat (set/difference (:dbs-up   state-post) (:dbs-up   state-pre))
                                 (set/difference (:props-up state-post) (:props-up state-pre)))]
@@ -433,11 +432,11 @@
 
 (defn- unary-close-method
   ^Boolean [^Method met]
-  (and (= "close" (.getName met) (nil? (seq (.getParameterTypes met))))))
+  (and (= "close" (.getName met)) (nil? (seq (.getParameterTypes met)))))
 
 (defn close!
   [obj]
-  (when obj
+  (if obj
     (if (isa? (class obj) Closeable)
       (.close ^Closeable obj)
       (some-> unary-close-method
@@ -497,7 +496,7 @@
   ([k config ds-getter ds-closer ds-suspender]
    (init-db k config ds-getter ds-closer ds-suspender nil))
   ([k config ds-getter ds-closer ds-suspender ds-resumer]
-   (when config
+   (if config
      (let [db-props (-> :properties config (dissoc :logger :migrations-dir) prep-db)
            db-name  (db-name db-props config k)
            db-key   (db-key-name k db-props config)
@@ -516,7 +515,7 @@
   (when config
     (log/msg "Closing database connection to" (db-name config k) (str "(" (db-key-name k config) ")"))
     (let [ds-closer (or (:finalizer config) close!)]
-      (when-some [ds (or (:datasource config) (:datastore config) (:database config))]
+      (if-some [ds (or (:datasource config) (:datastore config) (:database config))]
         (ds-closer ds))
       nil)))
 
@@ -533,7 +532,7 @@
   (let [ds-resumer (or (:resumer old-impl) (:resumer config) (:resumer old-config))]
     (if (and ds-resumer (= (dissoc config :initializer :finalizer :suspender :resumer)
                            (dissoc config :initializer :finalizer :suspender :resumer)))
-      (when-some [ds (:datasource old-impl)] (ds-resumer ds) old-impl)
+      (if-some [ds (:datasource old-impl)] (ds-resumer ds) old-impl)
       (do (system/halt-key! k old-impl)
           (system/init-key k config)))))
 
@@ -568,12 +567,12 @@
 
 (defn init-migrators
   [config]
-  (when (and config (sequential? config) (seq config))
+  (if (and config (sequential? config) (seq config))
     (mapv #(if (fn? %) % (init-mig nil %)) config)))
 
 (defn close-mig
   [k config]
-  (when (and (ident? k) (fn? config))
+  (if (and (ident? k) (fn? config))
     (when-some [config (config)]
       (close-db k config)
       nil)))

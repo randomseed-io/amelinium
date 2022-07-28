@@ -41,27 +41,27 @@
 
 (defn- bytes->b64u
   [v]
-  (try (when v (codecs/bytes->str (codecs/bytes->b64u v)))
+  (try (if v (codecs/bytes->str (codecs/bytes->b64u v)))
        (catch Throwable _
          nil)))
 
 (defn- b64u->bytes
   [v]
-  (try (when v (codecs/b64u->bytes (codecs/str->bytes v)))
+  (try (if v (codecs/b64u->bytes (codecs/str->bytes v)))
        (catch Throwable _
          nil)))
 
 (defn encrypt
   [plain-token]
-  (when plain-token
-    (when-some [enc (scrypt/encrypt plain-token scrypt-options)]
+  (if plain-token
+    (if-some [enc (scrypt/encrypt plain-token scrypt-options)]
       (str (bytes->b64u (bytes (get enc :salt))) "$"
            (bytes->b64u (bytes (get enc :password)))))))
 
 (defn check-encrypted
   ([plain-token encrypted-token-b64-str]
-   (when (and plain-token encrypted-token-b64-str)
-     (when-some [salt-pass (str/split encrypted-token-b64-str salt-splitter 2)]
+   (if (and plain-token encrypted-token-b64-str)
+     (if-some [salt-pass (str/split encrypted-token-b64-str salt-splitter 2)]
        (crypto/eq? (b64u->bytes (nth salt-pass 1 nil))
                    (get (scrypt/encrypt plain-token
                                         (b64u->bytes (nth salt-pass 0 nil))
@@ -136,20 +136,20 @@
 
 (defn ip-state
   [smap user-id user-email remote-ip]
-  (when-some [session-ip (or (get smap :ip) (get smap :ip-address))]
+  (if-some [session-ip (or (get smap :ip) (get smap :ip-address))]
     (if-some [remote-ip (ip/to-address remote-ip)]
-      (when-not (or (= (ip/to-v6 remote-ip) (ip/to-v6 session-ip))
-                    (= (ip/to-v4 remote-ip) (ip/to-v4 session-ip)))
+      (if-not (or (= (ip/to-v6 remote-ip) (ip/to-v6 session-ip))
+                  (= (ip/to-v4 remote-ip) (ip/to-v4 session-ip)))
         {:cause    :bad-ip
          :reason   (str-spc "Session IP address" (str "(" (ip/plain-ip-str session-ip) ")")
                             "is different than the remote IP address"
                             (str "(" (ip/plain-ip-str remote-ip) ")")
                             (log/for-user user-id user-email))
          :severity :warn})
-      (when-some [str-addr (ip/to-str remote-ip)]
-        (when-not (or (= str-addr (ip/to-str session-ip))
-                      (= str-addr (ip/to-str (ip/to-v4 session-ip)))
-                      (= str-addr (ip/to-str (ip/to-v6 session-ip))))
+      (if-some [str-addr (ip/to-str remote-ip)]
+        (if-not (or (= str-addr (ip/to-str session-ip))
+                    (= str-addr (ip/to-str (ip/to-v4 session-ip)))
+                    (= str-addr (ip/to-str (ip/to-v6 session-ip))))
           {:cause    :bad-ip
            :reason   (str-spc "Session IP string" (str "(" (ip/to-str remote-ip) ")")
                               "is different than the remote IP string"
@@ -171,13 +171,13 @@
 
 (defn expired?
   ([smap opts]
-   (when-some [exp (get opts :expires)]
+   (if-some [exp (get opts :expires)]
      (and (pos-int? (time/seconds exp))
           (time-exceeded? (get smap :active) (t/now) exp)))))
 
 (defn hard-expired?
   [smap opts]
-  (when-some [hexp (get opts :hard-expires)]
+  (if-some [hexp (get opts :hard-expires)]
     (and (pos-int? (time/seconds hexp))
          (time-exceeded? (get smap :active) (t/now) hexp))))
 
@@ -391,7 +391,7 @@
 
 (defn- prep-names
   [coll]
-  (when (coll? coll)
+  (if (coll? coll)
     (seq (if (map? coll) (keys coll) coll))))
 
 (defn get-var
@@ -485,12 +485,12 @@
    (invalidate-cache! req :session/config))
   ([req opts-or-config-key]
    (let [opts (config-options req opts-or-config-key)]
-     (when-some [invalidator (get opts :fn/invalidator)]
+     (if-some [invalidator (get opts :fn/invalidator)]
        (let [smap (get req (or (get opts :session-key) :session))]
          (invalidator (or (get smap :id) (get smap :err/id))
                       (get req :remote-ip))))))
   ([opts-or-fn sid-or-smap ip-address]
-   (when-some [invalidator (if (map? opts-or-fn) (get opts-or-fn :fn/invalidator) opts-or-fn)]
+   (if-some [invalidator (if (map? opts-or-fn) (get opts-or-fn :fn/invalidator) opts-or-fn)]
      (invalidator (if (map? sid-or-smap)
                     (or (get sid-or-smap :id)
                         (get sid-or-smap :err/id))
@@ -511,12 +511,12 @@
    (let [opts (config-options req opts-or-config-key)]
      ((get opts :fn/refresh) smap remote-ip)))
   ([opts last-active-fn invalidator-fn cache-expires smap remote-ip]
-   (or (when cache-expires
-         (when-some [last-active (get smap :active)]
+   (or (if cache-expires
+         (if-some [last-active (get smap :active)]
            (let [inactive-for (t/between last-active (t/now))]
              (when (t/> inactive-for cache-expires)
                (invalidator-fn (or (get smap :id) (get smap :err/id)) remote-ip)
-               (when-some [last-active (last-active-fn (db-sid-smap smap) remote-ip)]
+               (if-some [last-active (last-active-fn (db-sid-smap smap) remote-ip)]
                  (assoc smap :active last-active))))))
        smap)))
 
@@ -664,7 +664,7 @@
    (let [opts (config-options req opts-or-config-key)]
      ((get opts :fn/prolong) smap ip-address)))
   ([opts handler-fn update-active-fn invalidator-fn smap ip-address]
-   (when-some [sid (or (get smap :err/id) (get smap :id))]
+   (if-some [sid (or (get smap :err/id) (get smap :id))]
      (let [ip-address (ip/to-address ip-address)
            ipplain    (ip/plain-ip-str ip-address)
            new-time   (t/now)
@@ -699,8 +699,8 @@
    (let [user-id    (valuable user-id)
          user-email (some-str user-email)]
      (if-not (and user-id user-email)
-       (do (when-not user-id    (log/err "No user ID given when creating a session"))
-           (when-not user-email (log/err "No user e-mail given when creating a session"))
+       (do (if-not user-id    (log/err "No user ID given when creating a session"))
+           (if-not user-email (log/err "No user e-mail given when creating a session"))
            nil)
        (let [t       (t/now)
              ip      (ip/to-address ip-address)
@@ -750,7 +750,7 @@
   (let [expires   (get config :expires)
         cache-ttl (get config :cache-ttl)]
     (assoc config :cache-expires
-           (when (and expires cache-ttl)
+           (if (and expires cache-ttl)
              (if (t/> cache-ttl expires)
                (t/new-duration 1 :seconds)
                (t/- expires cache-ttl))))))
@@ -854,11 +854,11 @@
                                     %1 %2 %3)
         config             (assoc config :fn/create create-fn)]
     (log/msg "Installing session handler:" k)
-    (when dbname (log/msg "Using database" dbname "for storing sessions"))
+    (if dbname (log/msg "Using database" dbname "for storing sessions"))
     {:name    (keyword k)
      :config  config
      :compile (fn [{:keys [no-session?]} opts]
-                (when (and (not no-session?) db)
+                (if (and (not no-session?) db)
                   (fn [h]
                     (fn [req]
                       (h

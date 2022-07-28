@@ -21,8 +21,8 @@
       :or   {enabled? true}}]
   (when enabled?
     (log/msg "Initializing debugging middleware")
-    (let [request-keys  (when (seq request-keys)  request-keys)
-          response-keys (when (seq response-keys) response-keys)]
+    (let [request-keys  (if (seq request-keys)  request-keys)
+          response-keys (if (seq response-keys) response-keys)]
       {:name    k
        :compile (fn [_ _]
                   (fn [handler]

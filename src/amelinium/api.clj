@@ -605,10 +605,10 @@
          k-blank (seq (get r :blank))
          k-any   (seq (get r :any))
          r       (concat
-                  (when k-some  (map vector k-some  (repeatedly random-uuid)))
-                  (when k-blank (map vector k-blank (repeat "")))
-                  (when k-any   (map vector k-any   (repeatedly #(random-uuid-or-empty rng)))))]
-     (when (seq r)
+                  (if k-some  (map vector k-some  (repeatedly random-uuid)))
+                  (if k-blank (map vector k-blank (repeat "")))
+                  (if k-any   (map vector k-any   (repeatedly #(random-uuid-or-empty rng)))))]
+     (if (seq r)
        (into {} r)))))
 
 ;; Other helpers

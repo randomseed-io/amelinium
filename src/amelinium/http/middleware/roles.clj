@@ -45,18 +45,18 @@
   ([req]
    (filter-in-context (get req :roles/context) (get req :roles) (get req :roles/config)))
   ([context roles config]
-   (when (valuable? roles)
+   (if (valuable? roles)
      (let [context        (some-keyword context)
            global-context (get config :global-context)
-           context-roles  (when context (get roles context))
-           global-roles   (when global-context (get roles global-context))]
+           context-roles  (if context (get roles context))
+           global-roles   (if global-context (get roles global-context))]
        (set/union context-roles global-roles)))))
 
 (defn user-authenticated?
   "Returns true if user is authenticated, false otherwise."
   [session]
   (boolean
-   (when (map? session)
+   (if (map? session)
      (and (get session :valid?)
           (some? (get session :id))
           (some? (get session :user/id))))))
@@ -86,7 +86,7 @@
                      (get config :authorize-default? true)))
   ([req in-context _ auth-default?]
    (if-some [data (not-empty (get (ring/get-match req) :data))]
-     (when-not (some-> (get data :roles/forbidden) (contains-some? in-context))
+     (if-not (some-> (get data :roles/forbidden) (contains-some? in-context))
        (if-some [roles-any (not-empty (get data :roles/any))]
          (or  (contains-some? roles-any in-context)
               (some-> (get data :roles/all) (set/subset? in-context)) false)
@@ -115,7 +115,7 @@
   ([user-id config db]
    (query-roles db user-id))
   ([db user-id]
-   (when (and db user-id)
+   (if (and db user-id)
      (sql/find-by-keys db :roles {:user-id user-id} db/opts-simple-map))))
 
 (defn parse-roles
@@ -131,7 +131,7 @@
    (let [remove-unknown (if (or keep-unknown? (empty? known-roles))
                           identity
                           (partial filter (comp (partial contains? known-roles) :role)))]
-     (when (seq roles)
+     (if (seq roles)
        (->> roles
             (filter identity)
             (map #(update % :role keyword))
@@ -196,7 +196,7 @@
   ([config user-id handler-fn global-context anonymous-role]
    (if (valuable? user-id)
      (handler-fn user-id)
-     (when anonymous-role {global-context #{anonymous-role}}))))
+     (if anonymous-role {global-context #{anonymous-role}}))))
 
 (defn get-roles-from-session
   "Uses session map (`session`) to obtain current user's ID and then calls `handler-fn`
@@ -217,7 +217,7 @@
          roles   (get-roles-for-user-id config user-id handler-fn global-context anonymous-role)]
      (if (or (get session :valid?) (not user-id))
        roles
-       (when known-user-role {global-context #{known-user-role}})))))
+       (if known-user-role {global-context #{known-user-role}})))))
 
 (defn get-req-context
   "Gets context from a request using a key path."
@@ -244,10 +244,10 @@
                  (get config :req-self-path)
                  (get config :req-self-check-path)))
   ([req config self-role self-path self-check-path]
-   (when self-path
-     (when-some [req-self-value (get-in req self-path)]
+   (if self-path
+     (if-some [req-self-value (get-in req self-path)]
        (if self-check-path
-         (when (= req-self-value (get-in req self-check-path)) self-role)
+         (if (= req-self-value (get-in req self-check-path)) self-role)
          self-role)))))
 
 (defn force-context
@@ -299,7 +299,7 @@
     global-context authorize-default? session-key]
    (let [session        (get req session-key)
          authenticated? (delay (user-authenticated? session))
-         roles          (delay (let [sr (when (and self-role @authenticated?) (srfn req))]
+         roles          (delay (let [sr (if (and self-role @authenticated?) (srfn req))]
                                  (cond-> (get-roles-from-session config session
                                                                  processor
                                                                  global-context
@@ -362,14 +362,14 @@
 
 (defn- setup-req-path
   [v]
-  (when v
+  (if v
     (if (coll? v)
       (mapv some-keyword v)
       [(some-keyword v)])))
 
 (defn- setup-req-fn
   [v]
-  (when v
+  (if v
     (if (fn? v) v (var/deref-symbol v))))
 
 (defn- setup-session-key
@@ -435,7 +435,7 @@
            self-role logged-in-role anonymous-role known-user-role roles
            authorize-default? keep-unknown?]
     :as   config}]
-  (when-some [processor (var/deref-symbol (:handler config))]
+  (if-some [processor (var/deref-symbol (:handler config))]
     (let [handler-name     (:handler config)
           dbname           (db/db-name db)
           config           (-> config (dissoc :handler) (update :db db/ds) prep-config setup-session-key)
@@ -463,7 +463,7 @@
       (log/msg "Using database" dbname "for permissions")
       {:name    ::roles
        :compile (fn [{:keys [no-roles?]} opts]
-                  (when (and (not no-roles?) db)
+                  (if (and (not no-roles?) db)
                     (fn [h]
                       (fn [req]
                         (h

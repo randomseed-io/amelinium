@@ -43,7 +43,7 @@
   [{:keys [enabled? port join? gzip? handler properties
            keystore truststore same-key-passwords? key-password trust-password]
     :as   options}]
-  (when enabled?
+  (if enabled?
     (log/msg-with-val
      "HTTP server (Jetty) is starting on port" port
      (let [handler        (atom (delay handler))
@@ -51,7 +51,7 @@
            same-pwd?      (boolean same-key-passwords?)
            gzip?          (boolean gzip?)
            key-password   (ssl/ask-pass-keystore keystore key-password)
-           trust-password (when same-pwd? key-password)
+           trust-password (if same-pwd? key-password)
            trust-password (ssl/ask-pass-truststore truststore trust-password)
            options        (-> options
                               (map/assoc-missing   :name                 (properties :name))
@@ -74,7 +74,7 @@
 
 (defn suspend
   [{:keys [handler options]}]
-  (when handler
+  (if handler
     (log/msg-with-val
      "HTTP server (Jetty) connections to port" (options :port) "are suspended"
      (reset! handler (promise)))))
@@ -89,12 +89,12 @@
         (log/msg "Resuming HTTP server (Jetty) connections to port" (:port opts))
         (deliver @old-handler handler)
         old-impl))
-    (do (when old-impl (system/halt-key! k old-impl))
+    (do (if old-impl (system/halt-key! k old-impl))
         (system/init-key  k config))))
 
 (defn stop
   [{:keys [server options]}]
-  (when (and server options)
+  (if (and server options)
     (log/msg-with-val
      "HTTP server (Jetty) is stopping on port" (options :port)
-     (when-some [s server] (.stop ^Server s)))))
+     (if-some [s server] (.stop ^Server s)))))
