@@ -126,16 +126,17 @@
   ([options]
    (gen/fmap
     (fn [random-uuid]
-      (phone/generate (:region          options)
-                      (:type            options)
-                      (:predicate       options)
-                      (:retries         options 150)
-                      (:min-digits      options 3)
-                      (:locale          options)
-                      (:random-seed     options (.getMostSignificantBits ^UUID random-uuid))
-                      (:early-shrinking options false)
-                      (:preserve-raw    options true)))
-    (gen/uuid))))
+      (:phone-number/number
+       (phone/generate (:region          options)
+                       (:type            options)
+                       (:predicate       options)
+                       (:retries         options 150)
+                       (:min-digits      options 3)
+                       (:locale          options)
+                       (:random-seed     options (.getMostSignificantBits ^UUID random-uuid))
+                       (:early-shrinking options false)
+                       (:preserve-raw    options true))))
+    gen/uuid)))
 
 (def gen-regular-phone
   (make-gen-phone {:min-digits 5 :predicate vc/valid-regular-phone?}))
@@ -175,15 +176,15 @@
     (m/-simple-schema
      {:type            :regular-phone
       :pred            vc/valid-regular-phone?
-      :type-properties {:error/message      "should be a regular phone number"
-                        :decode/string      obj->phone
-                        :decode/json        obj->phone
-                        :encode/string      phone->str
-                        :encode/json        phone->str
-                        :json-schema/type   "string"
-                        :json-schema/format "phone"
-                        ;;:json-schema/example (gen/generate gen-regular-phone)
-                        :gen/gen            gen-regular-phone}})))
+      :type-properties {:error/message       "should be a regular phone number"
+                        :decode/string       obj->phone
+                        :decode/json         obj->phone
+                        :encode/string       phone->str
+                        :encode/json         phone->str
+                        :json-schema/type    "string"
+                        :json-schema/format  "phone"
+                        :json-schema/example (gen/generate gen-regular-phone)
+                        :gen/gen             gen-regular-phone}})))
 
 (def phone
   (let [obj->phone #(phutil/try-parse (phone/number %))
@@ -191,15 +192,15 @@
     (m/-simple-schema
      {:type            :phone
       :pred            phone/valid?
-      :type-properties {:error/message      "should be a phone number"
-                        :decode/string      obj->phone
-                        :decode/json        obj->phone
-                        :encode/string      phone->str
-                        :encode/json        phone->str
-                        :json-schema/type   "string"
-                        :json-schema/format "phone"
-                        ;;:json-schema/example (gen/generate gen-phone)
-                        :gen/gen            gen-phone}})))
+      :type-properties {:error/message       "should be a phone number"
+                        :decode/string       obj->phone
+                        :decode/json         obj->phone
+                        :encode/string       phone->str
+                        :encode/json         phone->str
+                        :json-schema/type    "string"
+                        :json-schema/format  "phone"
+                        :json-schema/example (gen/generate gen-phone)
+                        :gen/gen             gen-phone}})))
 
 (def password
   (m/-simple-schema
