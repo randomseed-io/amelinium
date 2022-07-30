@@ -20,8 +20,7 @@
             [io.randomseed.utils.vec               :as             vec]
             [io.randomseed.utils.map               :as             map]
             [io.randomseed.utils                   :refer         :all]
-            [potpuri.core                          :refer [deep-merge]]
-            [puget.printer :refer [cprint]]))
+            [potpuri.core                          :refer [deep-merge]]))
 
 ;; Default validation strategy.
 ;; If `true` then parameters without validators assigned are considered valid.
@@ -363,7 +362,6 @@
   logic behind preparing the configuration."
   [k config]
   (log/msg "Installing validators:" k)
-  (cprint config)
   {:name    k
    :config  config
    :compile (fn [data _]
@@ -384,44 +382,48 @@
                     required-source (or required-source :required/user)
                     required-mode   (or required-mode   :all)
                     required        (if check-required? (get config required-source))]
-                (cprint required)
-                (if explain?
-                  (let [explain-fn (case required-mode
-                                     :all v/explain-all-required
-                                     :one v/explain-required
-                                     (if (int? required-mode)
-                                       (partial v/explain-required (unchecked-int required-mode))
-                                       v/explain-all-required))]
-                    (fn [handler]
-                      (fn [req]
-                        (handler
-                         (if (get req :validators/disabled?)
-                           (assoc req config-key config result-key true)
-                           (let [reasons (v/explain (get req :form-params)
-                                                    validators-all
-                                                    default-pass?
-                                                    required
-                                                    explain-fn)]
-                             (assoc req
-                                    config-key config
-                                    result-key (nil? (first reasons))
-                                    explain-key reasons)))))))
-                  (let [check-fn (case required-mode
-                                   :all v/has-all-required?
-                                   :one v/has-required?
-                                   (if (int? required-mode)
-                                     (partial v/has-n-required? (unchecked-int required-mode))
-                                     v/has-all-required?))]
-                    (fn [handler]
-                      (fn [req]
-                        (handler
-                         (let [result (or (get req :validators/disabled?)
-                                          (v/validate (get req :form-params)
+                (if disabled?
+                  (fn [handler]
+                    (fn [req]
+                      (handler
+                       (assoc req result-key true))))
+                  (if explain?
+                    (let [explain-fn (case required-mode
+                                       :all v/explain-all-required
+                                       :one v/explain-required
+                                       (if (int? required-mode)
+                                         (partial v/explain-required (unchecked-int required-mode))
+                                         v/explain-all-required))]
+                      (fn [handler]
+                        (fn [req]
+                          (handler
+                           (if (get req :validators/disabled?)
+                             (assoc req config-key config result-key true)
+                             (let [reasons (v/explain (get req :form-params)
                                                       validators-all
                                                       default-pass?
                                                       required
-                                                      check-fn))]
-                           (assoc req config-key config result-key result)))))))))})
+                                                      explain-fn)]
+                               (assoc req
+                                      config-key config
+                                      result-key (nil? (first reasons))
+                                      explain-key reasons)))))))
+                    (let [check-fn (case required-mode
+                                     :all v/has-all-required?
+                                     :one v/has-required?
+                                     (if (int? required-mode)
+                                       (partial v/has-n-required? (unchecked-int required-mode))
+                                       v/has-all-required?))]
+                      (fn [handler]
+                        (fn [req]
+                          (handler
+                           (let [result (or (get req :validators/disabled?)
+                                            (v/validate (get req :form-params)
+                                                        validators-all
+                                                        default-pass?
+                                                        required
+                                                        check-fn))]
+                             (assoc req config-key config result-key result))))))))))})
 
 (system/add-prep  ::default [_ config] (prep-validators config))
 (system/add-init  ::default [k config] (wrap-validators k (if (:required/cat config)
