@@ -373,3 +373,4 @@
 (mregistry/set-default-registry!
  (mregistry/fast-registry
   (merge (m/default-schemas) schemas)))
+

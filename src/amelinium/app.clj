@@ -61,6 +61,12 @@
      ~@body))
 
 ;;
+;; application init key (used to force deps, e.g. with logger)
+;;
+
+(derive ::init ::system/nil)
+
+;;
 ;; property names
 ;;
 

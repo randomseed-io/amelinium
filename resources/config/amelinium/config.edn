@@ -24,6 +24,7 @@
  :amelinium.app/http-routes  #ref :amelinium.http.router/web-routes
  :amelinium.app/http-router  #ref :amelinium.http.router/web
  :amelinium.app/http-handler #ref :amelinium.http.handler/web
+ :amelinium.app/init         #ref :amelinium.logging/unilog
 
  ;; Databases (usernames and passwords loaded from other files)
 
