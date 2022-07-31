@@ -9,7 +9,9 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [reitit.ring                        :as       ring]
+  (:require [potemkin.namespaces                :as          p]
+            [reitit.ring                        :as       ring]
+            [reitit.coercion                    :as   coercion]
             [ring.middleware.keyword-params     :as    ring-kw]
             [ring.util.http-response            :as       resp]
             [ring.util.request                  :as        req]
@@ -273,3 +275,18 @@
 
         ;; Valid session causes page to be served.
         req))))
+
+;; Coercion error handler
+
+(defn handle-coercion-error
+  [e respond raise]
+  (let [data  (ex-data e)
+        ctype (get data :type)]
+    (if-let [status (case ctype
+                      ::coercion/request-coercion  422
+                      ::coercion/response-coercion 500
+                      nil)]
+      (respond
+       {:status status
+        :body   (coercion/encode-error data)})
+      (raise e))))

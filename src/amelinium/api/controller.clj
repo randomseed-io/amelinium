@@ -19,7 +19,9 @@
             [amelinium.i18n                     :as          i18n]
             [amelinium.api                      :as           api]
             [amelinium.http                     :as          http]
-            [amelinium.http.middleware.language :as      language]))
+            [amelinium.http.middleware.language :as      language]
+            [reitit.coercion                    :as      coercion]
+            [puget.printer :refer [cprint]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Data population
@@ -147,8 +149,10 @@
       (let [lang (common/lang-id req)]
         (-> req
             (assoc :response/body
-                   {:status  :error/bad-parameters
-                    :message (i18n/translate req lang :error/bad-parameters)})
+                   {:status        :error/bad-parameters
+                    :message       (i18n/translate req lang :error/bad-parameters)
+                    :status/sub    :params/errors
+                    :params/errors (get req :validators/reasons)})
             (api/body-add-lang lang)
             api/render-bad-params))
 
@@ -244,3 +248,22 @@
 (defn not-found!
   [req]
   (api/render-not-found req))
+
+;; Coercion error handler
+
+(defn handle-coercion-error
+  [e respond raise]
+  (let [data  (ex-data e)
+        req   (get data :request)
+        ctype (get data :type)]
+    (if-let [render-fn (case ctype
+                         ::coercion/request-coercion  api/render-bad-params
+                         ::coercion/response-coercion api/render-internal-server-error
+                         nil)]
+      (respond
+       (do
+         (cprint data)
+         (-> req
+             (assoc :response/body (coercion/encode-error data))
+             render-fn)))
+      (raise e))))

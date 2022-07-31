@@ -150,22 +150,57 @@
                                          :charset  :utf-8
                                          :encoding ["deflate" "gzip" "identity"]}
 
- :amelinium.http.middleware.validators/all {:enabled?        true
-                                            :check-required? true
-                                            :explain?        true
-                                            :default-pass?   false
-                                            :required        []
-                                            :required/blank  []
-                                            :required/some   []
-                                            :validators      {:url         io.randomseed.utils.validators.common/valid-url?
-                                                              :login       io.randomseed.utils.validators.common/valid-email?
-                                                              :phone       io.randomseed.utils.validators.common/valid-phone?
-                                                              :password    #re "|.{5,128}"
-                                                              :session-id  amelinium.http.middleware.session/sid-match
-                                                              :lang        amelinium.http.middleware.language/re-lang
-                                                              :first-name  #re "^[\\p{L} ,.'-]+$"
-                                                              :last-name   #re "^[\\p{L} ,.'-]+$"
-                                                              :middle-name #re "|^[\\p{L} ,.'-]+$"}}
+ ;; Coercion
+
+ :amelinium.http.coercion/all
+ {:initializer reitit.coercion.malli/create
+  :config      {:transformers     {:body     {:default reitit.coercion.malli/default-transformer-provider
+                                              :formats {"application/json" reitit.coercion.malli/json-transformer-provider}}
+                                   :string   {:default reitit.coercion.malli/string-transformer-provider}
+                                   :response {:default reitit.coercion.malli/default-transformer-provider}}
+                :error-keys       #{:type :in :value :errors :transformed}
+                :lite             true
+                :compile          malli.util/closed-schema
+                :validate         true
+                :enabled          true
+                :strip-extra-keys true
+                :default-values   true
+                ;;:encode-error     nil
+                ;; malli options
+                :options          nil}}
+
+ :amelinium.http.middleware.coercion/exceptions     {:handler amelinium.common.controller/handle-coercion-error}
+ :amelinium.http.middleware.coercion/exceptions-web {:handler amelinium.web.controller/handle-coercion-error}
+ :amelinium.http.middleware.coercion/exceptions-api {:handler amelinium.api.controller/handle-coercion-error}
+
+ ;; Validation
+
+ :amelinium.http.middleware.validators/all
+ {:enabled?        false
+  :init            #ref :amelinium.app/init
+  :check-required? true
+  :explain?        true
+  :default-pass?   false
+  :config-key      :validators/config
+  :result-key      :validators/params-valid?
+  :explain-key     :validators/reasons
+  :required/source :required/user
+  :required/mode   :all
+  :required        []
+  :validators      {:url         io.randomseed.utils.validators.common/valid-url?
+                    :login       io.randomseed.utils.validators.common/valid-email?
+                    :phone       io.randomseed.utils.validators.common/valid-phone?
+                    :password    #re "|.{5,128}"
+                    :session-id  amelinium.http.middleware.session/sid-match
+                    :lang        amelinium.http.middleware.language/re-lang
+                    :token       #re "|^[a-f0-9]{32,33}"
+                    :first-name  #re "^[\\p{L} ,.'-]+$"
+                    :last-name   #re "^[\\p{L} ,.'-]+$"
+                    :middle-name #re "|^[\\p{L} ,.'-]+$"}
+  :required/blank  [:first-name-fake :email-fake-id]
+  :required/some   [:total-comma-fake :subzero]}
+
+ ;; Population
 
  :amelinium.http.middleware.populators/web [[:route/data    amelinium.common.controller/route-data+]
                                             [:auth/db       amelinium.common.controller/auth-db+]
@@ -180,7 +215,7 @@
                                        :request-keys [:accept]}
 
  :amelinium.web.taggers/web {:enabled?     true
-                             :router       #ref :lawyert.app/http-router-web
+                             :router       #ref :amelinium.app/http-router-web
                              :language     #ref :amelinium.http.middleware.language/web
                              :validators   #ref :amelinium.http.middleware.validators/all
                              :translations #ref :amelinium.i18n/translations}
@@ -188,6 +223,9 @@
  :amelinium.http.middleware/web [#ref :amelinium.http.middleware.lazy-req/all
                                  #ref :amelinium.http.middleware.content/web
                                  reitit.ring.middleware.parameters/parameters-middleware
+                                 #ref :amelinium.http.coercion/exceptions
+                                 reitit.ring.coercion/coerce-request-middleware
+                                 reitit.ring.coercion/coerce-response-middleware
                                  #ref :amelinium.http.middleware.remote-ip/all
                                  #ref :amelinium.http.middleware.session/web
                                  #ref :amelinium.http.middleware.roles/web
@@ -205,7 +243,15 @@
 
  ;; HTTP default router
 
- :amelinium.http.router/web [#ref :amelinium.http.router/web-routes {:data {}}]
+ :amelinium.http.router/web [#ref :amelinium.http.router/web-routes
+                             {:data {:compile      reitit.coercion/compile-request-coercers
+                                     :middleware   #ref :amelinium.http.middleware/web
+                                     :translations #ref :amelinium.i18n/translations
+                                     :auth/config  #ref :amelinium.auth/config
+                                     :oplog/config #ref :amelinium.common.authlog/log
+                                     :coercion     #ref :amelinium.http.coercion/all
+                                     ;;:exception  reitit.dev.pretty/exception
+                                     :appinit      #ref :amelinium.app/init}}]
 
  ;; HTTP default handler
 
