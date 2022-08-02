@@ -653,15 +653,17 @@
 
 (defn body-add-session-errors
   ([req]
-   (body-add-session-errors req (common/session req) nil))
+   (body-add-session-errors req (common/session req) nil nil))
   ([req smap]
-   (body-add-session-errors req smap nil))
-  ([req smap lang]
+   (body-add-session-errors req smap nil nil))
+  ([req smap translate-sub]
+   (body-add-session-errors req smap translate-sub nil))
+  ([req smap translate-sub lang]
    (if (get smap :valid?)
      req
-     (let [lang    (or lang (common/lang-id req))
-           status  (session-status smap)
-           message (i18n/translate-sub req lang :session status)]
+     (let [translate-sub (or translate-sub (i18n/translator-sub req lang))
+           status        (session-status smap)
+           message       (translate-sub :session status)]
        (update req :response/body assoc
                :session/status  status
                :session/message message)))))

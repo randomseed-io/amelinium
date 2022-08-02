@@ -275,15 +275,13 @@
 (defn- update-http-code-name
   [req lang data]
   (if-some [hcode (get data :http/code)]
-    (-> data
-        (map/assoc-missing :http/code-name
-                           (delay (i18n/nil-missing (i18n/translate req lang hcode))))
-        (map/assoc-missing :http/code-description
-                           (delay (i18n/nil-missing
-                                   (i18n/translate
-                                    req lang
-                                    (keyword (namespace hcode)
-                                             (str (name hcode) ".full")))))))
+    (let [translate-sub (i18n/translator-sub req lang)]
+      (-> data
+          (map/assoc-missing :http/code-name (delay (i18n/nil-missing (translate-sub hcode))))
+          (map/assoc-missing :http/code-description (delay (i18n/nil-missing
+                                                            (translate-sub (namespace hcode)
+                                                                           (str (name hcode)
+                                                                                ".full")))))))
     data))
 
 (defn render

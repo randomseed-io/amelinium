@@ -63,27 +63,28 @@
   (let [req (controller/auth-user-with-password! req user-email password sess route-data)]
     (if (api/response? req)
       req
-      (let [lang       (or lang (api/pick-language req))
-            smap       (common/session req)
-            astatus    (get req :auth/status)
-            status     (controller/auth-status-to-status astatus)
-            resp-fn    (controller/auth-status-to-resp   astatus)
-            amessage   (i18n/translate-sub req lang :auth  astatus)
-            message    (i18n/translate-sub req lang :error status)
-            sess-err?  (= status :error/session)
-            substatus  (if sess-err? :session/status  :auth/status)
-            submessage (if sess-err? :session/message :auth/message)
-            req        (-> req
-                           (assoc :response/body {:status       status
-                                                  :message      message
-                                                  :status/sub   substatus
-                                                  :message/sub  submessage
-                                                  :auth/status  astatus
-                                                  :auth/message amessage})
-                           (language/force lang)
-                           (api/body-add-lang lang))]
+      (let [lang          (or lang (api/pick-language req))
+            smap          (common/session req)
+            astatus       (get req :auth/status)
+            status        (controller/auth-status-to-status astatus)
+            resp-fn       (controller/auth-status-to-resp   astatus)
+            translate-sub (i18n/translator-sub req lang)
+            amessage      (translate-sub :auth  astatus)
+            message       (translate-sub :error status)
+            sess-err?     (= status :error/session)
+            substatus     (if sess-err? :session/status  :auth/status)
+            submessage    (if sess-err? :session/message :auth/message)
+            req           (-> req
+                              (assoc :response/body {:status       status
+                                                     :message      message
+                                                     :status/sub   substatus
+                                                     :message/sub  submessage
+                                                     :auth/status  astatus
+                                                     :auth/message amessage})
+                              (language/force lang)
+                              (api/body-add-lang lang))]
         (api/render-response resp-fn (if sess-err?
-                                       (api/body-add-session-errors req smap lang)
+                                       (api/body-add-session-errors req smap translate-sub lang)
                                        (api/body-add-session-id req smap)))))))
 
 (defn authenticate!
@@ -164,12 +165,13 @@
       ;; Account is manually hard-locked.
 
       (account-locked? req sess @auth-db)
-      (let [user-id  (:user/id      sess)
-            email    (:user/email   sess)
-            ip-addr  (:remote-ip/str req)
-            for-user (log/for-user user-id email ip-addr)
-            for-mail (log/for-user nil email ip-addr)
-            lang     (common/lang-id req)]
+      (let [user-id   (:user/id      sess)
+            email     (:user/email   sess)
+            ip-addr   (:remote-ip/str req)
+            for-user  (log/for-user user-id email ip-addr)
+            for-mail  (log/for-user nil email ip-addr)
+            lang      (common/lang-id req)
+            translate (i18n/translator req lang)]
         (log/wrn "Hard-locked account access attempt" for-user)
         (api/oplog req
                    :user-id user-id
@@ -179,25 +181,26 @@
         (-> req
             (assoc :response/body
                    {:status       :error/authorization
-                    :message      (i18n/translate req lang :error/authorization)
+                    :message      (translate :error/authorization)
                     :status/sub   :auth/status
                     :message/sub  :auth/message
                     :auth/status  :locked
-                    :auth/message (i18n/translate req lang :auth/locked)})
+                    :auth/message (translate :auth/locked)})
             (api/body-add-lang lang)
             api/render-unauthorized))
 
       ;; Session is not valid.
 
       (and (not @valid-session?) (not (and @auth? @login-data?)))
-      (let [req      (cleanup-req req @auth-state)
-            expired? (get sess :expired?)
-            user-id  (:user/id      sess)
-            email    (:user/email   sess)
-            ip-addr  (:remote-ip/str req)
-            for-user (log/for-user user-id email ip-addr)
-            for-mail (log/for-user nil email ip-addr)
-            lang     (common/lang-id req)]
+      (let [req           (cleanup-req req @auth-state)
+            expired?      (get sess :expired?)
+            user-id       (:user/id      sess)
+            email         (:user/email   sess)
+            ip-addr       (:remote-ip/str req)
+            for-user      (log/for-user user-id email ip-addr)
+            for-mail      (log/for-user nil email ip-addr)
+            lang          (common/lang-id req)
+            translate-sub (i18n/translator-sub req lang)]
 
         ;; Log the event.
 
@@ -219,15 +222,15 @@
                        :msg     reason)
             (log/log (:severity (:error sess) :warn) reason)))
 
-        ;; Generate a response describing invalid session.
+        ;; Generate a response describing an invalid session.
 
         (-> req
             (assoc :response/body {:status      :error/session
                                    :status/sub  :session/status
                                    :message/sub :session/message
-                                   :message     (i18n/translate req lang :error/session)})
+                                   :message     (translate-sub :error/session)})
             (api/body-add-lang lang)
-            (api/body-add-session-errors sess lang)
+            (api/body-add-session-errors sess translate-sub lang)
             api/render-forbidden))
 
       :----pass

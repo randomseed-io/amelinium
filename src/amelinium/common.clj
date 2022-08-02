@@ -1134,7 +1134,7 @@
   (if uri
     (let [c (unchecked-int (count uri))]
       (if (pos? c)
-        (if (= \/ (.charAt uri (unchecked-dec-int c))) uri (str uri "/"))
+        (if (= \/ (.charAt ^String uri (unchecked-dec-int c))) uri (str uri "/"))
         "/"))
     "/"))
 
