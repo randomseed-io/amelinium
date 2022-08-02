@@ -254,19 +254,65 @@
 
 ;; Coercion error handler
 
+(defn- recode-coercion-error
+  [data translate-sub]
+  (let [dat (if-some [c (get data :coercion)] (coercion/-encode-error c data) data)
+        src (get dat :in)
+        err (get dat :errors)
+        err (if (coll? err) err (if (some? err) (cons err nil)))
+        src (if (coll? src) src (if (some? src) (cons src nil)))
+        src (if (= (first src) :request) (rest src) src)
+        src (or (first src) :unknown)]
+    (if err
+      (->> err
+           (map
+            (fn [e]
+              (if (map? e)
+                (if-some [param-path (get e :path)]
+                  (if-some [param-id (and (coll? param-path) (some-str (last param-path)))]
+                    (let [param-type  (if-some [s (some-str (get e :schema))]
+                                        (some-str (if (= \: (.charAt ^String s 0)) (subs s 1))))
+                          param-name  (i18n/nil-missing
+                                       (translate-sub :parameter param-id param-type))
+                          param-name? (some? param-name)
+                          param-name  (if param-name? param-name (some-str param-id))]
+                      {:parameter/id   param-id
+                       :parameter/name param-name
+                       :parameter/path param-path
+                       :parameter/type param-type
+                       :error/message
+                       (i18n/nil-missing
+                        (or (if param-id    (translate-sub :parameter-error param-id
+                                                           param-name
+                                                           param-id
+                                                           param-type))
+                            (if param-name? (translate-sub :error/named-parameter nil
+                                                           param-name
+                                                           param-id
+                                                           param-type))
+                            (translate-sub :error/parameter nil
+                                           param-id
+                                           param-type)))}))))))
+           (filter identity)))))
+
 (defn handle-coercion-error
   [e respond raise]
   (let [data  (ex-data e)
         req   (get data :request)
-        ctype (get data :type)]
+        ctype (get data :type)
+        data  (dissoc data :request :response)]
     (if-let [render-fn (case ctype
                          ::coercion/request-coercion  api/render-bad-params
                          ::coercion/response-coercion api/render-internal-server-error
                          nil)]
       (respond
-       (do
-         (cprint data)
+       (let [lang          (common/lang-id req)
+             translate-sub (i18n/translator-sub req lang)]
          (-> req
-             (assoc :response/body (coercion/encode-error data))
+             (assoc :response/body {:lang             lang
+                                    :status           :error/parameters
+                                    :status/message   (translate-sub :error/parameters)
+                                    :status/sub       :error/parameters
+                                    :error/parameters (recode-coercion-error data translate-sub)})
              render-fn)))
       (raise e))))
