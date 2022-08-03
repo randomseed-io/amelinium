@@ -20,8 +20,7 @@
             [amelinium.api                      :as           api]
             [amelinium.http                     :as          http]
             [amelinium.http.middleware.language :as      language]
-            [reitit.coercion                    :as      coercion]
-            [puget.printer :refer [cprint]]))
+            [reitit.coercion                    :as      coercion]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Data population
@@ -257,12 +256,8 @@
 (defn- recode-coercion-error
   [data translate-sub]
   (let [dat (if-some [c (get data :coercion)] (coercion/-encode-error c data) data)
-        src (get dat :in)
         err (get dat :errors)
-        err (if (coll? err) err (if (some? err) (cons err nil)))
-        src (if (coll? src) src (if (some? src) (cons src nil)))
-        src (if (= (first src) :request) (rest src) src)
-        src (or (first src) :unknown)]
+        err (if (coll? err) err (if (some? err) (cons err nil)))]
     (if err
       (->> err
            (map
@@ -301,10 +296,9 @@
         req   (get data :request)
         ctype (get data :type)
         data  (dissoc data :request :response)]
-    (if-let [render-fn (case ctype
-                         ::coercion/request-coercion  api/render-bad-params
-                         ::coercion/response-coercion api/render-internal-server-error
-                         nil)]
+    (case ctype
+
+      ::coercion/request-coercion
       (respond
        (let [lang          (common/lang-id req)
              translate-sub (i18n/translator-sub req lang)]
@@ -314,5 +308,17 @@
                                     :status/message   (translate-sub :error/parameters)
                                     :status/sub       :error/parameters
                                     :error/parameters (recode-coercion-error data translate-sub)})
-             render-fn)))
+             api/render-bad-params)))
+
+      ::coercion/response-coercion
+      (respond
+       (let [lang      (common/lang-id req)
+             translate (i18n/translator req lang)]
+         (-> req
+             (assoc :response/body {:lang           lang
+                                    :status         :error/internal
+                                    :status/message (translate :error/internal)
+                                    :status/sub     :error/parameters})
+             api/render-internal-server-error)))
+
       (raise e))))
