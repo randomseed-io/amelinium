@@ -928,6 +928,15 @@
   given it uses the `localized-page` function. If there is no language given but the
   page identified by its name requires a language parameter to be set, it will be
   obtained from the given request map (under the key `:language/str`)."
+  {:arglists '([f]
+               [f req]
+               [f req name-or-path]
+               [f req name-or-path path-params]
+               [f req name-or-path path-params query-params]
+               [f req name-or-path lang]
+               [f req name-or-path lang path-params]
+               [f req name-or-path lang path-params query-params]
+               [f req name-or-path lang path-params query-params & more])}
   ([f]
    (f "/"))
   ([f req]
@@ -951,6 +960,15 @@
   a request (under `:language/str` key) and if there will be no
   language-parameterized variant of the path, it will fail. Use this function to make
   sure that localized path will be produced, or `nil`."
+  {:arglists '([f]
+               [f req]
+               [f req name-or-path]
+               [f req name-or-path path-params]
+               [f req name-or-path path-params query-params]
+               [f req name-or-path lang]
+               [f req name-or-path lang path-params]
+               [f req name-or-path lang path-params query-params]
+               [f req name-or-path lang path-params query-params & more])}
   ([f]
    (f "/"))
   ([f req]
@@ -987,6 +1005,15 @@
      (#'def-redirect &form &env name doc-or-f f-or-code nil)
      `(let [f# ~f-or-code]
         (defn ~name ~doc-or-f
+          {:arglists '([]
+                       ~'[req]
+                       ~'[req name-or-path]
+                       ~'[req name-or-path path-params]
+                       ~'[req name-or-path path-params query-params]
+                       ~'[req name-or-path lang]
+                       ~'[req name-or-path lang path-params]
+                       ~'[req name-or-path lang path-params query-params]
+                       ~'[req name-or-path lang path-params query-params & more])}
           ([]
            (f# "/"))
           (~'[req]
@@ -1033,6 +1060,15 @@
      (#'def-localized-redirect &form &env name doc-or-f f-or-code nil)
      `(let [f# ~f-or-code]
         (defn ~name ~doc-or-f
+          {:arglists '([]
+                       ~'[req]
+                       ~'[req name-or-path]
+                       ~'[req name-or-path path-params]
+                       ~'[req name-or-path path-params query-params]
+                       ~'[req name-or-path lang]
+                       ~'[req name-or-path lang path-params]
+                       ~'[req name-or-path lang path-params query-params]
+                       ~'[req name-or-path lang path-params query-params & more])}
           ([]
            (f# "/"))
           (~'[req]
