@@ -394,38 +394,6 @@
   (if (coll? coll)
     (seq (if (map? coll) (keys coll) coll))))
 
-(defn get-var
-  "Gets session variable and de-serializes it to a Clojure data structure."
-  {:arglists '([opts sid var-name]
-               [opts smap var-name])}
-  ([opts sid-or-smap var-name]
-   (let [[smap opts db-sid] (prep-opts opts sid-or-smap)]
-     (if (and smap (not (valid? smap)))
-       (log/err "Cannot get session variable" var-name "because session is not valid")
-       ((get opts :fn/var-get) db-sid var-name)))))
-
-(defn get-variable-failed?
-  "Returns `true` if the value `v` obtained from a session variable indicates that it
-  actually could not be successfully fetched from a database."
-  [v]
-  (= ::db/get-failed v))
-
-(defn put-var!
-  "Puts a session variable `var-name` with a value `value` into a database. The session
-  can be identified with a session ID (`sid`) or a session map (`smap`). Optional
-  `pairs` of variable names and values can be given to perform a batch operation for
-  multiple variables."
-  {:arglists '([opts sid var-name value & pairs]
-               [opts smap var-name value & pairs])}
-  [opts sid-or-smap var-name value & pairs]
-  (let [[smap opts db-sid] (prep-opts opts sid-or-smap)]
-    (if-not db-sid
-      (log/err "Cannot store session variable" var-name
-               "because session ID is not valid")
-      (if pairs
-        ((get opts :fn/var-set) db-sid var-name value)
-        (apply (get opts :fn/var-set) db-sid var-name value pairs)))))
-
 (defn del-var!
   "Deletes from a session variable `var-name` assigned to a session of the given
   ID (`sid`) or a session map (`smap`). Optional variable `names` can be given to
@@ -438,8 +406,8 @@
       (log/err "Cannot delete session variable" var-name
                "because session ID is not valid")
       (if names
-        ((get opts :fn/var-del) db-sid var-name)
-        (apply (get opts :fn/var-del) db-sid var-name names)))))
+        (apply (get opts :fn/var-del) db-sid var-name names)
+        ((get opts :fn/var-del) db-sid var-name)))))
 
 (defn del-vars!
   "Deletes all session variables which belong to a session of the given ID (`sid`) or a
@@ -470,6 +438,51 @@
                    "because user ID" user-id "is invalid"
                    (log/for-user nil user-email))
           (del-fn user-id))))))
+
+(defn get-var
+  "Gets session variable and de-serializes it to a Clojure data structure."
+  {:arglists '([opts sid var-name]
+               [opts smap var-name])}
+  ([opts sid-or-smap var-name]
+   (let [[smap opts db-sid] (prep-opts opts sid-or-smap)]
+     (if (and smap (not (valid? smap)))
+       (log/err "Cannot get session variable" var-name "because session is not valid")
+       ((get opts :fn/var-get) db-sid var-name)))))
+
+(defn fetch-var!
+  "Like `get-var` but removes session variable after it is successfully read from a
+  database."
+  {:arglists '([opts sid var-name]
+               [opts smap var-name])}
+  ([opts sid-or-smap var-name]
+   (let [[smap opts db-sid] (prep-opts opts sid-or-smap)]
+     (if (and smap (not (valid? smap)))
+       (log/err "Cannot get session variable" var-name "because session is not valid")
+       (let [v ((get opts :fn/var-get) db-sid var-name)]
+         (del-var! opts sid-or-smap var-name)
+         v)))))
+
+(defn get-variable-failed?
+  "Returns `true` if the value `v` obtained from a session variable indicates that it
+  actually could not be successfully fetched from a database."
+  [v]
+  (= ::db/get-failed v))
+
+(defn put-var!
+  "Puts a session variable `var-name` with a value `value` into a database. The session
+  can be identified with a session ID (`sid`) or a session map (`smap`). Optional
+  `pairs` of variable names and values can be given to perform a batch operation for
+  multiple variables."
+  {:arglists '([opts sid var-name value & pairs]
+               [opts smap var-name value & pairs])}
+  [opts sid-or-smap var-name value & pairs]
+  (let [[smap opts db-sid] (prep-opts opts sid-or-smap)]
+    (if-not db-sid
+      (log/err "Cannot store session variable" var-name
+               "because session ID is not valid")
+      (if pairs
+        ((get opts :fn/var-set) db-sid var-name value)
+        (apply (get opts :fn/var-set) db-sid var-name value pairs)))))
 
 ;; Cache invalidation.
 
