@@ -16,6 +16,7 @@
             [ring.util.response]
             [ring.util.http-response              :as         resp]
             [ring.util.request                    :as          req]
+            [ring.util.codec                      :as        codec]
             [selmer.parser                        :as       selmer]
             [amelinium.i18n                       :as         i18n]
             [amelinium.common                     :as       common]
@@ -696,3 +697,16 @@
 
 (p/import-vars [amelinium.common
                 lang-id lang-str lang-config lang-from-req])
+
+;; Bad parameters parser
+
+(defn parse-query-params
+  [req qstr]
+  (codec/form-decode qstr (or (req/character-encoding req) "UTF-8")))
+
+(defn url->uri+params
+  [req u]
+  (try (let [{:keys [uri query-string]} (parse-url u)]
+         [(some-str uri) (parse-query-params req query-string)])
+       (catch Exception _ [(some-str u) nil])))
+
