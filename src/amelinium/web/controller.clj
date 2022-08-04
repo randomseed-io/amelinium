@@ -21,7 +21,9 @@
             [amelinium.i18n                     :as       i18n]
             [amelinium.web                      :as        web]
             [amelinium.http                     :as       http]
+            [amelinium.http.middleware.session  :as    session]
             [amelinium.http.middleware.language :as   language]
+            [io.randomseed.utils.map            :as        map]
             [io.randomseed.utils                :refer    :all]
             [puget.printer :refer [cprint]]))
 
@@ -382,12 +384,9 @@
     (->> err
          (map :path) (filter identity)
          (map last)  (filter identity)
-         (map some-str)
-         (str/join ","))))
+         (map some-str))))
 
-(defn- url->uri
-  [u]
-  (some-str (or (try (get (parse-url u) :uri) (catch Exception _ u)))))
+(def ^:private empty-fe-param  {"form-errors" ""})
 
 (defn handle-coercion-error
   [e respond raise]
@@ -399,21 +398,35 @@
 
       ::coercion/request-coercion
       (respond
-       (let [translate-sub (i18n/translator-sub req)]
-         (if-some [orig-page (or (http/get-route-data req :bad-parameters/page)
-                                 (url->uri (get-in req [:headers "referer"])))]
-           (let [errors (list-coercion-errors data)]
-             (common/temporary-redirect req orig-page nil {:errors errors}))
-           (-> req
-               (update :app/data assoc
-                       :title (delay (translate-sub :error/parameters))
-                       :error/parameters (delay (recode-coercion-error data translate-sub)))
-               web/render-bad-params)))) ;; TODO: template for listing bad params / update existing
+       (let [orig-page              (some-str (http/get-route-data req :bad-parameters))
+             referer                (if (nil? orig-page) (some-str (get-in req [:headers "referer"])))
+             [orig-uri orig-params] (if referer (web/url->uri+params req referer))]
+         (if (or orig-page orig-uri referer)
+           (let [errors       (list-coercion-errors data)
+                 orig-uri     (if orig-uri (some-str orig-uri))
+                 orig-params  (if orig-uri orig-params)
+                 [opts smap]  (common/config+session req)
+                 session?     (and smap (get smap :valid?)
+                                   (session/put-var!
+                                    opts smap :form-errors {:dest   (common/page req)
+                                                            :errors errors}))
+                 error-params (if session? "" (str/join "," errors))
+                 joint-params (assoc orig-params "form-errors" error-params)
+                 destination  (or orig-page orig-uri referer)]
+             (common/temporary-redirect req destination nil joint-params))
+           (let [translate-sub (delay (i18n/translator-sub req))]
+             (-> req
+                 (map/assoc-missing :app/data common/empty-lazy-map)
+                 (update :app/data assoc
+                         :title (delay (@translate-sub :error/parameters))
+                         :error/parameters (delay (recode-coercion-error data @translate-sub)))
+                 web/render-bad-params))))) ;; TODO: template for listing bad params / update existing template and check
 
       ::coercion/response-coercion
       (respond
        (-> req
-           (update :app/data assoc :title (delay (i18n/tr req :error/parameters)))
+           (map/assoc-missing :app/data common/empty-lazy-map)
+           (update :app/data assoc :title (delay (i18n/nil-missing (i18n/tr req :error/parameters))))
            web/render-internal-server-error))
 
       (raise e))))
