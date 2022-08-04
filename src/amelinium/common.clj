@@ -1260,8 +1260,17 @@
 
 (defn session
   "Gets a session map from the given request map."
-  [req]
-  (get req (or (get (get req :session/config) :session-key) :session)))
+  ([req]
+   (get req (or (get (get req :session/config) :session-key) :session)))
+  ([req config-key]
+   (get req (or (get (get req config-key) :session-key) :session))))
+
+(defn session-config
+  "Gets a session config map from the given request map."
+  ([req]
+   (get req :session/config))
+  ([req config-key]
+   (get req config-key)))
 
 (defn session-variable-get-failed?
   [v]
