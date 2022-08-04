@@ -1272,6 +1272,16 @@
   ([req config-key]
    (get req config-key)))
 
+(defn config+session
+  "Gets a session map and a session config map from the given request map. Returns a
+  two-element vector."
+  ([req]
+   (config+session req :session/config))
+  ([req config-key]
+   (if-some [cfg (get req config-key)]
+     [cfg (get req (or (get cfg :session-key) :session))]
+     [nil nil])))
+
 (defn session-variable-get-failed?
   [v]
   (session/get-variable-failed? v))
