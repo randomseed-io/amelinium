@@ -702,7 +702,9 @@
 
 (defn parse-query-params
   [req qstr]
-  (codec/form-decode qstr (or (req/character-encoding req) "UTF-8")))
+  (if req
+    (if-some [qstr (some-str qstr)]
+      (codec/form-decode qstr (or (req/character-encoding req) "UTF-8")))))
 
 (defn url->uri+params
   [req u]
