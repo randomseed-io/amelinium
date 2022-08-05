@@ -94,23 +94,23 @@
      :tr
      (fn [args ctx]
        (if-some [translator (get ctx :i18n/translator)]
-         (apply translator args)
+         (apply translator (common/keyword-from-param (first args)) (next args))
          (let [lang (get-lang-id ctx)]
            (apply i18n/translate-with
                   (or translations i18n/translations)
                   (get-lang-id ctx)
-                  args)))))
+                  (common/keyword-from-param (first args)) (next args))))))
 
     (selmer/add-tag!
      :tr-sub
      (fn [args ctx]
        (if-some [translator-sub (get ctx :i18n/translator-sub)]
-         (apply translator-sub args)
+         (apply translator-sub (common/keyword-from-param (first args)) (next args))
          (let [lang (get-lang-id ctx)]
            (apply i18n/translate-sub-with
                   (or translations i18n/translations)
                   (get-lang-id ctx)
-                  args)))))
+                  (common/keyword-from-param (first args)) (next args))))))
 
     (selmer/add-tag!
      :anti-spam-field
