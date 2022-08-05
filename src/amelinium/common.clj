@@ -1559,3 +1559,13 @@
 (defn lang-config
   [req]
   (get req :language/settings))
+
+;; Other helpers
+
+(defn keyword-from-param
+  [s]
+  (if (keyword? s)
+    s
+    (if-some [^String s (some-str s)]
+      (keyword
+       (if (= \: (.charAt ^String s 0)) (subs s 1) s)))))
