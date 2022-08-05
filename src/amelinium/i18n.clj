@@ -192,7 +192,11 @@
 
 (defn- zero-missing-keys
   [config]
-  (reduce #(update %1 (key %2) assoc :tongue/missing-key nil) config config))
+  (reduce-kv (fn [m lang translations]
+               (if (and (keyword? lang) (map? translations))
+                 (update m lang assoc :tongue/missing-key nil)
+                 m))
+             config config))
 
 (defn- handle-val
   [config v kpath]
