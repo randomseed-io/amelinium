@@ -166,7 +166,7 @@
                                   (catch Throwable _ nil)))
                            (gen/tuple (gen/choose 1969 2050)
                                       (gen/choose 1 12)
-                                      (gen/choose 1 31)
+                                      (gen/choose 1 28)
                                       (gen/choose 0 23)
                                       (gen/choose 0 59)
                                       (gen/choose 0 59)))))
