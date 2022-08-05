@@ -712,3 +712,33 @@
          [(some-str uri) (parse-query-params req query-string)])
        (catch Exception _ [(some-str u) nil])))
 
+(defn query-string-encode
+  ([params]
+   (if params (codec/form-encode params)))
+  ([params enc]
+   (if params (codec/form-encode params enc))))
+
+(defn parse-form-errors
+  "Tries to obtain form errors from previously visited page which were saved as a
+  session variable `:form-errors` or as a query parameter `form-errors`."
+  [req]
+  (if-some [query-params-errors (get (get req :query-params) "form-errors")]
+    (let [current-form-params (or (get req :form-params) #{})]
+      (if-some [query-params-errors (some-str query-params-errors)]
+        (->> (str/split query-params-errors #",")
+             (map str/trim)
+             (filter identity)
+             (filter (partial contains? current-form-params))
+             (map keyword) seq set)
+        (let [[opts smap]  (common/config+session req)
+              svar         (if (and opts smap (get smap :valid?)) (session/fetch-var! opts smap :form-errors))
+              expected-uri (if svar (get svar :uri))
+              uri-ok?      (or (not expected-uri) (= expected-uri (page req))) ;; cut after the ? or page does that?
+              errors       (if (and uri-ok? svar) (get svar :errors))]
+          (if errors
+            (->> errors
+                 (map some-str)
+                 (filter identity)
+                 (filter (partial contains? current-form-params))
+                 (map keyword) seq set)))))))
+
