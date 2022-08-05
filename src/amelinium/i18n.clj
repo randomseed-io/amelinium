@@ -15,8 +15,7 @@
             [amelinium.app           :as       app]
             [amelinium.system        :as    system]
             [amelinium.logging       :as       log]
-            [amelinium.http          :as      http]
-            [amelinium.locale        :as         l]))
+            [amelinium.http          :as      http]))
 
 (defonce translations nil)
 
@@ -41,10 +40,12 @@
   "Creates a keyword with the given name and namespace which both can be expressed as
   strings or idents. If the second argument is `nil` then a keyword is created using
   the first argument by simply converting it with the `keyword` function."
-  [ns name]
-  (if name
-    (keyword (idname ns) (idname name))
-    (keyword ns)))
+  ([name]
+   (if (keyword? name) name (keyword name)))
+  ([ns name]
+   (if name
+     (keyword (idname ns) (idname name))
+     (if (keyword? ns) ns (keyword ns)))))
 
 (defn translation-fn
   "Tries to obtain translation function from a route data in a request map or a `Match`
@@ -69,11 +70,12 @@
    (translator req-or-match nil))
   ([req-or-match locale]
    (let [tr-fn (translation-fn req-or-match)
-         tr-l  (keyword (or locale (lang req-or-match)))]
+         tr-l  (make-kw (or locale (lang req-or-match)))]
      (fn
-       ([key]          (tr-fn tr-l key))
-       ([key x]        (tr-fn tr-l key x))
-       ([key x & more] (apply tr-fn tr-l key x more))))))
+       ([key]            (tr-fn tr-l key))
+       ([key x]          (tr-fn tr-l key x))
+       ([key x y]        (tr-fn tr-l key x y))
+       ([key x y & more] (apply tr-fn tr-l key x y more))))))
 
 (defn translator-sub
   "Tries to obtain translation function from a route data in a request map or a `Match`
@@ -89,12 +91,13 @@
    (translator req-or-match nil))
   ([req-or-match locale]
    (let [tr-fn (translation-fn req-or-match)
-         tr-l  (keyword (or locale (lang req-or-match)))]
+         tr-l  (make-kw (or locale (lang req-or-match)))]
      (fn
-       ([key]                      (tr-fn tr-l key))
-       ([key-ns key-name]          (tr-fn tr-l (make-kw key-ns key-name)))
-       ([key-ns key-name x]        (tr-fn tr-l (make-kw key-ns key-name) x))
-       ([key-ns key-name x & more] (apply tr-fn tr-l (make-kw key-ns key-name) x more))))))
+       ([key]                        (tr-fn tr-l key))
+       ([key-ns key-name]            (tr-fn tr-l (make-kw key-ns key-name)))
+       ([key-ns key-name x]          (tr-fn tr-l (make-kw key-ns key-name) x))
+       ([key-ns key-name x y]        (tr-fn tr-l (make-kw key-ns key-name) x y))
+       ([key-ns key-name x y & more] (apply tr-fn tr-l (make-kw key-ns key-name) x y more))))))
 
 ;; Translators
 
@@ -102,27 +105,30 @@
   "Returns a translation string for the given `locale` (language ID) and the keyword
   `key` using a translation function `tf`. Any optional arguments are passed as they
   are."
-  ([tf locale key]          (tf (keyword locale) key))
-  ([tf locale key x]        (tf (keyword locale) key x))
-  ([tf locale key x & more] (apply tf (keyword locale) key x more)))
+  ([tf locale key]            (tf (make-kw locale) key))
+  ([tf locale key x]          (tf (make-kw locale) key x))
+  ([tf locale key x y]        (tf (make-kw locale) key x y))
+  ([tf locale key x y & more] (apply tf (make-kw locale) key x y more)))
 
 (defn translate-sub-with
   "Returns a translation string for the given `locale` (language ID), the namespace
   name `ns-name` and the key name `key-name`, using the given translation function
   `tf`. Useful to translate nested keys which are translated to fully-qualified
   keywords. Any additional arguments are passed as they are."
-  ([tf locale key-ns key-name]          (tf (keyword locale) (make-kw key-ns key-name)))
-  ([tf locale key-ns key-name x]        (tf (keyword locale) (make-kw key-ns key-name) x))
-  ([tf locale key-ns key-name x & more] (apply tf (keyword locale) (make-kw key-ns key-name) x more)))
+  ([tf locale key-ns key-name]            (tf (make-kw locale) (make-kw key-ns key-name)))
+  ([tf locale key-ns key-name x]          (tf (make-kw locale) (make-kw key-ns key-name) x))
+  ([tf locale key-ns key-name x y]        (tf (make-kw locale) (make-kw key-ns key-name) x y))
+  ([tf locale key-ns key-name x y & more] (apply tf (make-kw locale) (make-kw key-ns key-name) x y more)))
 
 (defn translate
   "Returns a translation string for the given `locale` (language ID) and the keyword
   `key` using a translation function obtained from the given request map (`req`) by
   calling `translator` function on it. Any optional arguments are passed as they
   are."
-  ([req locale key]          ((translator req locale) key))
-  ([req locale key x]        ((translator req locale) key x))
-  ([req locale key x & more] (apply (translator req locale) key x more)))
+  ([req locale key]            ((translator req (make-kw locale)) key))
+  ([req locale key x]          ((translator req (make-kw locale)) key x))
+  ([req locale key x y]        ((translator req (make-kw locale)) key x y))
+  ([req locale key x y & more] (apply (translator req (make-kw locale)) key x y more)))
 
 (defn translate-sub
   "Returns a translation string for the given `locale` (language ID), the namespace
@@ -130,17 +136,19 @@
   are translated to fully-qualified keywords. The translation function will be
   obtained by calling `translator` on `req` (which may be a request map or a `Match`
   object). Any additional arguments are passed as they are."
-  ([req locale key-ns key-name]          ((translator req locale) (make-kw key-ns key-name)))
-  ([req locale key-ns key-name x]        ((translator req locale) (make-kw key-ns key-name) x))
-  ([req locale key-ns key-name x & more] (apply (translator req locale) (make-kw key-ns key-name) x more)))
+  ([req locale key-ns key-name]            ((translator req (make-kw locale)) (make-kw key-ns key-name)))
+  ([req locale key-ns key-name x]          ((translator req (make-kw locale)) (make-kw key-ns key-name) x))
+  ([req locale key-ns key-name x y]        ((translator req (make-kw locale)) (make-kw key-ns key-name) x y))
+  ([req locale key-ns key-name x y & more] (apply (translator req (make-kw locale)) (make-kw key-ns key-name) x y more)))
 
 (defn tr
   "Returns a translation string for the given locale (obtained from a request map)
   and the keyword `key` using a translation function (obtained from a
   request map or a `Match` object). Any optional arguments are passed as they are."
-  ([req key]          ((translator req) key))
-  ([req key x]        ((translator req) key x))
-  ([req key x & more] (apply (translator req) key x more)))
+  ([req key]            ((translator req) key))
+  ([req key x]          ((translator req) key x))
+  ([req key x y]        ((translator req) key x y))
+  ([req key x y & more] (apply (translator req) key x y more)))
 
 (defn tr-sub
   "Returns a translation string for the given locale (obtained from a request map),
@@ -148,9 +156,10 @@
   keys which are translated to fully-qualified keywords. The translation function
   will be obtained by calling `translator` on `req` (which may be a request map or a
   `Match` object). Any additional arguments are passed as they are."
-  ([req key-ns key-name]          ((translator req) (make-kw key-ns key-name)))
-  ([req key-ns key-name x]        ((translator req) (make-kw key-ns key-name) x))
-  ([req key-ns key-name x & more] (apply (translator req) (make-kw key-ns key-name) x more)))
+  ([req key-ns key-name]            ((translator req) (make-kw key-ns key-name)))
+  ([req key-ns key-name x]          ((translator req) (make-kw key-ns key-name) x))
+  ([req key-ns key-name x y]        ((translator req) (make-kw key-ns key-name) x y))
+  ([req key-ns key-name x y & more] (apply (translator req) (make-kw key-ns key-name) x y more)))
 
 (defmacro nil-missing
   [& body]
@@ -159,21 +168,29 @@
 
 ;; Initialization
 
+(defn missing-key
+  [f locale k]
+  (if *handle-missing-keys* (f locale :amelinium/missing-key k)))
+
 (defn wrap-translate
   [f]
   (fn translate
     ([locale k]
-     (or (f locale k)
-         (if *handle-missing-keys* (f locale :amelinium/missing-key k))))
+     (if (keyword? k)
+       (or (f locale k) (missing-key f locale k))
+       (if-some [k (keyword k)] (or (f locale k) (missing-key f locale k)))))
     ([locale k a]
-     (or (f locale k a)
-         (if *handle-missing-keys* (f locale :amelinium/missing-key k))))
+     (if (keyword? k)
+       (or (f locale k a) (missing-key f locale k))
+       (if-some [k (keyword k)] (or (f locale k a) (missing-key f locale k)))))
     ([locale k a b]
-     (or (f locale k a b)
-         (if *handle-missing-keys* (f locale :amelinium/missing-key k))))
+     (if (keyword? k)
+       (or (f locale k a b) (missing-key f locale k))
+       (if-some [k (keyword k)] (or (f locale k a b) (missing-key f locale k)))))
     ([locale k a b & more]
-     (or (apply f locale k a b more)
-         (if *handle-missing-keys* (f locale :amelinium/missing-key k))))))
+     (if (keyword? k)
+       (or (apply f locale k a b more) (missing-key f locale k))
+       (if-some [k (keyword k)] (or (apply f locale k a b more) (missing-key f locale k)))))))
 
 (defn prep-pluralizer
   [config lang translations]
