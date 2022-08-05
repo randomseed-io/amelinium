@@ -70,6 +70,10 @@
   [p]
   (not (invalid-password? p)))
 
+(defn valid-password-relaxed?
+  [p]
+  (and (string? p) (pos-int? (count p))))
+
 (defn valid-session-id?
   [s]
   (and (string? s)
@@ -309,6 +313,20 @@
                       :json-schema/example (gen/generate gen-password)
                       :gen/gen             gen-password}}))
 
+(def password-relaxed
+  (m/-simple-schema
+   {:type            :password-relaxed
+    :pred            valid-password-relaxed?
+    :property-pred   (m/-min-max-pred count)
+    :type-properties {:error/message       "should be a relaxed password"
+                      :decode/json         utils/some-str
+                      :encode/string       utils/some-str
+                      :encode/json         utils/some-str
+                      :json-schema/type    "string"
+                      :json-schema/format  "password"
+                      :json-schema/example (gen/generate gen-password)
+                      :gen/gen             gen-password}}))
+
 (def session-id
   (m/-simple-schema
    {:type            :session-id
@@ -361,6 +379,7 @@
 (def schemas
   {:email              email
    :password           password
+   :password-relaxed   password-relaxed
    :instant            instant
    :duration           duration
    :phone              phone
