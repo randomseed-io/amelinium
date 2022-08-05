@@ -84,11 +84,33 @@
      out-path)))
 
 (defn add-taggers
-  [router language translator validators]
+  [router language translations validators]
 
   (let [lang-settings (or (get language :config) language)
         lang-param    (language/param nil lang-settings)
         validators    (or (get validators :config) validators)]
+
+    (selmer/add-tag!
+     :tr
+     (fn [args ctx]
+       (if-some [translator (get ctx :i18n/translator)]
+         (apply translator args)
+         (let [lang (get-lang-id ctx)]
+           (apply i18n/translate-with
+                  (or translations i18n/translations)
+                  (get-lang-id ctx)
+                  args)))))
+
+    (selmer/add-tag!
+     :tr-sub
+     (fn [args ctx]
+       (if-some [translator-sub (get ctx :i18n/translator-sub)]
+         (apply translator-sub args)
+         (let [lang (get-lang-id ctx)]
+           (apply i18n/translate-sub-with
+                  (or translations i18n/translations)
+                  (get-lang-id ctx)
+                  args)))))
 
     (selmer/add-tag!
      :anti-spam-field
