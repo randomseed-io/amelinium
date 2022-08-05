@@ -739,3 +739,6 @@
                  (filter (partial contains? current-form-params))
                  (map keyword) seq set)))))))
 
+(defn inject-form-errors
+  [req]
+  (assoc-in req [:app/data :form-errors] (delay (parse-form-errors req))))
