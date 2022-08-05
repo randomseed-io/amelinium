@@ -212,6 +212,10 @@
   [:i18n/translator     amelinium.common.populators/i18n-translator]
   [:i18n/translator-sub amelinium.common.populators/i18n-translator-sub]]
 
+ :amelinium.http.middleware.populators/post
+ [[:i18n/translator     amelinium.common.populators/i18n-translator]
+  [:i18n/translator-sub amelinium.common.populators/i18n-translator-sub]]
+
  :amelinium.http.middleware/web-renderer amelinium.web.controller/render!
  :amelinium.http.middleware/web-preparer amelinium.web.controller/prep!
 
@@ -237,6 +241,7 @@
                                  #ref :amelinium.http.middleware.populators/web
                                  #ref :amelinium.http.middleware.language/web
                                  #ref :amelinium.http.middleware.headers/web
+                                 #ref :amelinium.http.middleware.populators/post
                                  #ref :amelinium.http.middleware/web-preparer
                                  #ref :amelinium.http.middleware/web-renderer
                                  #ref :amelinium.http.middleware.debug/web]
