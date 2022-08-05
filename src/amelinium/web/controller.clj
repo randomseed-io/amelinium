@@ -28,12 +28,6 @@
             [puget.printer :refer [cprint]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Data population
-
-(p/import-vars [amelinium.common.controller
-                route-data+ auth-db+ auth-types+ oplog-logger+ user-lang+])
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Authentication
 
 (p/import-vars [amelinium.common.controller
@@ -229,11 +223,11 @@
             for-user (log/for-user user-id email ip-addr)
             for-mail (log/for-user nil email ip-addr)]
         (log/wrn "Hard-locked account access attempt" for-user)
-        (web/oplog req
-                   :user-id user-id
-                   :op      :access-denied
-                   :level   :warning
-                   :msg     (str "Permanent lock " for-mail))
+        (common/oplog req
+                      :user-id user-id
+                      :op      :access-denied
+                      :level   :warning
+                      :msg     (str "Permanent lock " for-mail))
         (web/go-to req (or (get route-data :auth/account-locked) :login/account-locked)))
 
       ;; Session expired and the time for prolongation has passed.
@@ -245,11 +239,11 @@
             for-user (log/for-user user-id email ip-addr)
             for-mail (log/for-user nil email ip-addr)]
         (log/msg "Session expired (hard)" for-user)
-        (web/oplog req
-                   :user-id user-id
-                   :op      :session
-                   :ok?     false
-                   :msg     (str "Hard-expired " for-mail))
+        (common/oplog req
+                      :user-id user-id
+                      :op      :session
+                      :ok?     false
+                      :msg     (str "Hard-expired " for-mail))
         (web/go-to req (or (get route-data :auth/session-expired) :login/session-expired)))
 
       ;; Session expired and we are not reaching an authentication page nor a login page.
@@ -287,18 +281,18 @@
                      for-user (log/for-user user-id email ip-addr)
                      for-mail (log/for-user nil email ip-addr)]
                  (log/msg "Session expired" for-user)
-                 (web/oplog req
-                            :user-id (:user/id sess)
-                            :op      :session
-                            :ok?     false
-                            :msg     (str "Expired " for-mail)))
+                 (common/oplog req
+                               :user-id (:user/id sess)
+                               :op      :session
+                               :ok?     false
+                               :msg     (str "Expired " for-mail)))
                (when-some [reason (:reason (:error sess))]
-                 (web/oplog req
-                            :user-id (:user/id sess)
-                            :op      :session
-                            :ok?     false
-                            :level   (:error sess)
-                            :msg     reason)
+                 (common/oplog req
+                               :user-id (:user/id sess)
+                               :op      :session
+                               :ok?     false
+                               :level   (:error sess)
+                               :msg     reason)
                  (log/log (:severity (:error sess) :warn) reason))))
 
         ;; Remove goto session variable as we already injected it into a response.

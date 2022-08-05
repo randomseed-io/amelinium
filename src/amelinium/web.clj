@@ -61,11 +61,6 @@
 (p/import-vars [amelinium.common
                 auth-config auth-db])
 
-;; Operations logging
-
-(p/import-vars [amelinium.common
-                oplog-config oplog-logger oplog-logger-populated oplog])
-
 ;; Routing data and settings helpers
 
 (p/import-vars [amelinium.common
