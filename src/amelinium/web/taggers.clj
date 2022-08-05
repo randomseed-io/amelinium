@@ -51,6 +51,13 @@
       (some-str (get ctx :language))
       (get ctx :language/default)))
 
+(defn get-lang-id
+  [ctx]
+  (or (get ctx :language/id)
+      (some-keyword-simple (get ctx :lang))
+      (some-keyword-simple (get ctx :language))
+      (get ctx :language/default)))
+
 (defn lang-url
   ([router ctx path-or-name lang localized? params query-params]
    (lang-url router ctx path-or-name lang localized? params query-params nil))
