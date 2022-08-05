@@ -42,6 +42,7 @@
 (def ^:const session-keys    [:session])
 (def ^:const remote-ip-keys  [:remote-ip :remote-ip/str :remote-ip/by-proxy? :remote-ip/proxy])
 (def ^:const language-keys   [:language/id :language/str :language/default :accept])
+(def ^:const i18n-keys       [:i18n/translator :i18n/translator-sub])
 (def ^:const roles-keys      [:roles :roles/in-context :roles/context
                               :user/authorized? :user/authenticated?])
 
@@ -53,6 +54,7 @@
 (def ^:const common-keys (vec (concat common-auth-keys
                                       validators-keys
                                       language-keys
+                                      i18n-keys
                                       param-keys
                                       page-keys)))
 
