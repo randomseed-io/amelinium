@@ -23,12 +23,6 @@
             [reitit.coercion                    :as      coercion]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Data population
-
-(p/import-vars [amelinium.common.controller
-                route-data+ auth-db+ auth-types+ oplog-logger+ user-lang+])
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Authentication
 
 (p/import-vars [amelinium.common.controller

@@ -38,43 +38,6 @@
 (def ^:const keywordize-params? false)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Data population
-
-(defn route-data+
-  "Injects route data directly into a request map."
-  [req _]
-  (get (get req ::r/match) :data))
-
-(defn auth-db+
-  "Injects authorization data source directly into a request map."
-  [req _]
-  (get (or (get (get req :route/data) :auth/config)
-           (get req :auth/config))
-       :db))
-
-(defn auth-types+
-  "Injects authorization configurations directly into a request map."
-  [req _]
-  (get (or (get (get req :route/data) :auth/config)
-           (get req :auth/config))
-       :types))
-
-(defn oplog-logger+
-  "Injects operations logger function into a request map."
-  [req _]
-  (delay (common/oplog-logger req)))
-
-(defn user-lang+
-  "Injects user's preferred language into a request map."
-  [req _]
-  (delay
-    (if-some [db (common/auth-db req)]
-      (let [smap (common/session req)]
-        (if-some [user-id (get smap :user/id)]
-          (let [supported (get (get req :language/settings) :supported)]
-            (contains? supported (user/setting db user-id :language))))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Calculations
 
 (defn kw-form-data
