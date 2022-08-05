@@ -104,17 +104,18 @@
                            :user      "Logged-in User"
                            :self      "Resource Owner"
                            :banned    "Account Blocked"}
-   :parameter             {:phone       "Phone number"
-                           :email       "E-mail address"
-                           :login       "Login"
-                           :password    "Password"
-                           :name        "Name"
-                           :last-name   "Last name"
-                           :second-name "Second name"
-                           :middle-name "Middle name"
-                           :token       "Token"
-                           :session-id  "Session identifier"
-                           :language    "Language identifier"
-                           :lang        "Language identifier"}
+   :parameter             {:phone            "Phone number"
+                           :email            "E-mail address"
+                           :login            "Login"
+                           :password         "Password"
+                           :password-relaxed "Password"
+                           :name             "Name"
+                           :last-name        "Last name"
+                           :second-name      "Second name"
+                           :middle-name      "Middle name"
+                           :token            "Token"
+                           :session-id       "Session identifier"
+                           :language         "Language identifier"
+                           :lang             "Language identifier"}
    :tongue/pluralizer     amelinium.i18n.pluralizers/en}}}
 
