@@ -153,22 +153,22 @@
 
  ;; Coercion
 
- :amelinium.http.coercion/all
- {:initializer reitit.coercion.malli/create
-  :config      {:transformers     {:body     {:default reitit.coercion.malli/default-transformer-provider
-                                              :formats {"application/json" reitit.coercion.malli/json-transformer-provider}}
-                                   :string   {:default reitit.coercion.malli/string-transformer-provider}
-                                   :response {:default reitit.coercion.malli/default-transformer-provider}}
-                :error-keys       #{:type :in :value :errors :transformed}
-                :lite             true
-                :compile          malli.util/closed-schema
-                :validate         true
-                :enabled          true
-                :strip-extra-keys true
-                :default-values   true
-                ;;:encode-error     nil
-                ;; malli options
-                :options          nil}}
+ :amelinium.http.middleware.coercion/coercer
+ {:init   reitit.coercion.malli/create
+  :config {:transformers     {:body     {:default reitit.coercion.malli/default-transformer-provider
+                                         :formats {"application/json" reitit.coercion.malli/json-transformer-provider}}
+                              :string   {:default reitit.coercion.malli/string-transformer-provider}
+                              :response {:default reitit.coercion.malli/default-transformer-provider}}
+           :error-keys       #{:coercion :type :in :value :errors :transformed}
+           :lite             true
+           :compile          malli.util/closed-schema
+           :validate         true
+           :enabled          true
+           :strip-extra-keys true
+           :default-values   true
+           ;;:encode-error     amelinium.api.controller/handle-coercion-error
+           ;; malli options
+           :options          nil}}
 
  :amelinium.http.middleware.coercion/exceptions     {:handler amelinium.common.controller/handle-coercion-error}
  :amelinium.http.middleware.coercion/exceptions-web {:handler amelinium.web.controller/handle-coercion-error}
@@ -203,11 +203,14 @@
 
  ;; Population
 
- :amelinium.http.middleware.populators/web [[:route/data    amelinium.common.controller/route-data+]
-                                            [:auth/db       amelinium.common.controller/auth-db+]
-                                            [:auth/types    amelinium.common.controller/auth-types+]
-                                            [:language/user amelinium.common.controller/user-lang+]
-                                            [:oplog/logger  amelinium.common.controller/oplog-logger+]]
+ :amelinium.http.middleware.populators/web
+ [[:route/data          amelinium.common.populators/route-data]
+  [:auth/db             amelinium.common.populators/auth-db]
+  [:auth/types          amelinium.common.populators/auth-types]
+  [:language/user       amelinium.common.populators/user-lang]
+  [:oplog/logger        amelinium.common.populators/oplog-logger]
+  [:i18n/translator     amelinium.common.populators/i18n-translator]
+  [:i18n/translator-sub amelinium.common.populators/i18n-translator-sub]]
 
  :amelinium.http.middleware/web-renderer amelinium.web.controller/render!
  :amelinium.http.middleware/web-preparer amelinium.web.controller/prep!
@@ -216,7 +219,7 @@
                                        :request-keys [:accept]}
 
  :amelinium.web.taggers/web {:enabled?     true
-                             :router       #ref :amelinium.app/http-router-web
+                             :router       #ref :amelinium.app/http-router
                              :language     #ref :amelinium.http.middleware.language/web
                              :validators   #ref :amelinium.http.middleware.validators/all
                              :translations #ref :amelinium.i18n/translations}
@@ -224,7 +227,7 @@
  :amelinium.http.middleware/web [#ref :amelinium.http.middleware.lazy-req/all
                                  #ref :amelinium.http.middleware.content/web
                                  reitit.ring.middleware.parameters/parameters-middleware
-                                 #ref :amelinium.http.coercion/exceptions
+                                 #ref :amelinium.http.middleware.coercion/exceptions-web
                                  reitit.ring.coercion/coerce-request-middleware
                                  reitit.ring.coercion/coerce-response-middleware
                                  #ref :amelinium.http.middleware.remote-ip/all
@@ -249,8 +252,8 @@
                                      :middleware   #ref :amelinium.http.middleware/web
                                      :translations #ref :amelinium.i18n/translations
                                      :auth/config  #ref :amelinium.auth/config
-                                     :oplog/config #ref :amelinium.common.authlog/log
-                                     :coercion     #ref :amelinium.http.coercion/all
+                                     :oplog/config #ref :amelinium.common.oplog.auth/log
+                                     :coercion     #ref :amelinium.http.middleware.coercion/coercer
                                      ;;:exception  reitit.dev.pretty/exception
                                      :appinit      #ref :amelinium.app/init}}]
 
