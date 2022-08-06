@@ -16,6 +16,7 @@
             [tick.core                            :as            t]
             [reitit.core                          :as            r]
             [ring.util.response]
+            [ring.util.codec                      :as        codec]
             [ring.util.http-response              :as         resp]
             [ring.util.request                    :as          req]
             [amelinium.http                       :as         http]
@@ -1637,3 +1638,21 @@
     (if-some [^String s (some-str s)]
       (keyword
        (if (= \: (.charAt ^String s 0)) (subs s 1) s)))))
+
+(defn parse-query-params
+  [req qstr]
+  (if req
+    (if-some [qstr (some-str qstr)]
+      (codec/form-decode qstr (or (req/character-encoding req) "UTF-8")))))
+
+(defn url->uri+params
+  [req u]
+  (try (let [{:keys [uri query-string]} (parse-url u)]
+         [(some-str uri) (parse-query-params req query-string)])
+       (catch Exception _ [(some-str u) nil])))
+
+(defn query-string-encode
+  ([params]
+   (if params (codec/form-encode params)))
+  ([params enc]
+   (if params (codec/form-encode params enc))))
