@@ -9,6 +9,7 @@
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require [potemkin.namespaces                :as          p]
+            [clojure.string                     :as        str]
             [reitit.ring                        :as       ring]
             [ring.middleware.keyword-params     :as    ring-kw]
             [ring.util.http-response            :as       resp]
@@ -25,6 +26,7 @@
             [io.randomseed.utils.map            :as        map]
             [io.randomseed.utils                :refer    :all]
             [amelinium.http.middleware.language :as   language]
+            [amelinium.http.middleware.session  :as    session]
             [amelinium.i18n                     :as       i18n]
             [amelinium.common                   :as     common]))
 
@@ -75,3 +77,29 @@
   language."
   [req _]
   (delay (i18n/translator-sub req)))
+
+(defn form-errors
+  "Tries to obtain form errors from previously visited page which were saved as a
+  session variable `:form-errors` or as a query parameter `form-errors`."
+  [req _]
+  (delay
+    (if-some [qp (get req :query-params)]
+      (if-some [query-params-errors (get qp "form-errors")]
+        (let [current-form-params (or (get req :form-params) #{})]
+          (if-some [query-params-errors (some-str query-params-errors)]
+            (->> (str/split query-params-errors #",")
+                 (map str/trim)
+                 (filter identity)
+                 (filter (partial contains? current-form-params))
+                 (map keyword) seq set)
+            (let [[opts smap]  (common/config+session req)
+                  svar         (if (and opts smap (get smap :valid?)) (session/fetch-var! opts smap :form-errors))
+                  expected-uri (if svar (get svar :uri))
+                  uri-ok?      (or (not expected-uri) (= expected-uri (get req :uri)))
+                  errors       (if (and uri-ok? svar) (get svar :errors))]
+              (if errors
+                (->> errors
+                     (map some-str)
+                     (filter identity)
+                     (filter (partial contains? current-form-params))
+                     (map keyword) seq set)))))))))
