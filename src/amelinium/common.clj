@@ -195,10 +195,18 @@
 
 ;; Path parsing
 
-(def ^:const path-splitter (re-pattern "([^\\?\\#]+)(\\#[^\\?]+)?(\\?.*)?"))
-(def ^:const split-qparams (re-pattern "[^\\?\\#]+|[\\?\\#].*"))
-(def ^:const on-slash      (re-pattern "/"))
-(def ^:const slash-break   (re-pattern "[^/]+|/"))
+(def ^:const max-url-len      8192)
+(def ^:const fast-url-matcher (re-pattern "^[a-zA-Z0-9\\+\\.\\-]+\\:"))
+(def ^:const path-splitter    (re-pattern "([^\\?\\#]+)(\\#[^\\?]+)?(\\?.*)?"))
+(def ^:const split-qparams    (re-pattern "[^\\?\\#]+|[\\?\\#].*"))
+(def ^:const on-slash         (re-pattern "/"))
+(def ^:const slash-break      (re-pattern "[^/]+|/"))
+
+(defn is-url?
+  [s]
+  (and s (string? s) (pos? (count ^String s))
+       (not= \/ (.charAt ^String s 0))
+       (some? (re-find fast-url-matcher ^String s))))
 
 (defn path-variants-core
   "Generates a list of all possible language variants of a path."
@@ -871,29 +879,37 @@
   ([resp-fn]
    (resp-fn))
   ([resp-fn req]
-   (if (resp/response? req)
-     req
-     (if-some [headers (get req :response/headers)]
-       (update (resp-fn) :headers conj headers)
-       (resp-fn))))
+   (if (nil? req)
+     (resp-fn)
+     (if (resp/response? req)
+       req
+       (if-some [headers (get req :response/headers)]
+         (update (resp-fn) :headers conj headers)
+         (resp-fn)))))
   ([resp-fn req a]
-   (if (resp/response? req)
-     req
-     (if-some [headers (get req :response/headers)]
-       (update (resp-fn a) :headers conj headers)
-       (resp-fn a))))
+   (if (nil? req)
+     (resp-fn a)
+     (if (resp/response? req)
+       req
+       (if-some [headers (get req :response/headers)]
+         (update (resp-fn a) :headers conj headers)
+         (resp-fn a)))))
   ([resp-fn req a b]
-   (if (resp/response? req)
-     req
-     (if-some [headers (get req :response/headers)]
-       (update (resp-fn a b) :headers conj headers)
-       (resp-fn a b))))
+   (if (nil? req)
+     (resp-fn a b)
+     (if (resp/response? req)
+       req
+       (if-some [headers (get req :response/headers)]
+         (update (resp-fn a b) :headers conj headers)
+         (resp-fn a b)))))
   ([resp-fn req a b & more]
-   (if (resp/response? req)
-     req
-     (if-some [headers (get req :response/headers)]
-       (update (resp-fn a b more) :headers conj headers)
-       (resp-fn a b more)))))
+   (if (nil? req)
+     (apply resp-fn a b more)
+     (if (resp/response? req)
+       req
+       (if-some [headers (get req :response/headers)]
+         (update (resp-fn a b more) :headers conj headers)
+         (apply resp-fn a b more))))))
 
 (defn render-force
   "Universal, body-less response renderer. Returns the result of calling the `resp-fn`
@@ -902,22 +918,30 @@
   ([resp-fn]
    (resp-fn))
   ([resp-fn req]
-   (if-some [headers (get req :response/headers)]
-     (update (resp-fn) :headers conj headers)
-     (resp-fn)))
+   (if (nil? req)
+     (resp-fn)
+     (if-some [headers (get req :response/headers)]
+       (update (resp-fn) :headers conj headers)
+       (resp-fn))))
   ([resp-fn req a]
-   (if-some [headers (get req :response/headers)]
-     (update (resp-fn a) :headers conj headers)
-     (resp-fn a)))
+   (if (nil? req)
+     (resp-fn a)
+     (if-some [headers (get req :response/headers)]
+       (update (resp-fn a) :headers conj headers)
+       (resp-fn a))))
   ([resp-fn req a b]
-   (if-some [headers (get req :response/headers)]
-     (update (resp-fn a b) :headers conj headers)
-     (resp-fn a b)))
+   (if (nil? req)
+     (resp-fn a b)
+     (if-some [headers (get req :response/headers)]
+       (update (resp-fn a b) :headers conj headers)
+       (resp-fn a b))))
   ([resp-fn req a b & more]
    ([resp-fn req a b]
-    (if-some [headers (get req :response/headers)]
-      (update (apply resp-fn a b more) :headers conj headers)
-      (apply resp-fn a b more)))))
+    (if (nil? req)
+      (apply resp-fn a b more)
+      (if-some [headers (get req :response/headers)]
+        (update (apply resp-fn a b more) :headers conj headers)
+        (apply resp-fn a b more))))))
 
 ;; Redirects
 
@@ -930,6 +954,8 @@
   obtained from the given request map (under the key `:language/str`)."
   {:arglists '([f]
                [f req]
+               [f url]
+               [f req url]
                [f req name-or-path]
                [f req name-or-path path-params]
                [f req name-or-path path-params query-params]
@@ -939,10 +965,14 @@
                [f req name-or-path lang path-params query-params & more])}
   ([f]
    (f "/"))
-  ([f req]
-   (render-force f req (page req)))
+  ([f req-or-url]
+   (if (map? req-or-url)
+     (render-force f req-or-url (page req-or-url))
+     (render-force f nil req-or-url)))
   ([f req name-or-path]
-   (render-force f req (page req name-or-path)))
+   (if (is-url? name-or-path)
+     (render-force f req name-or-path)
+     (render-force f req (page req name-or-path))))
   ([f req name-or-path lang]
    (render-force f req (page req name-or-path lang)))
   ([f req name-or-path lang params]
@@ -962,6 +992,8 @@
   sure that localized path will be produced, or `nil`."
   {:arglists '([f]
                [f req]
+               [f url]
+               [f req url]
                [f req name-or-path]
                [f req name-or-path path-params]
                [f req name-or-path path-params query-params]
@@ -971,10 +1003,14 @@
                [f req name-or-path lang path-params query-params & more])}
   ([f]
    (f "/"))
-  ([f req]
-   (render-force f req (localized-page req)))
+  ([f req-or-url]
+   (if (map? req-or-url)
+     (render-force f req-or-url (localized-page req-or-url))
+     (render-force f nil req-or-url)))
   ([f req name-or-path]
-   (render-force f req (localized-page req name-or-path)))
+   (if (is-url? name-or-path)
+     (render-force f req name-or-path)
+     (render-force f req (localized-page req name-or-path))))
   ([f req name-or-path lang]
    (render-force f req (localized-page req name-or-path lang)))
   ([f req name-or-path lang params]
@@ -1007,6 +1043,8 @@
         (defn ~name ~doc-or-f
           {:arglists '([]
                        ~'[req]
+                       ~'[url]
+                       ~'[req url]
                        ~'[req name-or-path]
                        ~'[req name-or-path path-params]
                        ~'[req name-or-path path-params query-params]
@@ -1016,10 +1054,14 @@
                        ~'[req name-or-path lang path-params query-params & more])}
           ([]
            (f# "/"))
-          (~'[req]
-           (render-force f# ~'req (page ~'req)))
+          (~'[req-or-url]
+           (if (map? ~'req-or-url)
+             (render-force f# ~'req-or-url (page ~'req-or-url))
+             (render-force f# nil ~'req-or-url)))
           (~'[req name-or-path]
-           (render-force f# ~'req (page ~'req ~'name-or-path)))
+           (if (is-url? ~'name-or-path)
+             (render-force f# ~'req ~'name-or-path)
+             (render-force f# ~'req (page ~'req ~'name-or-path))))
           (~'[req name-or-path lang]
            (render-force f# ~'req (page ~'req ~'name-or-path ~'lang)))
           (~'[req name-or-path lang params]
@@ -1062,6 +1104,8 @@
         (defn ~name ~doc-or-f
           {:arglists '([]
                        ~'[req]
+                       ~'[url]
+                       ~'[req url]
                        ~'[req name-or-path]
                        ~'[req name-or-path path-params]
                        ~'[req name-or-path path-params query-params]
@@ -1071,10 +1115,14 @@
                        ~'[req name-or-path lang path-params query-params & more])}
           ([]
            (f# "/"))
-          (~'[req]
-           (render-force f# ~'req (localized-page ~'req)))
+          (~'[req-or-url]
+           (if (map? ~'req-or-url)
+             (render-force f# ~'req-or-url (localized-page ~'req-or-url))
+             (render-force f# nil ~'req-or-url)))
           (~'[req name-or-path]
-           (render-force f# ~'req (localized-page ~'req ~'name-or-path)))
+           (if (is-url? ~'name-or-path)
+             (render-force f# ~'req ~'name-or-path)
+             (render-force f# ~'req (localized-page ~'req ~'name-or-path))))
           (~'[req name-or-path lang]
            (render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang)))
           (~'[req name-or-path lang params]
@@ -1106,13 +1154,13 @@
 
 (defn not-modified
   ([]           (resp/not-modified))
-  ([req]        (render-force resp/not-modified req))
-  ([req & more] (render-force resp/not-modified req)))
+  ([req]        (if (nil? req) (resp/not-modified) (render-force resp/not-modified req)))
+  ([req & more] (if (nil? req) (resp/not-modified) (render-force resp/not-modified req))))
 
 (defn localized-not-modified
   ([]           (resp/not-modified))
-  ([req]        (render-force resp/not-modified req))
-  ([req & more] (render-force resp/not-modified req)))
+  ([req]        (if (nil? req) (resp/not-modified) (render-force resp/not-modified req)))
+  ([req & more] (if (nil? req) (resp/not-modified) (render-force resp/not-modified req))))
 
 ;; Language
 
@@ -1467,7 +1515,7 @@
 ;; Linking helpers
 
 (defn path
-  "Creates a URL on a basis of route name or a path."
+  "Creates a URL path on a basis of route name or a path."
   ([]
    nil)
   ([req]
@@ -1477,6 +1525,16 @@
   ([req name-or-path lang]
    (localized-page nil name-or-path lang
                    nil nil true false
+                   (get req ::r/router)
+                   (lang-param req)))
+  ([req name-or-path lang params]
+   (localized-page nil name-or-path lang
+                   params nil true false
+                   (get req ::r/router)
+                   (lang-param req)))
+  ([req name-or-path lang params query-params]
+   (localized-page nil name-or-path lang
+                   params query-params true false
                    (get req ::r/router)
                    (lang-param req)))
   ([name-or-path lang params query-params router language-settings-or-param]
@@ -1502,6 +1560,16 @@
   ([req name-or-path lang]
    (localized-page nil name-or-path lang
                    nil nil true true
+                   (get req ::r/router)
+                   (lang-param req)))
+  ([req name-or-path lang params]
+   (localized-page nil name-or-path lang
+                   params nil true true
+                   (get req ::r/router)
+                   (lang-param req)))
+  ([req name-or-path lang params query-params]
+   (localized-page nil name-or-path lang
+                   params query-params true true
                    (get req ::r/router)
                    (lang-param req)))
   ([name-or-path lang params query-params router language-settings-or-param]
@@ -1560,7 +1628,7 @@
   [req]
   (get req :language/settings))
 
-;; Other helpers
+;; Parameters
 
 (defn keyword-from-param
   [s]
