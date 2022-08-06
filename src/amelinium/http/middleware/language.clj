@@ -17,8 +17,8 @@
             [io.randomseed.utils.var :as     var]
             [io.randomseed.utils     :refer :all]))
 
-(def default-lang-param         :lang)
-(def default-fallback-language    :en)
+(def default-lang-param      :lang)
+(def default-fallback-language :en)
 
 (def ^:const re-lang (re-pattern "[A-Za-z_\\-\\:\\.]{2,7}"))
 
