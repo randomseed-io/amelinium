@@ -447,20 +447,36 @@
    (let [[smap opts db-sid] (prep-opts opts sid-or-smap)]
      (if (and smap (not (valid? smap)))
        (log/err "Cannot get session variable" var-name "because session is not valid")
-       ((get opts :fn/var-get) db-sid var-name)))))
+       ((get opts :fn/var-get) db-sid var-name))))
+  ([opts sid-or-smap var-name & more]
+   (let [[smap opts db-sid] (prep-opts opts sid-or-smap)]
+     (if (and smap (not (valid? smap)))
+       (log/err "Cannot get session variable" var-name "because session is not valid")
+       (apply (get opts :fn/var-get) db-sid var-name more)))))
 
 (defn fetch-var!
   "Like `get-var` but removes session variable after it is successfully read from a
   database."
   {:arglists '([opts sid var-name]
-               [opts smap var-name])}
+               [opts smap var-name]
+               [opts sid var-name & var-names]
+               [opts smap var-name & var-names])}
   ([opts sid-or-smap var-name]
    (let [[smap opts db-sid] (prep-opts opts sid-or-smap)]
      (if (and smap (not (valid? smap)))
        (log/err "Cannot get session variable" var-name "because session is not valid")
        (let [v ((get opts :fn/var-get) db-sid var-name)]
          (del-var! opts sid-or-smap var-name)
-         v)))))
+         v))))
+  ([opts sid-or-smap var-name & var-names]
+   (if var-names
+     (let [[smap opts db-sid] (prep-opts opts sid-or-smap)]
+       (if (and smap (not (valid? smap)))
+         (log/err "Cannot get session variable" var-name "because session is not valid")
+         (let [results (apply (get opts :fn/var-get) db-sid var-name var-names)]
+           (apply del-var! opts sid-or-smap var-name var-names)
+           results)))
+     (fetch-var! opts sid-or-smap var-name))))
 
 (defn get-variable-failed?
   "Returns `true` if the value `v` obtained from a session variable indicates that it
@@ -842,7 +858,11 @@
         var-set-core-fn    (db/make-setting-setter  variables-table :session-id)
         var-del-core-fn    (db/make-setting-deleter variables-table :session-id)
         var-del-user-fn    (setup-fn config :fn/vars-del-user delete-user-vars)
-        var-get-fn         #(var-get-core-fn db %1 %2)
+        var-get-fn         (fn
+                             ([session-id setting-id]
+                              (var-get-core-fn db session-id setting-id))
+                             ([session-id setting-id & setting-ids]
+                              (apply var-get-core-fn db session-id setting-id setting-ids)))
         var-set-fn         (fn
                              ([session-id setting-id value]
                               (var-set-core-fn db session-id setting-id value))
