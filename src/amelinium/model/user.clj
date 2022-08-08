@@ -203,6 +203,12 @@
     (apply session/get-var opts smap var-name more)
     (session/get-var opts smap var-name)))
 
+(defn fetch-session-var
+  [opts smap var-name & more]
+  (if more
+    (apply session/fetch-var! opts smap var-name more)
+    (session/fetch-var! opts smap var-name)))
+
 (defn put-session-var
   [opts smap var-name v & more]
   (if more
