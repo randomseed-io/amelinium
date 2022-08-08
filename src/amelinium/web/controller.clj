@@ -36,21 +36,20 @@
                 regular-auth? hard-expiry?
                 keywordize-params? kw-form-data])
 
-(defn restore-form-data
+(defn saved-params
   "Gets go-to data from for a valid (and not expired) session. Returns form data as a
-  map. The resulting map has session-id entry removed (if found)."
+  map. The resulting map has session-id entry removed (if found). We assume that all
+  parameters were validated earlier."
   ([req gmap]
-   (restore-form-data req gmap nil))
+   (saved-params req gmap nil))
   ([req gmap smap]
    (if (and gmap (= (get req :uri) (get gmap :uri)))
-     (if-some [form-data (get gmap :form-data)]
-       (if (and (map? form-data) (pos-int? (count form-data)))
-         (if-some [smap (or smap (common/session req))]
-           (dissoc form-data (or (get smap :session-id-field) "session-id"))
-           (let [sess-opts (get req :session/config)
-                 sess-key  (or (get sess-opts :session-key) :session)
-                 sid-key   (web/session-field nil sess-opts sess-key :session/config)]
-             (dissoc form-data (or sid-key "session-id")))))))))
+     (if-some [gmap (valuable (select-keys gmap [:form-data :query-data :sid]))]
+       (let [smap (or smap (common/session req))]
+         (if (= (get smap :db/id) (get gmap :sid))
+           (-> gmap
+               (update :form-data dissoc (or (get smap :session-id-field) "session-id"))
+               (dissoc :sid))))))))
 
 (defn remove-login-data
   "Removes login data from the form params part of a request map."
@@ -64,8 +63,8 @@
   (if auth? req (remove-login-data req)))
 
 (defn inject-goto
-  "Injects go-to data into a request. Form data is merged only if go-to URI matches
-  current page URI and session ID matches. Go-to URI is always injected. When the
+  "Injects go-to data (`gmap`) into a request. Form data is merged only if a go-to URI
+  (`:uri`) matches the URI of a current page. Go-to URI is always injected. When the
   given gmap is broken it will set :goto-injected? to true but :goto-uri and :goto to
   false."
   ([req gmap]
@@ -76,10 +75,12 @@
      (if (web/session-variable-get-failed? gmap)
        (assoc req :goto-injected? true :goto-uri false :goto false)
        (let [req (assoc req :goto-injected? true :goto-uri (get gmap :uri))]
-         (if-some [form-data (restore-form-data req gmap smap)]
+         (if-some [{:keys [form-data query-data]} (saved-params req gmap smap)]
            (-> req
-               (update :form-params #(delay (merge form-data %)))
-               (update :params      #(delay (merge (kw-form-data form-data) %))))
+               (update :form-params  #(delay (merge form-data %)))
+               (update :query-params #(delay (merge query-data %)))
+               (update :params       #(delay (merge (kw-form-data query-data)
+                                                    (kw-form-data form-data) %))))
            req))))))
 
 (defn login-data?
@@ -95,7 +96,7 @@
 (defn get-goto+
   "Gets go-to map from a session variable even if the session expired."
   [smap sess-opts]
-  (user/get-session-var sess-opts (web/allow-soft-expired smap) :goto))
+  (user/get-session-var sess-opts (common/allow-soft-expired smap) :goto))
 
 (defn get-goto-for-valid+
   "Gets go-to map from session variable if the session is valid (and not expired)."
@@ -104,15 +105,15 @@
     (get-goto+ smap sess-opts)))
 
 (defn populate-goto+
-  "Gets go-to data from session variable if it does not yet exist in req
-  structure. Works also for expired session and only if go-to URI (:uri key of a map)
-  is the same as currently visited page. Uses inject-goto to inject goto data from a
-  session setting."
+  "Gets a go-to data from a session variable if it does not yet exist in the `req`
+  context. Works also for the expired session and only if a go-to URI (`:uri` key of
+  a map) is the same as the URI of a currently visited page. Uses `inject-goto` to
+  inject the data."
   ([req smap]
    (populate-goto+ req smap (get req :session/config)))
   ([req smap sess-opts]
    (if (or (get req :goto-injected?) (not smap)
-           (not (get (web/allow-soft-expired smap) :id)))
+           (not (get (common/allow-soft-expired smap) :id)))
      req
      (inject-goto req (get-goto+ smap sess-opts) smap))))
 
@@ -251,11 +252,17 @@
       ;; We have to preserve form data and original, destination URI in a session variable.
 
       (prolongation? sess @auth-state @login-data?)
-      (do (user/put-session-var (get req :session/config)
-                                (web/allow-soft-expired sess)
-                                :goto {:uri       (get req :uri)
-                                       :form-data (get (cleanup-req req @auth-state) :form-params)})
-          (web/move-to req (or (get route-data :auth/prolongate) :login/prolongate)))
+      (let [req            (cleanup-req req @auth-state)
+            sess           (common/allow-soft-expired sess)
+            session-config (get req :session/config)
+            session-field  (or (get sess :session-id-field) "session-id")]
+        (user/put-session-var session-config
+                              sess
+                              :goto {:uri        (get req :uri)
+                                     :sid        (get sess :db/id)
+                                     :form-data  (dissoc (get req :form-params) session-field)
+                                     :query-data (get req :query-params)})
+        (web/move-to req (or (get route-data :auth/prolongate) :login/prolongate)))
 
       :----pass
 
