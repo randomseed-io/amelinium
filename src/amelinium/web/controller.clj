@@ -9,22 +9,24 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [potemkin.namespaces                :as          p]
-            [tick.core                          :as          t]
-            [reitit.core                        :as          r]
-            [reitit.coercion                    :as   coercion]
-            [clojure.string                     :as        str]
-            [amelinium.logging                  :as        log]
-            [amelinium.model.user               :as       user]
-            [amelinium.common                   :as     common]
-            [amelinium.common.controller        :as controller]
-            [amelinium.i18n                     :as       i18n]
-            [amelinium.web                      :as        web]
-            [amelinium.http                     :as       http]
-            [amelinium.http.middleware.session  :as    session]
-            [amelinium.http.middleware.language :as   language]
-            [io.randomseed.utils.map            :as        map]
-            [io.randomseed.utils                :refer    :all]
+  (:require [potemkin.namespaces                :as               p]
+            [tick.core                          :as               t]
+            [reitit.core                        :as               r]
+            [reitit.coercion                    :as        coercion]
+            [ring.util.http-response            :as            resp]
+            [clojure.string                     :as             str]
+            [amelinium.logging                  :as             log]
+            [amelinium.model.user               :as            user]
+            [amelinium.common                   :as          common]
+            [amelinium.common.controller        :as      controller]
+            [amelinium.i18n                     :as            i18n]
+            [amelinium.web                      :as             web]
+            [amelinium.http                     :as            http]
+            [amelinium.http.middleware.session  :as         session]
+            [amelinium.http.middleware.language :as        language]
+            [io.randomseed.utils.map            :as             map]
+            [io.randomseed.utils                :refer         :all]
+            [potpuri.core                       :refer [deep-merge]]
             [puget.printer :refer [cprint]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -44,12 +46,14 @@
    (saved-params req gmap nil))
   ([req gmap smap]
    (if (and gmap (= (get req :uri) (get gmap :uri)))
-     (if-some [gmap (valuable (select-keys gmap [:form-data :query-data :sid]))]
-       (let [smap (or smap (common/session req))]
-         (if (= (get smap :db/id) (get gmap :sid))
+     (if-some [gmap (valuable (select-keys gmap [:form-params :query-params :parameters :session-id]))]
+       (let [smap      (or smap (common/session req))
+             sid-field (or (get smap :session-id-field) "session-id")]
+         (if (= (get smap :db/id) (get gmap :session-id))
            (-> gmap
-               (update :form-data dissoc (or (get smap :session-id-field) "session-id"))
-               (dissoc :sid))))))))
+               (update-in [:parameters :form] dissoc sid-field)
+               (update :form-params dissoc sid-field)
+               (dissoc :session-id))))))))
 
 (defn remove-login-data
   "Removes login data from the form params part of a request map."
@@ -65,8 +69,8 @@
 (defn inject-goto
   "Injects go-to data (`gmap`) into a request. Form data is merged only if a go-to URI
   (`:uri`) matches the URI of a current page. Go-to URI is always injected. When the
-  given gmap is broken it will set :goto-injected? to true but :goto-uri and :goto to
-  false."
+  given `gmap` is broken it will set `:goto-injected?` to `true` but `:goto-uri` and
+  `:goto` to `false`."
   ([req gmap]
    (inject-goto req gmap nil))
   ([req gmap smap]
@@ -75,12 +79,15 @@
      (if (web/session-variable-get-failed? gmap)
        (assoc req :goto-injected? true :goto-uri false :goto false)
        (let [req (assoc req :goto-injected? true :goto-uri (get gmap :uri))]
-         (if-some [{:keys [form-data query-data]} (saved-params req gmap smap)]
+         (if-some [{:keys [form-params query-params parameters]
+                    :or   {form-params {} query-params {} parameters {}}}
+                   (saved-params req gmap smap)]
            (-> req
-               (update :form-params  #(delay (merge form-data %)))
-               (update :query-params #(delay (merge query-data %)))
-               (update :params       #(delay (merge (kw-form-data query-data)
-                                                    (kw-form-data form-data) %))))
+               (update :parameters   #(delay (deep-merge :into parameters %)))
+               (update :form-params  #(delay (merge form-params  %)))
+               (update :query-params #(delay (merge query-params %)))
+               (update :params       #(delay (merge (kw-form-data query-params)
+                                                    (kw-form-data form-params) %))))
            req))))))
 
 (defn login-data?
@@ -258,10 +265,11 @@
             session-field  (or (get sess :session-id-field) "session-id")]
         (user/put-session-var session-config
                               sess
-                              :goto {:uri        (get req :uri)
-                                     :sid        (get sess :db/id)
-                                     :form-data  (dissoc (get req :form-params) session-field)
-                                     :query-data (get req :query-params)})
+                              :goto {:uri          (get req :uri)
+                                     :session-id   (get sess :db/id)
+                                     :parameters   (update (get req :parameters) :form dissoc session-field)
+                                     :form-params  (dissoc (get req :form-params) session-field)
+                                     :query-params (get req :query-params)})
         (web/move-to req (or (get route-data :auth/prolongate) :login/prolongate)))
 
       :----pass
@@ -386,8 +394,6 @@
          (map :path) (filter identity)
          (map last)  (filter identity)
          (map some-str))))
-
-(def ^:private empty-fe-param  {"form-errors" ""})
 
 (defn handle-coercion-error
   [e respond raise]
