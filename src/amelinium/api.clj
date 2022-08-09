@@ -661,7 +661,7 @@
   ([req smap translate-sub lang]
    (if (get smap :valid?)
      req
-     (let [translate-sub (or translate-sub (i18n/translator-sub req lang))
+     (let [translate-sub (or translate-sub (common/translator-sub req lang))
            status        (session-status smap)
            message       (translate-sub :session status)]
        (update req :response/body assoc

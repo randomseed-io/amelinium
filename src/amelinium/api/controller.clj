@@ -61,7 +61,7 @@
             astatus       (get req :auth/status)
             status        (controller/auth-status-to-status astatus)
             resp-fn       (controller/auth-status-to-resp   astatus)
-            translate-sub (i18n/translator-sub req lang)
+            translate-sub (common/translator-sub req lang)
             amessage      (translate-sub :auth  astatus)
             message       (translate-sub :error status)
             sess-err?     (= status :error/session)
@@ -140,11 +140,12 @@
       ;; Request is invalid.
 
       (not (get req :validators/params-valid?))
-      (let [lang (common/lang-id req)]
+      (let [lang      (common/lang-id    req)
+            translate (common/translator req)]
         (-> req
             (assoc :response/body
                    {:status        :error/bad-parameters
-                    :message       (i18n/translate req lang :error/bad-parameters)
+                    :message       (translate :error/bad-parameters)
                     :status/sub    :params/errors
                     :params/errors (get req :validators/reasons)})
             (api/body-add-lang lang)
@@ -164,7 +165,7 @@
             for-user  (log/for-user user-id email ip-addr)
             for-mail  (log/for-user nil email ip-addr)
             lang      (common/lang-id req)
-            translate (i18n/translator req lang)]
+            translate (common/translator req)]
         (log/wrn "Hard-locked account access attempt" for-user)
         (api/oplog req
                    :user-id user-id
@@ -193,7 +194,7 @@
             for-user      (log/for-user user-id email ip-addr)
             for-mail      (log/for-user nil email ip-addr)
             lang          (common/lang-id req)
-            translate-sub (i18n/translator-sub req lang)]
+            translate-sub (common/translator-sub req)]
 
         ;; Log the event.
 
@@ -295,7 +296,7 @@
       ::coercion/request-coercion
       (respond
        (let [lang          (common/lang-id req)
-             translate-sub (i18n/translator-sub req lang)]
+             translate-sub (common/translator-sub req)]
          (-> req
              (assoc :response/body {:lang             lang
                                     :status           :error/parameters
@@ -307,7 +308,7 @@
       ::coercion/response-coercion
       (respond
        (let [lang      (common/lang-id req)
-             translate (i18n/translator req lang)]
+             translate (common/translator req)]
          (-> req
              (assoc :response/body {:lang           lang
                                     :status         :error/internal

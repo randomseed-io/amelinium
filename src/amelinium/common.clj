@@ -26,6 +26,7 @@
             [amelinium.http.middleware.db         :as       mid-db]
             [amelinium.http.middleware.validators :as   validators]
             [amelinium.common.oplog.auth          :as   oplog-auth]
+            [amelinium.i18n                       :as         i18n]
             [amelinium.model.user                 :as         user]
             [amelinium.logging                    :as          log]
             [amelinium.db                         :as           db]
@@ -1628,6 +1629,24 @@
 (defn lang-config
   [req]
   (get req :language/settings))
+
+;; I18n
+
+(defn translator
+  ([req]
+   (or (get req :i18n/translator) (i18n/translator req)))
+  ([req lang]
+   (if lang
+     (i18n/translator req lang)
+     (or (get req :i18n/translator) (i18n/translator req)))))
+
+(defn translator-sub
+  ([req]
+   (or (get req :i18n/translator-sub) (i18n/translator-sub req)))
+  ([req lang]
+   (if lang
+     (i18n/translator-sub req lang)
+     (or (get req :i18n/translator-sub) (i18n/translator-sub req)))))
 
 ;; Parameters
 
