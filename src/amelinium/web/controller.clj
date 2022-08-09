@@ -404,29 +404,36 @@
     (case ctype
 
       ::coercion/request-coercion
-      (respond
-       (let [orig-page              (some-str (http/get-route-data req :bad-parameters))
-             referer                (if (nil? orig-page) (some-str (get-in req [:headers "referer"])))
-             [orig-uri orig-params] (if referer (web/url->uri+params req referer))]
-         (if (or orig-page orig-uri referer)
+      (let [orig-page              (some-str (http/get-route-data req :bad-parameters))
+            referer                (if (nil? orig-page) (some-str (get-in req [:headers "referer"])))
+            [orig-uri orig-params] (if referer (common/url->uri+params req referer))
+            handling-previous?     (contains? (get req :query-params) "form-errors")]
+        (respond
+         (if (and (or orig-page orig-uri referer) (not handling-previous?))
+           ;; redirect to a form-submission page allowing user to correct errors
            (let [errors       (list-coercion-errors data)
                  orig-uri     (if orig-uri (some-str orig-uri))
                  orig-params  (if orig-uri orig-params)
                  [opts smap]  (common/config+session req)
                  session?     (and smap (get smap :valid?)
                                    (session/put-var!
-                                    opts smap :form-errors {:dest   (common/page req)
+                                    opts smap :form-errors {:dest   (get req :uri)
                                                             :errors errors}))
                  error-params (if session? "" (str/join "," errors))
                  joint-params (assoc orig-params "form-errors" error-params)
-                 destination  (or orig-page orig-uri referer)]
-             (common/temporary-redirect req destination nil joint-params))
-           (let [translate-sub (delay (i18n/translator-sub req))]
+                 destination  (or orig-page orig-uri)]
+             (if destination
+               (common/temporary-redirect req destination nil joint-params)
+               (resp/temporary-redirect
+                (str referer (if (str/includes? referer "?") ("&" "?"))
+                     (common/query-string-encode joint-params)))))
+           ;; render a separate page describing invalid parameters
+           (let [translate-sub (common/translator-sub req)]
              (-> req
                  (map/assoc-missing :app/data common/empty-lazy-map)
                  (update :app/data assoc
-                         :title (delay (@translate-sub :error/parameters))
-                         :error/parameters (delay (recode-coercion-error data @translate-sub)))
+                         :title (delay (translate-sub :error/parameters))
+                         :error/parameters (delay (recode-coercion-error data translate-sub)))
                  web/render-bad-params))))) ;; TODO: template for listing bad params / update existing template and check
 
       ::coercion/response-coercion
