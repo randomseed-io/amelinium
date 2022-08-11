@@ -202,6 +202,21 @@
              sfld (get smap :session-id-field)]
          (str (anti-spam-code validators)
               "<input type=\"hidden\" name=\"" sfld "\" value=\"" (get smap :id) "\" />"))))
+
+    (selmer/add-tag!
+     :explain-form-error
+     (fn [args ctx]
+       (if-some [fe (get ctx :form-errors)]
+         (let [[param-id param-type] (common/split-coercion-error args)]
+           (if (contains? fe param-id)
+             (let [tr-sub      (translator-sub ctx translations-fn)
+                   param-type  (or param-type (get fe param-id))
+                   param-type  (if param-type (common/string-from-param param-type))
+                   ptype-class (if param-type (str " param-type-" param-type))
+                   text        (common/translate-coercion-error tr-sub param-id param-type)]
+               (if (pos? (count text))
+                 (str "<div class=\"form-error param-" param-id ptype-class "\">"
+                      "<p>" text "</p></div>"))))))))
     nil))
 
 ;; Configuration initializers
