@@ -83,34 +83,64 @@
          out-path     (or out-path (if-not (ident? path-or-name) (some-str path-or-name)))]
      out-path)))
 
+(defn translator
+  ([ctx]
+   (translator ctx nil))
+  ([ctx translations-fn]
+   (or (get ctx :i18n/translator)
+       (let [tf   (or translations-fn i18n/translations)
+             lang (get-lang-id ctx)]
+         #(apply i18n/translate-with tf lang
+                 (common/keyword-from-param (first %))
+                 (next %))))))
+
+(defn translator-sub
+  ([ctx]
+   (translator-sub ctx nil))
+  ([ctx translations-fn]
+   (or (get ctx :i18n/translator)
+       (let [tf   (or translations-fn i18n/translations)
+             lang (get-lang-id ctx)]
+         #(apply i18n/translate-sub-with tf lang
+                 (common/keyword-from-param (first  %))
+                 (common/keyword-from-param (second %))
+                 (nnext %))))))
+
+(defn tr
+  ([args ctx]
+   (tr args ctx nil))
+  ([args ctx translations-fn]
+   (if-some [translator (get ctx :i18n/translator)]
+     (apply translator (common/keyword-from-param (first args)) (next args))
+     (apply i18n/translate-with
+            (or translations-fn i18n/translations)
+            (get-lang-id ctx)
+            (common/keyword-from-param (first args))
+            (next args)))))
+
+(defn tr-sub
+  ([args ctx]
+   (tr-sub args ctx nil))
+  ([args ctx translations-fn]
+   (if-some [translator-sub (get ctx :i18n/translator-sub)]
+     (apply translator-sub (common/keyword-from-param (first args)) (next args))
+     (let [lang (get-lang-id ctx)]
+       (apply i18n/translate-sub-with
+              (or translations-fn i18n/translations)
+              (get-lang-id ctx)
+              (common/keyword-from-param (first  args))
+              (common/keyword-from-param (second args))
+              (nnext args))))))
+
 (defn add-taggers
-  [router language translations validators]
+  [router language translations-fn validators]
 
   (let [lang-settings (or (get language :config) language)
         lang-param    (language/param nil lang-settings)
         validators    (or (get validators :config) validators)]
 
-    (selmer/add-tag!
-     :tr
-     (fn [args ctx]
-       (if-some [translator (get ctx :i18n/translator)]
-         (apply translator (common/keyword-from-param (first args)) (next args))
-         (let [lang (get-lang-id ctx)]
-           (apply i18n/translate-with
-                  (or translations i18n/translations)
-                  (get-lang-id ctx)
-                  (common/keyword-from-param (first args)) (next args))))))
-
-    (selmer/add-tag!
-     :tr-sub
-     (fn [args ctx]
-       (if-some [translator-sub (get ctx :i18n/translator-sub)]
-         (apply translator-sub (common/keyword-from-param (first args)) (next args))
-         (let [lang (get-lang-id ctx)]
-           (apply i18n/translate-sub-with
-                  (or translations i18n/translations)
-                  (get-lang-id ctx)
-                  (common/keyword-from-param (first args)) (next args))))))
+    (selmer/add-tag! :tr     #(tr     %1 %2 translations-fn))
+    (selmer/add-tag! :tr-sub #(tr-sub %1 %2 translations-fn))
 
     (selmer/add-tag!
      :anti-spam-field
