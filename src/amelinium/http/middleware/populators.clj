@@ -15,36 +15,66 @@
             [io.randomseed.utils.map :as        map]
             [io.randomseed.utils     :refer    :all]))
 
+(defn compile-populator
+  "Prepares a single populator."
+  {:no-doc true}
+  [data entry]
+  (cond
+    (sequential? entry) (compile-populator data {:id (first entry) :fn (second entry) :args (nnext entry)})
+    (ident?      entry) (compile-populator data (list (some-keyword entry) (some-symbol entry)))
+    (string?     entry) (compile-populator data (some-symbol entry))
+    (map?        entry)
+    (let [{id    :id
+           f     :fn
+           cf    :compile
+           args  :args
+           cargs :compile-args} entry]
+      (if-some [id (some-keyword id)]
+        (let [f  (var/deref f)
+              cf (if (not f) (var/deref cf))
+              f  (or f (if cf (cf data id cargs) (var/deref (symbol id))))]
+          (if (fn? f) [id (fn populator [req] (f req id args))]))))))
+
 (defn compile
-  "Prepares population map."
-  [populators]
-  (->> populators
-       (map #(if (map? %) (seq %) %))
-       (map #(if (coll? %) % (list (keyword %) (symbol %))))
-       flatten (partition 2)
-       (map    (fn [[k v]] (list (keyword k) (if (ident? v) (var/deref v) v))))
-       (filter (fn [[k v]] (and (keyword? k) (instance? clojure.lang.IFn v))))
-       (map vec) vec))
+  "Prepares population map an a basis of configuration sequence by processing its
+  elements.
+
+  If the element is a map, it will look for `:id` and either `:fn` or `:compile`
+  keys. The first should be a keyword (a populator ID used as a key when injecting
+  value to a request map), the `:fn` should be a populator function or an ident (will
+  be dereferenced), and the `:compile` should be a function (or an ident naming the
+  function) which should return a populator. The compiling function will receive a
+  value as an argument which will be a map containing route data.
+
+  If the element is a sequence, the first element should be an identifier (a
+  populator ID used as a key when injecting value to a request map) and the second
+  should be a population function or an ident naming the function.
+
+  If the element is a single value it should be a string or an ident naming the
+  population function."
+  [data config]
+  (->> config (map (partial compile-populator data)) (filter vector?) vec))
 
 (defn populate
   "For each populator map calls the function identified by map's value and associates
   its result in a request with the key it's identified by. Called function must
   accept two arguments (a request/context map and a key) and return a value to be
   associated."
-  [req compiled-populators]
-  (reduce (fn [req [k f]] (assoc req k (f req k))) req compiled-populators))
+  [req populators]
+  (reduce (fn [req [k f]] (assoc req k (f req))) req populators))
 
 (defn wrap-populators
   "Populators wrapping middleware."
-  [k compiled-populators]
+  [k config]
   (log/msg "Installing populators:" k)
   {:name    k
-   :compile (fn [_ _]
-              (fn [handler]
-                (fn [req]
-                  (handler (populate req compiled-populators)))))})
+   :compile (fn [data _]
+              (if-some [populators (compile data config)]
+                (fn [handler]
+                  (fn [req]
+                    (handler (populate req populators))))))})
 
-(system/add-init  ::default [k config] (wrap-populators k (compile config)))
+(system/add-init  ::default [k config] (wrap-populators k config))
 (system/add-halt! ::default [_ config] nil)
 
 (derive ::web  ::default)

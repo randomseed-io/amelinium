@@ -35,31 +35,31 @@
 
 (defn route-data
   "Injects route data directly into a request map."
-  [req _]
+  [req _ _]
   (get (get req ::r/match) :data))
 
 (defn auth-db
   "Injects authorization data source directly into a request map."
-  [req _]
+  [req _ _]
   (get (or (get (get req :route/data) :auth/config)
            (get req :auth/config))
        :db))
 
 (defn auth-types
   "Injects authorization configurations directly into a request map."
-  [req _]
+  [req _ _]
   (get (or (get (get req :route/data) :auth/config)
            (get req :auth/config))
        :types))
 
 (defn oplog-logger
   "Injects operations logger function into a request map."
-  [req _]
+  [req _ _]
   (delay (common/oplog-logger req)))
 
 (defn user-lang
   "Injects user's preferred language into a request map."
-  [req _]
+  [req _ _]
   (delay
     (if-some [db (common/auth-db req)]
       (if-some [smap (common/session req)]
@@ -69,26 +69,26 @@
 
 (defn i18n-translator
   "Creates shared translator for currently detected language."
-  [req _]
+  [req _ _]
   (delay (i18n/translator req)))
 
 (defn i18n-translator-sub
   "Creates shared translator (supporting namespaces and keys) for currently detected
   language."
-  [req _]
+  [req _ _]
   (delay (i18n/translator-sub req)))
 
 (defn form-errors
-  "Tries to obtain form errors from previously visited page which were saved as a
+  "Tries to obtain form errors from previously visited page, saved as a
   session variable `:form-errors` or as a query parameter `form-errors`."
-  [req _]
+  [req _ _]
   (delay
     (if-some [qp (get req :query-params)]
       (if-some [query-params-errors (get qp "form-errors")]
-        (let [current-form-params (or (get req :form-params) #{})]
+        (let [current-form-params (or (get req :form-params) {})]
           (if-some [query-params-errors (some-str query-params-errors)]
             (->> (str/split query-params-errors #",")
-                 (map str/trim)
+                 (map #(if % (str/trim %)))
                  (filter identity)
                  (filter (partial contains? current-form-params))
                  (map keyword) seq set)
