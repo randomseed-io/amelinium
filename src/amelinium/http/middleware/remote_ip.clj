@@ -30,8 +30,9 @@
   "Parses remote address string to get the string representation of client's IP
   address."
   [addr]
-  (if-some [a (not-empty (str/trim (str/trim-newline (some-str addr))))]
-    (not-empty (sa/trim-both {\space \space \[ \] \( \)} a))))
+  (if-some [a (some-str addr)]
+    (if-some [a (not-empty (str/trim (str/trim-newline a)))]
+      (not-empty (sa/trim-both {\space \space \[ \] \( \)} a)))))
 
 (defn remote-addr-get
   "Parses :remote-addr key of a request to get the string representation of client's IP
