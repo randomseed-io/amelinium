@@ -9,16 +9,15 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [potemkin.namespaces                :as               p]
-            [tick.core                          :as               t]
+  (:require [tick.core                          :as               t]
             [reitit.core                        :as               r]
-            [reitit.coercion                    :as        coercion]
+            [reitit.coercion                      :as      coercion]
             [ring.util.http-response            :as            resp]
             [clojure.string                     :as             str]
             [amelinium.logging                  :as             log]
             [amelinium.model.user               :as            user]
             [amelinium.common                   :as          common]
-            [amelinium.common.controller        :as      controller]
+            [amelinium.common.controller        :as           super]
             [amelinium.i18n                     :as            i18n]
             [amelinium.web                      :as             web]
             [amelinium.http                     :as            http]
@@ -31,12 +30,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Authentication
-
-(p/import-vars [amelinium.common.controller
-                check-password lock-remaining-mins
-                account-locked? prolongation? prolongation-auth?
-                regular-auth? hard-expiry?
-                keywordize-params? kw-form-data])
 
 (defn saved-params
   "Gets go-to data from for a valid (and not expired) session. Returns form data as a
@@ -86,8 +79,8 @@
                (update :parameters   #(delay (deep-merge :into parameters %)))
                (update :form-params  #(delay (merge form-params  %)))
                (update :query-params #(delay (merge query-params %)))
-               (update :params       #(delay (merge (kw-form-data query-params)
-                                                    (kw-form-data form-params) %))))
+               (update :params       #(delay (merge (super/kw-form-data query-params)
+                                                    (super/kw-form-data form-params) %))))
            req))))))
 
 (defn login-data?
@@ -131,7 +124,7 @@
   "Authentication helper. Used by other controllers. Short-circuits on certain
   conditions and may emit a redirect or render a response."
   [req user-email password sess route-data lang]
-  (let [req (controller/auth-user-with-password! req user-email password sess route-data)]
+  (let [req (super/auth-user-with-password! req user-email password sess route-data)]
     (if (web/response? req)
       req
       (case (get req :auth/status)
@@ -195,10 +188,10 @@
                         (assoc sess :id (or (get sess :id) (get sess :err/id)) :prolonged? true)
                         (assoc sess :prolonged? false))))
         (assoc-in [:app/data :lock-remains]
-                  (delay (lock-remaining-mins req
-                                              (web/auth-db req)
-                                              (if @prolonged? sess)
-                                              t/now))))))
+                  (delay (super/lock-remaining-mins req
+                                                    (web/auth-db req)
+                                                    (if @prolonged? sess)
+                                                    t/now))))))
 
 (defn prep-request!
   "Prepares a request before any web controller is called."
@@ -224,7 +217,7 @@
 
       ;; Account is manually hard-locked.
 
-      (account-locked? req sess @auth-db)
+      (super/account-locked? req sess @auth-db)
       (let [user-id  (:user/id      sess)
             email    (:user/email   sess)
             ip-addr  (:remote-ip/str req)
@@ -240,7 +233,7 @@
 
       ;; Session expired and the time for prolongation has passed.
 
-      (hard-expiry? req sess route-data)
+      (super/hard-expiry? req sess route-data)
       (let [user-id  (:user/id      sess)
             email    (:user/email   sess)
             ip-addr  (:remote-ip/str req)
@@ -258,7 +251,7 @@
       ;; User can re-validate session using a login page.
       ;; We have to preserve form data and original, destination URI in a session variable.
 
-      (prolongation? sess @auth-state @login-data?)
+      (super/prolongation? sess @auth-state @login-data?)
       (let [req            (cleanup-req req @auth-state)
             sess           (common/allow-soft-expired sess)
             session-config (get req :session/config)
