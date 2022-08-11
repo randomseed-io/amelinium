@@ -15,6 +15,7 @@
             [potemkin.namespaces                  :as            p]
             [tick.core                            :as            t]
             [reitit.core                          :as            r]
+            [reitit.coercion                      :as     coercion]
             [ring.util.response]
             [ring.util.codec                      :as        codec]
             [ring.util.http-response              :as         resp]
@@ -1650,6 +1651,11 @@
 
 ;; Parameters
 
+(defn string-from-param
+  [s]
+  (if-some [s (some-str s)]
+    (if (= \: (.charAt ^String s 0)) (subs s 1) s)))
+
 (defn keyword-from-param
   [s]
   (if (keyword? s)
@@ -1675,3 +1681,166 @@
    (if params (codec/form-encode params)))
   ([params enc]
    (if params (codec/form-encode params enc))))
+
+;; Coercion
+
+(defn param-type
+  "Takes a coercion error data map `e` and returns a string with parameter type."
+  [e]
+  (if-some [s (some-str (get e :schema))]
+    (some-str (if (= \: (.charAt ^String s 0)) (subs s 1)))))
+
+(defn translate-coercion-error
+  {:arglists '([req param-error-properties
+                req param-id param-type
+                req lang param-id param-type
+                translate-sub param-error-properties
+                translate-sub param-id param-type])}
+  ([req-or-sub param-error-properties]
+   (translate-coercion-error req-or-sub
+                             (get :parameter/id   param-error-properties)
+                             (get :parameter/type param-error-properties)))
+  ([req lang param-id param-type]
+   (translate-coercion-error (translator-sub req lang) param-id param-type))
+  ([req-or-sub param-id param-type]
+   (if (map? req-or-sub)
+     (translate-coercion-error (translator-sub req-or-sub) param-id param-type nil nil)
+     (translate-coercion-error req-or-sub param-id param-type nil nil)))
+  ([translate-sub param-id param-type _ _]
+   (let [param-type? (and param-id param-type)
+         param-name  (if param-type? (i18n/nil-missing (translate-sub :parameter param-id param-type)))
+         param-name? (some? param-name)
+         param-name  (if param-name? param-name (some-str param-id))]
+     (i18n/nil-missing
+      (or (if param-id    (translate-sub :parameter-error param-id
+                                         param-name
+                                         param-id
+                                         param-type))
+          (if param-name? (translate-sub :error/named-parameter nil
+                                         param-name
+                                         param-id
+                                         param-type))
+          (translate-sub :error/parameter nil
+                         param-id
+                         param-type))))))
+
+(defn recode-coercion-errors
+  [data]
+  (let [dat (if-some [c (get data :coercion)] (coercion/-encode-error c data) data)
+        src (get dat :in)
+        err (get dat :errors)
+        err (if (coll? err) err (if (some? err) (cons err nil)))
+        src (if (coll? src) src (if (some? src) (cons src nil)))
+        src (if (= (first src) :request) (rest src) src)
+        src (or (first src) :unknown)]
+    (if err
+      (->> err
+           (map
+            (fn [e]
+              (if (map? e)
+                (if-some [param-path (get e :path)]
+                  (if-some [param-id (and (coll? param-path) (some-str (last param-path)))]
+                    {:parameter/id   param-id
+                     :parameter/src  src
+                     :parameter/path param-path
+                     :parameter/type (param-type e)})))))
+           (filter identity)))))
+
+(defn explain-coercion-errors
+  "Like `recode-coercion-errors` but each error map contains the additional key
+  `:parameter/message` containing a human-readable message created with translation
+  function `translate-sub` with ."
+  [data translate-sub]
+  (if-some [r (recode-coercion-errors data)]
+    (map #(assoc % :parameter/message (translate-coercion-error translate-sub %)) r)))
+
+(defn list-coercion-errors
+  "Returns a sequence of coercion errors containing 2-element sequences. First element
+  of each being a parameter identifier, second element being a parameter type. Takes
+  an exception data map which should contains `:coercion` key. Used to expose form
+  errors to another page which should indicate them to a visitor."
+  [data]
+  (let [dat (if-some [c (get data :coercion)] (coercion/-encode-error c data) data)
+        err (get dat :errors)
+        err (if (coll? err) err (if (some? err) (cons err nil)))]
+    (map (juxt-seq (comp last :path) param-type) (filter identity err))))
+
+(defn map-coercion-errors
+  "Like `list-coercion-errors` but returns a map in which keys are parameter names and
+  values are parameter types (as defined in schema). Used to expose form errors to
+  another page which should indicate them to a visitor."
+  [data]
+  (if-some [r (list-coercion-errors data)]
+    (into {} r)))
+
+(defn join-coercion-errors
+  "Used to produce a string containing parameter names and their types (as defined in
+  schema) from a coercion errors simple map or coercion errors sequence (produced by
+  `list-coercion-errors` or `map-coercion-errors` respectively). For non-empty string
+  it simply returns it. Used to generate a query string containing form errors in a form of
+  "
+  [errors]
+  (if (and (string? errors) (pos? (count errors)))
+    errors
+    (if-some [errors (seq errors)]
+      (->> errors
+           (map (fn [[param-id param-type]]
+                  (let [param-id   (some-str param-id)
+                        param-type (some-str param-type)
+                        param-id   (if param-id (str/trim param-id))
+                        param-type (if param-type (str/trim param-type))]
+                    (if (or param-id param-type)
+                      (str param-id ":" param-type)))))
+           (filter identity)
+           (str/join ",")))))
+
+(defn split-coercion-error
+  "Takes `param-id` and optional `param-type` and tries to clean-up their string
+  representations to produce a 2-element vector. When only 1 argument is present or
+  when the second argument is `nil` or empty, it will try to parse the first argument
+  so if it contains a colon character it will be split into two parts: parameter ID
+  and parameter type."
+  ([param-id param-type]
+   (if-not param-type
+     (if param-id (split-coercion-error param-id))
+     (let [id (some-str param-id)
+           ty (some-str param-type)
+           id (if id (str/trim id))
+           ty (if ty (str/trim ty))]
+       (if (or (and id (pos? (count id)))
+               (and ty (pos? (count ty))))
+         [id ty]))))
+  ([param-id]
+   (if (and (sequential? param-id) (seq param-id))
+     (split-coercion-error (first param-id) (second param-id))
+     (if-some [param-id (some-str param-id)]
+       (let [[f s] (str/split #":" (str/trim param-id))
+             f     (if f (some-str (str/trim f)))
+             s     (if s (some-str (str/trim s)))]
+         (if (or f s) [f s]))))))
+
+(defn parse-coercion-errors
+  "Transforms a string previously exposed with `join-coercion-errors`, a list created
+  with `list-coercion-errors` or a map resulted from calling `map-coercion-errors`
+  into a map containing parameter names as keys and parameter types as values. Used
+  to parse input from a query string or saved session variable."
+  [errors]
+  (cond
+    (map? errors)        errors
+    (string? errors)     (if (pos? (count errors))
+                           (->> (str/split errors #",+")
+                                (map split-coercion-error)
+                                (filter identity)
+                                (into {})
+                                not-empty))
+    (sequential? errors) (->> (seq errors)
+                              (map #(take 2 %))
+                              (filter identity)
+                              (into {})
+                              not-empty)))
+
+(defn inject-coercion-errors
+  "Takes coercion errors, parses them and injects into a `req` under a key named
+  `:form-errors`."
+  [req errors]
+  (assoc req :form-errors (delay (parse-coercion-errors errors))))

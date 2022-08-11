@@ -344,57 +344,6 @@
 
 ;; Coercion
 
-(defn- recode-coercion-error
-  [data translate-sub]
-  (let [dat (if-some [c (get data :coercion)] (coercion/-encode-error c data) data)
-        src (get dat :in)
-        err (get dat :errors)
-        err (if (coll? err) err (if (some? err) (cons err nil)))
-        src (if (coll? src) src (if (some? src) (cons src nil)))
-        src (if (= (first src) :request) (rest src) src)
-        src (or (first src) :unknown)]
-    (if err
-      (->> err
-           (map
-            (fn [e]
-              (if (map? e)
-                (if-some [param-path (get e :path)]
-                  (if-some [param-id (and (coll? param-path) (some-str (last param-path)))]
-                    (let [param-type  (if-some [s (some-str (get e :schema))]
-                                        (some-str (if (= \: (.charAt ^String s 0)) (subs s 1))))
-                          param-name  (i18n/nil-missing
-                                       (translate-sub :parameter param-id param-type))
-                          param-name? (some? param-name)
-                          param-name  (if param-name? param-name (some-str param-id))]
-                      {:parameter/id   param-id
-                       :parameter/name param-name
-                       :parameter/path param-path
-                       :parameter/type param-type
-                       :error/message
-                       (i18n/nil-missing
-                        (or (if param-id    (translate-sub :parameter-error param-id
-                                                           param-name
-                                                           param-id
-                                                           param-type))
-                            (if param-name? (translate-sub :error/named-parameter nil
-                                                           param-name
-                                                           param-id
-                                                           param-type))
-                            (translate-sub :error/parameter nil
-                                           param-id
-                                           param-type)))}))))))
-           (filter identity)))))
-
-(defn- list-coercion-errors
-  [data]
-  (let [dat (if-some [c (get data :coercion)] (coercion/-encode-error c data) data)
-        err (get dat :errors)
-        err (if (coll? err) err (if (some? err) (cons err nil)))]
-    (->> err
-         (map :path) (filter identity)
-         (map last)  (filter identity)
-         (map some-str))))
-
 (defn handle-coercion-error
   [e respond raise]
   (let [data  (ex-data e)
@@ -411,7 +360,8 @@
         (respond
          (if (and (or orig-page orig-uri referer) (not handling-previous?))
            ;; redirect to a form-submission page allowing user to correct errors
-           (let [errors       (list-coercion-errors data)
+           ;; transfer form errors using query params or form params (if session is present)
+           (let [errors       (common/map-coercion-errors data)
                  orig-uri     (if orig-uri (some-str orig-uri))
                  orig-params  (if orig-uri orig-params)
                  [opts smap]  (common/config+session req)
@@ -419,7 +369,7 @@
                                    (session/put-var!
                                     opts smap :form-errors {:dest   (get req :uri)
                                                             :errors errors}))
-                 error-params (if session? "" (str/join "," errors))
+                 error-params (if session? "" (common/join-coercion-errors errors))
                  joint-params (assoc orig-params "form-errors" error-params)
                  destination  (or orig-page orig-uri)]
              (if destination
@@ -428,12 +378,13 @@
                 (str referer (if (str/includes? referer "?") ("&" "?"))
                      (common/query-string-encode joint-params)))))
            ;; render a separate page describing invalid parameters
+           ;; instead of current page
            (let [translate-sub (common/translator-sub req)]
              (-> req
                  (map/assoc-missing :app/data common/empty-lazy-map)
                  (update :app/data assoc
                          :title (delay (translate-sub :error/parameters))
-                         :error/parameters (delay (recode-coercion-error data translate-sub)))
+                         :error/parameters (delay (common/explain-coercion-errors data translate-sub)))
                  web/render-bad-params))))) ;; TODO: template for listing bad params / update existing template and check
 
       ::coercion/response-coercion
