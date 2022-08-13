@@ -117,4 +117,17 @@
                            :session-id       "Identyfikator sesji"
                            :language         "Identyfikator języka"
                            :lang             "Identyfikator języka"}
+   :parameter-description {:phone            "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa."
+                           :email            "Adres e-mailowy powinien zawierać część lokalną i poprawną domenę."
+                           :login            "Login powinien być poprawnym adresem e-mailowym."
+                           :password         "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
+                           :password-relaxed "Hasło powinno być wprowadzone."
+                           :name             "Imię powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
+                           :last-name        "Nazwisko powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
+                           :second-name      "Drugie imię powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
+                           :middle-name      "Drugie imię powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
+                           :token            "Token powinien być łańcuchem znakowym reprezentującym liczbę w zapisie szesnastkowym."
+                           :session-id       "Identyfikator sesji powinien być jednym lub dwoma łańcuchami znakowymi w zapisie szesnastkowym."
+                           :language         "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."
+                           :lang             "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."}
    :tongue/pluralizer     amelinium.i18n.pluralizers/pl}}}

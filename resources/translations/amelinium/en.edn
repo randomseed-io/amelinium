@@ -117,5 +117,19 @@
                            :session-id       "Session identifier"
                            :language         "Language identifier"
                            :lang             "Language identifier"}
-   :tongue/pluralizer     amelinium.i18n.pluralizers/en}}}
+   :parameter-description {:phone            "Phone number should contain a country code with a plus sign."
+                           :email            "E-mail address should have a local part and a valid domain name."
+                           :login            "Login should be a valid e-mail address."
+                           :password         "Password should be at least 8 characters long, having big and small letters, a digit and a special character."
+                           :password-relaxed "Password should be present."
+                           :name             "Name should consist of regular characters with optional hyphen and cannot have blanks (like space)."
+                           :last-name        "Last name should consist of regular characters with optional hyphen and cannot have blanks (like space)."
+                           :second-name      "Second name should consist of regular characters with optional hyphen and cannot have blanks (like space)."
+                           :middle-name      "Second name should consist of regular characters with optional hyphen and cannot have blanks (like space)."
+                           :token            "Token should be a string expressing hexadecimal number."
+                           :session-id       "Session ID should be a string consisting of one or two hexadecimal numbers."
+                           :language         "Language ID should express a correct, supported language code."
+                           :lang             "Language ID should express a correct, supported language code."}
+
+   :tongue/pluralizer amelinium.i18n.pluralizers/en}}}
 
