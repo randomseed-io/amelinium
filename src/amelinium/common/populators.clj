@@ -78,28 +78,22 @@
   [req _ _]
   (delay (i18n/translator-sub req)))
 
-(defn form-errors
-  "Tries to obtain form errors from previously visited page, saved as a
-  session variable `:form-errors` or as a query parameter `form-errors`."
+(defn populate-form-errors
+  "Tries to obtain form errors from previously visited page, saved as a session
+  variable `:form-errors` or as a query parameter `form-errors`."
   [req _ _]
   (delay
     (if-some [qp (get req :query-params)]
       (if-some [query-params-errors (get qp "form-errors")]
-        (let [current-form-params (or (get req :form-params) {})]
-          (if-some [query-params-errors (some-str query-params-errors)]
-            (->> (str/split query-params-errors #",")
-                 (map #(if % (str/trim %)))
-                 (filter identity)
-                 (filter (partial contains? current-form-params))
-                 (map keyword) seq set)
-            (let [[opts smap]  (common/config+session req)
-                  svar         (if (and opts smap (get smap :valid?)) (session/fetch-var! opts smap :form-errors))
-                  expected-uri (if svar (get svar :uri))
-                  uri-ok?      (or (not expected-uri) (= expected-uri (get req :uri)))
-                  errors       (if (and uri-ok? svar) (get svar :errors))]
-              (if errors
-                (->> errors
-                     (map some-str)
-                     (filter identity)
-                     (filter (partial contains? current-form-params))
-                     (map keyword) seq set)))))))))
+        (let [[opts smap]     (common/config+session req)
+              session?        (and opts smap (get smap :valid?))
+              sess-var        (if session? (session/fetch-var! opts smap :form-errors))
+              expected-uri    (if sess-var (get sess-var :uri))
+              uri-ok?         (or (not expected-uri) (= expected-uri (get req :uri)))
+              sess-var-errors (if uri-ok? (not-empty (get sess-var :errors)))]
+          (common/parse-coercion-errors (or sess-var-errors query-params-errors)))))))
+
+(def form-errors
+  {:compile (fn [data _ _]
+              (if data
+                populate-form-errors))})
