@@ -377,7 +377,7 @@
                  (map/assoc-missing :app/data common/empty-lazy-map)
                  (update :app/data assoc
                          :title (delay (translate-sub :error/parameters))
-                         :error/parameters (delay (common/explain-coercion-errors data translate-sub)))
+                         :form/errors (delay (common/explain-coercion-errors data translate-sub)))
                  web/render-bad-params))))) ;; TODO: template for listing bad params / update existing template and check
 
       ::coercion/response-coercion
