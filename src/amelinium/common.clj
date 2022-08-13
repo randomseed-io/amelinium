@@ -1797,21 +1797,20 @@
 (defn join-coercion-errors
   "Used to produce a string containing parameter names and their types (as defined in
   schema) from a coercion errors simple map or coercion errors sequence (produced by
-  `list-coercion-errors` or `map-coercion-errors` respectively). For non-empty string
-  it simply returns it. Used to generate a query string containing form errors in a form of
-  "
+  `list-coercion-errors` or `map-coercion-errors` respectively). For anon-empty
+  string it simply returns it. Used to generate a query string containing form errors
+  in a form of a `parameter-id` or `parameter-id:parameter-type` substrings separated
+  by commas."
   [errors]
   (if (and (string? errors) (pos? (count errors)))
     errors
     (if-some [errors (seq errors)]
       (->> errors
            (map (fn [[param-id param-type]]
-                  (let [param-id   (some-str param-id)
-                        param-type (some-str param-type)
-                        param-id   (if param-id (str/trim param-id))
-                        param-type (if param-type (str/trim param-type))]
-                    (if (or param-id param-type)
-                      (str param-id ":" param-type)))))
+                  (if-some [param-id (and param-id (some-str (str/trim (str param-id))))]
+                    (if-some [param-type (and param-type (some-str (str/trim (str param-type))))]
+                      (str param-id ":" param-type)
+                      param-id))))
            (filter identity)
            (str/join ",")))))
 
