@@ -76,7 +76,9 @@
   If the element is a single value it should be a string or an ident naming the
   population function."
   [data config]
-  (->> config (map (partial compile-populator data)) (filter vector?) vec))
+  (let [to-en (set (get data :populators/enable))
+        to-di (set (get data :populators/disable))]
+    (->> config (map (partial compile-populator data to-en to-di)) (filter vector?) vec)))
 
 (defn populate
   "For each populator map calls the function identified by map's value and associates
