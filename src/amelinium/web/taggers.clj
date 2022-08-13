@@ -90,47 +90,44 @@
    (or (get ctx :i18n/translator)
        (let [tf   (or translations-fn i18n/translations)
              lang (get-lang-id ctx)]
-         #(apply i18n/translate-with tf lang
-                 (common/keyword-from-param (first %))
-                 (next %))))))
+         (fn
+           ([k]       (i18n/translate-with tf lang k))
+           ([k a]     (i18n/translate-with tf lang k a))
+           ([k a b]   (i18n/translate-with tf lang k a b))
+           ([k a b c] (i18n/translate-with tf lang k a b c))
+           ([k a b c & more] (apply i18n/translate-with tf lang k a b c more)))))))
 
 (defn translator-sub
   ([ctx]
    (translator-sub ctx nil))
   ([ctx translations-fn]
-   (or (get ctx :i18n/translator)
+   (or (get ctx :i18n/translator-sub)
        (let [tf   (or translations-fn i18n/translations)
              lang (get-lang-id ctx)]
-         #(apply i18n/translate-sub-with tf lang
-                 (common/keyword-from-param (first  %))
-                 (common/keyword-from-param (second %))
-                 (nnext %))))))
+         (fn
+           ([k]         (i18n/translate-sub-with tf lang k))
+           ([k a]       (i18n/translate-sub-with tf lang k a))
+           ([k a b]     (i18n/translate-sub-with tf lang k a b))
+           ([k a b c]   (i18n/translate-sub-with tf lang k a b c))
+           ([k a b c d] (i18n/translate-sub-with tf lang k a b c d))
+           ([k a b c d & more] (apply i18n/translate-sub-with tf lang k a b c d more)))))))
 
 (defn tr
   ([args ctx]
    (tr args ctx nil))
   ([args ctx translations-fn]
-   (if-some [translator (get ctx :i18n/translator)]
-     (apply translator (common/keyword-from-param (first args)) (next args))
-     (apply i18n/translate-with
-            (or translations-fn i18n/translations)
-            (get-lang-id ctx)
-            (common/keyword-from-param (first args))
-            (next args)))))
+   (if-some [translator (translator ctx translations-fn)]
+     (apply translator (common/keyword-from-param (first args)) (next args)))))
 
 (defn tr-sub
   ([args ctx]
    (tr-sub args ctx nil))
   ([args ctx translations-fn]
-   (if-some [translator-sub (get ctx :i18n/translator-sub)]
-     (apply translator-sub (common/keyword-from-param (first args)) (next args))
-     (let [lang (get-lang-id ctx)]
-       (apply i18n/translate-sub-with
-              (or translations-fn i18n/translations)
-              (get-lang-id ctx)
-              (common/keyword-from-param (first  args))
-              (common/keyword-from-param (second args))
-              (nnext args))))))
+   (if-some [translator-sub (translator-sub ctx translations-fn)]
+     (apply translator-sub
+            (common/keyword-from-param (first  args))
+            (common/keyword-from-param (second args))
+            (nnext args)))))
 
 (defn add-taggers
   [router language translations-fn validators]
