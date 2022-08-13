@@ -1708,22 +1708,39 @@
      (translate-coercion-error (translator-sub req-or-sub) param-id param-type nil nil)
      (translate-coercion-error req-or-sub param-id param-type nil nil)))
   ([translate-sub param-id param-type _ _]
-   (let [param-type? (and param-id param-type)
-         param-name  (if param-type? (i18n/nil-missing (translate-sub :parameter param-id param-type)))
+   (let [param-type? (some? param-type)
+         param-name  (i18n/nil-missing (translate-sub :parameter param-id param-type))
          param-name? (some? param-name)
-         param-name  (if param-name? param-name (some-str param-id))]
+         param-name  (if param-name? param-name (some-str param-id))
+         output      {:param-name param-name}]
      (i18n/nil-missing
-      (or (if param-id    (translate-sub :parameter-error param-id
-                                         param-name
-                                         param-id
-                                         param-type))
-          (if param-name? (translate-sub :error/named-parameter nil
-                                         param-name
-                                         param-id
-                                         param-type))
-          (translate-sub :error/parameter nil
-                         param-id
-                         param-type))))))
+      (-> output
+          (assoc :summary
+                 (or (if param-id    (translate-sub :parameter-error param-id
+                                                    param-name
+                                                    param-id
+                                                    param-type))
+                     (if param-name? (translate-sub :error/named-parameter nil
+                                                    param-name
+                                                    param-id
+                                                    param-type))
+                     (if param-type? (translate-sub :type-error param-type
+                                                    param-name
+                                                    param-id
+                                                    param-type))
+                     (translate-sub :error/parameter nil
+                                    param-id
+                                    param-type)))
+          (assoc :description
+                 (or (if param-id    (translate-sub :parameter-description param-id
+                                                    param-name
+                                                    param-id
+                                                    param-type))
+
+                     (if param-type? (translate-sub :type-description param-type
+                                                    param-name
+                                                    param-id
+                                                    param-type)))))))))
 
 (defn recode-coercion-errors
   [data]
