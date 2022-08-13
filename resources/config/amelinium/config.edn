@@ -214,7 +214,8 @@
 
  :amelinium.http.middleware.populators/post
  [[:i18n/translator     amelinium.common.populators/i18n-translator]
-  [:i18n/translator-sub amelinium.common.populators/i18n-translator-sub]]
+  [:i18n/translator-sub amelinium.common.populators/i18n-translator-sub]
+  [:form/errors         amelinium.common.populators/form-errors]]
 
  :amelinium.http.middleware/web-renderer amelinium.web.controller/render!
  :amelinium.http.middleware/web-preparer amelinium.web.controller/prep!

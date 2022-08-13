@@ -15,25 +15,48 @@
             [io.randomseed.utils.map :as        map]
             [io.randomseed.utils     :refer    :all]))
 
+(defn- derefn
+  [v]
+  (if-some [f (var/deref v)]
+    (if (fn? f) f)))
+
+(defn- derefe
+  [v]
+  (if-some [f (var/deref v)]
+    (if (or (map? f) (sequential? f)) f)))
+
+(defn- derefm
+  [v]
+  (if-some [f (var/deref v)]
+    (if (map? f) f)))
+
 (defn compile-populator
   "Prepares a single populator."
   {:no-doc true}
-  [data entry]
+  [data to-enable to-disable entry]
   (cond
-    (sequential? entry) (compile-populator data {:id (first entry) :fn (second entry) :args (nnext entry)})
-    (ident?      entry) (compile-populator data (list (some-keyword entry) (some-symbol entry)))
-    (string?     entry) (compile-populator data (some-symbol entry))
-    (map?        entry)
-    (let [{id    :id
-           f     :fn
-           cf    :compile
-           args  :args
-           cargs :compile-args} entry]
-      (if-some [id (some-keyword id)]
-        (let [f  (var/deref f)
-              cf (if (not f) (var/deref cf))
-              f  (or f (if cf (cf data id cargs) (var/deref (symbol id))))]
-          (if (fn? f) [id (fn populator [req] (f req id args))]))))))
+    (sequential? entry) (compile-populator data to-enable to-disable
+                                           (if-some [m (derefm (second entry))]
+                                             (assoc m :id (first entry))
+                                             {:id   (first entry)
+                                              :fn   (second entry)
+                                              :args (nnext entry)}))
+    (ident?  entry)     (compile-populator data to-enable to-disable
+                                           (or (derefe entry)
+                                               {:id entry
+                                                :fn (some-symbol entry)}))
+    (string? entry)     (compile-populator data to-enable to-disable (some-symbol entry))
+    (map?    entry)     (let [{id    :id
+                               f     :fn
+                               cf    :compile
+                               args  :args
+                               cargs :compile-args} entry]
+                          (if-some [id (some-keyword id)]
+                            (if (or (contains? to-enable id) (not (contains? to-disable id)))
+                              (let [f  (derefn f)
+                                    cf (if (not f) (derefn cf))
+                                    f  (or f (if cf (cf data id cargs) (derefn (symbol id))))]
+                                (if (fn? f) [id (fn populator [req] (f req id args))])))))))
 
 (defn compile
   "Prepares population map an a basis of configuration sequence by processing its
