@@ -157,13 +157,12 @@
 
 (def gen-instant
   (gen/such-that t/instant?
-                 (gen/fmap (fn [[y m d h m s]]
-                             (try (t/instant (str y "-" (pad-zero m) "-" (pad-zero d)
-                                                  "T"
-                                                  (pad-zero h) ":"
-                                                  (pad-zero m) ":"
-                                                  (pad-zero s) "Z"))
-                                  (catch Throwable _ nil)))
+                 (gen/fmap (fn [[Y M D h m s]]
+                             (t/instant (str Y "-" (pad-zero M) "-" (pad-zero D)
+                                             "T"
+                                             (pad-zero h) ":"
+                                             (pad-zero m) ":"
+                                             (pad-zero s) "Z")))
                            (gen/tuple (gen/choose 1969 2050)
                                       (gen/choose 1 12)
                                       (gen/choose 1 28)
