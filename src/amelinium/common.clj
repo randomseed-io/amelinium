@@ -1688,7 +1688,8 @@
   "Takes a coercion error data map `e` and returns a string with parameter type."
   [e]
   (if-some [s (some-str (get e :schema))]
-    (some-str (if (= \: (.charAt ^String s 0)) (subs s 1)))))
+    (if (some? (re-find #"^\:?[a-zA-Z0-9\-_\+\?\!]+$" s))
+      (some-str (if (= \: (.charAt ^String s 0)) (subs s 1))))))
 
 (defn translate-coercion-error
   {:arglists '([req param-error-properties
