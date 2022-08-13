@@ -1743,6 +1743,9 @@
                                                     param-type)))))))))
 
 (defn recode-coercion-errors
+  "Uses exception data to recode coercion errors in a form of a map. To be used mainly
+  with API handlers. For web form error reporting `map-coercion-errors`,
+  `list-coercion-errors` and `explain-coercion-errors` are better suited."
   [data]
   (let [dat (if-some [c (get data :coercion)] (coercion/-encode-error c data) data)
         src (get dat :in)
@@ -1781,7 +1784,7 @@
   (let [dat (if-some [c (get data :coercion)] (coercion/-encode-error c data) data)
         err (get dat :errors)
         err (if (coll? err) err (if (some? err) (cons err nil)))]
-    (map (juxt-seq (comp last :path) param-type) (filter identity err))))
+    (->> err (filter identity) (map (juxt-seq (comp some-str last :path) param-type)))))
 
 (defn map-coercion-errors
   "Like `list-coercion-errors` but returns a map in which keys are parameter names and
@@ -1789,7 +1792,7 @@
   another page which should indicate them to a visitor."
   [data]
   (if-some [r (list-coercion-errors data)]
-    (into {} r)))
+    (reduce (partial apply assoc) {} r)))
 
 (defn join-coercion-errors
   "Used to produce a string containing parameter names and their types (as defined in
