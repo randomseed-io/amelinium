@@ -88,7 +88,7 @@
   translator and locale. If it's not given, it will use language obtained from the
   context map `req`."
   ([req-or-match]
-   (translator req-or-match nil))
+   (translator-sub req-or-match nil))
   ([req-or-match locale]
    (let [tr-fn (translation-fn req-or-match)
          tr-l  (make-kw (or locale (lang req-or-match)))]
