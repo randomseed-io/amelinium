@@ -26,6 +26,10 @@
 (def ^:const proxy-header "x-forwarded-for")
 (def ^:const ip-separator (re-pattern "[,\\s]+"))
 
+(defn safe-ip-to-address
+  [s]
+  (try (ip/to-address s) (catch Exception _ nil)))
+
 (defn remote-addr-parse
   "Parses remote address string to get the string representation of client's IP
   address."
@@ -99,7 +103,7 @@
   ([pheader addr-string proxy-setting proxy-for-fn]
    (let [raddr (-> addr-string remote-addr-parse str str/trim ip/to-address)]
      (if (and pheader (or (not proxy-for-fn) (proxy-for-fn addr-string)))
-       (let [addr  (-> pheader (str/split ip-separator) first str str/trim ip/to-address)
+       (let [addr  (-> pheader (str/split ip-separator) first str str/trim safe-ip-to-address)
              paddr (ip/plain-ip-str addr)]
          [addr paddr raddr])
        [raddr (ip/plain-ip-str raddr) nil]))))
