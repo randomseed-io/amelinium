@@ -203,17 +203,22 @@
     (selmer/add-tag!
      :explain-form-error
      (fn [args ctx]
-       (if-some [fe (get ctx :form-errors)]
-         (let [[param-id param-type] (common/split-coercion-error args)]
+       (if-some [fe (get ctx :form/errors)]
+         (let [args                  (map common/string-from-param (take 2 args))
+               [param-id param-type] (common/split-coercion-error args)]
            (if (contains? fe param-id)
-             (let [tr-sub      (translator-sub ctx translations-fn)
-                   param-type  (or param-type (get fe param-id))
-                   param-type  (if param-type (common/string-from-param param-type))
-                   ptype-class (if param-type (str " param-type-" param-type))
-                   text        (common/translate-coercion-error tr-sub param-id param-type)]
-               (if (pos? (count text))
+             (let [translator-sub (translator-sub ctx translations-fn)
+                   param-type     (or param-type (get fe param-id))
+                   param-type     (if param-type (common/string-from-param param-type))
+                   ptype-class    (if param-type (str " param-type-" param-type))
+                   messages       (common/translate-coercion-error translator-sub param-id param-type)
+                   summary        (some-str (get messages :summary))
+                   description    (some-str (get messages :description))
+                   summary        (if summary (str "<p class=\"error-summary\">" summary "</p>"))
+                   description    (if description (str "<p class=\"error-description\">" description "</p>"))]
+               (if (or summary description)
                  (str "<div class=\"form-error param-" param-id ptype-class "\">"
-                      "<p>" text "</p></div>"))))))))
+                      summary description "</div>"))))))))
     nil))
 
 ;; Configuration initializers
