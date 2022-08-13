@@ -62,14 +62,16 @@
                            :598 "Network Read Timeout"
                            :599 "Network Connect Timeout"}
    :ok                    "Success!"
-   :error                 {:ok              "Success!"
-                           :authorization   "Access denied."
-                           :authentication  "Authentication error."
-                           :session         "Session error."
-                           :bad-parameters  "Your application has sent bad parameters."
-                           :parameters      "Invalid parameters."
-                           :parameter       "Parameter {1} in invalid."
-                           :named-parameter "{1} needs a fix."}
+   :error                 {:ok                "Success!"
+                           :authorization     "Access denied."
+                           :authentication    "Authentication error."
+                           :session           "Session error."
+                           :bad-parameters    "Your application has sent bad parameters."
+                           :parameters        "Invalid parameters."
+                           :parameter         "Parameter {1} in invalid."
+                           :parameter-of-type "Parameter of type {1} in invalid."
+                           :parameter-name    "{1} needs to be fixed."
+                           :type-name         "{1} needs to be fixed."}
    :session               {:ok                   "Session is correct."
                            :unknown-session-id   "Unknown session ID has been received."
                            :no-session-id        "No required session ID."
@@ -117,19 +119,44 @@
                            :session-id       "Session identifier"
                            :language         "Language identifier"
                            :lang             "Language identifier"}
-   :parameter-description {:phone            "Phone number should contain a country code with a plus sign."
-                           :email            "E-mail address should have a local part and a valid domain name."
-                           :login            "Login should be a valid e-mail address."
-                           :password         "Password should be at least 8 characters long, having big and small letters, a digit and a special character."
-                           :password-relaxed "Password should be present."
-                           :name             "Name should consist of regular characters with optional hyphen and cannot have blanks (like space)."
-                           :last-name        "Last name should consist of regular characters with optional hyphen and cannot have blanks (like space)."
-                           :second-name      "Second name should consist of regular characters with optional hyphen and cannot have blanks (like space)."
-                           :middle-name      "Second name should consist of regular characters with optional hyphen and cannot have blanks (like space)."
-                           :token            "Token should be a string expressing hexadecimal number."
-                           :session-id       "Session ID should be a string consisting of one or two hexadecimal numbers."
-                           :language         "Language ID should express a correct, supported language code."
-                           :lang             "Language ID should express a correct, supported language code."}
+   :parameter-type        {:string            "String"
+                           :integer           "Integer number"
+                           :boolean           "Decision field"
+                           :phone             "Phone number"
+                           :email             "E-mail address"
+                           :login             "Login"
+                           :password          "Password"
+                           :password-relaxed  "Password"
+                           :name              "Name"
+                           :token             "Token"
+                           :session-id        "Session identifier"
+                           :secure-session-id "Secure session identifier"
+                           :language          "Language identifier"}
+   :type-should           {:phone             "Phone number should contain a country code with a plus sign."
+                           :email             "E-mail address should have a local part and a valid domain name."
+                           :password          "Password should have at least 8 characters, big and small letters, a digit and a special character."
+                           :password-relaxed  "Password must be present."
+                           :name              "Name should consist of regular characters with optional hyphen and cannot have blanks (like space)."
+                           :token             "Token should be a string expressing hexadecimal number."
+                           :session-id        "Session ID should be a string consisting of one or two hexadecimal numbers."
+                           :secure-session-id "Secure session ID should be a string consisting two hexadecimal numbers separated by hyphen."
+                           :language          "Language ID should express a correct, supported language code."
+                           :lang              "Language ID should express a correct, supported language code."}
+   :parameter-should      {:phone                     :parameter-type-should/phone
+                           :email                     :parameter-type-should/email
+                           :login                     "Login should be a valid e-mail address."
+                           :password                  :parameter-type-should/password
+                           :password-relaxed          :parameter-type-should/password-relaxed
+                           :password.password         "Password should have min. 8 characters, big and small letters, a digit and a special character."
+                           :password.password-relaxed "Password must be present."
+                           :name                      :parameter-type-should/name
+                           :last-name                 "Last name should consist of letters with optional hyphen and cannot have blanks (like space)."
+                           :second-name               "Second name should consist of letters with optional hyphen and cannot have blanks (like space)."
+                           :middle-name               "Middle name should consist of letters with optional hyphen and cannot have blanks (like space)."
+                           :token                     :parameter-type-should/token
+                           :session-id                :parameter-type-should/session-id
+                           :language                  :parameter-type-should/language
+                           :lang                      :parameter-type-should/language}
 
    :tongue/pluralizer amelinium.i18n.pluralizers/en}}}
 

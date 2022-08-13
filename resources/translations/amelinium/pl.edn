@@ -62,14 +62,16 @@
                            :598 "Przekroczono czas odczytu z sieci"
                            :599 "Przekroczono czas połączenia sieciowego"}
    :ok                    "Sukces!"
-   :error                 {:ok              "Sukces!"
-                           :authorization   "Brak dostępu."
-                           :authentication  "Błąd uwierzytelniania."
-                           :session         "Błąd sesji."
-                           :bad-parameters  "Twoja aplikacja wysłała błędne parametry."
-                           :parameters      "Błędne parametry."
-                           :parameter       "Parametr {1} jest błędny."
-                           :named-parameter "{1} wymaga poprawy."}
+   :error                 {:ok                "Sukces!"
+                           :authorization     "Brak dostępu."
+                           :authentication    "Błąd uwierzytelniania."
+                           :session           "Błąd sesji."
+                           :bad-parameters    "Twoja aplikacja wysłała błędne parametry."
+                           :parameters        "Błędne parametry."
+                           :parameter         "Parametr {1} jest błędny."
+                           :parameter-of-type "Parametr typu {1} jest błędny."
+                           :parameter-name    "{1} wymaga poprawy."
+                           :type-name         "{1} wymaga poprawy."}
    :session               {:ok                   "Sesja jest poprawna."
                            :unknown-session-id   "Odebrano nieznany identyfikator sesji."
                            :no-session-id        "Brak wymaganego identyfikatora sesji."
@@ -117,17 +119,41 @@
                            :session-id       "Identyfikator sesji"
                            :language         "Identyfikator języka"
                            :lang             "Identyfikator języka"}
-   :parameter-description {:phone            "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa."
-                           :email            "Adres e-mailowy powinien zawierać część lokalną i poprawną domenę."
-                           :login            "Login powinien być poprawnym adresem e-mailowym."
-                           :password         "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
-                           :password-relaxed "Hasło powinno być wprowadzone."
-                           :name             "Imię powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
-                           :last-name        "Nazwisko powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
-                           :second-name      "Drugie imię powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
-                           :middle-name      "Drugie imię powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
-                           :token            "Token powinien być łańcuchem znakowym reprezentującym liczbę w zapisie szesnastkowym."
-                           :session-id       "Identyfikator sesji powinien być jednym lub dwoma łańcuchami znakowymi w zapisie szesnastkowym."
-                           :language         "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."
-                           :lang             "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."}
-   :tongue/pluralizer     amelinium.i18n.pluralizers/pl}}}
+   :parameter-type        {:string            "Napis tekstowy"
+                           :integer           "Liczba"
+                           :boolean           "Pole decyzji"
+                           :phone             "Numer telefoniczny"
+                           :email             "Adres e-mailowy"
+                           :password          "Hasło"
+                           :password-relaxed  "Hasło"
+                           :name              "Imię"
+                           :token             "Token"
+                           :session-id        "Identyfikator sesji"
+                           :secure-session-id "Bezpieczny identyfikator sesji"
+                           :language          "Identyfikator języka"}
+   :type-should           {:phone             "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa."
+                           :email             "Adres e-mailowy powinien zawierać część lokalną i poprawną domenę."
+                           :password          "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
+                           :password-relaxed  "Należy podać hasło."
+                           :name              "Imię powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
+                           :token             "Token powinien być łańcuchem znakowym reprezentującym liczbę w zapisie szesnastkowym."
+                           :session-id        "Identyfikator sesji powinien być jednym lub dwoma łańcuchami znakowymi w zapisie szesnastkowym."
+                           :secure-session-id "Bezpieczny identyfikator sesji powinien być jedną lub dwoma liczbami szesnastkowymi oddzielonymi dywizem."
+                           :language          "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."}
+   :parameter-should      {:phone                     :parameter-type-should/phone
+                           :email                     :parameter-type-should/email
+                           :login                     "Login powinien być poprawnym adresem e-mailowym."
+                           :password                  :parameter-type-should/password
+                           :password-relaxed          :parameter-type-should/password-relaxed
+                           :password.password         "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
+                           :password.password-relaxed "Należy podać hasło."
+                           :name                      :parameter-type-should/name
+                           :last-name                 "Nazwisko może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
+                           :second-name               "Drugie imię może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
+                           :middle-name               "Drugie imię może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
+                           :token                     :parameter-type-should/token
+                           :session-id                :parameter-type-should/session-id
+                           :language                  :parameter-type-should/language
+                           :lang                      :parameter-type-should/language}
+
+   :tongue/pluralizer amelinium.i18n.pluralizers/pl}}}
