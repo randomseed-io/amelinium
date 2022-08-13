@@ -1709,35 +1709,48 @@
      (translate-coercion-error req-or-sub param-id param-type nil nil)))
   ([translate-sub param-id param-type _ _]
    (let [param-type? (some? param-type)
+         param-id?   (some? param-id)
+         mixed-id    (if (and param-type? param-id?) (str param-id "." param-type))
+         mixed-id?   (some? mixed-id)
          param-name  (i18n/nil-missing (translate-sub :parameter param-id param-type))
          param-name? (some? param-name)
          param-name  (if param-name? param-name (some-str param-id))
+         type-name   (delay (i18n/nil-missing (translate-sub :parameter-type param-type param-id)))
+         type-name?  (delay (and param-type? (some? @type-name)))
          output      {:param-name param-name}]
      (i18n/nil-missing
       (-> output
           (assoc :summary
-                 (or (if param-id    (translate-sub :parameter-error param-id
-                                                    param-name
-                                                    param-id
-                                                    param-type))
-                     (if param-name? (translate-sub :error/named-parameter nil
-                                                    param-name
-                                                    param-id
-                                                    param-type))
+                 (or (if param-id?    (translate-sub :parameter-error param-id
+                                                     param-name
+                                                     param-id
+                                                     param-type))
+                     (if param-name? (translate-sub  :error/parameter-name nil
+                                                     param-name
+                                                     param-id
+                                                     param-type))
                      (if param-type? (translate-sub :type-error param-type
                                                     param-name
                                                     param-id
                                                     param-type))
-                     (translate-sub :error/parameter nil
-                                    param-id
-                                    param-type)))
+                     (if @type-name? (translate-sub :error/type-name nil
+                                                    @type-name
+                                                    param-id
+                                                    param-type))
+                     (if param-id?   (translate-sub :error/parameter nil
+                                                    param-id
+                                                    param-type))
+                     (translate-sub :error/parameter-of-type nil param-type)))
           (assoc :description
-                 (or (if param-id    (translate-sub :parameter-description param-id
+                 (or (if mixed-id?   (translate-sub :parameter-should mixed-id
                                                     param-name
                                                     param-id
                                                     param-type))
-
-                     (if param-type? (translate-sub :type-description param-type
+                     (if param-id?   (translate-sub :parameter-should param-id
+                                                    param-name
+                                                    param-id
+                                                    param-type))
+                     (if param-type? (translate-sub :type-should param-type
                                                     param-name
                                                     param-id
                                                     param-type)))))))))

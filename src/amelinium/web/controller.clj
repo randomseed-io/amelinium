@@ -25,8 +25,7 @@
             [amelinium.http.middleware.language :as        language]
             [io.randomseed.utils.map            :as             map]
             [io.randomseed.utils                :refer         :all]
-            [potpuri.core                       :refer [deep-merge]]
-            [puget.printer :refer [cprint]]))
+            [potpuri.core                       :refer [deep-merge]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Authentication
