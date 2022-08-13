@@ -1835,7 +1835,7 @@
    (if (and (sequential? param-id) (seq param-id))
      (split-coercion-error (first param-id) (second param-id))
      (if-some [param-id (some-str param-id)]
-       (let [[f s] (str/split #":" (str/trim param-id))
+       (let [[f s] (str/split (str/trim param-id) #":" 2)
              f     (if f (some-str (str/trim f)))
              s     (if s (some-str (str/trim s)))]
          (if (or f s) [f s]))))))
@@ -1847,9 +1847,9 @@
   to parse input from a query string or saved session variable."
   [errors]
   (cond
-    (map? errors)        errors
-    (string? errors)     (if (pos? (count errors))
-                           (->> (str/split errors #",+")
+    (map?        errors) errors
+    (string?     errors) (if (pos? (count errors))
+                           (->> (str/split errors #",+" 108)
                                 (map split-coercion-error)
                                 (filter identity)
                                 (into {})
@@ -1857,11 +1857,11 @@
     (sequential? errors) (->> (seq errors)
                               (map #(take 2 %))
                               (filter identity)
-                              (into {})
+                              (reduce (partial apply assoc) {})
                               not-empty)))
 
 (defn inject-coercion-errors
   "Takes coercion errors, parses them and injects into a `req` under a key named
-  `:form-errors`."
+  `:form/errors`."
   [req errors]
-  (assoc req :form-errors (delay (parse-coercion-errors errors))))
+  (assoc req :form/errors (delay (parse-coercion-errors errors))))
