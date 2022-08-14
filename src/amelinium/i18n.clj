@@ -161,7 +161,7 @@
   ([req key-ns key-name x y]        ((translator req) (make-kw key-ns key-name) x y))
   ([req key-ns key-name x y & more] (apply (translator req) (make-kw key-ns key-name) x y more)))
 
-(defmacro nil-missing
+(defmacro no-default
   [& body]
   `(binding [*handle-missing-keys* false]
      ~@body))

@@ -274,8 +274,8 @@
   (if-some [hcode (get data :http/code)]
     (let [translate-sub (common/translator-sub req lang)]
       (-> data
-          (map/assoc-missing :http/code-name (delay (i18n/nil-missing (translate-sub hcode))))
-          (map/assoc-missing :http/code-description (delay (i18n/nil-missing
+          (map/assoc-missing :http/code-name (delay (i18n/no-default (translate-sub hcode))))
+          (map/assoc-missing :http/code-description (delay (i18n/no-default
                                                             (translate-sub (namespace hcode)
                                                                            (str (name hcode)
                                                                                 ".full")))))))

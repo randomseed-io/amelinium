@@ -417,7 +417,7 @@
       (respond
        (-> req
            (map/assoc-missing :app/data common/empty-lazy-map)
-           (update :app/data assoc :title (delay (i18n/nil-missing (i18n/tr req :error/parameters))))
+           (update :app/data assoc :title (delay (i18n/no-default (i18n/tr req :error/parameters))))
            web/render-internal-server-error))
 
       (raise e))))
