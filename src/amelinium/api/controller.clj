@@ -20,7 +20,7 @@
             [amelinium.api                      :as           api]
             [amelinium.http                     :as          http]
             [amelinium.http.middleware.language :as      language]
-            [reitit.coercion                    :as      coercion]))
+            [amelinium.http.middleware.coercion :as      coercion]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Authentication
@@ -256,7 +256,7 @@
         data  (dissoc data :request :response)]
     (case ctype
 
-      ::coercion/request-coercion
+      :reitit.coercion/request-coercion
       (respond
        (let [lang          (common/lang-id req)
              translate-sub (common/translator-sub req)]
@@ -265,10 +265,10 @@
                                     :status           :error/parameters
                                     :status/message   (translate-sub :error/parameters)
                                     :status/sub       :error/parameters
-                                    :error/parameters (common/explain-coercion-errors data translate-sub)})
+                                    :error/parameters (coercion/explain-errors data translate-sub)})
              api/render-bad-params)))
 
-      ::coercion/response-coercion
+      :reitit.coercion/response-coercion
       (respond
        (let [lang      (common/lang-id req)
              translate (common/translator req)]

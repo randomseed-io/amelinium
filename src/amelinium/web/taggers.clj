@@ -16,6 +16,7 @@
             [amelinium.common                     :as     common]
             [amelinium.http.middleware.language   :as   language]
             [amelinium.http.middleware.validators :as validators]
+            [amelinium.http.middleware.coercion   :as   coercion]
             [amelinium.logging                    :as        log]
             [amelinium.system                     :as     system]
             [io.randomseed.utils                  :refer    :all]))
@@ -205,13 +206,13 @@
      (fn [args ctx]
        (if-some [fe (get ctx :form/errors)]
          (let [args                  (map common/string-from-param (take 2 args))
-               [param-id param-type] (common/split-coercion-error args)]
+               [param-id param-type] (coercion/split-error args)]
            (if (contains? fe param-id)
              (let [translator-sub (translator-sub ctx translations-fn)
                    param-type     (or param-type (get fe param-id))
                    param-type     (if param-type (common/string-from-param param-type))
                    ptype-class    (if param-type (str " param-type-" param-type))
-                   messages       (common/translate-coercion-error translator-sub param-id param-type)
+                   messages       (coercion/translate-error translator-sub param-id param-type)
                    summary        (some-str (get messages :summary))
                    description    (some-str (get messages :description))
                    summary        (if summary (str "<p class=\"error-summary\">" summary "</p>"))

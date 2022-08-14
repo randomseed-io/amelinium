@@ -27,6 +27,7 @@
             [io.randomseed.utils                :refer    :all]
             [amelinium.http.middleware.language :as   language]
             [amelinium.http.middleware.session  :as    session]
+            [amelinium.http.middleware.coercion :as   coercion]
             [amelinium.i18n                     :as       i18n]
             [amelinium.common                   :as     common]))
 
@@ -91,7 +92,7 @@
               expected-uri    (if sess-var (get sess-var :uri))
               uri-ok?         (or (not expected-uri) (= expected-uri (get req :uri)))
               sess-var-errors (if uri-ok? (not-empty (get sess-var :errors)))]
-          (common/parse-coercion-errors (or sess-var-errors query-params-errors)))))))
+          (coercion/parse-errors (or sess-var-errors query-params-errors)))))))
 
 (def form-errors
   {:compile (fn [data _ _]

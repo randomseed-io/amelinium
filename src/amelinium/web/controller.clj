@@ -11,7 +11,6 @@
 
   (:require [tick.core                          :as               t]
             [reitit.core                        :as               r]
-            [reitit.coercion                      :as      coercion]
             [ring.util.http-response            :as            resp]
             [clojure.string                     :as             str]
             [amelinium.logging                  :as             log]
@@ -23,6 +22,7 @@
             [amelinium.http                     :as            http]
             [amelinium.http.middleware.session  :as         session]
             [amelinium.http.middleware.language :as        language]
+            [amelinium.http.middleware.coercion :as        coercion]
             [io.randomseed.utils.map            :as             map]
             [io.randomseed.utils                :refer         :all]
             [potpuri.core                       :refer [deep-merge]]))
@@ -344,8 +344,8 @@
         data  (dissoc data :request :response)]
     (case ctype
 
-      ::coercion/request-coercion
       (let [orig-page              (some-str (http/get-route-data req :bad-parameters))
+      :reitit.coercion/request-coercion
             referer                (if (nil? orig-page) (some-str (get-in req [:headers "referer"])))
             [orig-uri orig-params] (if referer (common/url->uri+params req referer))
             handling-previous?     (contains? (get req :query-params) "form-errors")]
@@ -353,7 +353,7 @@
          (if (and (or orig-page orig-uri referer) (not handling-previous?))
            ;; redirect to a form-submission page allowing user to correct errors
            ;; transfer form errors using query params or form params (if session is present)
-           (let [errors       (common/map-coercion-errors data)
+           (let [errors       (coercion/map-errors data)
                  orig-uri     (if orig-uri (some-str orig-uri))
                  orig-params  (if orig-uri orig-params)
                  [opts smap]  (common/config+session req)
@@ -361,7 +361,7 @@
                                    (session/put-var!
                                     opts smap :form-errors {:dest   (get req :uri)
                                                             :errors errors}))
-                 error-params (if session? "" (common/join-coercion-errors errors))
+                 error-params (if session? "" (coercion/join-errors errors))
                  joint-params (assoc orig-params "form-errors" error-params)
                  destination  (or orig-page orig-uri)]
              (if destination
@@ -376,10 +376,10 @@
                  (map/assoc-missing :app/data common/empty-lazy-map)
                  (update :app/data assoc
                          :title (delay (translate-sub :error/parameters))
-                         :form/errors (delay (common/explain-coercion-errors data translate-sub)))
+                         :form/errors (delay (coercion/explain-errors data translate-sub)))
                  web/render-bad-params))))) ;; TODO: template for listing bad params / update existing template and check
 
-      ::coercion/response-coercion
+      :reitit.coercion/response-coercion
       (respond
        (-> req
            (map/assoc-missing :app/data common/empty-lazy-map)
