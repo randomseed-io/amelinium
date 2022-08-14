@@ -89,7 +89,7 @@
         (let [[opts smap]     (common/config+session req)
               session?        (and opts smap (get smap :valid?))
               sess-var        (if session? (session/fetch-var! opts smap :form-errors))
-              expected-uri    (if sess-var (get sess-var :uri))
+              expected-uri    (if sess-var (get sess-var :dest))
               uri-ok?         (or (not expected-uri) (= expected-uri (get req :uri)))
               sess-var-errors (if uri-ok? (not-empty (get sess-var :errors)))]
           (coercion/parse-errors (or sess-var-errors query-params-errors)))))))
