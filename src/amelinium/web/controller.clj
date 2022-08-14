@@ -378,8 +378,8 @@
         data  (dissoc data :request :response)]
     (case ctype
 
-      (let [orig-page              (some-str (http/get-route-data req :bad-parameters))
       :reitit.coercion/request-coercion
+      (let [orig-page              (some-str (http/get-route-data req :form-errors/uri))
             referer                (if (nil? orig-page) (some-str (get-in req [:headers "referer"])))
             [orig-uri orig-params] (if referer (common/url->uri+params req referer))
             handling-previous?     (contains? (get req :query-params) "form-errors")]
