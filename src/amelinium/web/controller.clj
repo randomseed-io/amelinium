@@ -337,6 +337,40 @@
 ;; Coercion
 
 (defn handle-coercion-error
+  "Called when coercion exception is thrown by the handler executed earlier in a
+  middleware chain. Takes exception object `e`, response wrapper `respond` and
+  `raise` function.
+
+  When a coercion error is detected during request processing, it creates a sequence
+  of maps containing coercion errors (with `amelinium.http.middleware.coercion/map-errors`).
+  If there is a session this map it is stored in a session variable `:form-errors`
+  under the `:errors` key (additionally, there is a `:dest` key identifying a path
+  of the current page). If there is no valid session or a session variable cannot be
+  stored, the result is serialized to a query string parameter `form-errors`
+  with erroneous fields separated by commas or tuples of fields containing field types
+  (if type information can be obtained from the exception data), and joined by colon
+  characters, like `login:email,password:password` or simply `login,password`.
+
+  Next, the originating URI is obtained from `Referer` header and a temporary
+  redirect (with HTTP code 307) is generated with this path and a query string
+  containing `form-errors` parameter. The value of the parameter is empty if form
+  errors were saved in a session variable. The destination of the redirect can be
+  overriden by the `:form-errors/uri` configuration option associated with HTTP route
+  data.
+
+  If the destination URI cannot be established or if coercion error happened during
+  handling some previous coercion error (so current page is where the browser had
+  been redirected to) then instead of generating a redirect, a regular page is
+  rendered with HTTP code 422. The `:app/data` key of a request map is updated with
+  `:title` (associated with translated message of `:error/parameters`) and
+  `:form/errors` (associated with the result of calling
+  `amelinium.http.middleware.coercion/explain-errors`).
+
+  When a coercion error is detected during response processing, a web page of HTTP
+  code 500 is rendered. The `:app/data` key of a request map is updated with the
+  `:title` (associated with translated message of `:error/parameters`) and
+  `:form/errors` (associated with the result of calling
+  `amelinium.http.middleware.coercion/explain-errors`)."
   [e respond raise]
   (let [data  (ex-data e)
         req   (get data :request)
