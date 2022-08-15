@@ -213,8 +213,8 @@
                    param-type     (if param-type (common/string-from-param param-type))
                    ptype-class    (if param-type (str " param-type-" param-type))
                    messages       (coercion/translate-error translator-sub param-id param-type)
-                   summary        (some-str (get messages :summary))
-                   description    (some-str (get messages :description))
+                   summary        (some-str (get messages :error/summary))
+                   description    (some-str (get messages :error/description))
                    summary        (if summary (str "<p class=\"error-summary\">" summary "</p>"))
                    description    (if description (str "<p class=\"error-description\">" description "</p>"))]
                (if (or summary description)

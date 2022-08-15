@@ -32,9 +32,9 @@
 (defn translate-error
   "Takes a translation function with already applied language ID or a request map,
   parameter ID and parameter type and tries to find the best translations describing
-  the erroneous field. Returns a map with the following keys `:param-name`,
-  `:summary` and `:description`. To be used after receiving form errors data after
-  redirect."
+  the erroneous field. Returns a map with the following keys `:parameter/name`,
+  `:error/summary` and `:error/description`. To be used after receiving form errors
+  data after redirect."
   {:arglists '([req param-error-properties
                 req param-id param-type
                 req lang param-id param-type
@@ -60,10 +60,10 @@
          param-name  (if param-name? param-name (some-str param-id))
          type-name   (delay (i18n/no-default (translate-sub :parameter-type param-type param-id)))
          type-name?  (delay (and param-type? (some? @type-name)))
-         output      {:param-name param-name}]
+         output      {:parameter/name param-name}]
      (i18n/no-default
       (-> output
-          (assoc :summary
+          (assoc :error/summary
                  (or (if param-id?   (translate-sub :parameter-error param-id
                                                     param-name
                                                     param-id
@@ -84,7 +84,7 @@
                                                     param-id
                                                     param-type))
                      (translate-sub :error/parameter-of-type nil param-type)))
-          (assoc :description
+          (assoc :error/description
                  (or (if mixed-id?   (translate-sub :parameter-should mixed-id
                                                     param-name
                                                     param-id
@@ -126,8 +126,8 @@
 (defn explain-errors
   "Like `recode-errors` but each error map contains the additional key
   `:parameter/message` containing a human-readable messages created with translation
-  function `translate-sub`. Enriches the output map with `:param-name`, `:summary`
-  and `:description` entries. To be used in API responses."
+  function `translate-sub`. Enriches the output map with `:parameter/name`,
+  `:error/summary` and `:error/description` entries. To be used in API responses."
   [data translate-sub]
   (if-some [r (recode-errors data)]
     (map #(into % (translate-error translate-sub %)) r)))
