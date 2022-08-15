@@ -409,8 +409,9 @@
              (-> req
                  (map/assoc-missing :app/data common/empty-lazy-map)
                  (update :app/data assoc
-                         :title (delay (translate-sub :error/parameters))
-                         :form/errors (delay (coercion/explain-errors data translate-sub)))
+                         :title           (delay (translate-sub :error/parameters))
+                         :form/errors     (delay (coercion/map-errors data))
+                         :coercion/errors (delay (coercion/explain-errors data translate-sub)))
                  web/render-bad-params))))) ;; TODO: template for listing bad params / update existing template and check
 
       :reitit.coercion/response-coercion
