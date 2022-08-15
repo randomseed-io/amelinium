@@ -21,7 +21,9 @@
 ;; Common functions
 
 (defn param-type
-  "Takes a coercion error data map `e` and returns a string with parameter type."
+  "Takes a coercion error expressed as a map `e` and returns a string with parameter
+  type if the type can easily be obtained (is a simple name expressed as a string or
+  a string representation of keyword)."
   [e]
   (if-some [s (some-str (get e :schema))]
     (if (some? (re-find #"^\:?[a-zA-Z0-9\-_\+\?\!]+$" s))
@@ -143,8 +145,8 @@
 
 (defn map-errors
   "Like `list-errors` but returns a map in which keys are parameter names and values
-  are parameter types (as defined in schema). Used to expose form errors to another
-  page which should expose them to a visitor."
+  are parameter types (as defined in a schema used to validate and coerce them). Used
+  to expose form errors to another page which should expose them to a visitor."
   [data]
   (if-some [r (list-errors data)]
     (reduce (partial apply assoc) {} r)))

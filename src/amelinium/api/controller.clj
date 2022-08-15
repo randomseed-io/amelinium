@@ -249,6 +249,29 @@
 ;; Coercion error handler
 
 (defn handle-coercion-error
+  "Called when coercion exception is thrown by the handler executed earlier in a
+  middleware chain. Takes exception object `e`, response wrapper `respond` and
+  `raise` function.
+
+  When a coercion error is detected during request processing, it creates a sequence
+  of maps (by calling `amelinium.http.middleware.coercion/explain-errors`) where each
+  contains the following keys:
+
+  - `:parameter/id`,
+  - `:parameter/src`,
+  - `:parameter/path`,
+  - `:parametery/type`,
+  - `:error/summary`,
+  - `:error/description`.
+
+  The sequence is then stored in a map identified with the `:response/body` key of a
+  request map, under the key `:error/parameters`. Additionally, the following keys
+  are added to the response body:
+
+  - `:lang` (current language),
+  - `:status` (always set to `:error/parameters`),
+  - `:status/message` (a result of translation of the `:error/parameters` key),
+  - `:status/sub` (always set to `:error/parameters`)."
   [e respond raise]
   (let [data  (ex-data e)
         req   (get data :request)
