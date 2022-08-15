@@ -276,7 +276,7 @@
   (let [data  (ex-data e)
         req   (get data :request)
         ctype (get data :type)
-        data  (dissoc data :request :response)]
+        data  (dissoc data :request)]
     (case ctype
 
       :reitit.coercion/request-coercion
@@ -293,8 +293,11 @@
 
       :reitit.coercion/response-coercion
       (respond
-       (let [lang      (common/lang-id req)
-             translate (common/translator req)]
+       (let [data       (dissoc data :response)
+             lang       (common/lang-id req)
+             translate  (common/translator req)
+             error-list (coercion/list-errors data)]
+         (log/err "Response coercion error:" (coercion/join-errors error-list))
          (-> req
              (assoc :response/body {:lang           lang
                                     :status         :error/internal
