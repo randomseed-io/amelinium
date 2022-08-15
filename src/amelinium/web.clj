@@ -36,7 +36,7 @@
 ;; Request map keys exposed in views
 
 (def ^:const page-keys       [:title :subtitle])
-(def ^:const param-keys      [:query-params :form-params :path-params :form/errors])
+(def ^:const param-keys      [:query-params :form-params :path-params :form/errors :coercion/errors])
 (def ^:const validators-keys [:validators/config :validators/params-valid?])
 (def ^:const session-keys    [:session])
 (def ^:const remote-ip-keys  [:remote-ip :remote-ip/str :remote-ip/by-proxy? :remote-ip/proxy])
