@@ -355,8 +355,8 @@
   redirect (with HTTP code 307) is generated with this path and a query string
   containing `form-errors` parameter. The value of the parameter is empty if form
   errors were saved in a session variable. The destination of the redirect can be
-  overriden by the `:form-errors/uri` configuration option associated with HTTP route
-  data.
+  overriden by the `:form-errors/page` configuration option associated with HTTP
+  route data.
 
   If the destination URI cannot be established or if coercion error happened during
   handling some previous coercion error (so current page is where the browser had
@@ -379,7 +379,7 @@
     (case ctype
 
       :reitit.coercion/request-coercion
-      (let [orig-page              (some-str (http/get-route-data req :form-errors/uri))
+      (let [orig-page              (http/get-route-data req :form-errors/page)
             referer                (if (nil? orig-page) (some-str (get-in req [:headers "referer"])))
             [orig-uri orig-params] (if referer (common/url->uri+params req referer))
             handling-previous?     (contains? (get req :query-params) "form-errors")]
