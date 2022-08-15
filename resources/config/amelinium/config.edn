@@ -158,7 +158,8 @@
   :config {:transformers     {:body     {:default reitit.coercion.malli/default-transformer-provider
                                          :formats {"application/json" reitit.coercion.malli/json-transformer-provider}}
                               :string   {:default reitit.coercion.malli/string-transformer-provider}
-                              :response {:default reitit.coercion.malli/default-transformer-provider}}
+                              :response {:default reitit.coercion.malli/default-transformer-provider
+                                         :formats {"application/json" reitit.coercion.malli/json-transformer-provider}}}
            :error-keys       #{:coercion :type :in :value :errors :transformed}
            :lite             true
            :compile          malli.util/closed-schema
