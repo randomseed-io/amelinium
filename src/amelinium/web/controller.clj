@@ -384,22 +384,25 @@
             [orig-uri orig-params] (if referer (common/url->uri+params req referer))
             handling-previous?     (contains? (get req :query-params) "form-errors")]
         (respond
-         (if (and (or orig-page orig-uri referer) (not handling-previous?))
+         (if (and (or (valuable? orig-page) (valuable? orig-uri) referer)
+                  (not handling-previous?))
            ;; redirect to a form-submission page allowing user to correct errors
            ;; transfer form errors using query params or form params (if session is present)
            (let [errors       (coercion/map-errors data)
                  orig-uri     (if orig-uri (some-str orig-uri))
                  orig-params  (if orig-uri orig-params)
                  [opts smap]  (common/config+session req)
+                 destination  (or orig-page orig-uri)
+                 dest-uri     (if (keyword? destination) (common/page req destination) destination)
+                 dest-uri     (some-str dest-uri)
                  session?     (and smap (get smap :valid?)
                                    (session/put-var!
-                                    opts smap :form-errors {:dest   (get req :uri)
+                                    opts smap :form-errors {:dest   dest-uri
                                                             :errors errors}))
                  error-params (if session? "" (coercion/join-errors errors))
-                 joint-params (assoc orig-params "form-errors" error-params)
-                 destination  (or orig-page orig-uri)]
-             (if destination
-               (common/temporary-redirect req destination nil joint-params)
+                 joint-params (assoc orig-params "form-errors" error-params)]
+             (if dest-uri
+               (common/temporary-redirect req dest-uri nil joint-params)
                (resp/temporary-redirect
                 (str referer (if (str/includes? referer "?") ("&" "?"))
                      (common/query-string-encode joint-params)))))
