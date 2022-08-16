@@ -142,21 +142,21 @@
                            :secure-session-id "Secure session ID should be a string consisting two hexadecimal numbers separated by hyphen."
                            :language          "Language ID should express a correct, supported language code."
                            :lang              "Language ID should express a correct, supported language code."}
-   :parameter-should      {:phone                     :parameter-type-should/phone
-                           :email                     :parameter-type-should/email
+   :parameter-should      {:phone                     :type-should/phone
+                           :email                     :type-should/email
                            :login                     "Login should be a valid e-mail address."
-                           :password                  :parameter-type-should/password
-                           :password-relaxed          :parameter-type-should/password-relaxed
+                           :password                  :type-should/password
+                           :password-relaxed          :type-should/password-relaxed
                            :password.password         "Password should have min. 8 characters, big and small letters, a digit and a special character."
                            :password.password-relaxed "Password must be present."
-                           :name                      :parameter-type-should/name
+                           :name                      :type-should/name
                            :last-name                 "Last name should consist of letters with optional hyphen and cannot have blanks (like space)."
                            :second-name               "Second name should consist of letters with optional hyphen and cannot have blanks (like space)."
                            :middle-name               "Middle name should consist of letters with optional hyphen and cannot have blanks (like space)."
-                           :token                     :parameter-type-should/token
-                           :session-id                :parameter-type-should/session-id
-                           :language                  :parameter-type-should/language
-                           :lang                      :parameter-type-should/language}
+                           :token                     :type-should/token
+                           :session-id                :type-should/session-id
+                           :language                  :type-should/language
+                           :lang                      :type-should/language}
 
    :tongue/pluralizer amelinium.i18n.pluralizers/en}}}
 

@@ -140,20 +140,20 @@
                            :session-id        "Identyfikator sesji powinien być jednym lub dwoma łańcuchami znakowymi w zapisie szesnastkowym."
                            :secure-session-id "Bezpieczny identyfikator sesji powinien być jedną lub dwoma liczbami szesnastkowymi oddzielonymi dywizem."
                            :language          "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."}
-   :parameter-should      {:phone                     :parameter-type-should/phone
-                           :email                     :parameter-type-should/email
+   :parameter-should      {:phone                     :type-should/phone
+                           :email                     :type-should/email
                            :login                     "Login powinien być poprawnym adresem e-mailowym."
-                           :password                  :parameter-type-should/password
-                           :password-relaxed          :parameter-type-should/password-relaxed
+                           :password                  :type-should/password
+                           :password-relaxed          :type-should/password-relaxed
                            :password.password         "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
                            :password.password-relaxed "Należy podać hasło."
-                           :name                      :parameter-type-should/name
+                           :name                      :type-should/name
                            :last-name                 "Nazwisko może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
                            :second-name               "Drugie imię może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
                            :middle-name               "Drugie imię może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
-                           :token                     :parameter-type-should/token
-                           :session-id                :parameter-type-should/session-id
-                           :language                  :parameter-type-should/language
-                           :lang                      :parameter-type-should/language}
+                           :token                     :type-should/token
+                           :session-id                :type-should/session-id
+                           :language                  :type-should/language
+                           :lang                      :type-should/language}
 
    :tongue/pluralizer amelinium.i18n.pluralizers/pl}}}
