@@ -89,6 +89,11 @@
   (and (string? s)
        (some? (re-find #"^[a-f0-9]{32}$" s))))
 
+(defn valid-name?
+  [s]
+  (and (string? s)
+       (some? (re-find #"^\p{L}[\p{L} ,.'-]*$" s))))
+
 ;; Generators
 
 (def gen-char-hex
@@ -136,6 +141,9 @@
 
 (def gen-string-password
   (make-gen-string-alphanumeric 4 6))
+
+(def gen-name
+  (gen/such-that valid-name? (gen/fmap str/capitalize gen-non-empty-string-alpha)))
 
 (def gen-email
   (gen/such-that vc/valid-email?
@@ -375,8 +383,23 @@
                       :json-schema/example (gen/generate gen-string-md5)
                       :gen/gen             gen-string-md5}}))
 
+(def personal-name
+  (m/-simple-schema
+   {:type            :name
+    :pred            valid-name?
+    :property-pred   (m/-min-max-pred count)
+    :type-properties {:error/message       "should be a valid name"
+                      :decode/json         utils/some-str
+                      :encode/string       utils/some-str
+                      :encode/json         utils/some-str
+                      :json-schema/type    "string"
+                      :json-schema/pattern "^\\p{L}[\\p{L} ,.'-]*$"
+                      :json-schema/example (gen/generate gen-name)
+                      :gen/gen             gen-name}}))
+
 (def schemas
   {:email              email
+   :name               personal-name
    :password           password
    :password-relaxed   password-relaxed
    :instant            instant
