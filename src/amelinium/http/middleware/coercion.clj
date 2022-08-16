@@ -42,8 +42,8 @@
                 translate-sub param-id param-type])}
   ([req-or-sub param-error-properties]
    (translate-error req-or-sub
-                    (get :parameter/id   param-error-properties)
-                    (get :parameter/type param-error-properties)))
+                    (get param-error-properties :parameter/id)
+                    (get param-error-properties :parameter/type)))
   ([req lang param-id param-type]
    (translate-error (i18n/translator-sub req lang) param-id param-type))
   ([req-or-sub param-id param-type]
