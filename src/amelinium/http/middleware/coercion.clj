@@ -58,9 +58,9 @@
          param-name  (i18n/no-default (translate-sub :parameter param-id param-type))
          param-name? (some? param-name)
          param-name  (if param-name? param-name (some-str param-id))
-         type-name   (delay (i18n/no-default (translate-sub :parameter-type param-type param-id)))
-         type-name?  (delay (and param-type? (some? @type-name)))
-         output      {:parameter/name param-name}]
+         type-name   (if param-type? (i18n/no-default (translate-sub :parameter-type param-type param-id)))
+         type-name?  (some? type-name)
+         output      {:parameter/name param-name :parameter-type/name type-name}]
      (i18n/no-default
       (-> output
           (assoc :error/summary
@@ -68,22 +68,23 @@
                                                     param-name
                                                     param-id
                                                     param-type))
-                     (if param-name? (translate-sub  :error/parameter-name nil
-                                                     param-name
-                                                     param-id
-                                                     param-type))
+                     (if param-name? (translate-sub :error/parameter-name nil
+                                                    param-name
+                                                    param-id
+                                                    param-type))
                      (if param-type? (translate-sub :type-error param-type
                                                     param-name
                                                     param-id
                                                     param-type))
-                     (if @type-name? (translate-sub :error/type-name nil
-                                                    @type-name
+                     (if type-name?  (translate-sub :error/type-name nil
+                                                    type-name
                                                     param-id
                                                     param-type))
                      (if param-id?   (translate-sub :error/parameter nil
                                                     param-id
                                                     param-type))
-                     (translate-sub :error/parameter-of-type nil param-type)))
+                     (if param-type? (translate-sub :error/parameter-of-type
+                                                    nil param-type))))
           (assoc :error/description
                  (or (if mixed-id?   (translate-sub :parameter-should mixed-id
                                                     param-name
@@ -103,7 +104,7 @@
   with API handlers. For web form error reporting `map-errors`, `list-errors`
   and `explain-errors` are better suited. "
   [data]
-  (let [dat (if-some [c (get data :coercion)] (coercion/-encode-error c data) data)
+  (let [dat (coercion/encode-error data)
         src (get dat :in)
         err (get dat :errors)
         err (if (coll? err) err (if (some? err) (cons err nil)))
@@ -116,7 +117,7 @@
             (fn [e]
               (if (map? e)
                 (if-some [param-path (get e :path)]
-                  (if-some [param-id (and (coll? param-path) (some-str (last param-path)))]
+                  (if-some [param-id (and (coll? param-path) (some-str (first param-path)))]
                     {:parameter/id   param-id
                      :parameter/src  src
                      :parameter/path param-path
@@ -138,10 +139,10 @@
   an exception data map which should contains `:coercion` key. Used to expose form
   errors to another page which should indicate them to a visitor."
   [data]
-  (let [dat (if-some [c (get data :coercion)] (coercion/-encode-error c data) data)
+  (let [dat (coercion/encode-error data)
         err (get dat :errors)
         err (if (coll? err) err (if (some? err) (cons err nil)))]
-    (->> err (filter identity) (map (juxt-seq (comp some-str last :path) param-type)))))
+    (->> err (filter identity) (map (juxt-seq (comp some-str first :path) param-type)))))
 
 (defn map-errors
   "Like `list-errors` but returns a map in which keys are parameter names and values
