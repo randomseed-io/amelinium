@@ -409,7 +409,7 @@
              (if dest-uri
                (common/temporary-redirect req dest-uri nil joint-params)
                (resp/temporary-redirect
-                (str referer (if (str/includes? referer "?") ("&" "?"))
+                (str referer (if (str/includes? referer "?") "&" "?")
                      (common/query-string-encode joint-params)))))
            ;; render a separate page describing invalid parameters
            ;; instead of current page
