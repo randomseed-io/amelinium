@@ -13,7 +13,8 @@
             [io.randomseed.utils.map         :as               map]
             [io.randomseed.utils.var         :as               var]
             [io.randomseed.utils.log         :as               log]
-            [io.randomseed.utils             :refer [some-str-spc]])
+            [io.randomseed.utils             :refer [some-str-spc
+                                                         some-str]])
 
   (:import  [logback_bundle.json                 FlatJsonLayout ValueDecoder]
             [ch.qos.logback.contrib.jackson      JacksonJsonFormatter]
@@ -94,7 +95,10 @@
  (log/init! (-> config
                 (map/update-existing :context-transformer prep-context-transformer)
                 (map/assoc-missing   :context-transformer ctx-transformer)))
- (msg-with-val "Configuration profile:" (:profile (:system config)) config))
+ (msg-with-val
+  "Configuration profile:" (or (some-str (:profile (:system config))) "unknown")
+  (str "[" (or (some-str (:node (:system config))) "unknown") " node]")
+  config))
 
 (system/add-halt!
  ::unilog

@@ -77,7 +77,8 @@
                   (update :name        normalize-name "unnamed system")
                   (update :title       normalize-name "unnamed system")
                   (update :author      normalize-name "unknown author")
-                  (update :profile     normalize-name "unknown")
+                  (update :profile     some-keyword)
+                  (update :node        some-keyword)
                   (update :version     normalize-name "1.0.0")
                   (update :license     normalize-name "Copyright")
                   (update :description normalize-name ""))]
