@@ -114,12 +114,10 @@
                     (fn [req]
                       (handler req)))))}))
 
-(system/add-init  ::default [k config] (init-headers k config))
-(system/add-prep  ::default [_ config] (prep-config config))
+(system/add-init  ::default [k config] (init-headers k (prep-config config)))
 (system/add-halt! ::default [_ config] nil)
 
 (system/add-init  ::handler [_ config] (transformer config))
-(system/add-prep  ::handler [_ config] (prep-config config))
 (system/add-halt! ::handler [_ config] nil)
 
 (derive ::web ::default)
