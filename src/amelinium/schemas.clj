@@ -352,6 +352,9 @@
    {:type            :secure-session-id
     :pred            valid-secure-session-id?
     :type-properties {:error/message       "should be a secure session ID"
+                      :decode/json         utils/some-str
+                      :encode/string       utils/some-str
+                      :encode/json         utils/some-str
                       :json-schema/type    "string"
                       :json-schema/pattern "^[a-f0-9]{32}-[a-f0-9]{32}$"
                       :json-schema/example (gen/generate gen-secure-session-id)
@@ -415,3 +418,31 @@
  (mregistry/fast-registry
   (merge (m/default-schemas) schemas)))
 
+;; Dynamic schemas
+
+(defn gen-gen-language
+  [langs]
+  (let [langs (vec langs)]
+    (gen/such-that not-empty (gen/elements langs))))
+
+(defn gen-language-schema
+  [id supported-languages]
+  (let [id    (utils/some-keyword id)
+        langs (if (utils/valuable? supported-languages) supported-languages [:en])
+        langs (if (coll? langs) langs [langs])
+        langs (set (map keyword langs))
+        enums (mapv name langs)
+        stype (keyword (or (and (keyword? name) (name id)) :language))]
+    (m/-simple-schema
+     {:type            stype
+      :pred            #(and (keyword? %) (contains? langs %))
+      :type-properties {:error/message       "should be a supported language"
+                        :decode/string       utils/some-keyword
+                        :decode/json         utils/some-keyword
+                        :encode/string       utils/some-str
+                        :encode/json         utils/some-str
+                        :json-schema/type    "string"
+                        :json-schema/pattern "[A-Za-z_\\-\\:\\.]{2,7}"
+                        :json-schema/enum    enums
+                        :json-schema/example "en"
+                        :gen/gen             (gen-gen-language langs)}})))

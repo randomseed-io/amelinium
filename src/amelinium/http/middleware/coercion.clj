@@ -8,15 +8,18 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid compile])
 
-  (:require [clojure.string          :as      str]
-            [amelinium.system        :as   system]
-            [amelinium.logging       :as      log]
-            [amelinium.i18n          :as     i18n]
-            [reitit.coercion         :as coercion]
-            [reitit.ring.coercion    :as      rrc]
-            [io.randomseed.utils.var :as      var]
-            [io.randomseed.utils.map :as      map]
-            [io.randomseed.utils     :refer  :all]))
+  (:require [clojure.string          :as       str]
+            [amelinium.system        :as    system]
+            [amelinium.logging       :as       log]
+            [amelinium.i18n          :as      i18n]
+            [amelinium.schemas       :as   schemas]
+            [reitit.coercion         :as  coercion]
+            [reitit.ring.coercion    :as       rrc]
+            [malli.core              :as         m]
+            [malli.registry          :as mregistry]
+            [io.randomseed.utils.var :as       var]
+            [io.randomseed.utils.map :as       map]
+            [io.randomseed.utils     :refer   :all]))
 
 ;; Common functions
 
@@ -236,6 +239,21 @@
 
 ;; Initializers
 
+(defn- process-schema-entry
+  [id {:keys [compile options] :as sch}]
+  (if (and compile (some? id))
+    (if-some [compile (if (symbol? compile) (var/deref compile))]
+      (compile id options))
+    sch))
+
+(defn init-registry
+  [config]
+  (let [local-schemas (->> config
+                           (map/map-vals-by-kv process-schema-entry)
+                           map/remove-empty-values)]
+    (mregistry/fast-registry
+     (merge (m/default-schemas) schemas/schemas local-schemas))))
+
 (defn init-exceptions-handler
   [k {enabled?          :enabled?
       exception-handler :handler
@@ -275,6 +293,9 @@
 
 (system/add-init  ::exceptions [k config] (var/make k (init-exceptions-handler k config)))
 (system/add-halt! ::exceptions [k config] (var/make k nil))
+
+(system/add-init  ::registry [k config] (var/make k (init-registry config)))
+(system/add-halt! ::registry [k config] (var/make k nil))
 
 (derive ::coercer-all ::coercer)
 (derive ::coercer-web ::coercer)
