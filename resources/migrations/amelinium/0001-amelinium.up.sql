@@ -135,6 +135,7 @@ CREATE TABLE IF NOT EXISTS confirmations (
   expires   TIMESTAMP(6) NULL,
   confirmed BOOLEAN NOT NULL DEFAULT FALSE,
   req_id    CHAR(128) NULL,
+  udata     VARBINARY(32768),
   PRIMARY KEY(id, reason)
 ) ENGINE=Aria TRANSACTIONAL=0 ROW_FORMAT=FIXED;
 --;;
