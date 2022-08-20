@@ -151,7 +151,7 @@
   (locking lock
     (let [handler-id handler                         ; symbolic handler identifier (from options)
           handler    (assoc (var/deref handler-id)   ; actual handler (a map of two functions)
-                            :id handler-id)          ; armored by its symbolic identifier (to later find it)
+                            :id handler-id)          ; armored by its symbolic identifier (to find it later)
           encrypt-fn (:encrypt-fn handler)           ; encryption function (from handler)
           check-fn   (:check-fn   handler)           ; checking function (from handler)
           opts       (-> handler :defaults           ; encryption parameters (configuration options merged with handler defaults)

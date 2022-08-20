@@ -40,14 +40,16 @@
   (get (get req ::r/match) :data))
 
 (defn auth-db
-  "Injects authorization data source directly into a request map."
+  "Injects authorization data source directly into a request map. Uses global
+  authentication configuration from a current route data."
   [req _ _]
   (get (or (get (get req :route/data) :auth/config)
            (get req :auth/config))
        :db))
 
 (defn auth-types
-  "Injects authorization configurations directly into a request map."
+  "Injects authorization configurations directly into a request map. Uses global
+  authentication configuration from a current route data."
   [req _ _]
   (get (or (get (get req :route/data) :auth/config)
            (get req :auth/config))
