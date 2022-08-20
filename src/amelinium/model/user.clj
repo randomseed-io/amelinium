@@ -19,6 +19,7 @@
             [buddy.core.codecs                 :as        codecs]
             [tick.core                         :as             t]
             [amelinium.db                      :as            db]
+            [amelinium.auth                    :as          auth]
             [amelinium.auth.pwd                :as           pwd]
             [amelinium.http.middleware.session :as       session]
             [amelinium.http.middleware.roles   :as         roles]
@@ -99,11 +100,11 @@
   ([db email]
    (if (and db email)
      (jdbc/execute-one! db [login-query email] db/opts-simple-map)))
-  ([db email auth-config]
-   (if-some [ac-types (get auth-config :account-types/names)]
-     (let [db (or db (get auth-config :db))]
+  ([db email auth-global-config]
+   (if-some [ac-types (get auth-global-config :account-types/names)]
+     (let [db (or db (get auth-global-config :db))]
        (if (and db email)
-         (let [ac-sql (get auth-config :account-types/sql)
+         (let [ac-sql (get auth-global-config :account-types/sql)
                query  (str login-query-atypes-pre
                            (if ac-sql ac-sql (str "IN " (db/braced-join-? ac-types)))
                            login-query-atypes-post)]
@@ -111,10 +112,16 @@
      (get-login-data db email))))
 
 (def ^:const insert-shared-suite-query
-  "INSERT IGNORE INTO password_suites(suite) VALUES(?) RETURNING id")
+  (str-spc
+   "INSERT INTO password_suites(suite) VALUES(?)"
+   "ON DUPLICATE KEY UPDATE id=id"
+   "RETURNING id"))
 
 (def ^:const shared-suite-query
   "SELECT id FROM password_suites WHERE suite = ?")
+
+(def ^:const shared-suite-by-id-query
+  "SELECT suite FROM password_suites WHERE id = ?")
 
 (defn create-or-get-shared-suite-id
   "Gets shared suite ID on a basis of its JSON content. If it does not exist, it is
@@ -122,8 +129,52 @@
   [db suite]
   (if (and db suite)
     (first
-     (or (jdbc/execute-one! db [insert-shared-suite-query suite] db/opts-simple-vec)
-         (jdbc/execute-one! db [shared-suite-query suite]        db/opts-simple-vec)))))
+     (jdbc/execute-one! db [insert-shared-suite-query suite] db/opts-simple-vec))))
+
+(defn get-shared-suite-id
+  "Gets shared suite ID on a basis of its JSON content."
+  [db suite]
+  (if (and db suite)
+    (first
+     (jdbc/execute-one! db [shared-suite-query suite] db/opts-simple-vec))))
+
+(defn get-shared-suite
+  "Gets shared suite by its ID as a JSON string."
+  [db suite-id]
+  (if (and db suite-id)
+    (first
+     (jdbc/execute-one! db [shared-suite-by-id-query suite-id] db/opts-simple-vec))))
+
+(defn prepare-password-suites
+  "Creates a password suites without saving it into a database. Uses database to store
+  the given, shared password suite if it does not exist yet. Returns a map with two
+  keys: `:password` (JSON-encoded password ready to be saved into a database which
+  should be given as an argument) and `:password-suite-id` (integer identifier of a
+  shared suite ID which exists on a database)."
+  ([db suites]
+   (if suites
+     (make-password db (get suites :shared) (get suites :intrinsic))))
+  ([db shared-suite user-suite]
+   (if (and db shared-suite user-suite)
+     (if-some [shared-id (create-or-get-shared-suite-id db shared-suite)]
+       {:password_suite_id shared-id
+        :password          user-suite}))))
+
+(defn generate-password
+  "Creates a password for the given authentication type. Returns a map of shared part
+  and an intrinsic part ID as two keys: `:password` and `password-suite-id`."
+  [auth-config password]
+  (if-some [db (get auth-config :db)]
+    (if-some [chains (auth/make-password-json password auth-config)]
+      (let [shared-suit ]
+        (if-some [shared-id (create-or-get-shared-suite-id db shared-suite)]
+          (let [uid       (if )
+                auth-type (if (keyword? auth-type) auth-type-or-uid)
+                uid       (if-not auth-type )]
+
+            ))))))
+
+;; auth-type
 
 (defn update-password
   "Updates password information for the given user by updating suite ID and intrinsic
@@ -546,69 +597,41 @@
 
 (def ^:const create-with-token-query
   (str-spc
-   "INSERT IGNORE INTO users(email,uid,first_name,middle_name,last_name)"
-   "SELECT id,UUID(),?,?,? FROM confirmations"
-   "WHERE token = ? AND confirmed = TRUE AND reason = 'creation' AND expires >= NOW()"
+   "INSERT IGNORE INTO users(email,uid,first_name,middle_name,last_name,password,password_suite_id)"
+   "SELECT id,UUID(),first_name,middle_name,last_name,password,pwd_suite FROM confirmations"
+   "WHERE token = ? AND confirmed = TRUE AND password <> NULL AND pwd_suite <> NULL"
+   "AND reason = 'creation' AND expires >= NOW()"
    "RETURNING id,uid,email"))
 
 (defn create-with-token
-  ([db token]
-   (create-with-token db token nil nil nil))
-  ([db token first-name]
-   (create-with-token db token first-name nil nil))
-  ([db token first-name last-name]
-   (create-with-token db token first-name nil last-name))
-  ([db token first-name middle-name last-name]
-   (if-some [token (some-str token)]
-     (if-some [r (jdbc/execute-one!
-                  db [create-with-token-query
-                      (some-str first-name)
-                      (some-str middle-name)
-                      (some-str last-name)
-                      token]
-                  db/opts-simple-map)]
-       (assoc r :created? true :uid (db/as-uuid (get r :uid)))
-       {:created? false :error (confirmation-report-error db token "creation")}))))
+  [db token]
+  (if-some [token (some-str token)]
+    (if-some [r (jdbc/execute-one! db [create-with-token-query token] db/opts-simple-map)]
+      (assoc r :created? true :uid (db/as-uuid (get r :uid)))
+      {:created? false :error (confirmation-report-error db token "creation")})))
 
 (def ^:const create-with-code-query
   (str-spc
-   "INSERT IGNORE INTO users(email,uid,first_name,middle_name,last_name)"
-   "SELECT id,UUID(),?,?,? FROM confirmations"
-   "WHERE id = ? AND code = ? AND confirmed = TRUE AND reason = 'creation' AND  expires >= NOW()"
+   "INSERT IGNORE INTO users(email,uid,first_name,middle_name,last_name,password,password_suite_id)"
+   "SELECT id,UUID(),first_name,middle_name,last_name,password,pwd_suite FROM confirmations"
+   "WHERE id = ? AND code = ? AND confirmed = TRUE AND password <> NULL AND pwd_suite <> NULL"
+   "AND reason = 'creation' AND  expires >= NOW()"
    "RETURNING id,uid,email"))
 
 (defn create-with-code
-  ([db code email]
-   (create-with-code db code email nil nil nil))
-  ([db code email first-name]
-   (create-with-code db code email first-name nil nil))
-  ([db code email first-name last-name]
-   (create-with-code db code email first-name nil last-name))
-  ([db code email first-name middle-name last-name]
-   (let [code  (some-str code)
-         email (some-str email)]
-     (if (and code email)
-       (if-some [r (jdbc/execute-one!
-                    db [create-with-code-query
-                        (some-str first-name)
-                        (some-str middle-name)
-                        (some-str last-name)
-                        email code]
-                    db/opts-simple-map)]
-         (assoc r :created? true :uid (db/as-uuid (get r :uid)))
-         {:created? false :error (confirmation-report-error db code email "creation")})))))
+  [db code email]
+  (let [code  (some-str code)
+        email (some-str email)]
+    (if (and code email)
+      (if-some [r (jdbc/execute-one! db [create-with-code-query email code] db/opts-simple-map)]
+        (assoc r :created? true :uid (db/as-uuid (get r :uid)))
+        {:created? false :error (confirmation-report-error db code email "creation")}))))
 
 (defn create-with-token-or-code
-  ([db token code email]
-   (create-with-token-or-code db token code email nil nil nil))
-  ([db token code email first-name]
-   (create-with-token-or-code db token code email first-name nil nil))
-  ([db token code email first-name last-name]
-   (create-with-token-or-code db token code email first-name nil last-name))
-  ([db token code email first-name middle-name last-name]
-   (if-some [token (some-str token)]
-     (create-with-token db token first-name middle-name last-name)
-     (create-with-code  db code email first-name middle-name last-name))))
+  [db token code email]
+  (if-some [token (some-str token)]
+    (create-with-token db token)
+    (create-with-code  db code email)))
 
 ;; Other
 

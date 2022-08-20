@@ -15,7 +15,10 @@
             [io.randomseed.utils        :refer   :all]
             [io.randomseed.utils.time   :as      time]
             [io.randomseed.utils.var    :as       var]
-            [io.randomseed.utils.map    :as       map]))
+            [io.randomseed.utils.map    :as       map])
+
+  (:import [javax.sql DataSource]
+           [java.time Duration]))
 
 (defonce config nil)
 
@@ -152,20 +155,56 @@
        map/remove-empty-values
        (map/map-vals #(update % :db (fnil identity db)))))
 
+(defrecord AccountTypes [^String                        sql
+                         ^clojure.lang.PersistentVector ids
+                         ^clojure.lang.PersistentVector names
+                         ^clojure.lang.Keyword          default
+                         ^String                        default-name])
+
+(defrecord Locking      [^Long     max-attempts
+                         ^Duration lock-wait
+                         ^Duration fail-expires])
+
+(defrecord Confirmation [^Long max-attempts
+                         ^Duration expires])
+
+(defrecord Registration [^Duration expires])
+
+(defrecord Passwords    [^clojure.lang.Keyword id
+                         ^clojure.lang.Fn check
+                         ^clojure.lang.Fn check-json
+                         ^clojure.lang.Fn encrypt
+                         ^clojure.lang.Fn encrypt-json
+                         ^clojure.lang.Fn wait])
+
+(defrecord Config       [^clojure.lang.Keyword id
+                         ^DataSource   db
+                         ^AccountTypes account-types
+                         ^Registration registration
+                         ^Confirmation confirmation
+                         ^Locking      locking
+                         ^Passwords    passwords])
+
+(defrecord Settings      [^DataSource db
+                          ^Config     default
+                          ^default-type
+                          ^AccountTypes types])
+
 (defn init-config
   "Initializes authentication configuration."
   [config]
   (let [config (map/update-existing config :db db/ds)
         db     (get config :db)
         dtype  (get config :default-type)
-        config (map/update-existing config :types init-by-type db)]
-    (assoc config :default (get (get config :types) dtype))))
+        config (map/update-existing config :types init-by-type db)
+        config (assoc config :default (get (get config :types) dtype))]
+    ))
 
 (system/add-init  ::auth [k config] (wrap-auth k config))
 (system/add-halt! ::auth [_ config] nil)
 
-(system/add-init  ::config [k config] (var/make k (init-config config)))
-(system/add-halt! ::config [k config] (var/make k nil))
+(system/add-init  ::settings [k config] (var/make k (init-config config)))
+(system/add-halt! ::settings [k config] (var/make k nil))
 
 (derive ::strong ::auth)
 (derive ::simple ::auth)
