@@ -26,7 +26,11 @@
             [io.randomseed.utils.time          :as          time]
             [io.randomseed.utils.map           :as           map]
             [io.randomseed.utils.ip            :as            ip]
-            [io.randomseed.utils               :refer       :all]))
+            [io.randomseed.utils               :refer       :all])
+
+  (:import [javax.sql DataSource]
+           [amelinium.auth.pwd Suites SuitesJSON]
+           [amelinium.auth Config Settings Locking Registration Confirmation AccountTypes]))
 
 (defonce props-cache    (atom nil))
 (defonce settings-cache (atom nil))
@@ -51,185 +55,6 @@
   [db uid]
   (if-some [uid (db/some-uuid-str)]
     (sql/get-by-id db :users uid :uid db/opts-simple-map)))
-
-;; Passwords
-
-(def ^:const password-query
-  (str-spc "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
-           "WHERE users.email = ? AND password_suites.id = users.password_suite_id"))
-
-(def ^:const password-query-atypes-pre
-  (str-spc "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
-           "WHERE users.email = ? AND users.account_type"))
-
-(def ^:const password-query-atypes-post
-  " AND password_suites.id = users.password_suite_id")
-
-(defn get-password-suites
-  "Gets intrinsic and shared password suites for the given user, identified by an
-  e-mail address."
-  ([db email]
-   (if (and db email)
-     (jdbc/execute-one! db [password-query email] db/opts-simple-map)))
-  ([db email account-types-config]
-   (if-some [ac-types (get account-types-config :account-types/names)]
-     (if (and db email)
-       (let [ac-sql (get account-types-config :account-types/sql)
-             query  (str password-query-atypes-pre
-                         (if ac-sql ac-sql (db/braced-join-? ac-types))
-                         password-query-atypes-post)]
-         (jdbc/execute-one! db (cons query (cons email ac-types)) db/opts-simple-map)))
-     (get-password-suites db email))))
-
-(def ^:const login-query
-  (str-spc "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
-           "FROM users, password_suites"
-           "WHERE users.email = ? AND password_suites.id = users.password_suite_id"))
-
-(def ^:const login-query-atypes-pre
-  (str-spc "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
-           "FROM users, password_suites"
-           "WHERE users.email = ? AND users.account_type"))
-
-(def ^:const login-query-atypes-post
-  " AND password_suites.id = users.password_suite_id")
-
-(defn get-login-data
-  "Gets data required for user to be authenticated, including intrinsic and shared
-  password suites."
-  ([db email]
-   (if (and db email)
-     (jdbc/execute-one! db [login-query email] db/opts-simple-map)))
-  ([db email auth-global-config]
-   (if-some [ac-types (get auth-global-config :account-types/names)]
-     (let [db (or db (get auth-global-config :db))]
-       (if (and db email)
-         (let [ac-sql (get auth-global-config :account-types/sql)
-               query  (str login-query-atypes-pre
-                           (if ac-sql ac-sql (str "IN " (db/braced-join-? ac-types)))
-                           login-query-atypes-post)]
-           (jdbc/execute-one! db (cons query (cons email ac-types)) db/opts-simple-map))))
-     (get-login-data db email))))
-
-(def ^:const insert-shared-suite-query
-  (str-spc
-   "INSERT INTO password_suites(suite) VALUES(?)"
-   "ON DUPLICATE KEY UPDATE id=id"
-   "RETURNING id"))
-
-(def ^:const shared-suite-query
-  "SELECT id FROM password_suites WHERE suite = ?")
-
-(def ^:const shared-suite-by-id-query
-  "SELECT suite FROM password_suites WHERE id = ?")
-
-(defn create-or-get-shared-suite-id
-  "Gets shared suite ID on a basis of its JSON content. If it does not exist, it is
-  created."
-  [db suite]
-  (if (and db suite)
-    (first
-     (jdbc/execute-one! db [insert-shared-suite-query suite] db/opts-simple-vec))))
-
-(defn get-shared-suite-id
-  "Gets shared suite ID on a basis of its JSON content."
-  [db suite]
-  (if (and db suite)
-    (first
-     (jdbc/execute-one! db [shared-suite-query suite] db/opts-simple-vec))))
-
-(defn get-shared-suite
-  "Gets shared suite by its ID as a JSON string."
-  [db suite-id]
-  (if (and db suite-id)
-    (first
-     (jdbc/execute-one! db [shared-suite-by-id-query suite-id] db/opts-simple-vec))))
-
-(defn prepare-password-suites
-  "Creates a password suites without saving it into a database. Uses database to store
-  the given, shared password suite if it does not exist yet. Returns a map with two
-  keys: `:password` (JSON-encoded password ready to be saved into a database which
-  should be given as an argument) and `:password-suite-id` (integer identifier of a
-  shared suite ID which exists on a database)."
-  ([db suites]
-   (if suites
-     (make-password db (get suites :shared) (get suites :intrinsic))))
-  ([db shared-suite user-suite]
-   (if (and db shared-suite user-suite)
-     (if-some [shared-id (create-or-get-shared-suite-id db shared-suite)]
-       {:password_suite_id shared-id
-        :password          user-suite}))))
-
-(defn generate-password
-  "Creates a password for the given authentication type. Returns a map of shared part
-  and an intrinsic part ID as two keys: `:password` and `password-suite-id`."
-  [auth-config password]
-  (if-some [db (get auth-config :db)]
-    (if-some [chains (auth/make-password-json password auth-config)]
-      (let [shared-suit ]
-        (if-some [shared-id (create-or-get-shared-suite-id db shared-suite)]
-          (let [uid       (if )
-                auth-type (if (keyword? auth-type) auth-type-or-uid)
-                uid       (if-not auth-type )]
-
-            ))))))
-
-;; auth-type
-
-(defn update-password
-  "Updates password information for the given user by updating suite ID and intrinsic
-  password in an authorization database. Additionally last_attempt and last_failed_ip
-  properties are deleted and login_attempts is set to 0."
-  ([db id suites]
-   (if suites
-     (update-password db id (get suites :shared) (get suites :intrinsic))))
-  ([db id shared-suite user-suite]
-   (if (and db id shared-suite user-suite)
-     (if-some [shared-id (create-or-get-shared-suite-id db shared-suite)]
-       (sql/update! db :users
-                    {:password_suite_id shared-id
-                     :password          user-suite
-                     :last_attempt      nil
-                     :last_failed_ip    nil
-                     :login_attempts    0}
-                    {:id id})))))
-
-(defn update-login-ok
-  [db id ip]
-  (if (and db id)
-    (let [login-time (t/now)]
-      (sql/update! db :users {:login_attempts 1
-                              :soft_locked    nil
-                              :last_attempt   login-time
-                              :last_login     login-time
-                              :last_ok_ip     (ip/to-str-v6 ip)} {:id id}))))
-
-(def ^:const login-failed-update-query
-  (str-spc
-   "UPDATE users"
-   "SET last_failed_ip = ?,"
-   " login_attempts = 1 + GREATEST(login_attempts -"
-   "  FLOOR(TIME_TO_SEC(TIMEDIFF(NOW(), last_attempt)) / ?),"
-   "  0),"
-   " last_attempt = NOW()"
-   "WHERE id = ?"))
-
-(def ^:const soft-lock-update-query
-  (str-spc
-   "UPDATE users"
-   "SET soft_locked = NOW()"
-   "WHERE id = ? AND login_attempts > ?"))
-
-(defn update-login-failed
-  [db user-id ip-address max-attempts attempt-expires-after-secs]
-  (when (and db user-id)
-    (jdbc/execute-one! db [login-failed-update-query
-                           (ip/to-str-v6 ip-address)
-                           (time/seconds attempt-expires-after-secs 1)
-                           user-id])
-    (jdbc/execute-one! db [soft-lock-update-query
-                           user-id
-                           (or max-attempts 1)])))
 
 ;; Sessions
 
@@ -632,6 +457,217 @@
   (if-some [token (some-str token)]
     (create-with-token db token)
     (create-with-code  db code email)))
+
+;; Passwords and login data
+
+(def ^:const password-query
+  (str-spc "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
+           "WHERE users.email = ? AND password_suites.id = users.password_suite_id"))
+
+(def ^:const password-query-atypes-pre
+  (str-spc "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
+           "WHERE users.email = ? AND users.account_type"))
+
+(def ^:const password-query-atypes-post
+  " AND password_suites.id = users.password_suite_id")
+
+(def ^:const password-query-atypes-single
+  (str-spc "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
+           "WHERE users.email = ? AND users.account_type = ?"
+           "AND password_suites.id = users.password_suite_id"))
+
+(def ^:const login-query
+  (str-spc "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
+           "FROM users, password_suites"
+           "WHERE users.email = ? AND password_suites.id = users.password_suite_id"))
+
+(def ^:const login-query-atypes-pre
+  (str-spc "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
+           "FROM users, password_suites"
+           "WHERE users.email = ? AND users.account_type"))
+
+(def ^:const login-query-atypes-post
+  " AND password_suites.id = users.password_suite_id")
+
+(def ^:const login-query-atypes-single
+  (str-spc "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
+           "FROM users, password_suites"
+           "WHERE users.email = ? AND users.account_type = ?"
+           "AND password_suites.id = users.password_suite_id"))
+
+(defrecord AuthQueries [^String generic ^String pre ^String post ^String single])
+
+(def ^:const ^AuthQueries login-data-queries
+  (->AuthQueries login-query
+                 login-query-atypes-pre
+                 login-query-atypes-post
+                 login-query-atypes-single))
+
+(def ^:const ^AuthQueries password-data-queries
+  (->AuthQueries password-query
+                 password-query-atypes-pre
+                 password-query-atypes-post
+                 password-query-atypes-single))
+
+(defprotocol Authorizable
+  (get-user-auth-data [auth-source email queries] [auth-source email account-type queries]))
+
+(extend-protocol Authorizable
+
+  Config
+  (get-user-auth-data
+    ([^Config src email ^AuthQueries queries]
+     (if email
+       (if-some [ac-types (.account-types ^Config src)]
+         (if-some [db (.db ^Config src)]
+           (let [ac-names (.names ^AccountTypes ac-types)
+                 ac-sql   (.sql   ^AccountTypes ac-types)
+                 ac-sql   (if ac-sql ac-sql (str " IN " (db/braced-join-? ac-names)))
+                 query    (str (.pre ^AuthQueries queries) ac-sql (.post ^AuthQueries queries))]
+             (jdbc/execute-one! db (cons query (cons email ac-names)) db/opts-simple-map))))))
+    ([^Config src email ac-type ^AuthQueries queries]
+     (if-some [ac-type (if (keyword? ac-type) ac-type (some-keyword ac-type))]
+       (if email
+         (if-some [db (.db ^Config src)]
+           (if-some [ac-ids (.ids ^AccountTypes (.account-types ^Config src))]
+             (if (contains? ac-ids ac-type)
+               (jdbc/execute-one!
+                db
+                (cons (.single ^AuthQueries queries) (cons email (cons (name ac-type) nil)))
+                db/opts-simple-map)))))
+       (get-user-auth-data src email queries))))
+
+  Settings
+  (get-user-auth-data
+    ([^Settings src email ^AuthQueries queries]
+     (if email
+       (let [global-db (.db ^Settings src)]
+         (if-some [ac-type (keyword (prop-by-email global-db :account-type email))]
+           (get-user-auth-data (get (.types ^Settings src) ac-type) email ac-type queries)))))
+    ([^Settings src email ac-type ^AuthQueries queries]
+     (if-some [ac-type (if (keyword? ac-type) ac-type (some-keyword ac-type))]
+       (if email
+         (if-some [auth-config (get (.types ^Settings src) ac-type)]
+           (get-user-auth-data auth-config email ac-type queries)))
+       (get-user-auth-data src email queries))))
+
+  DataSource
+  (get-user-auth-data
+    ([^DataSource src email ^AuthQueries queries]
+     (if email
+       (jdbc/execute-one! src
+                          (cons (.generic ^AuthQueries queries) (cons email nil))
+                          db/opts-simple-map)))
+    ([^DataSource src email ac-type ^AuthQueries queries]
+     (if-some [ac-type (some-str ac-type)]
+       (if email
+         (jdbc/execute-one! src
+                            (cons (.single ^AuthQueries queries) (cons email (cons ac-type nil)))
+                            db/opts-simple-map))
+       (get-user-auth-data src email queries)))))
+
+(defn get-login-data
+  "Returns data required for user to log in, including password information."
+  ([^amelinium.model.user.Authorizable auth-source email]
+   (get-user-auth-data auth-source email login-data-queries))
+  ([^amelinium.model.user.Authorizable auth-source email account-type]
+   (get-user-auth-data auth-source email account-type login-data-queries)))
+
+(defn get-password-suites
+  "Returns password information."
+  ([^amelinium.model.user.Authorizable auth-source email]
+   (get-user-auth-data auth-source email password-data-queries))
+  ([^amelinium.model.user.Authorizable auth-source email account-type]
+   (get-user-auth-data auth-source email account-type password-data-queries)))
+
+(def ^:const insert-shared-suite-query
+  (str-spc
+   "INSERT INTO password_suites(suite) VALUES(?)"
+   "ON DUPLICATE KEY UPDATE id=id"
+   "RETURNING id"))
+
+(def ^:const shared-suite-query
+  "SELECT id FROM password_suites WHERE suite = ?")
+
+(def ^:const shared-suite-by-id-query
+  "SELECT suite FROM password_suites WHERE id = ?")
+
+(defn create-or-get-shared-suite-id
+  "Gets shared suite ID on a basis of its JSON content. If it does not exist, it is
+  created."
+  [db suite]
+  (if (and db suite)
+    (first
+     (jdbc/execute-one! db [insert-shared-suite-query suite] db/opts-simple-vec))))
+
+(defn get-shared-suite-id
+  "Gets shared suite ID on a basis of its JSON content."
+  [db suite]
+  (if (and db suite)
+    (first
+     (jdbc/execute-one! db [shared-suite-query suite] db/opts-simple-vec))))
+
+(defn get-shared-suite
+  "Gets shared suite by its ID as a JSON string."
+  [db suite-id]
+  (if (and db suite-id)
+    (first
+     (jdbc/execute-one! db [shared-suite-by-id-query suite-id] db/opts-simple-vec))))
+
+(defn update-password
+  "Updates password information for the given user by updating suite ID and intrinsic
+  password in an authorization database. Additionally last_attempt and last_failed_ip
+  properties are deleted and login_attempts is set to 0."
+  ([db id ^Suites suites]
+   (if suites
+     (update-password db id (.shared ^Suites suites) (.intrinsic ^Suites suites))))
+  ([db id shared-suite user-suite]
+   (if (and db id shared-suite user-suite)
+     (if-some [shared-id (create-or-get-shared-suite-id db shared-suite)]
+       (sql/update! db :users
+                    {:password_suite_id shared-id
+                     :password          user-suite
+                     :last_attempt      nil
+                     :last_failed_ip    nil
+                     :login_attempts    0}
+                    {:id id})))))
+
+(defn update-login-ok
+  [db id ip]
+  (if (and db id)
+    (let [login-time (t/now)]
+      (sql/update! db :users {:login_attempts 1
+                              :soft_locked    nil
+                              :last_attempt   login-time
+                              :last_login     login-time
+                              :last_ok_ip     (ip/to-str-v6 ip)} {:id id}))))
+
+(def ^:const login-failed-update-query
+  (str-spc
+   "UPDATE users"
+   "SET last_failed_ip = ?,"
+   " login_attempts = 1 + GREATEST(login_attempts -"
+   "  FLOOR(TIME_TO_SEC(TIMEDIFF(NOW(), last_attempt)) / ?),"
+   "  0),"
+   " last_attempt = NOW()"
+   "WHERE id = ?"))
+
+(def ^:const soft-lock-update-query
+  (str-spc
+   "UPDATE users"
+   "SET soft_locked = NOW()"
+   "WHERE id = ? AND login_attempts > ?"))
+
+(defn update-login-failed
+  [db user-id ip-address max-attempts attempt-expires-after-secs]
+  (when (and db user-id)
+    (jdbc/execute-one! db [login-failed-update-query
+                           (ip/to-str-v6 ip-address)
+                           (time/seconds attempt-expires-after-secs 1)
+                           user-id])
+    (jdbc/execute-one! db [soft-lock-update-query
+                           user-id
+                           (or max-attempts 1)])))
 
 ;; Other
 
