@@ -5,8 +5,8 @@
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require
-   [clojure.spec.alpha  :as        s]
-   [io.randomseed.utils :refer  :all]))
+   [clojure.spec.alpha       :as        s]
+   [io.randomseed.utils      :refer  :all]))
 
 (s/def :amelinium.auth/encrypt-fn ifn?)
 (s/def :amelinium.auth/check-fn   ifn?)

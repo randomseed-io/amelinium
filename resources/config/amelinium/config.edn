@@ -258,7 +258,7 @@
                              {:data {:compile      reitit.coercion/compile-request-coercers
                                      :middleware   #ref :amelinium.http.middleware/web
                                      :translations #ref :amelinium.i18n/translations
-                                     :auth/config  #ref :amelinium.auth/config
+                                     :auth/config  #ref :amelinium.auth/settings
                                      :oplog/config #ref :amelinium.common.oplog.auth/log
                                      :coercion     #ref :amelinium.http.middleware.coercion/coercer
                                      ;;:exception  reitit.dev.pretty/exception
@@ -371,10 +371,10 @@
 
  ;; Main authentication configuration
 
- :amelinium.auth/config {:db           #ref :amelinium.db/main
-                         :default-type :user
-                         :types        {:system #ref :amelinium.auth/strong
-                                        :user   #ref :amelinium.auth/simple}}
+ :amelinium.auth/settings {:db           #ref :amelinium.db/main ;; should hold a mapping of user ID / user e-mail to the account type
+                           :default-type :user
+                           :types        {:system #ref :amelinium.auth/strong
+                                          :user   #ref :amelinium.auth/simple}}
 
  ;; I18n
 

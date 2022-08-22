@@ -29,6 +29,12 @@
    :wait-random [0 2]
    :wait-nouser 2})
 
+(defrecord Suites     [^clojure.lang.IPersistentMap shared
+                       ^clojure.lang.IPersistentMap intrinsic])
+
+(defrecord SuitesJSON [^String shared
+                       ^String intrinsic])
+
 ;;
 ;; Helper functions
 ;;
@@ -118,10 +124,10 @@
       (if (and (map? h) (seq h)) h))))
 
 (defn merge-suites
-  ([crypto-suites-dual]
+  ([^Suites crypto-suites-dual]
    (s/assert (s/nilable (s/or :settings-suite :amelinium.auth.settings.suite/dual
                               :password-chain :amelinium.auth.password-chain/dual)) crypto-suites-dual)
-   (merge-suites (:shared crypto-suites-dual) (:intrinsic crypto-suites-dual)))
+   (merge-suites (.shared ^Suites crypto-suites-dual) (.intrinsic ^Suites crypto-suites-dual)))
   ([defaults-crypto-suite user-crypto-suite & more]
    (let [suites (list* defaults-crypto-suite user-crypto-suite more)
          suites (filter identity suites)]
@@ -248,15 +254,18 @@
    (s/assert (s/nilable :amelinium.auth.plain/password)   plain)
    (s/assert (s/nilable :amelinium.auth/password-chain)   user-suite)
    (s/assert (s/nilable :amelinium.auth.settings/generic) user-settings)
-   (let [combo?   (map? user-suite) ; combined settings
+   (let [combo?   (instance? Suites user-suite) ; combined settings
          settings user-settings]
 
      ;; wait some time
      (if-not combo?
        ((:wait-fn settings) user-suite))
 
-     (if combo? ; if the suite is a map then extract :shared and :intrinsic
-       (check plain (:shared user-suite) (:intrinsic user-suite) settings)
+     (if combo? ; if the suite is a Suite then extract :shared and :intrinsic
+       (check plain
+              (.shared    ^Suites user-suite)
+              (.intrinsic ^Suites user-suite)
+              settings)
 
        ;; loop through all entries of a password suite
        ;; trying to resolve encryption handler
@@ -341,13 +350,12 @@
 (def shared-chain shared-suite)
 
 (defn split
-  "Splits a cipher entry or a password into two parts and returns a map with two
-  keys :shared and :intrinsic with these parts added as values."
+  "Splits a cipher entry or a password into two parts and returns a Suite record with
+  two fields `:shared` and `:intrinsic` with these parts."
   [crypto-entry]
   (s/assert :amelinium.auth/crypto-entry crypto-entry)
   (let [shared-suite (shared crypto-entry)]
-    {:shared    shared-suite
-     :intrinsic (apply dissoc crypto-entry (keys shared-suite))}))
+    (->Suites shared-suite (apply dissoc crypto-entry (keys shared-suite)))))
 
 (defn split-suite
   [suite]
@@ -361,7 +369,7 @@
           new-st-chain (conj st-chain shared-pwd)
           new-va-chain (conj va-chain (apply dissoc pwd-entry (keys shared-pwd)))]
       (if (nil? nexte)
-        {:shared new-st-chain, :intrinsic new-va-chain}
+        (->Suites new-st-chain new-va-chain)
         (recur nexte new-st-chain new-va-chain)))))
 
 (def split-chain split-suite)
@@ -431,7 +439,7 @@
   [settings]
   (fn password-check
     ([password suites]
-     (password-check password (get suites :shared) (get suites :intrinsic)))
+     (password-check password (.shared ^Suites suites) (.intrinsic ^Suites suites)))
     ([password shared-suite user-suite]
      (if (or shared-suite user-suite)
        (check password (merge-suites shared-suite user-suite) settings)
@@ -441,14 +449,17 @@
   [settings]
   (fn password-encrypt-json
     [plain-text]
-    (-> plain-text (encrypt settings) split-suite
-        (map/update-values {:shared to-json :intrinsic to-json}))))
+    (let [suites (-> plain-text (encrypt settings) split-suite)]
+      (->SuitesJSON (to-json (.shared    ^Suites suites))
+                    (to-json (.intrinsic ^Suites suites))))))
 
 (defn new-json-checker
   [settings]
   (fn password-check-json
-    ([password json-suites]
-     (password-check-json password (get json-suites :shared) (get json-suites :intrinsic)))
+    ([password ^SuitesJSON json-suites]
+     (password-check-json password
+                          (.shared    ^SuitesJSON json-suites)
+                          (.intrinsic ^SuitesJSON json-suites)))
     ([password shared-suite-json user-suite-json]
      (if (or shared-suite-json user-suite-json)
        (check password
@@ -460,8 +471,8 @@
  ::pwd [k config]
  (s/assert :amelinium.auth/config config)
  (log/msg "Configuring password authentication:" k)
- (let [config (-> config                ; processing configuration:
-                  init-wait             ; initializing delay parameters
+ (let [config (-> config         ; processing configuration:
+                  init-wait      ; initializing delay parameters
                   process-suite
                   (assoc :id k))
        config (assoc config :encrypt-fn      (new-encryptor      config))
