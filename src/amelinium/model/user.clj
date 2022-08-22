@@ -36,6 +36,8 @@
 (defonce settings-cache (atom nil))
 (defonce ids-cache      (atom nil))
 
+(defrecord DBPassword [^Long password_suite_id ^String password])
+
 ;; Users
 
 (defn get-user-by-id
@@ -613,6 +615,31 @@
   (if (and db suite-id)
     (first
      (jdbc/execute-one! db [shared-suite-by-id-query suite-id] db/opts-simple-vec))))
+
+(defn prepare-password-suites
+  "Creates a password suites without saving it into a database. Uses database to store
+  the given, shared password suite if it does not exist yet. Returns a map with two
+  keys: `:password` (JSON-encoded password ready to be saved into a database which
+  should be given as an argument) and `:password-suite-id` (integer identifier of a
+  shared suite ID which exists on a database)."
+  ([db ^Suites suites]
+   (if suites
+     (prepare-password-suites db (.shared ^Suites suites) (.intrinsic ^Suites suites))))
+  ([db shared-suite user-suite]
+   (if (and db shared-suite user-suite)
+     (if-some [shared-id (create-or-get-shared-suite-id db shared-suite)]
+       (->DBPassword shared-id user-suite)))))
+
+(defn generate-password
+  "Creates a password for the given authentication config. Returns a map of shared part
+  ID and an intrinsic part as two keys: `password-suite-id` and `:password`."
+  [auth-config password]
+  (if-some [db (.db ^Config auth-config)]
+    (if-some [suites (auth/make-password-json password auth-config)]
+      (let [shared-suite    (.shared    ^SuitesJSON suites)
+            intrinsic-suite (.intrinsic ^SuitesJSON suites)]
+        (if-some [shared-id (create-or-get-shared-suite-id db shared-suite)]
+          (->DBPassword shared-id intrinsic-suite))))))
 
 (defn update-password
   "Updates password information for the given user by updating suite ID and intrinsic
