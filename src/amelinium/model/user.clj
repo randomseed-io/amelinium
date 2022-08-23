@@ -219,22 +219,28 @@
   (prop-set db id k nil))
 
 (defn props
+  "Returns user properties for the given user ID (cached)."
   ([db id]
    (db/get-cached props-cache info-getter db id))
   ([db id & ids]
    (db/get-cached-coll props-cache info-getter-coll db (cons id ids))))
 
 (defn props-multi
+  "Returns user properties for each of the given user IDs (cached)."
   [db ids]
   (db/get-cached-coll props-cache info-getter-coll db ids))
 
 (defn prop
+  "Returns user property for the given user ID or a map of user property keyed with its
+  ID if multiple IDs are given (cached)."
   ([db prop id]
    (db/get-cached-prop props-cache info-getter db prop id))
   ([db prop id & ids]
    (db/get-cached-coll-prop props-cache info-getter-coll db prop (cons id ids))))
 
 (defn prop-or-default
+  "Returns user property for the given user ID or a map of user property keyed with its
+  ID if multiple IDs are given (cached)."
   ([db prop default id]
    (db/get-cached-prop-or-default props-cache info-getter db prop default id))
   ([db prop default id & ids]
@@ -244,18 +250,21 @@
 ;; Getting user properties by...
 
 (defn props-by-id
+  "Returns properties of the given user ID (cached)."
   [db user-id]
   (if (some? user-id) (props db user-id)))
 
 (defn props-by-session
+  "Returns properties of the given user session (cached)."
   [db smap]
   (if-some [user-id (get smap :user/id)] (props db user-id)))
 
 (defn props-by-session-or-id
+  "Returns properties of the given user session or ID (cached)."
   [db smap user-id]
   (if db (or (props-by-session db smap) (props-by-id db user-id))))
 
-;; Email to ID mapping (cached)
+;; E-mail to ID mapping
 
 (def ^:const email-id-query
   "SELECT id FROM users WHERE email = ?")
@@ -264,40 +273,47 @@
   "SELECT email, id FROM users WHERE email IN")
 
 (defn get-user-id-by-email
+  "Returns user ID for the given e-mail (not cached)."
   ([db email]
    (db/get-id-by-email db email-id-query email))
   ([db _ email]
    (db/get-id-by-email db email-id-query email)))
 
 (defn get-user-ids-by-emails
+  "Returns user IDs for the given e-mails (not cached)."
   ([db emails]
    (db/get-ids-by-emails db emails-ids-query emails))
   ([db _ emails]
    (db/get-ids-by-emails db emails-ids-query emails)))
 
 (defn email-to-id
+  "Returns user ID for the given e-mail (cached)."
   [db email]
   (db/email-to-id db ids-cache get-user-id-by-email email))
 
 (defn emails-to-ids
+  "Returns user IDs for the given e-mails (cached)."
   [db emails]
   (db/emails-to-ids db ids-cache get-user-ids-by-emails emails))
 
 (defn props-by-email
+  "Returns user properties for the given e-mail (cached)."
   [db email]
   (props db (email-to-id db email)))
 
 (defn id-to-email
+  "Returns user e-mail for the given user ID (cached)."
   ([db id]
    (prop db :email id))
   ([db id & ids]
    (apply prop db :email id ids)))
 
 (defn ids-to-emails
+  "Returns user e-mails for the given user IDs (cached)."
   ([db ids]
    (db/get-cached-coll-prop props-cache info-getter-coll db :email ids)))
 
-;; UID to ID mapping (cached)
+;; UID to ID mapping
 
 (def ^:const uid-id-query
   "SELECT id FROM users WHERE uid = ?")
@@ -306,36 +322,43 @@
   "SELECT uid, id FROM users WHERE uid IN")
 
 (defn get-user-id-by-uid
+  "Returns user ID for the given user UID (not cached)."
   ([db uid]
    (db/get-id-by-uid db uid-id-query uid))
   ([db _ uid]
    (db/get-id-by-uid db uid-id-query uid)))
 
 (defn get-user-ids-by-uids
+  "Returns user IDs for the given user UIDs (not cached)."
   ([db uids]
    (db/get-ids-by-uids db uids-ids-query uids))
   ([db _ uids]
    (db/get-ids-by-uids db uids-ids-query uids)))
 
 (defn uid-to-id
+  "Returns user ID for the given user UID (cached)."
   [db uid]
   (db/uid-to-id db ids-cache get-user-id-by-uid uid))
 
 (defn uids-to-ids
+  "Returns user IDs for the given user UIDs (cached)."
   [db uids]
   (db/uids-to-ids db ids-cache get-user-ids-by-uids uids))
 
 (defn props-by-uid
+  "Returns user properties for the given user UID (cached)."
   [db uid]
   (props db (uid-to-id db uid)))
 
 (defn id-to-uid
+  "Returns user UID for the given user ID (cached)."
   ([db id]
    (prop db :uid id))
   ([db id & ids]
    (apply prop db :uid id ids)))
 
 (defn ids-to-uids
+  "Returns user UIDs for the given user IDs (cached)."
   ([db ids]
    (db/get-cached-coll-prop props-cache info-getter-coll db :uid ids)))
 
@@ -712,9 +735,9 @@
            (ident? v) (nat-int? (str/index-of (str (symbol v)) \@)))))
 
 (defn find-id
-  "Gets user ID on a basis of a map with :id key, on a basis of a map with :uid key,
-  on a basis of a number, a string or a keyword being ID, email or UID. User must
-  exist in a database. Uses cached properties if possible."
+  "Gets user ID on a basis of a map with `:id` key or on a basis of a map with `:uid`
+  key or on a basis of a number, a string or a keyword being ID, email or UID. User
+  must exist in a database. Uses cached properties if possible."
   [db user-spec]
   (if (and db user-spec)
     (if (map? user-spec)
