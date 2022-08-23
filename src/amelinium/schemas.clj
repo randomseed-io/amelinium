@@ -19,11 +19,15 @@
             [phone-number.core                     :as       phone]
             [phone-number.util                     :as      phutil]
             [io.randomseed.utils.validators.common :as          vc]
+            [io.randomseed.utils.ip                :as          ip]
             [io.randomseed.utils                   :as       utils]
             [amelinium.locale                      :as      locale])
 
   (:import [java.util UUID]
-           [java.time Duration]))
+           [java.time Duration]
+           [inet.ipaddr IPAddress]
+           [inet.ipaddr.ipv4 IPv4Address]
+           [inet.ipaddr.ipv6 IPv6Address]))
 
 ;; Helpers
 
@@ -94,7 +98,43 @@
   (and (string? s)
        (some? (re-find #"^\p{L}[\p{L} ,.'-]*$" s))))
 
+(defn valid-ip-address?
+  [v]
+  (instance? IPAddress v))
+
+(defn valid-ipv4-address?
+  [v]
+  (instance? IPv4Address v))
+
+(defn valid-ipv6-address?
+  [v]
+  (instance? IPv6Address v))
+
 ;; Generators
+
+(def gen-ubyte
+  (gen/choose 0 255))
+
+(defn make-gen-ubytes-array
+  [length]
+  (gen/fmap
+   #(byte-array (map unchecked-byte %))
+   (gen/vector gen-ubyte length)))
+
+(def gen-4-ubytes-array
+  (make-gen-ubytes-array 4))
+
+(def gen-16-ubytes-array
+  (make-gen-ubytes-array 16))
+
+(def gen-ipv4-address
+  (gen/fmap #(IPv4Address. %) gen-4-ubytes-array))
+
+(def gen-ipv6-address
+  (gen/fmap #(IPv6Address. %) gen-16-ubytes-array))
+
+(def gen-ip-address
+  (gen/one-of [gen-ipv4-address gen-ipv6-address]))
 
 (def gen-char-hex
   (gen/fmap char
@@ -400,6 +440,52 @@
                       :json-schema/example (gen/generate gen-name)
                       :gen/gen             gen-name}}))
 
+(def ipv4-address
+  (let [ipv4->str (comp ip/to-str ip/to-v4)
+        str->ipv4 (comp ip/to-v4 ip/to-address)]
+    (m/-simple-schema
+     {:type            :name
+      :pred            valid-ipv4-address?
+      :type-properties {:error/message       "should be a valid IPv4 address"
+                        :encode/json         str->ipv4
+                        :decode/json         ipv4->str
+                        :encode/string       str->ipv4
+                        :decode/string       ipv4->str
+                        :json-schema/type    "string"
+                        :json-schema/format  "ipv4"
+                        :json-schema/example (ipv4->str (gen/generate gen-ipv4-address))
+                        :gen/gen             gen-ipv4-address}})))
+
+(def ipv6-address
+  (let [ipv6->str (comp ip/to-str ip/to-v6)
+        str->ipv6 (comp ip/to-v6 ip/to-address)]
+    (m/-simple-schema
+     {:type            :name
+      :pred            valid-ipv6-address?
+      :type-properties {:error/message       "should be a valid IPv6 address"
+                        :encode/json         str->ipv6
+                        :decode/json         ipv6->str
+                        :encode/string       str->ipv6
+                        :decode/string       ipv6->str
+                        :json-schema/type    "string"
+                        :json-schema/format  "ipv6"
+                        :json-schema/example (ipv6->str (gen/generate gen-ipv6-address))
+                        :gen/gen             gen-ipv6-address}})))
+
+(def ip-address
+  (m/-simple-schema
+   {:type            :name
+    :pred            valid-ip-address?
+    :type-properties {:error/message       "should be a valid IP address"
+                      :encode/json         ip/plain-ip-str
+                      :decode/json         ip/plain-ip
+                      :encode/string       ip/plain-ip-str
+                      :decode/string       ip/plain-ip
+                      :json-schema/type    "string"
+                      :json-schema/anyOf   [{:format "ipv4"}, {:format "ipv6"}]
+                      :json-schema/example (ip/plain-ip-str (gen/generate gen-ip-address))
+                      :gen/gen             gen-ip-address}}))
+
 (def schemas
   {:email              email
    :name               personal-name
@@ -409,6 +495,9 @@
    :duration           duration
    :phone              phone
    :regular-phone      regular-phone
+   :ip-address         ip-address
+   :ipv4-address       ipv4-address
+   :ipv6-address       ipv6-address
    :md5-string         md5-string
    :confirmation-token confirmation-token
    :session-id         session-id
