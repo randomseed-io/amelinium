@@ -301,6 +301,13 @@
   [db email]
   (props db (email-to-id db email)))
 
+(defn prop-by-email
+  "Returns user property identified by `prop-id` for the given e-mail (cached)."
+  ([db prop-id email]
+   (prop db prop-id (email-to-id db email)))
+  ([db prop-id email & emails]
+   (apply prop db prop-id (emails-to-ids db (cons email emails)))))
+
 (defn id-to-email
   "Returns user e-mail for the given user ID (cached)."
   ([db id]
