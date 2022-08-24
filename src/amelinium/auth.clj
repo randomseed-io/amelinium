@@ -48,6 +48,7 @@
 (defrecord Config       [^clojure.lang.Keyword id
                          ^DataSource           db
                          ^AccountTypes         account-types
+                         ^AccountTypes         parent-account-types
                          ^Registration         registration
                          ^Confirmation         confirmation
                          ^Locking              locking
@@ -108,52 +109,77 @@
 
 (defn make-passwords
   [m]
-  (apply ->Passwords
-         (map (:passwords m)
-              [:id :suite :check-fn :check-json-fn :encrypt-fn :encrypt-json-fn :wait-fn])))
+  (if (instance? Passwords m) m
+      (apply ->Passwords
+             (map (:passwords m)
+                  [:id :suite :check-fn :check-json-fn :encrypt-fn :encrypt-json-fn :wait-fn]))))
 
-(defn parse-account-types
+(defn parse-account-ids
   ([v]
-   (parse-account-types some-keyword-simple v))
+   (parse-account-ids some-keyword-simple v))
   ([f v]
    (if v
-     (some->> (if (coll? v) (seq (if (map? v) (keys v) v)) (cons v nil))
-              seq (filter #(and % (valuable? %)))
-              seq (map f) (filter keyword?) seq))))
+     (some->> (if (coll? v) (if (map? v) (keys v) v) (cons v nil))
+              seq (filter valuable?) (map f) (filter keyword?) seq))))
+
+(defn new-account-types
+  ([ids]
+   (new-account-types ids nil))
+  ([ids default-id]
+   (let [ids (some->> ids parse-account-ids (filter identity) distinct seq)
+         dfl (or (some-keyword-simple default-id) (first ids))
+         dfn (if dfl (name dfl))
+         ids (if dfl (conj ids dfl))
+         ids (if ids (set ids))
+         nms (if ids (mapv name ids))
+         sql (if ids (if (= 1 (count nms)) " = ?" (str " IN " (db/braced-join-? nms))))]
+     (->AccountTypes sql ids nms dfl dfn))))
 
 (defn make-account-types
   [m]
-  (let [ids (some->> [:account-types/ids :account-types :account-types/names :account-type]
-                     (map (comp parse-account-types m))
-                     (filter identity)
-                     (apply concat)
-                     distinct seq vec)
-        nms (if ids (mapv name ids))
-        sql (if ids (if (= 1 (count nms)) " = ?" (str " IN " (db/braced-join-? nms))))
-        dfl (or (some-keyword-simple (or (:account-types/default m)
-                                         (:account-types/default-name m)))
-                (first ids))
-        dfn (if dfl (name dfl))
-        ids (set ids)]
-    (->AccountTypes sql ids nms dfl dfn)))
+  (if (instance? AccountTypes m) m
+      (let [act (:account-types m)
+            act (if (instance? AccountTypes act) (:ids act) act)
+            act (if act (parse-account-ids act))
+            ids (some->> [:account-types/ids :account-types/names]
+                         (map (partial get m))
+                         (apply concat act))]
+        (new-account-types ids (or (:account-types/default m)
+                                   (:account-types/default-name m))))))
 
 (defn make-registration
   [m]
-  (->Registration
-   ((fnil time/parse-duration [10 :minutes]) (:registration/expires m))))
+  (if (instance? Registration m) m
+      (->Registration
+       ((fnil time/parse-duration [10 :minutes]) (:registration/expires m)))))
 
 (defn make-confirmation
   [m]
-  (->Confirmation
-   (safe-parse-long (:confirmation/max-attempts m) 3)
-   ((fnil time/parse-duration [1 :minutes]) (:confirmation/expires m))))
+  (if (instance? Confirmation m) m
+      (->Confirmation
+       (safe-parse-long (:confirmation/max-attempts m) 3)
+       ((fnil time/parse-duration [1 :minutes]) (:confirmation/expires m)))))
 
 (defn make-locking
   [m]
-  (->Locking
-   (safe-parse-long (:locking/max-attempts m) 10)
-   ((fnil time/parse-duration [10 :minutes]) (:locking/lock-wait    m))
-   ((fnil time/parse-duration [ 1 :minutes]) (:locking/fail-expires m))))
+  (if (instance? Locking m) m
+      (->Locking
+       (safe-parse-long (:locking/max-attempts m) 10)
+       ((fnil time/parse-duration [10 :minutes]) (:locking/lock-wait    m))
+       ((fnil time/parse-duration [ 1 :minutes]) (:locking/fail-expires m)))))
+
+(defn make-auth
+  ([m]
+   (make-auth nil m))
+  ([k m]
+   (if (instance? Config m) m
+       (map->Config {:id            (keyword (or (:id m) k))
+                     :db            (db/ds          (:db m))
+                     :passwords     (make-passwords      m)
+                     :account-types (make-account-types  m)
+                     :locking       (make-locking        m)
+                     :confirmation  (make-confirmation   m)
+                     :registration  (make-registration   m)}))))
 
 (defn init-auth
   "Authentication configurator."
@@ -162,13 +188,7 @@
            (str "(attempts: "  (:locking/max-attempts config)
                 ", lock wait: "    (time/seconds  (:locking/lock-wait    config)) " s"
                 ", lock expires: " (time/seconds  (:locking/fail-expires config)) " s)"))
-  (map->Config {:id            (keyword k)
-                :db            (db/ds         (:db config))
-                :passwords     (make-passwords     config)
-                :account-types (make-account-types config)
-                :locking       (make-locking       config)
-                :confirmation  (make-confirmation  config)
-                :registration  (make-registration  config)}))
+  (make-auth k config))
 
 (defn config-by-type
   "Returns authentication configuration for the given account type using an
@@ -184,21 +204,39 @@
   [var-name account-type]
   (config-by-type (var/deref var-name) account-type))
 
-;; Mapping an account type to its preferred authentication configuration
+(defn index-by-type
+  "Prepares static authentication preference map by mapping a copy of each
+  authentication configuration to any account type identifier found within it. So,
+  `[{:account-types {:ids [:a :b]}}]` becomes:
+  `{:a {:account-types {:ids [:a :b]}}, :b {:account-types {:ids [:a :b]}}`.
 
-(defn init-by-type
-  "Prepares static authentication preference map."
-  [config db]
-  (->> config
-       (map/map-keys some-keyword-simple)
-       map/remove-empty-values
-       (map/map-vals #(update % :db (db/ds (fnil identity db))))))
+  Additionally, it sets `:db` if it's missing, and updates `:account-types` field to
+  have current account type set as default (including SQL query). Original account
+  types is preserved under `:parent-account-types`. Each authentication configuration
+  will be initialized if it isn't already."
+  [coll db]
+  (->> coll
+       (filter map?)
+       (map #(update % :db (comp db/ds (fnil identity db))))
+       (map #(assoc  % :account-types (make-account-types %)))
+       (mapcat #(map list (map keyword (:ids (:account-types %))) (repeat %)))
+       (filter #(and (coll? %) (keyword? (first %)) (map? (second %))))
+       (map (fn [[id auth-config]]
+              (if-some [id (some-keyword-simple id)]
+                (vector
+                 id
+                 (make-auth (or (:id auth-config) id)
+                            (assoc auth-config
+                                   :parent-account-types (:account-types auth-config)
+                                   :account-types (new-account-types id)))))))
+       (filter identity)
+       (into {})))
 
 (defn init-config
   "Prepares authentication settings."
   [config]
   (let [config (map/update-existing config :db db/ds)
-        config (map/update-existing config :types init-by-type (:db config))]
+        config (update config :types index-by-type (:db config))]
     (-> config
         (assoc :default (get (:types config) (:default-type config)))
         map->Settings)))
