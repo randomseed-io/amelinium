@@ -535,3 +535,23 @@
                         :json-schema/enum    enums
                         :json-schema/example "en"
                         :gen/gen             (gen-gen-language langs)}})))
+
+;; (defn gen-account-type-schema
+;;   [id auth-settings]
+;;   (let [id            (utils/some-keyword id)
+;;         account-types (map keyword (filter identity (keys (:types auth-settings))))]
+;;     (if (seq account-types)
+;;       (m/-simple-schema
+;;        {:type            stype
+;;         :pred            #(and (keyword? %) (contains? langs %))
+;;         :type-properties {:error/message       "should be a known account type"
+;;                           :decode/string       utils/some-keyword
+;;                           :decode/json         utils/some-keyword
+;;                           :encode/string       utils/some-str
+;;                           :encode/json         utils/some-str
+;;                           :json-schema/type    "string"
+;;                           :json-schema/pattern "[A-Za-z_\\-\\.]{1,32}"
+;;                           :json-schema/enum    enums
+;;                           :json-schema/example "en"
+;;                           :gen/gen             (gen-gen-language langs)}}))))
+

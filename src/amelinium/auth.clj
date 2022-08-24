@@ -15,7 +15,8 @@
             [io.randomseed.utils      :refer   :all]
             [io.randomseed.utils.time :as      time]
             [io.randomseed.utils.var  :as       var]
-            [io.randomseed.utils.map  :as       map])
+            [io.randomseed.utils.map  :as       map]
+            [puget.printer :refer [cprint]])
 
   (:import [javax.sql DataSource]
            [java.time Duration]))
@@ -108,24 +109,25 @@
 
 (defn make-passwords
   [m]
-  (apply ->Passwords
-         (map (:passwords m)
-              [:id :suite :check-fn :check-json-fn :encrypt-fn :encrypt-json-fn :wait-fn])))
+  (if (instance? Passwords m) m
+      (apply ->Passwords
+             (map (:passwords m)
+                  [:id :suite :check-fn :check-json-fn :encrypt-fn :encrypt-json-fn :wait-fn]))))
 
 (defn parse-account-types
   ([v]
    (parse-account-types some-keyword-simple v))
   ([f v]
    (if v
-     (some->> (if (coll? v) (seq (if (map? v) (keys v) v)) (cons v nil))
-              seq (filter #(and % (valuable? %)))
-              seq (map f) (filter keyword?) seq))))
+     (some->> (if (coll? v) (if (map? v) (keys v) v) (cons v nil))
+              seq (filter valuable?) (map f) (filter keyword?) seq))))
 
 (defn make-account-types
   [m]
-  (let [ids (some->> [:account-types/ids :account-types :account-types/names :account-type]
+  (let [ids (some->> [:account-types/ids :account-types/names]
                      (map (comp parse-account-types m))
                      (filter identity)
+                     #(do (cprint %) %)
                      (apply concat)
                      distinct seq vec)
         nms (if ids (mapv name ids))
@@ -139,21 +141,35 @@
 
 (defn make-registration
   [m]
-  (->Registration
-   ((fnil time/parse-duration [10 :minutes]) (:registration/expires m))))
+  (if (instance? Registration m) m
+      (->Registration
+       ((fnil time/parse-duration [10 :minutes]) (:registration/expires m)))))
 
 (defn make-confirmation
   [m]
-  (->Confirmation
-   (safe-parse-long (:confirmation/max-attempts m) 3)
-   ((fnil time/parse-duration [1 :minutes]) (:confirmation/expires m))))
+  (if (instance? Confirmation m) m
+      (->Confirmation
+       (safe-parse-long (:confirmation/max-attempts m) 3)
+       ((fnil time/parse-duration [1 :minutes]) (:confirmation/expires m)))))
 
 (defn make-locking
   [m]
-  (->Locking
-   (safe-parse-long (:locking/max-attempts m) 10)
-   ((fnil time/parse-duration [10 :minutes]) (:locking/lock-wait    m))
-   ((fnil time/parse-duration [ 1 :minutes]) (:locking/fail-expires m))))
+  (if (instance? Locking m) m
+      (->Locking
+       (safe-parse-long (:locking/max-attempts m) 10)
+       ((fnil time/parse-duration [10 :minutes]) (:locking/lock-wait    m))
+       ((fnil time/parse-duration [ 1 :minutes]) (:locking/fail-expires m)))))
+
+(defn make-auth
+  [m]
+  (if (instance? Config m) m
+      (map->Config {:id            (keyword       (:id m))
+                    :db            (db/ds         (:db m))
+                    :passwords     (make-passwords     m)
+                    :account-types (make-account-types m)
+                    :locking       (make-locking       m)
+                    :confirmation  (make-confirmation  m)
+                    :registration  (make-registration  m)})))
 
 (defn init-auth
   "Authentication configurator."
@@ -162,13 +178,7 @@
            (str "(attempts: "  (:locking/max-attempts config)
                 ", lock wait: "    (time/seconds  (:locking/lock-wait    config)) " s"
                 ", lock expires: " (time/seconds  (:locking/fail-expires config)) " s)"))
-  (map->Config {:id            (keyword k)
-                :db            (db/ds         (:db config))
-                :passwords     (make-passwords     config)
-                :account-types (make-account-types config)
-                :locking       (make-locking       config)
-                :confirmation  (make-confirmation  config)
-                :registration  (make-registration  config)}))
+  (make-auth config))
 
 (defn config-by-type
   "Returns authentication configuration for the given account type using an
@@ -184,15 +194,23 @@
   [var-name account-type]
   (config-by-type (var/deref var-name) account-type))
 
-;; Mapping an account type to its preferred authentication configuration
-
 (defn init-by-type
-  "Prepares static authentication preference map."
+  "Prepares static authentication preference map by mapping each account type (a key)
+  to its preferred authentication configuration. Authentication configuration will be
+  initialized if it isn't already."
   [config db]
   (->> config
        (map/map-keys some-keyword-simple)
        map/remove-empty-values
-       (map/map-vals #(update % :db (db/ds (fnil identity db))))))
+       (map/map-vals-by-kv
+        (fn [id auth-config]
+          (-> auth-config
+              (update :db (comp db/ds (fnil identity db)))
+              (update :account-types/ids conj id))))
+       (map/map-vals
+        (fn [auth-config]
+          (make-auth
+           (assoc auth-config :account-types (make-account-types auth-config)))))))
 
 (defn init-config
   "Prepares authentication settings."
