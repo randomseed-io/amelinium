@@ -512,7 +512,7 @@
 (defn gen-gen-language
   [langs]
   (let [langs (vec langs)]
-    (gen/such-that not-empty (gen/elements langs))))
+    (gen/such-that keyword? (gen/elements langs))))
 
 (defn gen-language-schema
   [id supported-languages]
@@ -535,3 +535,31 @@
                         :json-schema/enum    enums
                         :json-schema/example "en"
                         :gen/gen             (gen-gen-language langs)}})))
+
+(defn gen-gen-account-type
+  [account-types]
+  (let [account-types (vec account-types)]
+    (gen/such-that keyword? (gen/elements account-types))))
+
+(defn gen-account-type-schema
+  [id auth-settings]
+  (let [id            (utils/some-keyword id)
+        account-types (some->> auth-settings :types keys (filter some?) (map keyword))
+        account-types (if (seq account-types) (set account-types))
+        enums         (if account-types (mapv name account-types))
+        gen-ac-type   (if account-types (gen-gen-account-type account-types))]
+    (if account-types
+      (m/-simple-schema
+       {:type            :account-type
+        :pred            #(and (keyword? %) (contains? account-types %))
+        :type-properties {:error/message       "should be a known account type"
+                          :decode/string       utils/some-keyword
+                          :decode/json         utils/some-keyword
+                          :encode/string       utils/some-str
+                          :encode/json         utils/some-str
+                          :json-schema/type    "string"
+                          :json-schema/pattern "[A-Za-z_\\-\\.]{1,32}"
+                          :json-schema/enum    enums
+                          :json-schema/example (name (gen/generate gen-ac-type))
+                          :gen/gen             gen-ac-type}}))))
+
