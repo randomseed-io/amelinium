@@ -24,10 +24,7 @@
             [amelinium.locale                      :as      locale])
 
   (:import [java.util UUID]
-           [java.time Duration]
-           [inet.ipaddr IPAddress]
-           [inet.ipaddr.ipv4 IPv4Address]
-           [inet.ipaddr.ipv6 IPv6Address]))
+           [java.time Duration]))
 
 ;; Helpers
 
@@ -98,18 +95,6 @@
   (and (string? s)
        (some? (re-find #"^\p{L}[\p{L} ,.'-]*$" s))))
 
-(defn valid-ip-address?
-  [v]
-  (instance? IPAddress v))
-
-(defn valid-ipv4-address?
-  [v]
-  (instance? IPv4Address v))
-
-(defn valid-ipv6-address?
-  [v]
-  (instance? IPv6Address v))
-
 ;; Generators
 
 (def gen-ubyte
@@ -128,10 +113,10 @@
   (make-gen-ubytes-array 16))
 
 (def gen-ipv4-address
-  (gen/fmap #(IPv4Address. %) gen-4-ubytes-array))
+  (gen/fmap ip/bytes-to-ipv4 gen-4-ubytes-array))
 
 (def gen-ipv6-address
-  (gen/fmap #(IPv6Address. %) gen-16-ubytes-array))
+  (gen/fmap ip/bytes-to-ipv6 gen-16-ubytes-array))
 
 (def gen-ip-address
   (gen/one-of [gen-ipv4-address gen-ipv6-address]))
@@ -442,10 +427,10 @@
 
 (def ipv4-address
   (let [ipv4->str (comp ip/to-str ip/to-v4)
-        str->ipv4 (comp ip/to-v4 ip/to-address)]
+        str->ipv4 (comp ip/to-v4 ip/string-to-address)]
     (m/-simple-schema
      {:type            :name
-      :pred            valid-ipv4-address?
+      :pred            ip/is-ipv4?
       :type-properties {:error/message       "should be a valid IPv4 address"
                         :encode/json         str->ipv4
                         :decode/json         ipv4->str
@@ -458,10 +443,10 @@
 
 (def ipv6-address
   (let [ipv6->str (comp ip/to-str ip/to-v6)
-        str->ipv6 (comp ip/to-v6 ip/to-address)]
+        str->ipv6 (comp ip/to-v6 ip/string-to-address)]
     (m/-simple-schema
      {:type            :name
-      :pred            valid-ipv6-address?
+      :pred            ip/is-ipv6?
       :type-properties {:error/message       "should be a valid IPv6 address"
                         :encode/json         str->ipv6
                         :decode/json         ipv6->str
@@ -473,18 +458,20 @@
                         :gen/gen             gen-ipv6-address}})))
 
 (def ip-address
-  (m/-simple-schema
-   {:type            :name
-    :pred            valid-ip-address?
-    :type-properties {:error/message       "should be a valid IP address"
-                      :encode/json         ip/plain-ip-str
-                      :decode/json         ip/plain-ip
-                      :encode/string       ip/plain-ip-str
-                      :decode/string       ip/plain-ip
-                      :json-schema/type    "string"
-                      :json-schema/anyOf   [{:format "ipv4"}, {:format "ipv6"}]
-                      :json-schema/example (ip/plain-ip-str (gen/generate gen-ip-address))
-                      :gen/gen             gen-ip-address}}))
+  (let [ip->str #(if (ip/is-ip? %) (ip/to-str (or (ip/to-v4 %) %)))
+        str->ip #(if (string? %) (ip/string-to-address %))]
+    (m/-simple-schema
+     {:type            :name
+      :pred            ip/is-ip?
+      :type-properties {:error/message       "should be a valid IP address"
+                        :encode/json         ip->str
+                        :decode/json         str->ip
+                        :encode/string       ip->str
+                        :decode/string       str->ip
+                        :json-schema/type    "string"
+                        :json-schema/anyOf   [{:format "ipv4"}, {:format "ipv6"}]
+                        :json-schema/example (ip/plain-ip-str (gen/generate gen-ip-address))
+                        :gen/gen             gen-ip-address}})))
 
 (def schemas
   {:email              email
