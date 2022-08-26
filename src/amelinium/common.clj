@@ -76,7 +76,6 @@
   object."
   [req-or-match]
   (or (http/get-route-data req-or-match :oplog/config)
-      (if-not (instance? Match req-or-match) (get req-or-match :oplog/config))
       oplog-auth/log))
 
 (defn oplog-logger
@@ -89,7 +88,6 @@
   configuration map containing the `:fn/reporter` key."
   ([req-or-match]
    (if-some [lgr (or (get (http/get-route-data req-or-match :oplog/config) :fn/reporter)
-                     (if-not (instance? Match req-or-match) (get (get req-or-match :oplog/config) :fn/reporter))
                      oplog-auth/log)]
      (fn [& {:as message}] (lgr message))
      (constantly nil))))
