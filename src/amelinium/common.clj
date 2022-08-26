@@ -43,15 +43,15 @@
 ;; Data sources
 
 (defn auth-config
-  "Gets authentication configuration for the given account type or a global settings if
-  the account type was not given. If `auth-type` is explicitly set to `nil`, it will
-  be changed into `:default`."
+  "Gets authentication configuration for the given account type or a global
+  authentication settings if the account type was not given. If `auth-type` is
+  explicitly set to `nil`, it will be changed into `:default`."
   ([req-or-match auth-type]
    (if-some [auth-settings (http/get-route-data req-or-match :auth/config)]
      (get (.types ^amelinium.auth.Settings auth-settings)
           (cond (keyword? auth-type) auth-type
-                (nil? auth-type)     :default
-                :other               (keyword auth-type)))))
+                (some? auth-type)    (keyword auth-type)
+                :other               :default))))
   ([req-or-match]
    (http/get-route-data req-or-match :auth/config)))
 
