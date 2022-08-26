@@ -212,8 +212,6 @@
 
  :amelinium.http.middleware.populators/web
  [[:route/data          amelinium.common.populators/route-data]
-  [:auth/db             amelinium.common.populators/auth-db]
-  [:auth/types          amelinium.common.populators/auth-types]
   [:language/user       amelinium.common.populators/user-lang]
   [:oplog/logger        amelinium.common.populators/oplog-logger]
   [:i18n/translator     amelinium.common.populators/i18n-translator]
