@@ -429,7 +429,7 @@
   (let [ipv4->str (comp ip/to-str ip/to-v4)
         str->ipv4 (comp ip/to-v4 ip/string-to-address)]
     (m/-simple-schema
-     {:type            :name
+     {:type            :ipv4-address
       :pred            ip/is-ipv4?
       :type-properties {:error/message       "should be a valid IPv4 address"
                         :encode/json         str->ipv4
@@ -445,7 +445,7 @@
   (let [ipv6->str (comp ip/to-str ip/to-v6)
         str->ipv6 (comp ip/to-v6 ip/string-to-address)]
     (m/-simple-schema
-     {:type            :name
+     {:type            :ipv6-address
       :pred            ip/is-ipv6?
       :type-properties {:error/message       "should be a valid IPv6 address"
                         :encode/json         str->ipv6
@@ -457,11 +457,33 @@
                         :json-schema/example (ipv6->str (gen/generate gen-ipv6-address))
                         :gen/gen             gen-ipv6-address}})))
 
+(def ip-address-mapped
+  (let [str->ipv6 (comp ip/to-v6 ip/string-to-address)
+        ip->str   #(if (ip/is-ipv6? %) (ip/to-str (or (ip/to-v4 %) %)))]
+    (m/-simple-schema
+     {:type            :ip-address-mapped
+      :pred            ip/is-ipv6?
+      :type-properties {:error/message       "should be a valid IP address which can be mapped to IPv6"
+                        :encode/json         str->ipv6
+                        :decode/json         ip->str
+                        :encode/string       str->ipv6
+                        :decode/string       ip->str
+                        :json-schema/type    "string"
+                        :json-schema/format  "ipv6"
+                        :json-schema/x-anyOf [{:type    "string"
+                                               :format  "ipv4"
+                                               :example (ip/to-str (gen/generate gen-ipv4-address))}
+                                              {:type    "string"
+                                               :format  "ipv6"
+                                               :example (ip/to-str (gen/generate gen-ipv6-address))}]
+                        :json-schema/example (ip->str (gen/generate gen-ipv6-address))
+                        :gen/gen             gen-ipv6-address}})))
+
 (def ip-address
   (let [ip->str #(if (ip/is-ip? %) (ip/to-str (or (ip/to-v4 %) %)))
         str->ip #(if (string?   %) (ip/string-to-address %))]
     (m/-simple-schema
-     {:type            :name
+     {:type            :ip-address
       :pred            ip/is-ip?
       :type-properties {:error/message       "should be a valid IP address"
                         :encode/json         ip->str
@@ -491,6 +513,7 @@
    :ip-address         ip-address
    :ipv4-address       ipv4-address
    :ipv6-address       ipv6-address
+   :ip-address-mapped  ip-address-mapped
    :md5-string         md5-string
    :confirmation-token confirmation-token
    :session-id         session-id
