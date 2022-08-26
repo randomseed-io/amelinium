@@ -18,7 +18,7 @@
   (:import [reitit.core Match]))
 
 (p/import-vars [io.randomseed.utils.reitit.http
-                router? router match? match
+                router? router match match?
                 route-data-param route-name
                 route-middleware route-handler route-conflicting?
                 path req-or-route-param])
@@ -31,12 +31,12 @@
   Match
 
   (get-route-data
-    ([req-or-match]
-     (get req-or-match :data))
-    ([req-or-match param]
-     (get (get req-or-match :data) param))
-    ([match req param]
-     (get (or (get match :data)
+    ([^Match match]
+     (.data ^Match match))
+    ([^Match match param]
+     (get (.data ^Match match) param))
+    ([^Match match req param]
+     (get (or (.data ^Match match)
               (get req :route/data)
               (get (get req ::r/match) :data))
           param)))
@@ -44,12 +44,12 @@
   clojure.lang.IPersistentMap
 
   (get-route-data
-    ([req-or-match]
-     (or (get req-or-match :route/data)
-         (get (get req-or-match ::r/match) :data)))
-    ([req-or-match param]
-     (get (or (get req-or-match :route/data)
-              (get (get req-or-match ::r/match) :data))
+    ([req]
+     (or (get req :route/data)
+         (get (get req ::r/match) :data)))
+    ([req param]
+     (get (or (get req :route/data)
+              (get (get req ::r/match) :data))
           param))
     ([req match param]
      (get (or (get req :route/data)
@@ -60,12 +60,12 @@
   clojure.lang.Associative
 
   (get-route-data
-    ([req-or-match]
-     (or (get req-or-match :route/data)
-         (get (get req-or-match ::r/match) :data)))
-    ([req-or-match param]
-     (get (or (get req-or-match :route/data)
-              (get (get req-or-match ::r/match) :data))
+    ([req]
+     (or (get req :route/data)
+         (get (get req ::r/match) :data)))
+    ([req param]
+     (get (or (get req :route/data)
+              (get (get req ::r/match) :data))
           param))
     ([req match param]
      (get (or (get req :route/data)
