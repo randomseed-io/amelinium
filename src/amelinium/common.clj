@@ -168,13 +168,13 @@
   "Returns true if the current (or given as a match) page is a login page (has :login-page?
   route data set to a truthy value)."
   ([req]            (boolean (http/get-route-data req :login-page?)))
-  ([req ring-match] (boolean (http/get-route-data req ring-match :login-page?))))
+  ([req ring-match] (boolean (http/get-route-data ring-match req :login-page?))))
 
 (defn auth-page?
   "Returns true if the current (or given as a match) page is an authentication
   page (has :auth-page? route data set to a truthy value)."
   ([req]            (boolean (http/get-route-data req :auth-page?)))
-  ([req ring-match] (boolean (http/get-route-data req ring-match :auth-page?))))
+  ([req ring-match] (boolean (http/get-route-data ring-match req :auth-page?))))
 
 (defn login-auth-state
   "Helper which returns 2-element sequence telling if the current (or given as a match)
