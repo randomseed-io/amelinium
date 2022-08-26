@@ -36,34 +36,38 @@
             [io.randomseed.utils.map              :as          map]
             [io.randomseed.utils                  :refer      :all])
 
-  (:import [reitit.core Match]
+  (:import [amelinium.auth AccountTypes]
+           [reitit.core Match]
            [lazy_map.core LazyMapEntry LazyMap]))
 
-;; Database
+;; Data sources
 
 (defn auth-config
-  "Gets authentication configuration for the given account type or a default one if the
-  account type was not given or is `nil`."
+  "Gets authentication configuration for the given account type or a global settings if
+  the account type was not given. If `auth-type` is explicitly set to `nil`, it will
+  be changed into `:default`."
   ([req-or-match auth-type]
-   (if-some [types-map (or (if-not (instance? Match req-or-match) (get req-or-match :auth/types))
-                           (get (http/get-route-data req-or-match :auth/config) :types)
-                           (if-not (instance? Match req-or-match)
-                           (get (get req-or-match :auth/config) :types)))]
-     (get types-map (some-keyword auth-type))))
+   (if-some [auth-settings (http/get-route-data req-or-match :auth/config)]
+     (get (.types ^amelinium.auth.Settings auth-settings)
+          (cond (keyword? auth-type) auth-type
+                (nil? auth-type)     :default
+                :other               (keyword auth-type)))))
   ([req-or-match]
-   (get (or (http/get-route-data req-or-match :auth/config)
-            (if-not (instance? Match req-or-match) (get req-or-match :auth/config)))
-        :default)))
+   (http/get-route-data req-or-match :auth/config)))
 
 (defn auth-db
   "Returns an authentication database connection object for the given authentication
   type or, if the type is not given, for a common authentication database (top-level,
-  not assigned to any particular authentication type)."
+  not assigned to any particular authentication type). If the `auth-type` is given
+  but it is `nil` then the authentication database for a default authentication
+  configuration (under the `:default` key of authentication settings) will be
+  returned."
   ([req-or-match auth-type]
-   (get (auth-config req-or-match (some-keyword auth-type)) :db))
+   (if-some [auth-config (auth-config req-or-match auth-type)]
+     (.db ^amelinium.auth.Config auth-config)))
   ([req-or-match]
-   (or (if-not (instance? Match req-or-match) (get req-or-match :auth/db))
-       (get (auth-config req-or-match) :db))))
+   (if-some [auth-settings (auth-config req-or-match)]
+     (.db ^amelinium.auth.Settings auth-settings))))
 
 ;; Operations logging
 
