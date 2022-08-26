@@ -459,7 +459,7 @@
 
 (def ip-address
   (let [ip->str #(if (ip/is-ip? %) (ip/to-str (or (ip/to-v4 %) %)))
-        str->ip #(if (string? %) (ip/string-to-address %))]
+        str->ip #(if (string?   %) (ip/string-to-address %))]
     (m/-simple-schema
      {:type            :name
       :pred            ip/is-ip?
@@ -469,8 +469,14 @@
                         :encode/string       ip->str
                         :decode/string       str->ip
                         :json-schema/type    "string"
-                        :json-schema/anyOf   [{:format "ipv4"}, {:format "ipv6"}]
-                        :json-schema/example (ip/plain-ip-str (gen/generate gen-ip-address))
+                        :json-schema/format  "ipv4"
+                        :json-schema/x-anyOf [{:type    "string"
+                                               :format  "ipv4"
+                                               :example (ip/to-str (gen/generate gen-ipv4-address))}
+                                              {:type    "string"
+                                               :format  "ipv6"
+                                               :example (ip/to-str (gen/generate gen-ipv6-address))}]
+                        :json-schema/example (ip->str (gen/generate gen-ipv4-address))
                         :gen/gen             gen-ip-address}})))
 
 (def schemas
