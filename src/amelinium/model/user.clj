@@ -542,7 +542,9 @@
                  password-query-atypes-single))
 
 (defprotocol Authorizable
-  (get-user-auth-data [auth-source email queries] [auth-source email account-type queries]))
+  (get-user-auth-data
+    [auth-source email queries]
+    [auth-source email account-type queries]))
 
 (extend-protocol Authorizable
 
