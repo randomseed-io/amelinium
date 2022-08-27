@@ -628,18 +628,23 @@
 
 (defn create-or-get-shared-suite-id
   "Gets shared suite ID on a basis of its JSON content. If it does not exist, it is
-  created."
+  created. If the value of `suite` is a fixed-precision integer, it is returned."
   [db suite]
   (if (and db suite)
-    (first
-     (jdbc/execute-one! db [insert-shared-suite-query suite] db/opts-simple-vec))))
+    (if (int? suite)
+      suite
+      (first
+       (jdbc/execute-one! db [insert-shared-suite-query suite] db/opts-simple-vec)))))
 
 (defn get-shared-suite-id
-  "Gets shared suite ID on a basis of its JSON content."
+  "Gets shared suite ID on a basis of its JSON content. If the value of `suite` is a
+  fixed-precision integer, it is returned."
   [db suite]
   (if (and db suite)
-    (first
-     (jdbc/execute-one! db [shared-suite-query suite] db/opts-simple-vec))))
+    (if (int? suite)
+      suite
+      (first
+       (jdbc/execute-one! db [shared-suite-query suite] db/opts-simple-vec)))))
 
 (defn get-shared-suite
   "Gets shared suite by its ID as a JSON string."
