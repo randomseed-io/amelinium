@@ -56,79 +56,87 @@
 
 (def ^:const new-email-confirmation-query
   (str-spc
-   "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,first_name,middle_name,last_name,password,pwd_suite)"
-   "SELECT ?,?,?,?,?,0,(SELECT users.id FROM users WHERE users.email = ?),?,?,?,?,?"
+   "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,"
+   "account_type,first_name,middle_name,last_name,password,pwd_suite)"
+   "SELECT ?,?,?,?,?,0,(SELECT users.id FROM users WHERE users.email = ?),?,?,?,?,?,?"
    "ON DUPLICATE KEY UPDATE"
-   "user_id     = VALUE(user_id),"
-   "attempts    = IF(NOW()>expires, 1, attempts),"
-   "code        = IF(NOW()>expires, VALUE(code), code),"
-   "token       = IF(NOW()>expires, VALUE(token), token),"
-   "created     = IF(NOW()>expires, NOW(), created),"
-   "confirmed   = IF(NOW()>expires, VALUE(confirmed), confirmed),"
-   "first_name  = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(first_name),  first_name),"
-   "middle_name = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(middle_name), middle_name),"
-   "last_name   = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(last_name),   last_name),"
-   "password    = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(password),    password),"
-   "pwd_suite   = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(pwd_suite),   pwd_suite),"
-   "expires     = IF(NOW()>expires, VALUE(expires), expires)"
-   "RETURNING user_id, attempts, code, token, created, confirmed, expires"))
+   "user_id      = VALUE(user_id),"
+   "attempts     = IF(NOW()>expires, 1, attempts),"
+   "code         = IF(NOW()>expires, VALUE(code), code),"
+   "token        = IF(NOW()>expires, VALUE(token), token),"
+   "created      = IF(NOW()>expires, NOW(), created),"
+   "confirmed    = IF(NOW()>expires, VALUE(confirmed), confirmed),"
+   "account_type = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(account_type), account_type),"
+   "first_name   = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(first_name),  first_name),"
+   "middle_name  = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(middle_name), middle_name),"
+   "last_name    = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(last_name),   last_name),"
+   "password     = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(password),    password),"
+   "pwd_suite    = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(pwd_suite),   pwd_suite),"
+   "expires      = IF(NOW()>expires, VALUE(expires), expires)"
+   "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
 
 (def ^:const new-email-confirmation-query-with-attempt
   (str-spc
-   "INSERT INTO confirmations(id,code,token,reason,expires,attempts,confirmed,user_id,first_name,middle_name,last_name,password,pwd_suite)"
-   "SELECT ?,?,?,?,?,1,0,(SELECT users.id FROM users WHERE users.email = ?),?,?,?,?,?"
+   "INSERT INTO confirmations(id,code,token,reason,expires,attempts,confirmed,user_id,"
+   "account_type,first_name,middle_name,last_name,password,pwd_suite)"
+   "SELECT ?,?,?,?,?,1,0,(SELECT users.id FROM users WHERE users.email = ?),?,?,?,?,?,?"
    "ON DUPLICATE KEY UPDATE"
-   "user_id     = VALUE(user_id),"
-   "attempts    = IF(NOW()>expires, 1, attempts + 1),"
-   "code        = IF(NOW()>expires, VALUE(code), code),"
-   "token       = IF(NOW()>expires, VALUE(token), token),"
-   "created     = IF(NOW()>expires, NOW(), created),"
-   "confirmed   = IF(NOW()>expires, VALUE(confirmed), confirmed),"
-   "first_name  = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(first_name),  first_name),"
-   "middle_name = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(middle_name), middle_name),"
-   "last_name   = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(last_name),   last_name),"
-   "password    = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(password),    password),"
-   "pwd_suite   = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(pwd_suite),   pwd_suite),"
-   "expires     = IF(NOW()>expires, VALUE(expires), expires)"
-   "RETURNING user_id, attempts, code, token, created, confirmed, expires"))
+   "user_id      = VALUE(user_id),"
+   "attempts     = IF(NOW()>expires, 1, attempts + 1),"
+   "code         = IF(NOW()>expires, VALUE(code), code),"
+   "token        = IF(NOW()>expires, VALUE(token), token),"
+   "created      = IF(NOW()>expires, NOW(), created),"
+   "confirmed    = IF(NOW()>expires, VALUE(confirmed), confirmed),"
+   "account_type = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(account_type), account_type),"
+   "first_name   = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(first_name),  first_name),"
+   "middle_name  = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(middle_name), middle_name),"
+   "last_name    = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(last_name),   last_name),"
+   "password     = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(password),    password),"
+   "pwd_suite    = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(pwd_suite),   pwd_suite),"
+   "expires      = IF(NOW()>expires, VALUE(expires), expires)"
+   "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
 
 (def ^:const new-phone-confirmation-query
   (str-spc
-   "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,first_name,middle_name,last_name,password,pwd_suite)"
-   "SELECT ?,?,?,?,?,0,(SELECT users.id FROM users WHERE users.phone = ?),?,?,?,?,?"
+   "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,"
+   "account_type,first_name,middle_name,last_name,password,pwd_suite)"
+   "SELECT ?,?,?,?,?,0,(SELECT users.id FROM users WHERE users.phone = ?),?,?,?,?,?,?"
    "ON DUPLICATE KEY UPDATE"
-   "user_id     = VALUE(user_id),"
-   "attempts    = IF(NOW()>expires, 1, attempts),"
-   "code        = IF(NOW()>expires, VALUE(code), code),"
-   "token       = IF(NOW()>expires, VALUE(token), token),"
-   "created     = IF(NOW()>expires, NOW(), created),"
-   "confirmed   = IF(NOW()>expires, VALUE(confirmed), confirmed),"
-   "first_name  = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(first_name),  first_name),"
-   "middle_name = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(middle_name), middle_name),"
-   "last_name   = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(last_name),   last_name),"
-   "password    = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(password),    password),"
-   "pwd_suite   = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(pwd_suite),   pwd_suite),"
-   "expires     = IF(NOW()>expires, VALUE(expires), expires)"
-   "RETURNING user_id, attempts, code, token, created, confirmed, expires"))
+   "user_id      = VALUE(user_id),"
+   "attempts     = IF(NOW()>expires, 1, attempts),"
+   "code         = IF(NOW()>expires, VALUE(code), code),"
+   "token        = IF(NOW()>expires, VALUE(token), token),"
+   "created      = IF(NOW()>expires, NOW(), created),"
+   "confirmed    = IF(NOW()>expires, VALUE(confirmed), confirmed),"
+   "account_type = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(account_type), account_type),"
+   "first_name   = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(first_name),  first_name),"
+   "middle_name  = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(middle_name), middle_name),"
+   "last_name    = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(last_name),   last_name),"
+   "password     = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(password),    password),"
+   "pwd_suite    = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(pwd_suite),   pwd_suite),"
+   "expires      = IF(NOW()>expires, VALUE(expires), expires)"
+   "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
 
 (def ^:const new-phone-confirmation-query-with-attempt
   (str-spc
-   "INSERT INTO confirmations(id,code,token,reason,expires,attempts,confirmed,user_id,first_name,middle_name,last_name,password,pwd_suite)"
-   "SELECT ?,?,?,?,?,1,0,(SELECT users.id FROM users WHERE users.phone = ?),?,?,?,?,?"
+   "INSERT INTO confirmations(id,code,token,reason,expires,attempts,confirmed,user_id,"
+   "account_type,first_name,middle_name,last_name,password,pwd_suite)"
+   "SELECT ?,?,?,?,?,1,0,(SELECT users.id FROM users WHERE users.phone = ?),?,?,?,?,?,?"
    "ON DUPLICATE KEY UPDATE"
-   "user_id     = VALUE(user_id),"
-   "attempts    = IF(NOW()>expires, 1, attempts + 1),"
-   "code        = IF(NOW()>expires, VALUE(code), code),"
-   "token       = IF(NOW()>expires, VALUE(token), token),"
-   "created     = IF(NOW()>expires, NOW(), created),"
-   "confirmed   = IF(NOW()>expires, VALUE(confirmed), confirmed),"
-   "first_name  = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(first_name),  first_name),"
-   "middle_name = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(middle_name), middle_name),"
-   "last_name   = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(last_name),   last_name),"
-   "password    = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(password),    password),"
-   "pwd_suite   = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(pwd_suite),   pwd_suite),"
-   "expires     = IF(NOW()>expires, VALUE(expires), expires)"
-   "RETURNING user_id, attempts, code, token, created, confirmed, expires"))
+   "user_id      = VALUE(user_id),"
+   "attempts     = IF(NOW()>expires, 1, attempts + 1),"
+   "code         = IF(NOW()>expires, VALUE(code), code),"
+   "token        = IF(NOW()>expires, VALUE(token), token),"
+   "created      = IF(NOW()>expires, NOW(), created),"
+   "confirmed    = IF(NOW()>expires, VALUE(confirmed), confirmed),"
+   "account_type = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(account_type), account_type),"
+   "first_name   = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(first_name),   first_name),"
+   "middle_name  = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(middle_name),  middle_name),"
+   "last_name    = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(last_name),    last_name),"
+   "password     = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(password),     password),"
+   "pwd_suite    = IF(NOW()>expires AND VALUE(first_name) <> NULL), VALUE(pwd_suite),    pwd_suite),"
+   "expires      = IF(NOW()>expires, VALUE(expires), expires)"
+   "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
 
 (defn- gen-confirmation-core
   "Creates a confirmation code for the given identity (an e-mail address or a
@@ -151,7 +159,7 @@
              exp    (or exp (t/new-duration 10 :minutes))
              exp    (if (t/duration? exp) (t/hence exp) exp)
              udata  (or udata (constantly nil))
-             udata  (map udata [:first-name :middle-name :last-name :password :pwd-suite])
+             udata  (map udata [:account-type :first-name :middle-name :last-name :password :pwd-suite])
              query  (concat [query id code token reason exp id] udata)]
          (if-some [r (jdbc/execute-one! db query db/opts-simple-map)]
            (let [user-id    (get r :user-id)

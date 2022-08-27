@@ -125,27 +125,29 @@ CREATE TABLE IF NOT EXISTS session_variables (
 CREATE INDEX IF NOT EXISTS session_variables_index ON session_variables(session_id);
 --;;
 CREATE TABLE IF NOT EXISTS confirmations (
-  id          CHAR(128) NOT NULL,
-  user_id     INTEGER UNSIGNED NULL,
-  code        CHAR(16) NULL,
-  token       CHAR(128) NULL,
-  reason      ENUM('creation', 'recovery', 'unlock') NOT NULL,
-  attempts    SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-  created     TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  expires     TIMESTAMP(6) NULL,
-  confirmed   BOOLEAN NOT NULL DEFAULT FALSE,
-  req_id      CHAR(128) NULL,
-  first_name  VARCHAR(64),
-  middle_name VARCHAR(64),
-  last_name   VARCHAR(64),
-  password    JSON,
-  pwd_suite   INTEGER UNSIGNED,
+  id           CHAR(128) NOT NULL,
+  user_id      INTEGER UNSIGNED NULL,
+  code         CHAR(16) NULL,
+  token        CHAR(128) NULL,
+  reason       ENUM('creation', 'recovery', 'unlock') NOT NULL,
+  attempts     SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  created      TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  expires      TIMESTAMP(6) NULL,
+  confirmed    BOOLEAN NOT NULL DEFAULT FALSE,
+  req_id       CHAR(128) NULL,
+  account_type ENUM('system', 'manager', 'lawyer', 'user') NOT NULL DEFAULT 'user',
+  first_name   VARCHAR(64),
+  middle_name  VARCHAR(64),
+  last_name    VARCHAR(64),
+  password     JSON,
+  pwd_suite    INTEGER UNSIGNED,
   PRIMARY KEY(id, reason)
 ) ENGINE=Aria TRANSACTIONAL=0 ROW_FORMAT=FIXED;
 --;;
 CREATE UNIQUE INDEX IF NOT EXISTS confirmations_token_index   ON confirmations(token);
 CREATE UNIQUE INDEX IF NOT EXISTS confirmations_code_id_index ON confirmations(code,id);
-CREATE UNIQUE INDEX IF NOT EXISTS confirmations_dates_index   ON confirmations(created,expires);
+CREATE UNIQUE INDEX IF NOT EXISTS confirmations_created_index ON confirmations(created);
+CREATE UNIQUE INDEX IF NOT EXISTS confirmations_expires_index ON confirmations(expires);
 --;;
 CREATE OR REPLACE EVENT confirmations_cleanup
   ON SCHEDULE EVERY 1 HOUR
