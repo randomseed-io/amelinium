@@ -421,7 +421,6 @@
                       :encode/string       utils/some-str
                       :encode/json         utils/some-str
                       :json-schema/type    "string"
-                      :json-schema/pattern "^\\p{L}[\\p{L} ,.'-]*$"
                       :json-schema/example (gen/generate gen-name)
                       :gen/gen             gen-name}}))
 
