@@ -404,8 +404,9 @@
     :pred            valid-string-md5?
     :type-properties {:error/message       "should be a confirmation token"
                       :decode/json         utils/some-str
-                      :encode/string       utils/some-str
+                      :decode/string       utils/some-str
                       :encode/json         utils/some-str
+                      :encode/string       utils/some-str
                       :json-schema/type    "string"
                       :json-schema/pattern "^[a-f0-9]{32}$"
                       :json-schema/example (gen/generate gen-string-md5)
@@ -418,8 +419,9 @@
     :property-pred   (m/-min-max-pred count)
     :type-properties {:error/message       "should be a valid name"
                       :decode/json         utils/some-str
-                      :encode/string       utils/some-str
+                      :decode/string       utils/some-str
                       :encode/json         utils/some-str
+                      :encode/string       utils/some-str
                       :json-schema/type    "string"
                       :json-schema/example (gen/generate gen-name)
                       :gen/gen             gen-name}}))
