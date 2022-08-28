@@ -415,40 +415,40 @@
 
 ;; Creation
 
-(def ^:const confirmation-report-error-token-query
+(def ^:const creation-report-error-token-query
   (str-spc
    "SELECT (confirmed <> TRUE) AS not_confirmed,"
    "(reason <> ?) AS bad_reason,"
-   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS registered,"
+   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS exists,"
    "(expires < NOW()) AS expired"
    "FROM confirmations WHERE token = ?"))
 
-(def ^:const confirmation-report-error-code-query
+(def ^:const creation-report-error-code-query
   (str-spc
    "SELECT (confirmed <> TRUE) AS not_confirmed,"
    "(reason <> ?) AS bad_reason,"
-   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS registered,"
+   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS exists,"
    "(expires < NOW()) AS expired"
    "FROM confirmations WHERE code = ? AND id = ?"))
 
-(defn- confirmation-report-error
+(defn- creation-report-error
   ([r]
    (cond
      (nil? r)                      :verify/bad-token
-     (pos-int? (:registered    r)) :verify/registered
+     (pos-int? (:exists        r)) :verify/exists
      (pos-int? (:bad_reason    r)) :verify/bad-reason
      (pos-int? (:expired       r)) :verify/expired
      (pos-int? (:not_confirmed r)) :verify/unconfirmed
      :bad-token                    :verify/bad-token))
   ([db code email reason]
-   (let [r (confirmation-report-error
-            (jdbc/execute-one! db [confirmation-report-error-code-query
+   (let [r (creation-report-error
+            (jdbc/execute-one! db [creation-report-error-code-query
                                    (or reason "creation") code email]
                                db/opts-simple-map))]
      (if (= :verify/bad-token r) :verify/bad-code r)))
   ([db token reason]
-   (confirmation-report-error
-    (jdbc/execute-one! db [confirmation-report-error-token-query
+   (creation-report-error
+    (jdbc/execute-one! db [creation-report-error-token-query
                            (or reason "creation") token]
                        db/opts-simple-map))))
 
@@ -466,7 +466,7 @@
     (if token
       (if-some [r (jdbc/execute-one! db [create-with-token-query token] db/opts-simple-map)]
         (assoc r :created? true :uid (db/as-uuid (get r :uid)))
-        {:created? false :error (confirmation-report-error db token "creation")}))))
+        {:created? false :error (creation-report-error db token "creation")}))))
 
 (def ^:const create-with-code-query
   (str-spc
@@ -483,7 +483,7 @@
     (if (and code email)
       (if-some [r (jdbc/execute-one! db [create-with-code-query code email] db/opts-simple-map)]
         (assoc r :created? true :uid (db/as-uuid (get r :uid)))
-        {:created? false :error (confirmation-report-error db code email "creation")}))))
+        {:created? false :error (creation-report-error db code email "creation")}))))
 
 (defn create-with-token-or-code
   [db token code email]
