@@ -419,23 +419,23 @@
   (str-spc
    "SELECT (confirmed <> TRUE) AS not_confirmed,"
    "(reason <> ?) AS bad_reason,"
-   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS exists,"
-   "(expires < NOW()) AS expired"
+   "(expires < NOW()) AS expired,"
+   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS present"
    "FROM confirmations WHERE token = ?"))
 
 (def ^:const creation-report-error-code-query
   (str-spc
    "SELECT (confirmed <> TRUE) AS not_confirmed,"
    "(reason <> ?) AS bad_reason,"
-   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS exists,"
-   "(expires < NOW()) AS expired"
+   "(expires < NOW()) AS expired,"
+   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS present"
    "FROM confirmations WHERE code = ? AND id = ?"))
 
 (defn- creation-report-error
   ([r]
    (cond
      (nil? r)                      :verify/bad-token
-     (pos-int? (:exists        r)) :verify/exists
+     (pos-int? (:present       r)) :verify/exists
      (pos-int? (:bad_reason    r)) :verify/bad-reason
      (pos-int? (:expired       r)) :verify/expired
      (pos-int? (:not_confirmed r)) :verify/unconfirmed
