@@ -443,13 +443,13 @@
   ([db code email reason]
    (let [r (creation-report-error
             (jdbc/execute-one! db [creation-report-error-code-query
-                                   (or reason "creation") code email]
+                                   (or (some-str reason) "creation") code email]
                                db/opts-simple-map))]
      (if (= :verify/bad-token r) :verify/bad-code r)))
   ([db token reason]
    (creation-report-error
     (jdbc/execute-one! db [creation-report-error-token-query
-                           (or reason "creation") token]
+                           (or (some-str reason) "creation") token]
                        db/opts-simple-map))))
 
 (def ^:const create-with-token-query
