@@ -71,7 +71,7 @@
    "middle_name       = IF(NOW()>expires, VALUE(middle_name),  middle_name),"
    "last_name         = IF(NOW()>expires, VALUE(last_name),    last_name),"
    "password          = IF(NOW()>expires, VALUE(password),     password),"
-   "password_suite_id = IF(NOW()>expires, VALUE(password_suite_id),    password_suite_id),"
+   "password_suite_id = IF(NOW()>expires, VALUE(password_suite_id), password_suite_id),"
    "expires           = IF(NOW()>expires, VALUE(expires),      expires)"
    "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
 
@@ -364,7 +364,7 @@
                    {:confirmed? (= err :verify/confirmed) :error err}))))))))
   ([db id code token exp-inc reason]
    (if-some [token (some-str token)]
-     (establish db token exp-inc reason)
+     (establish db token   exp-inc reason)
      (establish db id code exp-inc reason)))
   ([db token exp-inc reason]
    (if-some [token (some-str token)]
