@@ -387,3 +387,12 @@
                {:confirmed? (= err :verify/confirmed)
                 :token      token
                 :error      err}))))))))
+
+(defn delete
+  "Deletes confirmation identified with an `id` from a database."
+  ([db id]
+   (delete db id "creation"))
+  ([db id reason]
+   (if id
+     (let [reason (or (some-str reason) "creation")]
+       (sql/delete! db :confirmations {:id id :reason reason})))))
