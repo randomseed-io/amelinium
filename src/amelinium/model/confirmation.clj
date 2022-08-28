@@ -55,7 +55,7 @@
 ;; Generation of confirmation tokens and codes
 
 (def ^:const new-email-confirmation-query
-  (str-spc
+  (str-squeeze-spc
    "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,"
    "account_type,first_name,middle_name,last_name,password,password_suite_id)"
    "SELECT ?,?,?,?,?,0,(SELECT users.id FROM users WHERE users.email = ?),?,?,?,?,?,?"
@@ -76,7 +76,7 @@
    "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
 
 (def ^:const new-email-confirmation-query-with-attempt
-  (str-spc
+  (str-squeeze-spc
    "INSERT INTO confirmations(id,code,token,reason,expires,attempts,confirmed,user_id,"
    "account_type,first_name,middle_name,last_name,password,password_suite_id)"
    "SELECT ?,?,?,?,?,1,0,(SELECT users.id FROM users WHERE users.email = ?),?,?,?,?,?,?"
@@ -97,7 +97,7 @@
    "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
 
 (def ^:const new-phone-confirmation-query
-  (str-spc
+  (str-squeeze-spc
    "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,"
    "account_type,first_name,middle_name,last_name,password,password_suite_id)"
    "SELECT ?,?,?,?,?,0,(SELECT users.id FROM users WHERE users.phone = ?),?,?,?,?,?,?"
@@ -118,7 +118,7 @@
    "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
 
 (def ^:const new-phone-confirmation-query-with-attempt
-  (str-spc
+  (str-squeeze-spc
    "INSERT INTO confirmations(id,code,token,reason,expires,attempts,confirmed,user_id,"
    "account_type,first_name,middle_name,last_name,password,password_suite_id)"
    "SELECT ?,?,?,?,?,1,0,(SELECT users.id FROM users WHERE users.phone = ?),?,?,?,?,?,?"
