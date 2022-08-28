@@ -278,37 +278,41 @@
   (str-spc
    "SELECT (confirmed = TRUE) AS confirmed,"
    "(reason <> ?) AS bad_reason,"
-   "(expires < NOW()) AS expired"
+   "(expires < NOW()) AS expired,"
+   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS present"
    "FROM confirmations WHERE token = ?"))
 
 (def ^:const confirmation-report-error-code-query
   (str-spc
    "SELECT (confirmed = TRUE) AS confirmed,"
    "(reason <> ?) AS bad_reason,"
-   "(expires < NOW()) AS expired"
+   "(expires < NOW()) AS expired,"
+   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS present"
    "FROM confirmations WHERE code = ? AND id = ?"))
 
 (defn- confirmation-report-error
-  ([r]
+  ([r reason]
    (cond
-     (nil? r)                      :verify/bad-token
-     (pos-int? (:bad_reason    r)) :verify/bad-reason
-     (pos-int? (:expired       r)) :verify/expired
-     (pos-int? (:confirmed     r)) :verify/confirmed
-     :bad-token                    :verify/bad-token))
+     (nil? r)                     :verify/bad-token
+     (pos-int? (:bad_reason   r)) :verify/bad-reason
+     (pos-int? (:expired      r)) :verify/expired
+     (pos-int? (:confirmed    r)) :verify/confirmed
+     (and (pos-int? (:present r))
+          (= "creation" reason))  :verify/exists
+     :bad-token                   :verify/bad-token))
   ([db code email reason]
-   (let [r (confirmation-report-error
-            (jdbc/execute-one! db [confirmation-report-error-code-query
-                                   (or reason "creation")
-                                   code email]
-                               db/opts-simple-map))]
+   (let [reason (or (some-str reason) "creation")
+         r      (confirmation-report-error
+                 (jdbc/execute-one! db [confirmation-report-error-code-query reason code email]
+                                    db/opts-simple-map)
+                 reason)]
      (if (= :verify/bad-token r) :verify/bad-code r)))
   ([db token reason]
-   (confirmation-report-error
-    (jdbc/execute-one! db [confirmation-report-error-token-query
-                           (or reason "creation")
-                           token]
-                       db/opts-simple-map))))
+   (let [reason (or (some-str reason) "creation")]
+     (confirmation-report-error
+      (jdbc/execute-one! db [confirmation-report-error-token-query reason token]
+                         db/opts-simple-map)
+      reason))))
 
 (defn code-to-token
   "Returns a confirmation token associated with the given confirmation code and
@@ -371,7 +375,8 @@
      (establish db id code exp-inc reason)))
   ([db token exp-inc reason]
    (if-some [token (some-str token)]
-     (let [reason (or (some-str reason) "creation")]
+     (let [reason  (or (some-str reason) "creation")
+           exp-inc (time/minutes exp-inc 1)]
        (if-some [r (::jdbc/update-count
                     (jdbc/execute-one! db [confirm-token-query exp-inc token reason]
                                        db/opts-simple-map))]
