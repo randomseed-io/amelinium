@@ -29,6 +29,8 @@
 
 (def ^:const sid-match (re-pattern "|^[a-f0-9]{30,128}(-[a-f0-9]{30,128})?$"))
 
+(def one-second (t/new-duration 1 :seconds))
+
 ;; Secure sessions
 
 (def ^:const scrypt-options
@@ -781,7 +783,7 @@
     (assoc config :cache-expires
            (if (and expires cache-ttl)
              (if (t/> cache-ttl expires)
-               (t/new-duration 1 :seconds)
+               one-second
                (t/- expires cache-ttl))))))
 
 (defn- setup-fn

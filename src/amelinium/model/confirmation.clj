@@ -24,6 +24,9 @@
             [io.randomseed.utils.ip   :as            ip]
             [io.randomseed.utils      :refer       :all]))
 
+(def ten-minutes
+  (t/new-duration 10 :minutes))
+
 (def ^:const email-exists-query
   "SELECT uid FROM users WHERE email = ?")
 
@@ -154,7 +157,7 @@
        (let [code   (if exp (gen-code))
              token  (if exp (gen-token))
              reason (or (some-str reason) "creation")
-             exp    (or exp (t/new-duration 10 :minutes))
+             exp    (or exp ten-minutes)
              exp    (if (t/duration? exp) (t/hence exp) exp)
              udata  (map #(get udata %) [:account-type
                                          :first-name :middle-name :last-name
