@@ -1688,5 +1688,5 @@
 
 (defn mobile-agent?
   [req]
-  (if-some [ua (get (get req :headers) "User-Agent")]
-    (some? (re-find ua) #"\b(iPhone|iPad|iPod|Android|Windows Phone|webOS|IEMobile|BlackBerry)\b")))
+  (if-some [ua (get (get req :headers) "user-agent")]
+    (some? (re-find #"\b(iPhone|iPad|iPod|Android|Windows Phone|webOS|IEMobile|BlackBerry)\b" ua))))
