@@ -481,7 +481,7 @@
   (let [code  (some-str code)
         email (some-str email)]
     (if (and code email)
-      (if-some [r (jdbc/execute-one! db [create-with-code-query email code] db/opts-simple-map)]
+      (if-some [r (jdbc/execute-one! db [create-with-code-query code email] db/opts-simple-map)]
         (assoc r :created? true :uid (db/as-uuid (get r :uid)))
         {:created? false :error (confirmation-report-error db code email "creation")}))))
 
