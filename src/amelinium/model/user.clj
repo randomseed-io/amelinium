@@ -419,7 +419,7 @@
   (str-spc
    "SELECT (confirmed <> TRUE) AS not_confirmed,"
    "(reason <> ?) AS bad_reason,"
-   "(SELECT 1 FROM users WHERE user.email = confirmations.id) AS registered,"
+   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS registered,"
    "(expires < NOW()) AS expired"
    "FROM confirmations WHERE token = ?"))
 
@@ -427,7 +427,7 @@
   (str-spc
    "SELECT (confirmed <> TRUE) AS not_confirmed,"
    "(reason <> ?) AS bad_reason,"
-   "(SELECT 1 FROM users WHERE user.email = confirmations.id) AS registered,"
+   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS registered,"
    "(expires < NOW()) AS expired"
    "FROM confirmations WHERE code = ? AND id = ?"))
 
@@ -454,24 +454,25 @@
 
 (def ^:const create-with-token-query
   (str-spc
-   "INSERT IGNORE INTO users(email,uid,first_name,middle_name,last_name,password,password_suite_id)"
-   "SELECT id,UUID(),first_name,middle_name,last_name,password,pwd_suite FROM confirmations"
-   "WHERE token = ? AND confirmed = TRUE AND password <> NULL AND pwd_suite <> NULL"
+   "INSERT IGNORE INTO users(email,uid,account_type,first_name,middle_name,last_name,password,password_suite_id)"
+   "SELECT id,UUID(),account_type,first_name,middle_name,last_name,password,password_suite_id FROM confirmations"
+   "WHERE token = ? AND confirmed = TRUE AND password IS NOT NULL AND password_suite_id IS NOT NULL"
    "AND reason = 'creation' AND expires >= NOW()"
    "RETURNING id,uid,email"))
 
 (defn create-with-token
   [db token]
-  (if-some [token (some-str token)]
-    (if-some [r (jdbc/execute-one! db [create-with-token-query token] db/opts-simple-map)]
-      (assoc r :created? true :uid (db/as-uuid (get r :uid)))
-      {:created? false :error (confirmation-report-error db token "creation")})))
+  (let [token (some-str token)]
+    (if token
+      (if-some [r (jdbc/execute-one! db [create-with-token-query token] db/opts-simple-map)]
+        (assoc r :created? true :uid (db/as-uuid (get r :uid)))
+        {:created? false :error (confirmation-report-error db token "creation")}))))
 
 (def ^:const create-with-code-query
   (str-spc
-   "INSERT IGNORE INTO users(email,uid,first_name,middle_name,last_name,password,password_suite_id)"
-   "SELECT id,UUID(),first_name,middle_name,last_name,password,pwd_suite FROM confirmations"
-   "WHERE id = ? AND code = ? AND confirmed = TRUE AND password <> NULL AND pwd_suite <> NULL"
+   "INSERT IGNORE INTO users(email,uid,account_type,first_name,middle_name,last_name,password,password_suite_id)"
+   "SELECT id,UUID(),account_type,first_name,middle_name,last_name,password,password_suite_id FROM confirmations"
+   "WHERE code = ? AND id = ? AND confirmed = TRUE AND password IS NOT NULL AND password_suite_id IS NOT NULL"
    "AND reason = 'creation' AND  expires >= NOW()"
    "RETURNING id,uid,email"))
 
