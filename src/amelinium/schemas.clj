@@ -286,18 +286,20 @@
                         :gen/gen             gen-duration}})))
 
 (def email
-  (m/-simple-schema
-   {:type            :email
-    :pred            vc/valid-email?
-    :property-pred   (m/-min-max-pred count)
-    :type-properties {:error/message       "should be an e-mail address"
-                      :decode/json         utils/some-str
-                      :encode/string       utils/some-str
-                      :encode/json         utils/some-str
-                      :json-schema/type    "string"
-                      :json-schema/format  "email"
-                      :json-schema/example (gen/generate gen-email)
-                      :gen/gen             gen-email}}))
+  (let [str->email (comp utils/some-str str/trim str)]
+    (m/-simple-schema
+     {:type            :email
+      :pred            vc/valid-email?
+      :property-pred   (m/-min-max-pred count)
+      :type-properties {:error/message       "should be an e-mail address"
+                        :encode/json         utils/some-str
+                        :decode/json         str->email
+                        :encode/string       utils/some-str
+                        :decode/string       str->email
+                        :json-schema/type    "string"
+                        :json-schema/format  "email"
+                        :json-schema/example (gen/generate gen-email)
+                        :gen/gen             gen-email}})))
 
 (def regular-phone
   (let [obj->phone #(phutil/try-parse (phone/number %))
