@@ -57,14 +57,16 @@
 
 ;; Generation of confirmation tokens and codes
 
-(def ^:const new-email-confirmation-query
+(defn gen-confirmation-query
+  [id-column inc-att?]
   (str-squeeze-spc
    "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,"
    "account_type,first_name,middle_name,last_name,password,password_suite_id)"
-   "SELECT ?,?,?,?,?,0,(SELECT users.id FROM users WHERE users.email = ?),?,?,?,?,?,?"
+   (str "SELECT ?,?,?,?,?,0,(SELECT users.id FROM users WHERE users."
+        (or (some-str id-column) "email") " = ?),?,?,?,?,?,?")
    "ON DUPLICATE KEY UPDATE"
    "user_id           = VALUE(user_id),"
-   "attempts          = IF(NOW()>expires, 1,                   attempts),"
+   "attempts          = IF(NOW()>expires, 1," (str "attempts" (if inc-att? " + 1") "),")
    "code              = IF(NOW()>expires, VALUE(code),         code),"
    "token             = IF(NOW()>expires, VALUE(token),        token),"
    "created           = IF(NOW()>expires, NOW(),               created),"
@@ -78,68 +80,17 @@
    "expires           = IF(NOW()>expires, VALUE(expires),      expires)"
    "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
 
-(def ^:const new-email-confirmation-query-with-attempt
-  (str-squeeze-spc
-   "INSERT INTO confirmations(id,code,token,reason,expires,attempts,confirmed,user_id,"
-   "account_type,first_name,middle_name,last_name,password,password_suite_id)"
-   "SELECT ?,?,?,?,?,1,0,(SELECT users.id FROM users WHERE users.email = ?),?,?,?,?,?,?"
-   "ON DUPLICATE KEY UPDATE"
-   "user_id           = VALUE(user_id),"
-   "attempts          = IF(NOW()>expires, 1,                   attempts + 1),"
-   "code              = IF(NOW()>expires, VALUE(code),         code),"
-   "token             = IF(NOW()>expires, VALUE(token),        token),"
-   "created           = IF(NOW()>expires, NOW(),               created),"
-   "confirmed         = IF(NOW()>expires, VALUE(confirmed),    confirmed),"
-   "account_type      = IF(NOW()>expires, VALUE(account_type), account_type),"
-   "first_name        = IF(NOW()>expires, VALUE(first_name),   first_name),"
-   "middle_name       = IF(NOW()>expires, VALUE(middle_name),  middle_name),"
-   "last_name         = IF(NOW()>expires, VALUE(last_name),    last_name),"
-   "password          = IF(NOW()>expires, VALUE(password),     password),"
-   "password_suite_id = IF(NOW()>expires, VALUE(password_suite_id), password_suite_id),"
-   "expires           = IF(NOW()>expires, VALUE(expires),      expires)"
-   "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
+(def ^:const new-email-confirmation-query
+  (gen-confirmation-query :email true))
 
 (def ^:const new-phone-confirmation-query
-  (str-squeeze-spc
-   "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,"
-   "account_type,first_name,middle_name,last_name,password,password_suite_id)"
-   "SELECT ?,?,?,?,?,0,(SELECT users.id FROM users WHERE users.phone = ?),?,?,?,?,?,?"
-   "ON DUPLICATE KEY UPDATE"
-   "user_id           = VALUE(user_id),"
-   "attempts          = IF(NOW()>expires, 1,                   attempts),"
-   "code              = IF(NOW()>expires, VALUE(code),         code),"
-   "token             = IF(NOW()>expires, VALUE(token),        token),"
-   "created           = IF(NOW()>expires, NOW(),               created),"
-   "confirmed         = IF(NOW()>expires, VALUE(confirmed),    confirmed),"
-   "account_type      = IF(NOW()>expires, VALUE(account_type), account_type),"
-   "first_name        = IF(NOW()>expires, VALUE(first_name),   first_name),"
-   "middle_name       = IF(NOW()>expires, VALUE(middle_name),  middle_name),"
-   "last_name         = IF(NOW()>expires, VALUE(last_name),    last_name),"
-   "password          = IF(NOW()>expires, VALUE(password),     password),"
-   "password_suite_id = IF(NOW()>expires, VALUE(password_suite_id), password_suite_id),"
-   "expires           = IF(NOW()>expires, VALUE(expires),      expires)"
-   "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
+  (gen-confirmation-query :phone true))
 
-(def ^:const new-phone-confirmation-query-with-attempt
-  (str-squeeze-spc
-   "INSERT INTO confirmations(id,code,token,reason,expires,attempts,confirmed,user_id,"
-   "account_type,first_name,middle_name,last_name,password,password_suite_id)"
-   "SELECT ?,?,?,?,?,1,0,(SELECT users.id FROM users WHERE users.phone = ?),?,?,?,?,?,?"
-   "ON DUPLICATE KEY UPDATE"
-   "user_id           = VALUE(user_id),"
-   "attempts          = IF(NOW()>expires, 1,                   attempts + 1),"
-   "code              = IF(NOW()>expires, VALUE(code),         code),"
-   "token             = IF(NOW()>expires, VALUE(token),        token),"
-   "created           = IF(NOW()>expires, NOW(),               created),"
-   "confirmed         = IF(NOW()>expires, VALUE(confirmed),    confirmed),"
-   "account_type      = IF(NOW()>expires, VALUE(account_type), account_type),"
-   "first_name        = IF(NOW()>expires, VALUE(first_name),   first_name),"
-   "middle_name       = IF(NOW()>expires, VALUE(middle_name),  middle_name),"
-   "last_name         = IF(NOW()>expires, VALUE(last_name),    last_name),"
-   "password          = IF(NOW()>expires, VALUE(password),     password),"
-   "password_suite_id = IF(NOW()>expires, VALUE(password_suite_id), password_suite_id),"
-   "expires           = IF(NOW()>expires, VALUE(expires),      expires)"
-   "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
+(def ^:const new-email-confirmation-query-without-attempt
+  (gen-confirmation-query :email false))
+
+(def ^:const new-phone-confirmation-query-without-attempt
+  (gen-confirmation-query :phone false))
 
 (defn- gen-confirmation-core
   "Creates a confirmation code for the given identity (an e-mail address or a
@@ -150,7 +101,7 @@
   identity (as a string) and `:reason` set to the given reason (as a keyword or `nil`
   if not given)."
   ([db query id exp udata]
-   (gen-confirmation-core db query id exp udata nil))
+   (gen-confirmation-core db query id exp udata nil true))
   ([db query id exp udata reason]
    (if db
      (if-some [id (some-str id)]
@@ -159,10 +110,10 @@
              reason (or (some-str reason) "creation")
              exp    (or exp ten-minutes)
              exp    (if (t/duration? exp) (t/hence exp) exp)
-             udata  (map #(get udata %) [:account-type
-                                         :first-name :middle-name :last-name
-                                         :password :password-suite-id])
-             query  (concat [query id code token reason exp id] udata)]
+             udata  (mapv #(get udata %) [:account-type
+                                          :first-name :middle-name :last-name
+                                          :password :password-suite-id])
+             query  (list* query id code token reason exp id udata)]
          (if-some [r (jdbc/execute-one! db query db/opts-simple-map)]
            (let [user-id    (get r :user-id)
                  exists?    (pos-int? user-id)
@@ -184,14 +135,14 @@
    (create-for-registration-without-attempt (get udata :db) udata))
   ([db udata]
    (gen-confirmation-core db
-                          new-email-confirmation-query
+                          new-email-confirmation-query-without-attempt
                           (get udata :email)
                           (get udata :expires-in)
                           udata
                           "creation"))
   ([db udata reason]
    (gen-confirmation-core db
-                          new-email-confirmation-query
+                          new-email-confirmation-query-without-attempt
                           (get udata :email)
                           (get udata :expires-in)
                           udata
@@ -209,14 +160,14 @@
    (create-for-registration (get udata :db) udata))
   ([db udata]
    (gen-confirmation-core db
-                          new-email-confirmation-query-with-attempt
+                          new-email-confirmation-query
                           (get udata :email)
                           (get udata :expires-in)
                           udata
                           "creation"))
   ([db udata reason]
    (gen-confirmation-core db
-                          new-email-confirmation-query-with-attempt
+                          new-email-confirmation-query
                           (get udata :email)
                           (get udata :expires-in)
                           udata
