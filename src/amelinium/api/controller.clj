@@ -11,6 +11,7 @@
 
   (:require [potemkin.namespaces                :as             p]
             [tick.core                          :as             t]
+            [clojure.string                     :as           str]
             [amelinium.logging                  :as           log]
             [amelinium.common                   :as        common]
             [amelinium.common.controller        :as    controller]
@@ -306,3 +307,15 @@
              api/render-internal-server-error)))
 
       (raise e))))
+
+;; Handle options method
+
+(defn handle-options
+  "Default handler for OPTIONS method."
+  [req]
+  (render!
+   (assoc req :response/headers
+          {"Access-Control-Allow-Methods"
+           (->> (-> req (get :reitit.core/match) (get :result))
+                (filter second) keys (map name)
+                (str/join ", ") str/upper-case)})))

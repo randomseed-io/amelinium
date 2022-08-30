@@ -9,6 +9,7 @@
 
   (:require [reitit.core               :as  route]
             [reitit.ring               :as   ring]
+            [ring.middleware.cors      :as   cors]
             [amelinium.system          :as system]
             [io.randomseed.utils.map   :as    map]
             [io.randomseed.utils.var   :as    var]
