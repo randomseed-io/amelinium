@@ -812,7 +812,7 @@
    (if (ident? name-or-path)
      ;; route name
      (page-core router name-or-path params query-params
-                (list (guess-lang-param lang-settings-or-param) hint-lang))
+                [(guess-lang-param lang-settings-or-param) hint-lang])
      ;; path
      (page-core router name-or-path params query-params nil)))
   ([_ name-or-path lang params query-params require-param? name-path-fallback? router lang-settings-or-param]
