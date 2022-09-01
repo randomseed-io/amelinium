@@ -203,14 +203,14 @@
   `[{:account-types {:ids [:a :b]}}]` becomes:
   `{:a {:account-types {:ids [:a :b]}}, :b {:account-types {:ids [:a :b]}}`.
 
-  Additionally, it sets `:db` if it's missing, and updates `:account-types` field to
-  have current account type set as default (including SQL query). Original account
+  Additionally, it sets `:db` from global settings and updates `:account-types` field
+  to have current account type set as default (including SQL query). Original account
   types is preserved under `:parent-account-types`. Each authentication configuration
   will be initialized if it isn't already."
   [coll db]
   (->> coll
        (filter map?)
-       (map #(update % :db (comp db/ds (fnil identity db))))
+       (map #(update % :db (db/ds db)))
        (map #(assoc  % :account-types (make-account-types %)))
        (mapcat #(map list (map keyword (:ids (:account-types %))) (repeat %)))
        (filter #(and (coll? %) (keyword? (first %)) (map? (second %))))
