@@ -15,12 +15,15 @@
             [io.randomseed.utils      :refer   :all]
             [io.randomseed.utils.time :as      time]
             [io.randomseed.utils.var  :as       var]
-            [io.randomseed.utils.map  :as       map])
+            [io.randomseed.utils.map  :as       map]
+            [tick.core                :as         t])
 
   (:import [javax.sql DataSource]
            [java.time Duration]))
 
 (defonce config nil)
+
+(def confirmation-expires-default (t/new-duration 10 :minutes))
 
 (defrecord AccountTypes     [^String                        sql
                              ^clojure.lang.PersistentVector ids
