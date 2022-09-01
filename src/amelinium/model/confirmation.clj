@@ -225,45 +225,67 @@
 
 ;; Confirming identity with a token or code
 
-(def ^:const confirmation-report-error-token-query
-  (str-spc
+(defn gen-report-errors-query
+  [where]
+  (str-squeeze-spc
    "SELECT (confirmed = TRUE) AS confirmed,"
-   "(reason <> ?) AS bad_reason,"
-   "(expires < NOW()) AS expired,"
-   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS present"
-   "FROM confirmations WHERE token = ?"))
+   "(attempts <= 0)           AS no_attempts,"
+   "(reason <> ?)             AS bad_reason,"
+   "(expires < NOW())         AS expired,"
+   "(SELECT 1 FROM users WHERE users.email = confirmations.id"
+   "                        OR users.phone = confirmations.id) AS present"
+   "FROM confirmations" (if-some [w (some-str where)] (str "WHERE " w))))
 
-(def ^:const confirmation-report-error-code-query
-  (str-spc
-   "SELECT (confirmed = TRUE) AS confirmed,"
-   "(reason <> ?) AS bad_reason,"
-   "(expires < NOW()) AS expired,"
-   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS present"
-   "FROM confirmations WHERE code = ? AND id = ?"))
+(def ^:const report-errors-simple-id-query
+  (gen-report-errors-query "id = ?"))
 
-(defn- confirmation-report-error
-  ([r reason]
-   (cond
-     (nil? r)                     :verify/bad-token
-     (pos-int? (:bad_reason   r)) :verify/bad-reason
-     (pos-int? (:expired      r)) :verify/expired
-     (pos-int? (:confirmed    r)) :verify/confirmed
-     (and (pos-int? (:present r))
-          (= "creation" reason))  :verify/exists
-     :bad-token                   :verify/bad-token))
-  ([db code email reason]
-   (let [reason (or (some-str reason) "creation")
-         r      (confirmation-report-error
-                 (jdbc/execute-one! db [confirmation-report-error-code-query reason code email]
-                                    db/opts-simple-map)
-                 reason)]
-     (if (= :verify/bad-token r) :verify/bad-code r)))
+(def ^:const report-errors-id-query
+  (gen-report-errors-query "id = ? AND reason = ?"))
+
+(def ^:const report-errors-code-query
+  (gen-report-errors-query "id = ? AND code = ?"))
+
+(def ^:const report-errors-token-query
+  (gen-report-errors-query "token = ?"))
+
+(def verify-bad-id-set
+  #{:verify/not-found :verify/bad-id})
+
+(def verify-bad-code-set
+  #{:verify/not-found :verify/bad-code})
+
+(def verify-bad-token-set
+  #{:verify/not-found :verify/bad-token})
+
+(defn- process-errors
+  [r]
+  (not-empty
+   (reduce-kv #(if (pos-int? %3) (conj %1 (keyword "verify" (name %2))) %1) #{} r)))
+
+(defn report-errors
+  "Returns a set of keywords indicating confirmation errors detected when querying the
+  confirmations table. When `token` is given then it will be used to match the
+  correct data row. When `id` and `code` are given then they will be used to match
+  the correct data row. When the `id` is given but the `code` is `nil` then the
+  matching will be performed on `id` and `reason` (to match on `id` only and not
+  `reason`, explicitly set code to `false`)."
   ([db token reason]
-   (let [reason (or (some-str reason) "creation")]
-     (confirmation-report-error
-      (jdbc/execute-one! db [confirmation-report-error-token-query reason token]
-                         db/opts-simple-map)
-      reason))))
+   (let [reason (or (some-str reason) "creation")
+         qargs  [report-errors-token-query reason token]]
+     (or (process-errors (jdbc/execute-one! db qargs db/opts-simple-map))
+         verify-bad-token-set)))
+  ([db id code reason]
+   (let [id     (some-str id)
+         reason (or (some-str reason) "creation")
+         qargs  (cond code          [report-errors-code-query      reason id code]
+                      (false? code) [report-errors-simple-id-query reason id reason]
+                      :no-code      [report-errors-id-query        reason id])]
+     (or (process-errors (jdbc/execute-one! db qargs db/opts-simple-map))
+         (if code verify-bad-code-set verify-bad-id-set))))
+  ([db id token code reason]
+   (if token
+     (report-errors db id token reason)
+     (report-errors db id code  reason))))
 
 (defn code-to-token
   "Returns a confirmation token associated with the given confirmation code and
@@ -318,8 +340,9 @@
            (let [r     (if (pos-int? r) (code-to-token db id code))
                  token (if r (get r :token))]
              (or (if (and r (get r :confirmed?)) r)
-                 (let [err (confirmation-report-error db id code reason)]
-                   {:confirmed? (= err :verify/confirmed) :error err}))))))))
+                 (let [err (report-errors db id code reason)]
+                   {:confirmed? (contains? err :verify/confirmed)
+                    :errors     err}))))))))
   ([db id code token exp-inc reason]
    (if-some [token (some-str token)]
      (establish db token   exp-inc reason)
@@ -334,8 +357,8 @@
          (if (int? r)
            (if (pos-int? r)
              {:confirmed? true :token token}
-             (let [err (confirmation-report-error db token reason)]
-               {:confirmed? (= err :verify/confirmed)
+             (let [err (report-errors db token reason)]
+               {:confirmed? (contains? err :verify/confirmed)
                 :token      token
                 :error      err}))))))))
 
