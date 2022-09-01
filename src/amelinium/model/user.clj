@@ -24,6 +24,7 @@
             [amelinium.auth.pwd                :as           pwd]
             [amelinium.http.middleware.session :as       session]
             [amelinium.http.middleware.roles   :as         roles]
+            [amelinium.model.confirmation      :as  confirmation]
             [io.randomseed.utils.time          :as          time]
             [io.randomseed.utils.map           :as           map]
             [io.randomseed.utils.ip            :as            ip]
@@ -464,43 +465,6 @@
 
 ;; Creation
 
-(def ^:const creation-report-error-token-query
-  (str-spc
-   "SELECT (confirmed <> TRUE) AS not_confirmed,"
-   "(reason <> ?) AS bad_reason,"
-   "(expires < NOW()) AS expired,"
-   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS present"
-   "FROM confirmations WHERE token = ?"))
-
-(def ^:const creation-report-error-code-query
-  (str-spc
-   "SELECT (confirmed <> TRUE) AS not_confirmed,"
-   "(reason <> ?) AS bad_reason,"
-   "(expires < NOW()) AS expired,"
-   "(SELECT 1 FROM users WHERE users.email = confirmations.id) AS present"
-   "FROM confirmations WHERE code = ? AND id = ?"))
-
-(defn- creation-report-error
-  ([r]
-   (cond
-     (nil? r)                      :verify/bad-token
-     (pos-int? (:present       r)) :verify/exists
-     (pos-int? (:bad_reason    r)) :verify/bad-reason
-     (pos-int? (:expired       r)) :verify/expired
-     (pos-int? (:not_confirmed r)) :verify/unconfirmed
-     :bad-token                    :verify/bad-token))
-  ([db code email reason]
-   (let [r (creation-report-error
-            (jdbc/execute-one! db [creation-report-error-code-query
-                                   (or (some-str reason) "creation") code email]
-                               db/opts-simple-map))]
-     (if (= :verify/bad-token r) :verify/bad-code r)))
-  ([db token reason]
-   (creation-report-error
-    (jdbc/execute-one! db [creation-report-error-token-query
-                           (or (some-str reason) "creation") token]
-                       db/opts-simple-map))))
-
 (def ^:const create-with-token-query
   (str-spc
    "INSERT IGNORE INTO users(email,uid,account_type,first_name,middle_name,last_name,password,password_suite_id)"
@@ -515,7 +479,8 @@
     (if token
       (if-some [r (jdbc/execute-one! db [create-with-token-query token] db/opts-simple-map)]
         (assoc r :created? true :uid (db/as-uuid (get r :uid)))
-        {:created? false :error (creation-report-error db token "creation")}))))
+        {:created? false
+         :errors   (confirmation/report-errors db token "creation")}))))
 
 (def ^:const create-with-code-query
   (str-spc
@@ -532,7 +497,8 @@
     (if (and code email)
       (if-some [r (jdbc/execute-one! db [create-with-code-query code email] db/opts-simple-map)]
         (assoc r :created? true :uid (db/as-uuid (get r :uid)))
-        {:created? false :error (creation-report-error db code email "creation")}))))
+        {:created? false
+         :errors   (confirmation/report-errors db code email "creation")}))))
 
 (defn create-with-token-or-code
   [db token code email]
