@@ -36,7 +36,7 @@
             [io.randomseed.utils.map              :as          map]
             [io.randomseed.utils                  :refer      :all])
 
-  (:import [amelinium.auth AccountTypes]
+  (:import [amelinium.auth AuthConfig AuthSettings AccountTypes]
            [reitit.core Match]
            [lazy_map.core LazyMapEntry LazyMap]))
 
@@ -48,7 +48,7 @@
   explicitly set to `nil`, it will be changed into `:default`."
   ([req-or-match auth-type]
    (if-some [auth-settings (http/get-route-data req-or-match :auth/config)]
-     (get (.types ^amelinium.auth.Settings auth-settings)
+     (get (.types ^AuthSettings auth-settings)
           (cond (keyword? auth-type) auth-type
                 (some? auth-type)    (keyword auth-type)
                 :other               :default))))
@@ -58,16 +58,10 @@
 (defn auth-db
   "Returns an authentication database connection object for the given authentication
   type or, if the type is not given, for a common authentication database (top-level,
-  not assigned to any particular authentication type). If the `auth-type` is given
-  but it is `nil` then the authentication database for a default authentication
-  configuration (under the `:default` key of authentication settings) will be
-  returned."
-  ([req-or-match auth-type]
-   (if-some [auth-config (auth-config req-or-match auth-type)]
-     (.db ^amelinium.auth.Config auth-config)))
+  not assigned to any particular authentication type)."
   ([req-or-match]
    (if-some [auth-settings (auth-config req-or-match)]
-     (.db ^amelinium.auth.Settings auth-settings))))
+     (.db ^AuthSettings auth-settings))))
 
 ;; Operations logging
 

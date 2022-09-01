@@ -18,6 +18,7 @@
             [buddy.core.hash                   :as          hash]
             [buddy.core.codecs                 :as        codecs]
             [tick.core                         :as             t]
+            [phone-number.core                 :as         phone]
             [amelinium.db                      :as            db]
             [amelinium.auth                    :as          auth]
             [amelinium.auth.pwd                :as           pwd]
@@ -29,14 +30,62 @@
             [io.randomseed.utils               :refer       :all])
 
   (:import [javax.sql DataSource]
+           [java.time Duration]
+           [phone_number.core Phoneable]
            [amelinium.auth.pwd Suites SuitesJSON]
-           [amelinium.auth Config Settings Locking Registration Confirmation AccountTypes]))
+           [amelinium.auth AuthConfig AuthSettings AuthLocking AuthConfirmation AccountTypes]))
 
 (defonce props-cache    (atom nil))
 (defonce settings-cache (atom nil))
 (defonce ids-cache      (atom nil))
 
-(defrecord DBPassword [^Long password_suite_id ^String password])
+(defrecord DBPassword [^Long   password_suite_id
+                       ^String password])
+
+(defrecord UserData   [^String               email
+                       ^Phoneable            phone
+                       ^clojure.lang.Keyword account-type
+                       ^AuthConfig           auth-config
+                       ^DataSource           db
+                       ^String               password
+                       ^String               password-shared
+                       ^Long                 password-suite-id
+                       ^String               first-name
+                       ^String               middle-name
+                       ^String               last-name
+                       ^Duration             expires-in
+                       ^Long                 max-attempts])
+
+;; User data initialization
+
+(declare create-or-get-shared-suite-id)
+
+(defn make-user-data
+  "Creates user data record by getting values from the given authentication settings
+  and parameters map. If `:password` parameter is present it will make JSON password
+  suite."
+  [auth-settings params]
+  (let [email         (some-str (or (get params :login) (get params :email)))
+        phone         (get params :phone)
+        password      (some-str (get params :password))
+        account-type  (get params :account-type)
+        account-type  (if (keyword? account-type) account-type (some-keyword account-type))
+        account-type  (or account-type (.default-type ^AuthSettings auth-settings))
+        auth-config   (or (get (.types ^AuthSettings auth-settings) account-type)
+                          (.default ^AuthSettings auth-settings))
+        auth-cfrm     (.confirmation ^AuthConfig auth-config)
+        db            (or (.db ^AuthConfig auth-config) (.db ^AuthSettings auth-settings))
+        pwd-chains    (if password (auth/make-password-json password auth-config))
+        pwd-intrinsic (if pwd-chains (.intrinsic ^SuitesJSON pwd-chains))
+        pwd-shared    (if pwd-chains (.shared    ^SuitesJSON pwd-chains))
+        pwd-shared-id (if (and db pwd-shared) (create-or-get-shared-suite-id db pwd-shared))]
+    (->UserData email phone (name account-type) auth-config db
+                pwd-intrinsic pwd-shared pwd-shared-id
+                (some-str (get params :first-name))
+                (some-str (get params :middle-name))
+                (some-str (get params :last-name))
+                (or (.expires      ^AuthConfirmation auth-cfrm) auth/confirmation-expires-default)
+                (or (.max-attempts ^AuthConfirmation auth-cfrm) 3))))
 
 ;; Users
 
@@ -549,22 +598,22 @@
 
 (extend-protocol Authorizable
 
-  Config
+  AuthConfig
   (get-user-auth-data
-    ([^Config src email ^AuthQueries queries]
+    ([^AuthConfig src email ^AuthQueries queries]
      (if email
-       (if-some [ac-types (.account-types ^Config src)]
-         (if-some [db (.db ^Config src)]
+       (if-some [ac-types (.account-types ^AuthConfig src)]
+         (if-some [db (.db ^AuthConfig src)]
            (let [ac-names (.names ^AccountTypes ac-types)
                  ac-sql   (.sql   ^AccountTypes ac-types)
                  ac-sql   (if ac-sql ac-sql (str " IN " (db/braced-join-? ac-names)))
                  query    (str (.pre ^AuthQueries queries) ac-sql (.post ^AuthQueries queries))]
              (jdbc/execute-one! db (cons query (cons email ac-names)) db/opts-simple-map))))))
-    ([^Config src email ac-type ^AuthQueries queries]
+    ([^AuthConfig src email ac-type ^AuthQueries queries]
      (if-some [ac-type (if (keyword? ac-type) ac-type (some-keyword ac-type))]
        (if email
-         (if-some [db (.db ^Config src)]
-           (if-some [ac-ids (.ids ^AccountTypes (.account-types ^Config src))]
+         (if-some [db (.db ^AuthConfig src)]
+           (if-some [ac-ids (.ids ^AccountTypes (.account-types ^AuthConfig src))]
              (if (contains? ac-ids ac-type)
                (jdbc/execute-one!
                 db
@@ -572,17 +621,17 @@
                 db/opts-simple-map)))))
        (get-user-auth-data src email queries))))
 
-  Settings
+  AuthSettings
   (get-user-auth-data
-    ([^Settings src email ^AuthQueries queries]
+    ([^AuthSettings src email ^AuthQueries queries]
      (if email
-       (let [global-db (.db ^Settings src)]
+       (let [global-db (.db ^AuthSettings src)]
          (if-some [ac-type (keyword (prop-by-email global-db :account-type email))]
-           (get-user-auth-data (get (.types ^Settings src) ac-type) email ac-type queries)))))
-    ([^Settings src email ac-type ^AuthQueries queries]
+           (get-user-auth-data (get (.types ^AuthSettings src) ac-type) email ac-type queries)))))
+    ([^AuthSettings src email ac-type ^AuthQueries queries]
      (if-some [ac-type (if (keyword? ac-type) ac-type (some-keyword ac-type))]
        (if email
-         (if-some [auth-config (get (.types ^Settings src) ac-type)]
+         (if-some [auth-config (get (.types ^AuthSettings src) ac-type)]
            (get-user-auth-data auth-config email ac-type queries)))
        (get-user-auth-data src email queries))))
 
@@ -672,7 +721,7 @@
   "Creates a password for the given authentication config. Returns a map of shared part
   ID and an intrinsic part as two keys: `password-suite-id` and `:password`."
   [auth-config password]
-  (if-some [db (.db ^Config auth-config)]
+  (if-some [db (.db ^AuthConfig auth-config)]
     (if-some [suites (auth/make-password-json password auth-config)]
       (let [shared-suite    (.shared    ^SuitesJSON suites)
             intrinsic-suite (.intrinsic ^SuitesJSON suites)]

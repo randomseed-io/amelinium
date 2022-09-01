@@ -22,42 +22,39 @@
 
 (defonce config nil)
 
-(defrecord AccountTypes [^String                        sql
-                         ^clojure.lang.PersistentVector ids
-                         ^clojure.lang.PersistentVector names
-                         ^clojure.lang.Keyword          default
-                         ^String                        default-name])
+(defrecord AccountTypes     [^String                        sql
+                             ^clojure.lang.PersistentVector ids
+                             ^clojure.lang.PersistentVector names
+                             ^clojure.lang.Keyword          default
+                             ^String                        default-name])
 
-(defrecord Locking      [^Long     max-attempts
-                         ^Duration lock-wait
-                         ^Duration fail-expires])
+(defrecord AuthLocking      [^Long                max-attempts
+                             ^Duration            lock-wait
+                             ^Duration            fail-expires])
 
-(defrecord Confirmation [^Long max-attempts
-                         ^Duration expires])
+(defrecord AuthConfirmation [^Long                max-attempts
+                             ^Duration            expires])
 
-(defrecord Registration [^Duration expires])
+(defrecord AuthPasswords    [^clojure.lang.Keyword id
+                             ^clojure.lang.ISeq    suite
+                             ^clojure.lang.Fn      check
+                             ^clojure.lang.Fn      check-json
+                             ^clojure.lang.Fn      encrypt
+                             ^clojure.lang.Fn      encrypt-json
+                             ^clojure.lang.Fn      wait])
 
-(defrecord Passwords    [^clojure.lang.Keyword id
-                         ^clojure.lang.ISeq    suite
-                         ^clojure.lang.Fn      check
-                         ^clojure.lang.Fn      check-json
-                         ^clojure.lang.Fn      encrypt
-                         ^clojure.lang.Fn      encrypt-json
-                         ^clojure.lang.Fn      wait])
+(defrecord AuthConfig       [^clojure.lang.Keyword id
+                             ^DataSource           db
+                             ^AccountTypes         account-types
+                             ^AccountTypes         parent-account-types
+                             ^AuthConfirmation     confirmation
+                             ^AuthLocking          locking
+                             ^AuthPasswords        passwords])
 
-(defrecord Config       [^clojure.lang.Keyword id
-                         ^DataSource           db
-                         ^AccountTypes         account-types
-                         ^AccountTypes         parent-account-types
-                         ^Registration         registration
-                         ^Confirmation         confirmation
-                         ^Locking              locking
-                         ^Passwords            passwords])
-
-(defrecord Settings     [^DataSource           db
-                         ^clojure.lang.Keyword default-type
-                         ^Config               default
-                         ^AccountTypes         types])
+(defrecord AuthSettings     [^DataSource           db
+                             ^clojure.lang.Keyword default-type
+                             ^AuthConfig           default
+                             ^AccountTypes         types])
 
 ;; Password authentication
 
@@ -66,13 +63,13 @@
   suites. Specific authentication configuration map must be given."
   ([password pwd-suites auth-config]
    (if (and password pwd-suites auth-config)
-     (if-some [checker (.check ^Passwords (.passwords ^Config auth-config))]
+     (if-some [checker (.check ^AuthPasswords (.passwords ^AuthConfig auth-config))]
        (if (map? pwd-suites)
          (checker password pwd-suites)
          (checker password nil pwd-suites)))))
   ([password pwd-shared-suite pwd-user-suite auth-config]
    (if (and password pwd-shared-suite pwd-user-suite auth-config)
-     (if-some [checker (.check ^Passwords (.passwords ^Config auth-config))]
+     (if-some [checker (.check ^AuthPasswords (.passwords ^AuthConfig auth-config))]
        (checker password pwd-shared-suite pwd-user-suite)))))
 
 (defn check-password-json
@@ -80,13 +77,13 @@
   authentication configuration map must be given."
   ([password json-pwd-suites auth-config]
    (if (and password json-pwd-suites auth-config)
-     (if-some [checker (.check-json ^Passwords (.passwords ^Config auth-config))]
+     (if-some [checker (.check-json ^AuthPasswords (.passwords ^AuthConfig auth-config))]
        (if (map? json-pwd-suites)
          (checker password json-pwd-suites)
          (checker password nil json-pwd-suites)))))
   ([password json-pwd-shared-suite json-pwd-user-suite auth-config]
    (if (and password json-pwd-shared-suite json-pwd-user-suite auth-config)
-     (if-some [checker (.check-json ^Passwords (.passwords ^Config auth-config))]
+     (if-some [checker (.check-json ^AuthPasswords (.passwords ^AuthConfig auth-config))]
        (checker password json-pwd-shared-suite json-pwd-user-suite)))))
 
 (defn make-password
@@ -94,7 +91,7 @@
   given."
   [password auth-config]
   (if (and password auth-config)
-    (if-some [encryptor (.encrypt ^Passwords (.passwords ^Config auth-config))]
+    (if-some [encryptor (.encrypt ^AuthPasswords (.passwords ^AuthConfig auth-config))]
       (encryptor password))))
 
 (defn make-password-json
@@ -102,15 +99,15 @@
   configuration map must be given."
   [password auth-config]
   (if (and password auth-config)
-    (if-some [encryptor (.encrypt-json ^Passwords (.passwords ^Config auth-config))]
+    (if-some [encryptor (.encrypt-json ^AuthPasswords (.passwords ^AuthConfig auth-config))]
       (encryptor password))))
 
 ;; Settings initialization
 
 (defn make-passwords
   [m]
-  (if (instance? Passwords m) m
-      (apply ->Passwords
+  (if (instance? AuthPasswords m) m
+      (apply ->AuthPasswords
              (map (:passwords m)
                   [:id :suite :check-fn :check-json-fn :encrypt-fn :encrypt-json-fn :wait-fn]))))
 
@@ -147,23 +144,17 @@
         (new-account-types ids (or (:account-types/default m)
                                    (:account-types/default-name m))))))
 
-(defn make-registration
-  [m]
-  (if (instance? Registration m) m
-      (->Registration
-       ((fnil time/parse-duration [10 :minutes]) (:registration/expires m)))))
-
 (defn make-confirmation
   [m]
-  (if (instance? Confirmation m) m
-      (->Confirmation
+  (if (instance? AuthConfirmation m) m
+      (->AuthConfirmation
        (safe-parse-long (:confirmation/max-attempts m) 3)
        ((fnil time/parse-duration [1 :minutes]) (:confirmation/expires m)))))
 
 (defn make-locking
   [m]
-  (if (instance? Locking m) m
-      (->Locking
+  (if (instance? AuthLocking m) m
+      (->AuthLocking
        (safe-parse-long (:locking/max-attempts m) 10)
        ((fnil time/parse-duration [10 :minutes]) (:locking/lock-wait    m))
        ((fnil time/parse-duration [ 1 :minutes]) (:locking/fail-expires m)))))
@@ -172,14 +163,13 @@
   ([m]
    (make-auth nil m))
   ([k m]
-   (if (instance? Config m) m
-       (map->Config {:id            (keyword (or (:id m) k))
-                     :db            (db/ds          (:db m))
-                     :passwords     (make-passwords      m)
-                     :account-types (make-account-types  m)
-                     :locking       (make-locking        m)
-                     :confirmation  (make-confirmation   m)
-                     :registration  (make-registration   m)}))))
+   (if (instance? AuthConfig m) m
+       (map->AuthConfig {:id            (keyword (or (:id m) k))
+                         :db            (db/ds          (:db m))
+                         :passwords     (make-passwords      m)
+                         :account-types (make-account-types  m)
+                         :locking       (make-locking        m)
+                         :confirmation  (make-confirmation   m)}))))
 
 (defn init-auth
   "Authentication configurator."
@@ -194,7 +184,7 @@
   "Returns authentication configuration for the given account type using an
   authentication configuration map."
   [auth-settings account-type]
-  (if-some [types-map (.types ^Settings auth-settings)]
+  (if-some [types-map (.types ^AuthSettings auth-settings)]
     (get types-map (some-keyword-simple account-type))))
 
 (defn config-by-type-with-var
@@ -239,7 +229,7 @@
         config (update config :types index-by-type (:db config))]
     (-> config
         (assoc :default (get (:types config) (:default-type config)))
-        map->Settings)))
+        map->AuthSettings)))
 
 (system/add-init  ::auth [k config] (init-auth k config))
 (system/add-halt! ::auth [_ config] nil)
