@@ -208,12 +208,11 @@
   #{:verify/not-found :verify/bad-token})
 
 (def ^:private ^:const errs-prioritized
-  [:bad-result
-   :verify/bad-result
-   :verify/not-found
+  [:verify/bad-result
    :verify/bad-token
    :verify/bad-code
    :verify/bad-id
+   :verify/not-found
    :verify/bad-reason
    :verify/expired
    :verify/exists
