@@ -466,11 +466,14 @@
 ;; Creation
 
 (def ^:const create-with-token-query
-  (str-spc
-   "INSERT IGNORE INTO users(email,uid,account_type,first_name,middle_name,last_name,password,password_suite_id)"
-   "SELECT id,UUID(),account_type,first_name,middle_name,last_name,password,password_suite_id FROM confirmations"
-   "WHERE token = ? AND confirmed = TRUE AND password IS NOT NULL AND password_suite_id IS NOT NULL"
-   "AND reason = 'creation' AND expires >= NOW()"
+  (str-squeeze-spc
+   "INSERT IGNORE INTO users(email,uid,account_type,first_name,middle_name,last_name,"
+   "                         password,password_suite_id)"
+   "SELECT id,UUID(),account_type,first_name,middle_name,last_name,"
+   "       password,password_suite_id FROM confirmations"
+   "WHERE token = ? AND confirmed = TRUE AND password IS NOT NULL"
+   "                AND password_suite_id IS NOT NULL"
+   "                AND reason = 'creation' AND expires >= NOW()"
    "RETURNING id,uid,email"))
 
 (defn create-with-token
@@ -479,32 +482,39 @@
     (if token
       (if-some [r (jdbc/execute-one! db [create-with-token-query token] db/opts-simple-map)]
         (assoc r :created? true :uid (db/as-uuid (get r :uid)))
-        {:created? false
-         :errors   (confirmation/report-errors db token "creation")}))))
+        (let [errs (confirmation/report-errors db token "creation" true)]
+          {:created? false
+           :errors   errs
+           :error    (confirmation/most-significant-error errs)})))))
 
 (def ^:const create-with-code-query
-  (str-spc
-   "INSERT IGNORE INTO users(email,uid,account_type,first_name,middle_name,last_name,password,password_suite_id)"
-   "SELECT id,UUID(),account_type,first_name,middle_name,last_name,password,password_suite_id FROM confirmations"
-   "WHERE code = ? AND id = ? AND confirmed = TRUE AND password IS NOT NULL AND password_suite_id IS NOT NULL"
-   "AND reason = 'creation' AND  expires >= NOW()"
+  (str-squeeze-spc
+   "INSERT IGNORE INTO users(email,uid,account_type,first_name,middle_name,last_name,"
+   "                         password,password_suite_id)"
+   "SELECT id,UUID(),account_type,first_name,middle_name,last_name,"
+   "       password,password_suite_id FROM confirmations"
+   "WHERE code = ? AND id = ? AND confirmed = TRUE AND password IS NOT NULL"
+   "      AND password_suite_id IS NOT NULL"
+   "      AND reason = 'creation' AND  expires >= NOW()"
    "RETURNING id,uid,email"))
 
 (defn create-with-code
-  [db code email]
+  [db email code]
   (let [code  (some-str code)
         email (some-str email)]
     (if (and code email)
       (if-some [r (jdbc/execute-one! db [create-with-code-query code email] db/opts-simple-map)]
         (assoc r :created? true :uid (db/as-uuid (get r :uid)))
-        {:created? false
-         :errors   (confirmation/report-errors db code email "creation")}))))
+        (let [errs (confirmation/report-errors db email code "creation" true)]
+          {:created? false
+           :errors   errs
+           :error    (confirmation/most-significant-error errs)})))))
 
 (defn create-with-token-or-code
-  [db token code email]
+  [db email token code]
   (if-some [token (some-str token)]
     (create-with-token db token)
-    (create-with-code  db code email)))
+    (create-with-code  db email code)))
 
 ;; Passwords and login data
 
