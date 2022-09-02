@@ -173,56 +173,6 @@
                           udata
                           reason)))
 
-;; Updating attempts
-
-(def ^:const resent-confirmation-query
-  (str-spc
-   "INSERT IGNORE INTO confirmations"
-   "SELECT * FROM confirmations WHERE id=? AND reason=?"
-   "ON DUPLICATE KEY UPDATE"
-   "attempts = IF((NOW() > expires OR attempts >= ?), attempts, attempts + 1)"
-   "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
-
-(defn update-attempts-core
-  [db query id max-attempts reason]
-  (if db
-    (if-some [id (some-str id)]
-      (let [reason (or (some-str reason) "creation")]
-        (if-some [r (jdbc/execute-one! db [query id max-attempts reason])]
-          r)))))
-
-(defn update-email-attempts
-  "Updates attempt count for an email confirmation entry. The given reason must be the
-  same as the reason stored for the e-mail."
-  ([udata]
-   (update-email-attempts (get udata :db) udata))
-  ([db udata]
-   (update-attempts-core db resent-confirmation-query
-                         (get udata :email)
-                         (get udata :max-attempts)
-                         "creation"))
-  ([db udata reason]
-   (update-attempts-core db resent-confirmation-query
-                         (get udata :email)
-                         (get udata :max-attempts)
-                         reason)))
-
-(defn update-phone-attempts
-  "Updates attempt count for a phone number confirmation entry. The given reason must
-  be the same as the reason stored for the e-mail."
-  ([udata]
-   (update-phone-attempts (get udata :db) udata))
-  ([db udata]
-   (update-attempts-core db resent-confirmation-query
-                         (get udata :phone)
-                         (get udata :max-attempts)
-                         "creation"))
-  ([db udata reason]
-   (update-attempts-core db resent-confirmation-query
-                         (get udata :phone)
-                         (get udata :max-attempts)
-                         reason)))
-
 ;; Confirming identity with a token or code
 
 (defn gen-report-errors-query
