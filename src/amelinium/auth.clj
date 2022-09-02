@@ -210,8 +210,7 @@
   [coll db]
   (->> coll
        (filter map?)
-       (map #(update % :db (db/ds db)))
-       (map #(assoc  % :account-types (make-account-types %)))
+       (map #(assoc % :account-types (make-account-types %) :db (db/ds db)))
        (mapcat #(map list (map keyword (:ids (:account-types %))) (repeat %)))
        (filter #(and (coll? %) (keyword? (first %)) (map? (second %))))
        (map (fn [[id auth-config]]
