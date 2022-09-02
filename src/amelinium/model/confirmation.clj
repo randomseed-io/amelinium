@@ -58,15 +58,15 @@
 ;; Generation of confirmation tokens and codes
 
 (defn gen-confirmation-query
-  [id-column inc-att?]
+  [id-column dec-att?]
   (str-squeeze-spc
    "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,"
-   "account_type,first_name,middle_name,last_name,password,password_suite_id)"
+   "attempts,account_type,first_name,middle_name,last_name,password,password_suite_id)"
    (str "SELECT ?,?,?,?,?,0,(SELECT users.id FROM users WHERE users."
-        (or (some-str id-column) "email") " = ?),?,?,?,?,?,?")
+        (or (some-str id-column) "email") " = ?),?,?,?,?,?,?,?")
    "ON DUPLICATE KEY UPDATE"
    "user_id           = VALUE(user_id),"
-   "attempts          = IF(NOW()>expires, 1," (str "attempts" (if inc-att? " + 1") "),")
+   "attempts          = IF(NOW()>expires, VALUE(attempts)," (str "attempts" (if dec-att? " - 1") "),")
    "code              = IF(NOW()>expires, VALUE(code),         code),"
    "token             = IF(NOW()>expires, VALUE(token),        token),"
    "created           = IF(NOW()>expires, NOW(),               created),"
@@ -110,11 +110,11 @@
              reason (or (some-str reason) "creation")
              exp    (or exp ten-minutes)
              exp    (if (t/duration? exp) (t/hence exp) exp)
-             udata  (mapv #(get udata %) [:account-type
+             udata  (mapv #(get udata %) [:max-attempts :account-type
                                           :first-name :middle-name :last-name
                                           :password :password-suite-id])
-             query  (list* query id code token reason exp id udata)]
-         (if-some [r (jdbc/execute-one! db query db/opts-simple-map)]
+             qargs  (list* query id code token reason exp id udata)]
+         (if-some [r (jdbc/execute-one! db qargs db/opts-simple-map)]
            (let [user-id    (get r :user-id)
                  exists?    (pos-int? user-id)
                  confirmed? (pos-int? (get r :confirmed))]
