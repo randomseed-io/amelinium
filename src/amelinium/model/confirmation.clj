@@ -226,10 +226,12 @@
 
 (defn- process-errors
   [r should-be-confirmed?]
-  (let [r (reduce-kv #(if (pos-int? %3) (conj %1 (keyword "verify" (name %2))) %1) #{} r)]
-    (if (contains? r :verify/confirmed)
-      (if should-be-confirmed? (disj r :verify/confirmed) r)
-      (if should-be-confirmed? (conj r :verify/not-confirmed) r))))
+  (if r
+    (let [r (reduce-kv #(if (pos-int? %3) (conj %1 (keyword "verify" (name %2))) %1) #{} r)]
+      (if (some? (not-empty r))
+        (if (contains? r :verify/confirmed)
+          (if should-be-confirmed? (disj r :verify/confirmed) r)
+          (if should-be-confirmed? (conj r :verify/not-confirmed) r))))))
 
 (defn report-errors
   "Returns a set of keywords indicating confirmation errors detected when querying the
