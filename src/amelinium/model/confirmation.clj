@@ -241,7 +241,7 @@
   ([db token reason should-be-confirmed?]
    (let [reason (or (some-str reason) "creation")
          qargs  [report-errors-token-query reason token]]
-     (or (process-errors (jdbc/execute-one! db qargs db/opts-simple-map))
+     (or (process-errors (jdbc/execute-one! db qargs db/opts-simple-map) should-be-confirmed?)
          verify-bad-token-set)))
   ([db id code reason should-be-confirmed?]
    (let [id     (some-str id)
