@@ -257,10 +257,29 @@
 (def verify-bad-token-set
   #{:verify/not-found :verify/bad-token})
 
+(def ^:private ^:const errs-prioritized
+  [:bad-result
+   :verify/bad-result
+   :verify/not-found
+   :verify/bad-token
+   :verify/bad-code
+   :verify/bad-id
+   :verify/bad-reason
+   :verify/expired
+   :verify/exists
+   :verify/not-confirmed
+   :verify/confirmed])
+
+(defn most-significant-error
+  [errors]
+  (if errors (some errors errs-prioritized)))
+
 (defn- process-errors
-  [r]
-  (not-empty
-   (reduce-kv #(if (pos-int? %3) (conj %1 (keyword "verify" (name %2))) %1) #{} r)))
+  [r should-be-confirmed?]
+  (let [r (reduce-kv #(if (pos-int? %3) (conj %1 (keyword "verify" (name %2))) %1) #{} r)]
+    (if (contains? r :verify/confirmed)
+      (if should-be-confirmed? (disj r :verify/confirmed) r)
+      (if should-be-confirmed? (conj r :verify/not-confirmed) r))))
 
 (defn report-errors
   "Returns a set of keywords indicating confirmation errors detected when querying the
@@ -269,45 +288,45 @@
   the correct data row. When the `id` is given but the `code` is `nil` then the
   matching will be performed on `id` and `reason` (to match on `id` only and not
   `reason`, explicitly set code to `false`)."
-  ([db token reason]
+  ([db token reason should-be-confirmed?]
    (let [reason (or (some-str reason) "creation")
          qargs  [report-errors-token-query reason token]]
      (or (process-errors (jdbc/execute-one! db qargs db/opts-simple-map))
          verify-bad-token-set)))
-  ([db id code reason]
+  ([db id code reason should-be-confirmed?]
    (let [id     (some-str id)
          reason (or (some-str reason) "creation")
          qargs  (cond code          [report-errors-code-query      reason id code]
                       (false? code) [report-errors-simple-id-query reason id reason]
                       :no-code      [report-errors-id-query        reason id])]
-     (or (process-errors (jdbc/execute-one! db qargs db/opts-simple-map))
+     (or (process-errors (jdbc/execute-one! db qargs db/opts-simple-map) should-be-confirmed?)
          (if code verify-bad-code-set verify-bad-id-set))))
-  ([db id token code reason]
+  ([db id token code reason should-be-confirmed?]
    (if token
-     (report-errors db id token reason)
-     (report-errors db id code  reason))))
+     (report-errors db token   reason should-be-confirmed?)
+     (report-errors db id code reason should-be-confirmed?))))
 
 (defn code-to-token
   "Returns a confirmation token associated with the given confirmation code and
-  identity."
+  identity. Additionally returns confirmation status."
   [db id code]
   (if-some [r (first
-               (sql/find-by-keys db :confirmations
-                                 {:id id :code code}
-                                 (assoc db/opts-simple-map
-                                        :columns [:token :confirmed])))]
+               (sql/find-by-keys
+                db :confirmations
+                {:id id :code code}
+                (assoc db/opts-simple-map :columns [:token :confirmed])))]
     (-> r
         (assoc  :confirmed? (pos-int? (get r :confirmed)))
         (dissoc :confirmed))))
 
 (def confirm-token-query
-  (str-spc
+  (str-squeeze-spc
    "UPDATE confirmations"
    "SET expires = DATE_ADD(expires, INTERVAL ? MINUTE), confirmed = TRUE"
    "WHERE token = ? AND confirmed <> TRUE AND reason = ? AND expires >= NOW()"))
 
 (def confirm-code-query
-  (str-spc
+  (str-squeeze-spc
    "UPDATE confirmations"
    "SET expires = DATE_ADD(expires, INTERVAL ? MINUTE), confirmed = TRUE"
    "WHERE id = ? AND code = ? AND confirmed <> TRUE AND reason = ? AND expires >= NOW()"))
@@ -318,16 +337,18 @@
   flag to `TRUE` (1) in a database which prevents from further confirmations and
   marks identity as confirmed for other operations. The `exp-inc` argument should be
   a positive integer and will be used to increase expiration time by the given amount
-  of minutes. This is to ensure that next operation, which may take some time (like
-  entering user details by newly registered user), will succeed. The `reason`
-  argument is the confirmation reason and should match the reason given during the
-  generation of a token or code.
+  of minutes. This is to ensure that the next operation, if any, which may take some
+  time, will succeed. The `reason` argument is the confirmation reason and should
+  match the reason given during the generation of a token or code.
 
-  Returns a map with `:confirmed?` set to `true` if the token or code was
+  Returns a map with `:confirmed?` set to `true` if the given token or code was
   verified. Returns a map with `:confirmed?` set to `false` and `:error` set to a
   keyword describing the cause if the token or code was not verified. Returns `nil`
-  if something went wrong during interaction with a database or when the required
-  input parameters were empty."
+  if something went wrong during the interaction with a database or when the required
+  input parameters were empty.
+
+  If the identity is already confirmed and there is no error (i.e. confirmation has
+  not yet expired), it will also return a map with `:confirmed?` set to `true`."
   ([db id code exp-inc reason]
    (let [reason (or (some-str reason) "creation")
          id     (some-str id)
@@ -336,13 +357,14 @@
        (if-some [r (::jdbc/update-count
                     (jdbc/execute-one! db [confirm-code-query exp-inc id code reason]
                                        db/opts-simple-map))]
-         (if (int? r)
-           (let [r     (if (pos-int? r) (code-to-token db id code))
-                 token (if r (get r :token))]
-             (or (if (and r (get r :confirmed?)) r)
-                 (let [err (report-errors db id code reason)]
-                   {:confirmed? (contains? err :verify/confirmed)
-                    :errors     err}))))))))
+         (if (pos-int? r)
+           {:confirmed? true}
+           (let [errs (report-errors db id code reason false)]
+             (if (and (= 1 (count errs)) (contains? errs :verify/confirmed))
+               {:confirmed? true}
+               {:confirmed? false
+                :errors     errs
+                :error      (most-significant-error errs)})))))))
   ([db id code token exp-inc reason]
    (if-some [token (some-str token)]
      (establish db token   exp-inc reason)
@@ -356,11 +378,14 @@
                                        db/opts-simple-map))]
          (if (int? r)
            (if (pos-int? r)
-             {:confirmed? true :token token}
-             (let [err (report-errors db token reason)]
-               {:confirmed? (contains? err :verify/confirmed)
-                :token      token
-                :error      err}))))))))
+             {:confirmed? true}
+             (let [errs (report-errors db token reason false)]
+               (if (and (= 1 (count errs)) (contains? errs :verify/confirmed))
+                 {:confirmed true}
+                 {:confirmed? false
+                  :token      token
+                  :errors     errs
+                  :error      (most-significant-error errs)})))))))))
 
 (defn delete
   "Deletes confirmation identified with an `id` from a database."
