@@ -370,3 +370,42 @@
    (if id
      (let [reason (or (some-str reason) "creation")]
        (sql/delete! db :confirmations {:id id :reason reason})))))
+
+;; Updating attempts
+
+(def ^:const decrease-attempts-query
+  (str-squeeze-spc
+   "INSERT IGNORE INTO confirmations"
+   "SELECT * FROM confirmations"
+   "         WHERE id = ? AND confirmed = FALSE AND attempts > 0"
+   "               AND NOW() <= expires AND reason = ?"
+   "ON DUPLICATE KEY UPDATE"
+   "attempts = attempts - 1"
+   "RETURNING id, user_id, account_type, attempts, code, token, created, confirmed, expires"))
+
+(defn- decrease-attempts-core
+  [db id reason]
+  (if db
+    (if-some [id (some-str id)]
+      (let [reason (or (some-str reason) "creation")]
+        (if-some [r (jdbc/execute-one! db [decrease-attempts-query id reason] db/opts-simple-map)]
+          (dissoc (assoc r :confirmed? false) :confirmed)
+          (let [errs (report-errors db id nil reason false)]
+            {:errors errs
+             :error  (most-significant-error errs)}))))))
+
+(defn retry-email
+  ([udata]
+   (decrease-attempts-core (:db udata) (:email udata)))
+  ([db id]
+   (decrease-attempts-core db id "creation"))
+  ([db id reason]
+   (decrease-attempts-core db id reason)))
+
+(defn retry-phone
+  ([udata]
+   (decrease-attempts-core (:db udata) (:phone udata)))
+  ([db id]
+   (decrease-attempts-core db id "creation"))
+  ([db id reason]
+   (decrease-attempts-core db id reason)))
