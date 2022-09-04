@@ -30,18 +30,24 @@
             [io.randomseed.utils.ip            :as            ip]
             [io.randomseed.utils               :refer       :all])
 
-  (:import [javax.sql DataSource]
-           [java.time Duration]
-           [phone_number.core Phoneable]
+  (:import [javax.sql          DataSource]
+           [java.time          Duration]
+           [phone_number.core  Phoneable]
            [amelinium.auth.pwd Suites SuitesJSON]
-           [amelinium.auth AuthConfig AuthSettings AuthLocking AuthConfirmation AccountTypes]))
+           [amelinium.auth     AuthConfig AuthSettings AuthLocking AuthConfirmation AccountTypes]))
 
 (defonce props-cache    (atom nil))
 (defonce settings-cache (atom nil))
 (defonce ids-cache      (atom nil))
 
+;; DBPassword record is to pass intrinsic suite in JSON format and shared suite ID.
+;; It's used to pass data around.
+
 (defrecord DBPassword [^Long   password_suite_id
                        ^String password])
+
+;; UserData record is to pass user data between models and controllers
+;; in a bit faster way than with regular maps.
 
 (defrecord UserData   [^String               email
                        ^Phoneable            phone
@@ -56,6 +62,22 @@
                        ^String               last-name
                        ^Duration             expires-in
                        ^Long                 max-attempts])
+
+;; AuthQueries record is used to pass a set of SQL queries in some structured form.
+
+(defrecord AuthQueries [^String generic
+                        ^String pre
+                        ^String post
+                        ^String single])
+
+;; Authorizable protocol is to support class-based, single method dispatch, when
+;; dealing with authorization and authentication data. The auth-source can be a data
+;; source, an AuthConfig record or a global AuthSettings record.
+
+(defprotocol Authorizable
+  (get-user-auth-data
+    [auth-source email queries]
+    [auth-source email account-type queries]))
 
 ;; User data initialization
 
@@ -553,8 +575,6 @@
            "WHERE users.email = ? AND users.account_type = ?"
            "AND password_suites.id = users.password_suite_id"))
 
-(defrecord AuthQueries [^String generic ^String pre ^String post ^String single])
-
 (def ^:const ^AuthQueries login-data-queries
   (->AuthQueries login-query
                  login-query-atypes-pre
@@ -566,11 +586,6 @@
                  password-query-atypes-pre
                  password-query-atypes-post
                  password-query-atypes-single))
-
-(defprotocol Authorizable
-  (get-user-auth-data
-    [auth-source email queries]
-    [auth-source email account-type queries]))
 
 (extend-protocol Authorizable
 
@@ -601,8 +616,8 @@
   (get-user-auth-data
     ([^AuthSettings src email ^AuthQueries queries]
      (if email
-       (let [global-db (.db ^AuthSettings src)]
-         (if-some [ac-type (keyword (prop-by-email global-db :account-type email))]
+       (let [db (.db ^AuthSettings src)]
+         (if-some [ac-type (keyword (prop-by-email db :account-type email))]
            (get-user-auth-data (get (.types ^AuthSettings src) ac-type) email ac-type queries)))))
     ([^AuthSettings src email ac-type ^AuthQueries queries]
      (if-some [ac-type (if (keyword? ac-type) ac-type (some-keyword ac-type))]
