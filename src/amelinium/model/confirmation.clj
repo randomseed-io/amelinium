@@ -77,6 +77,7 @@
    "last_name         = IF(NOW()>expires, VALUE(last_name),    last_name),"
    "password          = IF(NOW()>expires, VALUE(password),     password),"
    "password_suite_id = IF(NOW()>expires, VALUE(password_suite_id), password_suite_id),"
+   "req_id            = IF(NOW()>expires, NULL,                req_id),"
    "expires           = IF(NOW()>expires, VALUE(expires),      expires)"
    "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
 
@@ -385,3 +386,28 @@
    (decrease-attempts-core db id "creation"))
   ([db id reason]
    (decrease-attempts-core db id reason)))
+
+;; Updating confirmation request ID
+
+(defn update-request-id
+  ([db token request-id]
+   (if db
+     (if-some [token (some-str token)]
+       (if-some [request-id (some-str request-id)]
+         (sql/update! db :confirmations
+                      {:req-id request-id}
+                      {:token token}
+                      db/opts-simple-map)))))
+  ([db id code request-id]
+   (if db
+     (if-some [request-id (some-str request-id)]
+       (if-some [code (some-str code)]
+         (if-some [id (some-str id)]
+           (sql/update! db :confirmations
+                        {:req-id request-id}
+                        {:id id :code code}
+                        db/opts-simple-map))))))
+  ([db id code token request-id]
+   (if-some [token (some-str token)]
+     (update-request-id db token request-id)
+     (update-request-id db id code request-id))))
