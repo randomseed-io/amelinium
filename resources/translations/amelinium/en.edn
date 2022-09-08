@@ -65,6 +65,7 @@
    :error                 {:ok                "Success!"
                            :authorization     "Access denied."
                            :authentication    "Authentication error."
+                           :not-found         "Not found."
                            :session           "Session error."
                            :bad-parameters    "Your application has sent bad parameters."
                            :parameters        "Invalid parameters."
