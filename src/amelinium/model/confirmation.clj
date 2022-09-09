@@ -373,7 +373,7 @@
 
 (defn retry-email
   ([udata]
-   (decrease-attempts-core (:db udata) (:email udata)))
+   (decrease-attempts-core (get udata :db) (get udata :email) (get udata :reason)))
   ([db id]
    (decrease-attempts-core db id "creation"))
   ([db id reason]
@@ -381,7 +381,7 @@
 
 (defn retry-phone
   ([udata]
-   (decrease-attempts-core (:db udata) (:phone udata)))
+   (decrease-attempts-core (get udata :db) (get udata :phone) (get udata :reason)))
   ([db id]
    (decrease-attempts-core db id "creation"))
   ([db id reason]
