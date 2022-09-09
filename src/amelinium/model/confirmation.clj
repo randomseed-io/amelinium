@@ -165,7 +165,7 @@
                           (get udata :email)
                           (get udata :expires-in)
                           udata
-                          "creation"))
+                          (or (get udata :reason) "creation")))
   ([db udata reason]
    (gen-confirmation-core db
                           new-email-confirmation-query
