@@ -667,3 +667,31 @@
        (update req :response/body assoc
                :session/status  status
                :session/message message)))))
+
+(def error-to-response
+  {:verify/confirmed     render-already-reported
+   :verify/exists        render-conflict
+   :verify/not-confirmed render-unauthorized
+   :verify/expired       render-unauthorized
+   :verify/bad-id        render-unauthorized
+   :verify/bad-code      render-unauthorized
+   :verify/bad-token     render-unauthorized
+   :verify/bad-email     render-not-found
+   :verify/bad-phone     render-not-found
+   :verify/not-found     render-unauthorized
+   :verify/bad-reason    render-forbidden
+   :verify/bad-result    render-internal-server-error})
+
+(def error-to-status
+  {:verify/confirmed     :warning/already-reported
+   :verify/exists        :error/exists
+   :verify/not-confirmed :error/unauthorized
+   :verify/expired       :error/expired
+   :verify/bad-id        :error/unauthorized
+   :verify/bad-code      :error/unauthorized
+   :verify/bad-token     :error/unauthorized
+   :verify/bad-email     :error/not-found
+   :verify/bad-phone     :error/not-found
+   :verify/not-found     :error/unauthorized
+   :verify/bad-reason    :error/unauthorized
+   :verify/bad-result    :error/internal})
