@@ -693,3 +693,18 @@
 
 (p/import-vars [amelinium.common
                 lang-id lang-str lang-config lang-from-req])
+
+;; Errors to web responses
+
+(def error-to-response
+  {:verify/confirmed     render-already-reported
+   :verify/exists        render-conflict
+   :verify/not-confirmed render-unauthorized
+   :verify/expired       render-unauthorized
+   :verify/bad-id        render-unauthorized
+   :verify/bad-code      render-unauthorized
+   :verify/bad-token     render-unauthorized
+   :verify/bad-email     render-unauthorized
+   :verify/not-found     render-unauthorized
+   :verify/bad-reason    render-forbidden
+   :verify/bad-result    render-internal-server-error})
