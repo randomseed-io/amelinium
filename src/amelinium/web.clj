@@ -705,6 +705,7 @@
    :verify/bad-code      render-unauthorized
    :verify/bad-token     render-unauthorized
    :verify/bad-email     render-unauthorized
+   :verify/bad-phone     render-unauthorized
    :verify/not-found     render-unauthorized
    :verify/bad-reason    render-forbidden
    :verify/bad-result    render-internal-server-error})
