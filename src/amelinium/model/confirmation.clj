@@ -353,12 +353,13 @@
 (def ^:const decrease-attempts-query
   (str-squeeze-spc
    "INSERT IGNORE INTO confirmations"
-   "SELECT * FROM confirmations"
-   "         WHERE id = ? AND confirmed = FALSE AND attempts > 0"
-   "               AND NOW() <= expires AND reason = ?"
+   "SELECT * FROM confirmations WHERE id = ? AND reason = ?"
    "ON DUPLICATE KEY UPDATE"
-   "attempts = attempts - 1"
-   "RETURNING id, user_id, account_type, attempts, code, token, created, confirmed, expires"))
+   "attempts = IF(VALUE(confirmed) = FALSE AND"
+   "              VALUE(attempts)  > 0 AND"
+   "              VALUE(expires)   > NOW(),"
+   "              VALUE(attempts)-1, VALUE(attempts))"
+   "RETURNING id,user_id,user_uid,account_type,attempts,code,token,created,confirmed,expires"))
 
 (defn- decrease-attempts-core
   [db id reason]
@@ -366,7 +367,9 @@
     (if-some [id (some-str id)]
       (let [reason (or (some-str reason) "creation")]
         (if-some [r (jdbc/execute-one! db [decrease-attempts-query id reason] db/opts-simple-map)]
-          (dissoc (assoc r :confirmed? false) :confirmed)
+          (-> r
+              (assoc :confirmed? (pos-int? (get r :confirmed))) (dissoc :confirmed)
+              (map/update-existing :account-type some-keyword))
           (let [errs (report-errors db id nil reason false)]
             {:errors errs
              :error  (most-significant-error errs)}))))))
