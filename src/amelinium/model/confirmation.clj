@@ -249,8 +249,8 @@
    (let [id     (some-str id)
          reason (or (some-str reason) "creation")
          qargs  (cond code          [report-errors-code-query      reason id code]
-                      (false? code) [report-errors-simple-id-query reason id reason]
-                      :no-code      [report-errors-id-query        reason id])]
+                      (false? code) [report-errors-simple-id-query reason id]
+                      :no-code      [report-errors-id-query        reason id reason])]
      (or (process-errors (jdbc/execute-one! db qargs db/opts-simple-map) should-be-confirmed?)
          (if code verify-bad-code-set verify-bad-id-set))))
   ([db id token code reason should-be-confirmed?]
