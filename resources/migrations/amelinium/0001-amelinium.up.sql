@@ -127,6 +127,7 @@ CREATE INDEX IF NOT EXISTS session_variables_index ON session_variables(session_
 CREATE TABLE IF NOT EXISTS confirmations (
   id                CHAR(128) NOT NULL,
   user_id           INTEGER UNSIGNED NULL,
+  user_uid          UUID NULL,
   code              CHAR(16) NULL,
   token             CHAR(128) NULL,
   reason            ENUM('creation', 'recovery', 'unlock') NOT NULL,
