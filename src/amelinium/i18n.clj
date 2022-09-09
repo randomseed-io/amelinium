@@ -50,11 +50,23 @@
 (defn translation-fn
   "Tries to obtain translation function from a route data in a request map or a `Match`
   object and if that fails from a request map itself. Falls back to a global variable
-  `amelinium.i18n/translations`."
+  `amelinium.i18n/translations`.
+
+  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` then the
+  generated translation function will always generate `nil` when a key is missing,
+  ignoring dynamic binding."
   [req-or-match]
-  (or (http/get-route-data req-or-match :translations)
-      (if-not (http/match? req-or-match) (get req-or-match :translations))
-      translations))
+  (let [f (or (http/get-route-data req-or-match :translations)
+              (if-not (http/match? req-or-match) (get req-or-match :translations))
+              translations)]
+    (if *handle-missing-keys*
+      f
+      (fn translate-without-default
+        ([key]              (binding [*handle-missing-keys* false] (f key)))
+        ([key x]            (binding [*handle-missing-keys* false] (f key x)))
+        ([key x y]          (binding [*handle-missing-keys* false] (f key x y)))
+        ([key x y z]        (binding [*handle-missing-keys* false] (f key x y z)))
+        ([key x y z & more] (binding [*handle-missing-keys* false] (apply f key x y z more)))))))
 
 ;; Builders
 
@@ -65,7 +77,11 @@
 
   When `locale` is given it will generate a translation function with predefined
   translator and locale. If it's not given, it will use language obtained from the
-  context map `req`."
+  context map `req`.
+
+  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` then the
+  generated translation function will always generate `nil` when a key is missing,
+  ignoring dynamic binding."
   ([req-or-match]
    (translator req-or-match nil))
   ([req-or-match locale]
@@ -86,7 +102,11 @@
 
   When `locale` is given it will generate a translation function with predefined
   translator and locale. If it's not given, it will use language obtained from the
-  context map `req`."
+  context map `req`.
+
+  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` then the
+  generated translation function will always generate `nil` when a key is missing,
+  ignoring dynamic binding."
   ([req-or-match]
    (translator-sub req-or-match nil))
   ([req-or-match locale]
@@ -104,7 +124,16 @@
 (defn translate-with
   "Returns a translation string for the given `locale` (language ID) and the keyword
   `key` using a translation function `tf`. Any optional arguments are passed as they
-  are."
+  are.
+
+  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` (which can
+  be set using `no-default` macro) then the function will return `nil` when a key is
+  missing instead of a warning string.
+
+  If a translation function `tr` was generated (using `translation-fn`, `translator`
+  or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
+  or `nil` then it will always return `nil` when a key is missing, regardless of
+  current value of `*handle-missing-keys*` in the calling context."
   ([tf locale key]            (tf (make-kw locale) key))
   ([tf locale key x]          (tf (make-kw locale) key x))
   ([tf locale key x y]        (tf (make-kw locale) key x y))
@@ -114,7 +143,16 @@
   "Returns a translation string for the given `locale` (language ID), the namespace
   name `ns-name` and the key name `key-name`, using the given translation function
   `tf`. Useful to translate nested keys which are translated to fully-qualified
-  keywords. Any additional arguments are passed as they are."
+  keywords. Any additional arguments are passed as they are.
+
+  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` (which can
+  be set using `no-default` macro) then the function will return `nil` when a key is
+  missing instead of a warning string.
+
+  If a translation function `tr` was generated (using `translation-fn`, `translator`
+  or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
+  or `nil` then it will always return `nil` when a key is missing, regardless of
+  current value of `*handle-missing-keys*` in the calling context."
   ([tf locale key-ns key-name]            (tf (make-kw locale) (make-kw key-ns key-name)))
   ([tf locale key-ns key-name x]          (tf (make-kw locale) (make-kw key-ns key-name) x))
   ([tf locale key-ns key-name x y]        (tf (make-kw locale) (make-kw key-ns key-name) x y))
@@ -124,7 +162,16 @@
   "Returns a translation string for the given `locale` (language ID) and the keyword
   `key` using a translation function obtained from the given request map (`req`) by
   calling `translator` function on it. Any optional arguments are passed as they
-  are."
+  are.
+
+  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` (which can
+  be set using `no-default` macro) then the function will return `nil` when a key is
+  missing instead of a warning string.
+
+  If a translation function `tr` was generated (using `translation-fn`, `translator`
+  or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
+  or `nil` then it will always return `nil` when a key is missing, regardless of
+  current value of `*handle-missing-keys*` in the calling context."
   ([req locale key]            ((translator req (make-kw locale)) key))
   ([req locale key x]          ((translator req (make-kw locale)) key x))
   ([req locale key x y]        ((translator req (make-kw locale)) key x y))
@@ -135,7 +182,16 @@
   name `ns-name` and the key name `key-name`. Useful to translate nested keys which
   are translated to fully-qualified keywords. The translation function will be
   obtained by calling `translator` on `req` (which may be a request map or a `Match`
-  object). Any additional arguments are passed as they are."
+  object). Any additional arguments are passed as they are.
+
+  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` (which can
+  be set using `no-default` macro) then the function will return `nil` when a key is
+  missing instead of a warning string.
+
+  If a translation function `tr` was generated (using `translation-fn`, `translator`
+  or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
+  or `nil` then it will always return `nil` when a key is missing, regardless of
+  current value of `*handle-missing-keys*` in the calling context."
   ([req locale key-ns key-name]            ((translator req (make-kw locale)) (make-kw key-ns key-name)))
   ([req locale key-ns key-name x]          ((translator req (make-kw locale)) (make-kw key-ns key-name) x))
   ([req locale key-ns key-name x y]        ((translator req (make-kw locale)) (make-kw key-ns key-name) x y))
@@ -144,7 +200,16 @@
 (defn tr
   "Returns a translation string for the given locale (obtained from a request map)
   and the keyword `key` using a translation function (obtained from a
-  request map or a `Match` object). Any optional arguments are passed as they are."
+  request map or a `Match` object). Any optional arguments are passed as they are.
+
+  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` (which can
+  be set using `no-default` macro) then the function will return `nil` when a key is
+  missing instead of a warning string.
+
+  If a translation function `tr` was generated (using `translation-fn`, `translator`
+  or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
+  or `nil` then it will always return `nil` when a key is missing, regardless of
+  current value of `*handle-missing-keys*` in the calling context."
   ([req key]            ((translator req) key))
   ([req key x]          ((translator req) key x))
   ([req key x y]        ((translator req) key x y))
@@ -155,13 +220,26 @@
   the namespace name `key-ns` and the key name `key-name`. Useful to translate nested
   keys which are translated to fully-qualified keywords. The translation function
   will be obtained by calling `translator` on `req` (which may be a request map or a
-  `Match` object). Any additional arguments are passed as they are."
+  `Match` object). Any additional arguments are passed as they are.
+
+  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` (which can
+  be set using `no-default` macro) then the function will return `nil` when a key is
+  missing instead of a warning string.
+
+  If a translation function `tr` was generated (using `translation-fn`, `translator`
+  or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
+  or `nil` then it will always return `nil` when a key is missing, regardless of
+  current value of `*handle-missing-keys*` in the calling context."
   ([req key-ns key-name]            ((translator req) (make-kw key-ns key-name)))
   ([req key-ns key-name x]          ((translator req) (make-kw key-ns key-name) x))
   ([req key-ns key-name x y]        ((translator req) (make-kw key-ns key-name) x y))
   ([req key-ns key-name x y & more] (apply (translator req) (make-kw key-ns key-name) x y more)))
 
 (defmacro no-default
+  "Sets `*handle-missing-keys*` dynamic variable to `false`, causing translation
+  functions to return `nil` when translation key is not found instead of a warning
+  string. Also, when used with `translation-fn`, `translator` or `translator-sub`
+  causes generated function to always behave that way."
   [& body]
   `(binding [*handle-missing-keys* false]
      ~@body))
@@ -169,6 +247,9 @@
 ;; Initialization
 
 (defn missing-key
+  "Returns a warning string for a missing key (defined under a special key
+  `:amelinium/missing-key`) if the dynamic variable `*handle-missing-keys*` is set to
+  a truthy value. Otherwise it returns `nil`."
   [f locale k]
   (if *handle-missing-keys* (f locale :amelinium/missing-key k)))
 
