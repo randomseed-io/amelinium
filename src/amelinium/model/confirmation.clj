@@ -269,6 +269,25 @@
      (report-errors db token   reason should-be-confirmed?)
      (report-errors db id code reason should-be-confirmed?))))
 
+(defn specific-id
+  "Makes errors more specific by replacing generic bad ID error (as a keyword) with a
+  bad e-mail or phone error."
+  ([errs id src-id email-id phone-id]
+   (if errs
+     (if (contains? errs src-id)
+       (if-some [id (some-str id)]
+         (if-some [dst-id (cond (str/index-of id \@ 1) email-id
+                                (= (first id) \+)      phone-id)]
+           (conj (disj errs src-id) dst-id)
+           errs)
+         errs)
+       errs)))
+  ([errs src-id dst-id]
+   (if errs
+     (if (contains? errs src-id)
+       (conj (disj errs src-id) dst-id)
+       errs))))
+
 (defn code-to-token
   "Returns a confirmation token associated with the given confirmation code and
   identity. Additionally returns confirmation status."
@@ -322,7 +341,8 @@
                                        db/opts-simple-map))]
          (if (pos-int? r)
            {:confirmed? true}
-           (let [errs (report-errors db id code reason false)]
+           (let [errs (report-errors db id code reason false)
+                 errs (specific-id errs id :verify/bad-id :verify/bad-email :verify/bad-phone)]
              (if (and (= 1 (count errs)) (contains? errs :verify/confirmed))
                {:confirmed? true}
                {:confirmed? false
@@ -381,7 +401,8 @@
           (-> r
               (assoc :confirmed? (pos-int? (get r :confirmed))) (dissoc :confirmed)
               (map/update-existing :account-type some-keyword))
-          (let [errs (report-errors db id nil reason false)]
+          (let [errs (report-errors db id nil reason false)
+                errs (specific-id errs id :verify/bad-id :verify/bad-email :verify/bad-phone)]
             {:errors errs
              :error  (most-significant-error errs)}))))))
 
