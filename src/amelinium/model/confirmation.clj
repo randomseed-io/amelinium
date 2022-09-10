@@ -398,7 +398,9 @@
       (let [reason (or (some-str reason) "creation")]
         (if-some [r (jdbc/execute-one! db [decrease-attempts-query id reason] db/opts-simple-map)]
           (-> r
+              (assoc :exists?    (pos-int? (get r :user-id)))
               (assoc :confirmed? (pos-int? (get r :confirmed))) (dissoc :confirmed)
+              (map/update-existing :user-uid     (comp parse-uuid str))
               (map/update-existing :account-type some-keyword))
           (let [errs (report-errors db id nil reason false)
                 errs (specific-id errs id :verify/bad-id :verify/bad-email :verify/bad-phone)]
