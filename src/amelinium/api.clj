@@ -673,25 +673,27 @@
    :verify/exists        render-conflict
    :verify/not-confirmed render-unauthorized
    :verify/expired       render-unauthorized
+   :verify/max-attempts  render-too-many-requests
    :verify/bad-id        render-unauthorized
    :verify/bad-code      render-unauthorized
    :verify/bad-token     render-unauthorized
    :verify/bad-email     render-not-found
    :verify/bad-phone     render-not-found
-   :verify/not-found     render-unauthorized
+   :verify/not-found     render-not-found
    :verify/bad-reason    render-forbidden
    :verify/bad-result    render-internal-server-error})
 
 (def error-to-status
   {:verify/confirmed     :warning/already-reported
    :verify/exists        :error/exists
-   :verify/not-confirmed :error/unauthorized
-   :verify/expired       :error/expired
-   :verify/bad-id        :error/unauthorized
-   :verify/bad-code      :error/unauthorized
-   :verify/bad-token     :error/unauthorized
+   :verify/not-confirmed :error/authorization
+   :verify/expired       :error/authorization
+   :verify/max-attempts  :error/too-many-requests
+   :verify/bad-id        :error/authorization
+   :verify/bad-code      :error/authorization
+   :verify/bad-token     :error/authorization
    :verify/bad-email     :error/not-found
    :verify/bad-phone     :error/not-found
-   :verify/not-found     :error/unauthorized
-   :verify/bad-reason    :error/unauthorized
+   :verify/not-found     :error/not-found
+   :verify/bad-reason    :error/authorization
    :verify/bad-result    :error/internal})

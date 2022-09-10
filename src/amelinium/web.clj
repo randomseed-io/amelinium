@@ -701,6 +701,7 @@
    :verify/exists        render-conflict
    :verify/not-confirmed render-unauthorized
    :verify/expired       render-unauthorized
+   :verify/max-attempts  render-too-many-requests
    :verify/bad-id        render-unauthorized
    :verify/bad-code      render-unauthorized
    :verify/bad-token     render-unauthorized
