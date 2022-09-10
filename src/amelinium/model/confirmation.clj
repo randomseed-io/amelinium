@@ -219,17 +219,21 @@
   [:verify/bad-result
    :verify/bad-token
    :verify/bad-code
+   :verify/bad-email
+   :verify/bad-phone
    :verify/bad-id
    :verify/not-found
    :verify/bad-reason
    :verify/expired
+   :verify/too-many-requests
    :verify/exists
    :verify/not-confirmed
    :verify/confirmed])
 
 (defn most-significant-error
   [errors]
-  (if errors (some errors errs-prioritized)))
+  (if errors
+    (or (some errors errs-prioritized) (first errors))))
 
 (defn- process-errors
   [r should-be-confirmed?]
