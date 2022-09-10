@@ -65,6 +65,7 @@
    :error                 {:ok                "Sukces!"
                            :authorization     "Brak dostępu."
                            :authentication    "Błąd uwierzytelniania."
+                           :too-many-requests "Zbyt wiele żądań."
                            :not-found         "Nie znaleziono."
                            :session           "Błąd sesji."
                            :bad-parameters    "Twoja aplikacja wysłała błędne parametry."
