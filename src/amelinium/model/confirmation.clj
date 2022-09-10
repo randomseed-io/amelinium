@@ -60,12 +60,15 @@
 (defn gen-confirmation-query
   [id-column dec-att?]
   (str-squeeze-spc
-   "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,"
+   "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,user_uid,"
    "attempts,account_type,first_name,middle_name,last_name,password,password_suite_id)"
-   (str "SELECT ?,?,?,?,?,0,(SELECT users.id FROM users WHERE users."
-        (or (some-str id-column) "email") " = ?),?,?,?,?,?,?,?")
+   (str "SELECT ?,?,?,?,?,0,"
+        " (SELECT users.id  FROM users WHERE users." (or (some-str id-column) "email") " = ?),"
+        " (SELECT users.uid FROM users WHERE users." (or (some-str id-column) "email") " = ?),"
+        "?,?,?,?,?,?,?")
    "ON DUPLICATE KEY UPDATE"
-   "user_id           = VALUE(user_id),"
+   "user_id           = IF(NOW()>expires, VALUE(user_id),      user_id),"
+   "user_uid          = IF(NOW()>expires, VALUE(user_uid),     user_uid),"
    "attempts          = IF(NOW()>expires, VALUE(attempts)," (str "attempts" (if dec-att? " - 1") "),")
    "code              = IF(NOW()>expires, VALUE(code),         code),"
    "token             = IF(NOW()>expires, VALUE(token),        token),"
@@ -79,7 +82,7 @@
    "password_suite_id = IF(NOW()>expires, VALUE(password_suite_id), password_suite_id),"
    "req_id            = IF(NOW()>expires, NULL,                req_id),"
    "expires           = IF(NOW()>expires, VALUE(expires),      expires)"
-   "RETURNING user_id, account_type, attempts, code, token, created, confirmed, expires"))
+   "RETURNING user_id,user_uid,account_type,attempts,code,token,created,confirmed,expires"))
 
 (def ^:const new-email-confirmation-query
   (gen-confirmation-query :email true))
@@ -102,7 +105,7 @@
   identity (as a string) and `:reason` set to the given reason (as a keyword or `nil`
   if not given)."
   ([db query id exp udata]
-   (gen-confirmation-core db query id exp udata nil true))
+   (gen-confirmation-core db query id exp udata (get udata :reason)))
   ([db query id exp udata reason]
    (if db
      (if-some [id (some-str id)]
@@ -114,14 +117,18 @@
              udata  (mapv #(get udata %) [:max-attempts :account-type
                                           :first-name :middle-name :last-name
                                           :password :password-suite-id])
-             qargs  (list* query id code token reason exp id udata)]
+             qargs  (list* query id code token reason exp id id udata)]
          (if-some [r (jdbc/execute-one! db qargs db/opts-simple-map)]
-           (let [user-id    (get r :user-id)
-                 exists?    (pos-int? user-id)
-                 confirmed? (pos-int? (get r :confirmed))]
-             (-> (if exists? (assoc r :exists? true :user/id user-id) (assoc r :exists? false))
-                 (assoc :confirmed? (pos-int? (get r :confirmed)))
+           (let [user-id   (get r :user-id)
+                 user-id?  (pos-int? user-id)
+                 user-uid  (parse-uuid (str (get r :user-uid)))
+                 user-uid? (uuid? user-uid)]
+             (-> r
+                 (map/assoc-if user-id?  :user/id  user-id)
+                 (map/assoc-if user-uid? :user/uid user-uid)
+                 (assoc :exists? user-id? :confirmed? (pos-int? (get r :confirmed)))
                  (dissoc :confirmed)
+                 (map/update-existing :account-type some-keyword)
                  (map/update-existing :reason some-keyword)))))))))
 
 (defn create-for-registration-without-attempt
@@ -140,7 +147,7 @@
                           (get udata :email)
                           (get udata :expires-in)
                           udata
-                          "creation"))
+                          (or (get udata :reason) "creation")))
   ([db udata reason]
    (gen-confirmation-core db
                           new-email-confirmation-query-without-attempt
