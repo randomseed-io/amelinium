@@ -384,11 +384,10 @@
 (def ^:const decrease-attempts-query
   (str-squeeze-spc
    "INSERT IGNORE INTO confirmations"
-   "SELECT * FROM confirmations WHERE id = ? AND reason = ?"
+   "SELECT * FROM confirmations"
+   "WHERE id = ? AND reason = ? AND expires > NOW()"
    "ON DUPLICATE KEY UPDATE"
-   "attempts = IF(VALUE(confirmed) = FALSE AND"
-   "              VALUE(attempts)  > 0 AND"
-   "              VALUE(expires)   > NOW(),"
+   "attempts = IF(VALUE(confirmed) = FALSE AND VALUE(attempts)  > 0,"
    "              VALUE(attempts)-1, VALUE(attempts))"
    "RETURNING id,user_id,user_uid,account_type,attempts,code,token,created,confirmed,expires"))
 
