@@ -870,6 +870,15 @@
     :headers {}
     :body    body}))
 
+(defn early-hints
+  "103 Early Hints
+   The server sends some response headers (e.g. HTML resource links) before final HTTP message."
+  ([] (early-hints nil))
+  ([body]
+   {:status  103
+    :headers {}
+    :body    body}))
+
 ;; Rendering
 
 (defn render
