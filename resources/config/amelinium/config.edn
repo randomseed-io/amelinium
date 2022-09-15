@@ -259,14 +259,15 @@
  ;; HTTP default router
 
  :amelinium.http.router/web [#ref :amelinium.http.router/web-routes
-                             {:data {:compile      reitit.coercion/compile-request-coercers
-                                     :middleware   #ref :amelinium.http.middleware/web
-                                     :translations #ref :amelinium.i18n/translations
-                                     :auth/config  #ref :amelinium.auth/settings
-                                     :oplog/config #ref :amelinium.common.oplog.auth/log
-                                     :coercion     #ref :amelinium.http.middleware.coercion/coercer
+                             {:data {:compile       reitit.coercion/compile-request-coercers
+                                     :middleware    #ref :amelinium.http.middleware/web
+                                     :translations  #ref :amelinium.i18n/translations
+                                     :errors/config #ref :amelinium.errors/settings
+                                     :auth/config   #ref :amelinium.auth/settings
+                                     :oplog/config  #ref :amelinium.common.oplog.auth/log
+                                     :coercion      #ref :amelinium.http.middleware.coercion/coercer
                                      ;;:exception  reitit.dev.pretty/exception
-                                     :appinit      #ref :amelinium.app/init}}]
+                                     :appinit       #ref :amelinium.app/init}}]
 
  ;; HTTP default handler
 
@@ -383,6 +384,54 @@
  ;; I18n
 
  :amelinium.i18n/translations {:tongue/fallback :en}
+
+ ;; Error handling
+
+ :amelinium.errors/priorities [:verify/bad-result
+                               :verify/bad-token
+                               :verify/bad-code
+                               :verify/bad-email
+                               :verify/bad-phone
+                               :verify/bad-id
+                               :verify/not-found
+                               :verify/bad-reason
+                               :verify/expired
+                               :verify/too-many-requests
+                               :verify/exists
+                               :verify/not-confirmed
+                               :verify/confirmed]
+
+ :amelinium.errors/web {:priorities #ref :amelinium.errors/priorities
+                        :responses  {:verify/confirmed     amelinium.web/render-already-reported
+                                     :verify/exists        amelinium.web/render-conflict
+                                     :verify/not-confirmed amelinium.web/render-unauthorized
+                                     :verify/expired       amelinium.web/render-unauthorized
+                                     :verify/max-attempts  amelinium.web/render-too-many-requests
+                                     :verify/bad-id        amelinium.web/render-unauthorized
+                                     :verify/bad-code      amelinium.web/render-unauthorized
+                                     :verify/bad-token     amelinium.web/render-unauthorized
+                                     :verify/bad-email     amelinium.web/render-unauthorized
+                                     :verify/bad-phone     amelinium.web/render-unauthorized
+                                     :verify/not-found     amelinium.web/render-unauthorized
+                                     :verify/bad-reason    amelinium.web/render-forbidden
+                                     :verify/bad-result    amelinium.web/render-internal-server-error}
+                        :views      {:verify/confirmed "user/confirmed-already"
+                                     :verify/exists    "user/exists"}}
+
+ :amelinium.errors/api {:priorities #ref :amelinium.errors/priorities
+                        :responses  {:verify/confirmed     amelinium.api/render-already-reported
+                                     :verify/exists        amelinium.api/render-conflict
+                                     :verify/not-confirmed amelinium.api/render-unauthorized
+                                     :verify/expired       amelinium.api/render-unauthorized
+                                     :verify/max-attempts  amelinium.api/render-too-many-requests
+                                     :verify/bad-id        amelinium.api/render-unauthorized
+                                     :verify/bad-code      amelinium.api/render-unauthorized
+                                     :verify/bad-token     amelinium.api/render-unauthorized
+                                     :verify/bad-email     amelinium.api/render-not-found
+                                     :verify/bad-phone     amelinium.api/render-not-found
+                                     :verify/not-found     amelinium.api/render-not-found
+                                     :verify/bad-reason    amelinium.api/render-forbidden
+                                     :verify/bad-result    amelinium.api/render-internal-server-error}}
 
  ;; Logger
 
