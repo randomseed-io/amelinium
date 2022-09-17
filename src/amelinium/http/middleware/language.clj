@@ -210,11 +210,11 @@
 
 (def query-params-picker
   (-> req-picker
-      (assoc :key-path :params)))
+      (assoc :key-path :query-params)))
 
 (def query-params-picker-str
   (-> req-picker
-      (assoc :key-path :params :stringify-lang-param? true)))
+      (assoc :key-path :query-params :stringify-lang-param? true)))
 
 (def form-params-picker-str
   {:compile (fn [config]
