@@ -414,9 +414,7 @@
                                      :verify/bad-phone     amelinium.web/render-unauthorized
                                      :verify/not-found     amelinium.web/render-unauthorized
                                      :verify/bad-reason    amelinium.web/render-forbidden
-                                     :verify/bad-result    amelinium.web/render-internal-server-error}
-                        :views      {:verify/confirmed "user/confirmed-already"
-                                     :verify/exists    "user/exists"}}
+                                     :verify/bad-result    amelinium.web/render-internal-server-error}}
 
  :amelinium.errors/api {:priorities #ref :amelinium.errors/priorities
                         :responses  {:verify/confirmed     amelinium.api/render-already-reported
