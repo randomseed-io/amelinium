@@ -19,6 +19,7 @@
             [selmer.parser                        :as       selmer]
             [amelinium.i18n                       :as         i18n]
             [amelinium.common                     :as       common]
+            [amelinium.errors                     :as       errors]
             [amelinium.http                       :as         http]
             [amelinium.http.middleware.language   :as     language]
             [amelinium.http.middleware.session    :as      session]
@@ -269,17 +270,31 @@
 
 ;; Response rendering
 
-(defn- update-http-code-name
-  [req lang data]
-  (if-some [hcode (get data :http/code)]
-    (let [translate-sub (common/translator-sub req lang)]
-      (-> data
-          (map/assoc-missing :http/code-name (delay (i18n/no-default (translate-sub hcode))))
-          (map/assoc-missing :http/code-description (delay (i18n/no-default
-                                                            (translate-sub (namespace hcode)
-                                                                           (str (name hcode)
-                                                                                ".full")))))))
+(defn- update-status-messages
+  [data req status lang]
+  (if (some? status)
+    (let [translate-sub (delay (i18n/no-default (common/translator-sub req lang)))]
+      (map/assoc-missing
+       data
+       :http/status             status
+       :http/status-name        (delay (@translate-sub status))
+       :http/status-description (delay (@translate-sub (namespace status) (str (name status) ".full")))))
     data))
+
+(defn- error-lv
+  [req status layout view]
+  (if (or (nil? status)
+          (and layout view)
+          (contains? #{"ok" "info"} (namespace status)))
+    [layout view]
+    [(or layout
+         (get (http/req-or-route-param req :error/layouts) status)
+         (http/req-or-route-param req :app/error-layout)
+         "error")
+     (or view
+         (get (http/req-or-route-param req :error/views) status)
+         (http/req-or-route-param req :app/error-view)
+         "error")]))
 
 (defn render
   "HTML web page renderer. Takes a request, a data map to be used in templates, a name
@@ -289,23 +304,54 @@
   language cannot be established otherwise and taken from the request if not
   given). Uses values associated with the `:layout/dir` and `:view/dir` keys of the
   `req` to obtain optional subdirectories to be looked up when searching for views
-  and layouts."
+  and layouts.
+
+  It will add `:http/status`, `:http/status-name` and `:http/status-message` entries
+  to `:app/data` map (unless it already contains one), using configuration maps
+  associated with the `:errors/config` key of a route data.
+
+  In case of a regular response page (when the namespace of a `status` keyword is
+  \"ok\" or \"info\") the following sources are checked to find a layout path:
+  - the given `layout`,
+  - value of `:app/layout` (in a route data or a request map).
+
+  In case of a regular response page (when the namespace of a `status` keyword is
+  \"ok\" or \"info\") the following sources are checked to find a view path:
+  - the given `view`,
+  - value of `:app/view` (in a route data or a request map).
+
+  In case of an error response page (when the namespace of a `status` keyword is not
+  \"ok\" nor \"info\") the following sources are checked to find a layout path:
+  - the given `layout`,
+  - value of `status` looked up in a map under `:error/layouts` (in a route data or a request map),
+  - value of `:app/error-layout` (in a route data or a request map),
+  - \"error\".
+
+  In case of an error response page (when the namespace of a status keyword is not
+  \"ok\" nor \"info\") the following sources are checked to find a view path:
+  - the given `view`,
+  - value of `status` looked up in a map under `:error/views` (in a  route data or a request map),
+  - value of `:app/error-view` (in a route data or a request map),
+  - \"error\"."
   ([]
-   (render nil nil nil nil nil nil))
+   (render nil :ok/found nil nil nil nil nil))
   ([req]
-   (render req nil nil nil nil nil))
-  ([req data]
-   (render req data nil nil nil nil))
-  ([req data view]
-   (render req data view nil nil nil))
-  ([req data view layout]
-   (render req data view layout nil nil))
-  ([req data view layout lang]
-   (render req data view layout lang nil))
-  ([req data view layout lang sess]
-   (let [lang (or lang (if-not (false? lang) (pick-language-str req)))
-         layt (resolve-layout req lang layout)
-         view (resolve-view   req lang view)]
+   (render req :ok/found nil nil nil nil nil))
+  ([req status]
+   (render req status nil nil nil nil nil))
+  ([req status data]
+   (render req status data nil nil nil nil))
+  ([req status data view]
+   (render req status data view nil nil nil))
+  ([req status data view layout]
+   (render req status data view layout nil nil))
+  ([req status data view layout lang]
+   (render req status data view layout lang nil))
+  ([req status data view layout lang sess]
+   (let [lang        (or lang (if-not (false? lang) (pick-language-str req)))
+         [layt view] (error-lv req status layout view)
+         layt        (resolve-layout req lang layt)
+         view        (resolve-view   req lang view)]
      (if (and layt view)
        (let [dlng (or lang (get req :language/str))
              data (prep-app-data req data)
@@ -313,7 +359,7 @@
                                      :url  (delay (req/request-url req))
                                      :path (delay (common/page req))
                                      :lang dlng)
-             data (update-http-code-name req dlng data)
+             data (update-status-messages data req status dlng)
              html (selmer/render-file view data)
              rndr (assoc data :body [:safe html])
              resp (selmer/render-file layt rndr)]
@@ -329,355 +375,345 @@
   values associated with the `:app/data`, `:app/view`, `:app/layout`, `:app/view-dir`
   and `:app/layout-dir` in the `req` map, or provided as arguments) and response
   headers (using the `:response/headers` value), unless the `req` is already a valid
-  response."
+  response.
+
+  It will add `:http/status`, `:http/status-name` and `:http/status-message` entries
+  to `:app/data` map (unless it already contains one), using configuration maps
+  associated with the `:errors/config` key of a route data.
+
+    In case of a regular response page (when the namespace of a `status` keyword is
+  \"ok\" or \"info\") the following sources are checked to find a layout path:
+  - the given `layout`,
+  - value of `:app/layout` (in a route data or a request map).
+
+  In case of a regular response page (when the namespace of a `status` keyword is
+  \"ok\" or \"info\") the following sources are checked to find a view path:
+  - the given `view`,
+  - value of `:app/view` (in a route data or a request map).
+
+  In case of an error response page (when the namespace of a `status` keyword is not
+  \"ok\" nor \"info\") the following sources are checked to find a layout path:
+  - the given `layout`,
+  - value of `status` looked up in a map under `:error/layouts` (in a route data or a request map),
+  - value of `:app/error-layout` (in a route data or a request map),
+  - \"error\".
+
+  In case of an error response page (when the namespace of a status keyword is not
+  \"ok\" nor \"info\") the following sources are checked to find a view path:
+  - the given `view`,
+  - value of `status` looked up in a map under `:error/views` (in a  route data or a request map),
+  - value of `:app/error-view` (in a route data or a request map),
+  - \"error\"."
   ([]
-   (render-response resp/ok nil nil nil nil nil nil))
+   (render-response resp/ok :ok/found nil nil nil nil nil nil))
   ([resp-fn]
-   (render-response resp-fn nil nil nil nil nil nil))
+   (render-response resp-fn nil nil nil nil nil nil nil))
   ([resp-fn req]
-   (render-response resp-fn req nil nil nil nil nil))
-  ([resp-fn req data]
-   (render-response resp-fn req data nil nil nil nil))
-  ([resp-fn req data view]
-   (render-response resp-fn req data view nil nil nil))
-  ([resp-fn req data view layout]
-   (render-response resp-fn req data view layout nil nil))
-  ([resp-fn req data view layout lang]
-   (render-response resp-fn req data view layout lang nil))
-  ([resp-fn req data view layout lang sess]
+   (render-response resp-fn nil req nil nil nil nil nil))
+  ([resp-fn status req]
+   (render-response resp-fn status req nil nil nil nil nil))
+  ([resp-fn status req data]
+   (render-response resp-fn status req data nil nil nil nil))
+  ([resp-fn status req data view]
+   (render-response resp-fn status req data view nil nil nil))
+  ([resp-fn status req data view layout]
+   (render-response resp-fn status req data view layout nil nil))
+  ([resp-fn status req data view layout lang]
+   (render-response resp-fn status req data view layout lang nil))
+  ([resp-fn status req data view layout lang sess]
    (if (resp/response? req)
      req
      (if-some [headers (get req :response/headers)]
-       (-> (render req data view layout lang sess) resp-fn (update :headers conj headers))
-       (resp-fn (render req data view layout lang sess))))))
+       (-> (render req status data view layout lang sess) resp-fn (update :headers conj headers))
+       (-> (render req status data view layout lang sess) resp-fn)))))
 
 (defn render-response-force
   "Web response renderer. Uses the `render` function to render a response body
   (using values associated with the `:app/data`, `:app/view` and `:app/layout` in the
   `req` map, or provided as arguments) and the response headers (using the
   `:response/headers` value), regardless if the `req` is already a valid response or
-  not."
+  not.
+
+  It will add `:http/status`, `:http/status-name` and `:http/status-message` entries
+  to `:app/data` map (unless it already contains one), using configuration maps
+  associated with the `:errors/config` key of a route data.
+
+  In case of a regular response page (when the namespace of a `status` keyword is
+  \"ok\" or \"info\") the following sources are checked to find a layout path:
+  - the given `layout`,
+  - value of `:app/layout` (in a route data or a request map).
+
+  In case of a regular response page (when the namespace of a `status` keyword is
+  \"ok\" or \"info\") the following sources are checked to find a view path:
+  - the given `view`,
+  - value of `:app/view` (in a route data or a request map).
+
+  In case of an error response page (when the namespace of a `status` keyword is not
+  \"ok\" nor \"info\") the following sources are checked to find a layout path:
+  - the given `layout`,
+  - value of `status` looked up in a map under `:error/layouts` (in a route data or a request map),
+  - value of `:app/error-layout` (in a route data or a request map),
+  - \"error\".
+
+  In case of an error response page (when the namespace of a status keyword is not
+  \"ok\" nor \"info\") the following sources are checked to find a view path:
+  - the given `view`,
+  - value of `status` looked up in a map under `:error/views` (in a  route data or a request map),
+  - value of `:app/error-view` (in a route data or a request map),
+  - \"error\"."
   ([]
-   (render-response resp/ok nil nil nil nil nil nil))
+   (render-response resp/ok :ok/found nil nil nil nil nil nil))
   ([resp-fn]
-   (render-response resp-fn nil nil nil nil nil nil))
+   (render-response resp-fn nil nil nil nil nil nil nil))
   ([resp-fn req]
-   (render-response resp-fn req nil nil nil nil nil))
-  ([resp-fn req data]
-   (render-response resp-fn req data nil nil nil nil))
-  ([resp-fn req data view]
-   (render-response resp-fn req data view nil nil nil))
-  ([resp-fn req data view layout]
-   (render-response resp-fn req data view layout nil nil))
-  ([resp-fn req data view layout lang]
-   (render-response resp-fn req data view layout lang nil))
-  ([resp-fn req data view layout lang sess]
+   (render-response resp-fn nil req nil nil nil nil nil))
+  ([resp-fn status req]
+   (render-response resp-fn status req nil nil nil nil nil))
+  ([resp-fn status req data]
+   (render-response resp-fn status req data nil nil nil nil))
+  ([resp-fn status req data view]
+   (render-response resp-fn status req data view nil nil nil))
+  ([resp-fn status req data view layout]
+   (render-response resp-fn status req status data view layout nil nil))
+  ([resp-fn status req data view layout lang]
+   (render-response resp-fn status req data view layout lang nil))
+  ([resp-fn status req data view layout lang sess]
    (if-some [headers (get req :response/headers)]
-     (-> (render req data view layout lang sess) resp-fn (update :headers conj headers))
-     (-> (render req data view layout lang sess) resp-fn))))
+     (-> (render req status data view layout lang sess) resp-fn (update :headers conj headers))
+     (-> (render req status data view layout lang sess) resp-fn))))
 
 ;; Rendering functions generation
 
 (defmacro def-render
   "Generates a web rendering function."
   {:arglists '([name f]
-               [name f code]
+               [name f status]
                [name doc f]
-               [name doc f code])}
+               [name doc f status])}
   ([name f]
    (#'def-render &form &env name f nil))
-  ([name f-or-doc code-or-f]
-   (let [[f doc code] (if (string? f-or-doc)
-                        [code-or-f f-or-doc nil]
-                        [f-or-doc nil code-or-f])]
+  ([name f-or-doc status-or-f]
+   (let [[f doc status] (if (string? f-or-doc)
+                          [status-or-f f-or-doc nil]
+                          [f-or-doc nil status-or-f])
+         status         (keyword status)]
      (if doc
-       (#'def-render &form &env name doc f code)
+       (#'def-render &form &env name doc f status)
        (#'def-render
         &form &env name
-        (str "Renders a " (if code (str code " "))
-             "response with a possible body generated with views, layouts and data \n"
-             "obtained from a request map (`:app/layout`, `:app/view`, `:app/data` keys).\n"
+        (str "Renders a " (if status (name status " "))
+             "response with a possible body generated with views, layouts and data \n  "
+             "obtained from a request map (`:app/layout`, `:app/view`, `:app/data` keys).\n  "
              "Uses `" f-or-doc "` to set the response code."
-             (if (and code (not= code 200))
-               (str " Additionaly, sets `:http/code` key\n"
-                    "to `:http-code/" code "` within a map under "
-                    "the `:app/data` of the `req`.")))
-        f (if (not= 200 code) code)))))
-  ([name doc f code]
+             (if status
+               (str " Additionaly, associates `:http/status` key\n  "
+                    "with `" (str status) "` in `:app/data` "
+                    "by passing it as an argument to `render-response`\n  "
+                    "(which will also set the `:http/status-name` "
+                    "and `:http/status-description` if possible).")))
+        f status))))
+  ([name doc f status]
    `(let [f# ~f
-          c# ~code
-          c# (if c# (keyword "http-code" (str c#)))]
-      (if c#
-        (defn ~name ~doc
-          ([]
-           (render-response f# nil nil nil nil nil nil))
-          (~'[req]
-           (render-response f# (update ~'req :app/data assoc :http/code c#)
-                            nil nil nil nil nil))
-          (~'[req data]
-           (render-response f# (update ~'req :app/data assoc :http/code c#)
-                            ~'data nil nil nil nil))
-          (~'[req data view]
-           (render-response f# (update ~'req :app/data assoc :http/code c#)
-                            ~'data ~'view nil nil nil))
-          (~'[req data view layout]
-           (render-response f# (update ~'req :app/data assoc :http/code c#)
-                            ~'data ~'view ~'layout nil nil))
-          (~'[req data view layout lang]
-           (render-response f# (update ~'req :app/data assoc :http/code c#)
-                            ~'data ~'view ~'layout ~'lang nil))
-          (~'[req data view layout lang session-map]
-           (render-response f# (update ~'req :app/data assoc :http/code c#)
-                            ~'data ~'view ~'layout ~'lang ~'session-map)))
-        (defn ~name ~doc
-          ([]
-           (render-response f# nil nil nil nil nil nil))
-          (~'[req]
-           (render-response f# ~'req nil nil nil nil nil))
-          (~'[req data]
-           (render-response f# ~'req ~'data nil nil nil nil))
-          (~'[req data view]
-           (render-response f# ~'req ~'data ~'view nil nil nil))
-          (~'[req data view layout]
-           (render-response f# ~'req ~'data ~'view ~'layout nil nil))
-          (~'[req data view layout lang]
-           (render-response f# ~'req ~'data ~'view ~'layout ~'lang nil))
-          (~'[req data view layout lang session-map]
-           (render-response f# ~'req ~'data ~'view ~'layout ~'lang ~'session-map)))))))
+          c# ~status
+          c# (if c# (keyword c#))]
+      (defn ~name ~doc
+        ([]
+         (render-response f# c# nil nil nil nil nil nil))
+        (~'[req]
+         (render-response f# c# ~'req nil nil nil nil nil))
+        (~'[req data]
+         (render-response f# c# ~'req ~'data nil nil nil nil))
+        (~'[req data view]
+         (render-response f# c# ~'req ~'data ~'view nil nil nil))
+        (~'[req data view layout]
+         (render-response f# c# ~'req ~'data ~'view ~'layout nil nil))
+        (~'[req data view layout lang]
+         (render-response f# c# ~'req ~'data ~'view ~'layout ~'lang nil))
+        (~'[req data view layout lang session-map]
+         (render-response f# c# ~'req ~'data ~'view ~'layout ~'lang ~'session-map))))))
 
 ;; OK response
 
-(def-render render-ok resp/ok 200)
+(def-render render-ok    resp/ok :ok/found)
+(def-render render-page  resp/ok :ok/found)
+(def-render render-found resp/ok :ok/found)
 
 ;; Success responses with bodies
 
-(def-render render-accepted                        resp/accepted                        202)
-(def-render render-non-authoritative-information   resp/non-authoritative-information   203)
-(def-render render-partial-content                 resp/partial-content                 206)
-(def-render render-multi-status                    resp/multi-status                    207)
-(def-render render-already-reported                resp/already-reported                208)
-(def-render render-im-used                         resp/im-used                         226)
+(def-render render-accepted                        resp/accepted                        :ok/accepted)
+(def-render render-non-authoritative-information   resp/non-authoritative-information   :ok/non-authoritative-information)
+(def-render render-partial-content                 resp/partial-content                 :ok/partial-content)
+(def-render render-multi-status                    resp/multi-status                    :ok/multi-status)
+(def-render render-already-reported                resp/already-reported                :ok/already-reported)
+(def-render render-im-used                         resp/im-used                         :ok/im-used)
+
+;; Informational responses with bodies
+
+(def-render render-early-hints                     common/early-hints                   :info/early-hints)
 
 ;; Error responses with possible bodies
 
-(def-render render-bad-request                     resp/bad-request                     400)
-(def-render render-unauthorized                    resp/unauthorized                    401)
-(def-render render-payment-required                resp/payment-required                402)
-(def-render render-forbidden                       resp/forbidden                       403)
-(def-render render-not-found                       resp/not-found                       404)
-(def-render render-method-not-allowed              resp/method-not-allowed              405)
-(def-render render-not-acceptable                  resp/not-acceptable                  406)
-(def-render render-proxy-authentication-required   resp/proxy-authentication-required   407)
-(def-render render-request-timeout                 resp/request-timeout                 408)
-(def-render render-conflict                        resp/conflict                        409)
-(def-render render-gone                            resp/gone                            410)
-(def-render render-length-required                 resp/length-required                 411)
-(def-render render-precondition-failed             resp/precondition-failed             412)
-(def-render render-request-entity-too-large        resp/request-entity-too-large        413)
-(def-render render-request-uri-too-long            resp/request-uri-too-long            414)
-(def-render render-unsupported-media-type          resp/unsupported-media-type          415)
-(def-render render-requested-range-not-satisfiable resp/requested-range-not-satisfiable 416)
-(def-render render-expectation-failed              resp/expectation-failed              417)
-(def-render render-im-a-teapot                     common/im-a-teapot                   418)
-(def-render render-enhance-your-calm               resp/enhance-your-calm               420)
-(def-render render-misdirected-request             common/misdirected-request           421)
-(def-render render-unprocessable-entity            resp/unprocessable-entity            422)
-(def-render render-bad-params                      resp/unprocessable-entity            422)
-(def-render render-locked                          resp/locked                          423)
-(def-render render-failed-dependency               resp/failed-dependency               424)
-(def-render render-unordered-collection            resp/unordered-collection            425)
-(def-render render-too-early                       resp/unordered-collection            425)
-(def-render render-upgrade-required                resp/upgrade-required                426)
-(def-render render-precondition-required           resp/precondition-required           428)
-(def-render render-too-many-requests               resp/too-many-requests               429)
-(def-render render-request-header-fields-too-large resp/request-header-fields-too-large 431)
-(def-render render-retry-with                      resp/retry-with                      449)
-(def-render render-blocked-by-windows-parental-controls resp/blocked-by-windows-parental-controls 450)
-(def-render render-unavailable-for-legal-reasons   resp/unavailable-for-legal-reasons   451)
-(def-render render-internal-server-error           resp/internal-server-error           500)
-(def-render render-not-implemented                 resp/not-implemented                 501)
-(def-render render-bad-gateway                     resp/bad-gateway                     502)
-(def-render render-service-unavailable             resp/service-unavailable             503)
-(def-render render-gateway-timeout                 resp/gateway-timeout                 504)
-(def-render render-http-version-not-supported      resp/http-version-not-supported      505)
-(def-render render-variant-also-negotiates         resp/variant-also-negotiates         506)
-(def-render render-insufficient-storage            resp/insufficient-storage            507)
-(def-render render-loop-detected                   resp/loop-detected                   508)
-(def-render render-bandwidth-limit-exceeded        resp/bandwidth-limit-exceeded        509)
-(def-render render-not-extended                    resp/not-extended                    510)
-(def-render render-network-authentication-required resp/network-authentication-required 511)
-(def-render render-network-read-timeout            resp/network-read-timeout            598)
-(def-render render-network-connect-timeout         resp/network-connect-timeout         599)
+(def-render render-bad-request                     resp/bad-request                     :error/bad-request)
+(def-render render-unauthorized                    resp/unauthorized                    :error/unauthorized)
+(def-render render-payment-required                resp/payment-required                :error/payment-required)
+(def-render render-forbidden                       resp/forbidden                       :error/forbidden)
+(def-render render-not-found                       resp/not-found                       :error/not-found)
+(def-render render-method-not-allowed              resp/method-not-allowed              :error/method-not-allowed)
+(def-render render-not-acceptable                  resp/not-acceptable                  :error/not-acceptable)
+(def-render render-proxy-authentication-required   resp/proxy-authentication-required   :error/proxy-authentication-required)
+(def-render render-request-timeout                 resp/request-timeout                 :error/request-timeout)
+(def-render render-conflict                        resp/conflict                        :error/conflict)
+(def-render render-gone                            resp/gone                            :error/gone)
+(def-render render-length-required                 resp/length-required                 :error/length-required)
+(def-render render-precondition-failed             resp/precondition-failed             :error/precondition-failed)
+(def-render render-request-entity-too-large        resp/request-entity-too-large        :error/request-entity-too-large)
+(def-render render-request-uri-too-long            resp/request-uri-too-long            :error/request-uri-too-long)
+(def-render render-unsupported-media-type          resp/unsupported-media-type          :error/unsupported-media-type)
+(def-render render-requested-range-not-satisfiable resp/requested-range-not-satisfiable :error/requested-range-not-satisfiable)
+(def-render render-expectation-failed              resp/expectation-failed              :error/expectation-failed)
+(def-render render-im-a-teapot                     common/im-a-teapot                   :error/im-a-teapot)
+(def-render render-enhance-your-calm               resp/enhance-your-calm               :error/enhance-your-calm)
+(def-render render-misdirected-request             common/misdirected-request           :error/misdirected-request)
+(def-render render-unprocessable-entity            resp/unprocessable-entity            :error/unprocessable-entity)
+(def-render render-bad-params                      resp/unprocessable-entity            :error/bad-parameters)
+(def-render render-locked                          resp/locked                          :error/render-locked)
+(def-render render-failed-dependency               resp/failed-dependency               :error/failed-dependency)
+(def-render render-unordered-collection            resp/unordered-collection            :error/unordered-collection)
+(def-render render-too-early                       resp/unordered-collection            :error/too-early)
+(def-render render-upgrade-required                resp/upgrade-required                :error/upgrade-required)
+(def-render render-precondition-required           resp/precondition-required           :error/precondition-failed)
+(def-render render-too-many-requests               resp/too-many-requests               :error/too-many-requests)
+(def-render render-request-header-fields-too-large resp/request-header-fields-too-large :error/request-header-fields-too-large)
+(def-render render-retry-with                      resp/retry-with                      :error/retry-with)
+(def-render render-blocked-by-windows-parental-controls resp/blocked-by-windows-parental-controls :error/blocked-by-windows-parental-controls)
+(def-render render-unavailable-for-legal-reasons   resp/unavailable-for-legal-reasons   :error/unavailable-for-legal-reasons)
+(def-render render-internal-server-error           resp/internal-server-error           :server-error/internal)
+(def-render render-not-implemented                 resp/not-implemented                 :server-error/not-implemented)
+(def-render render-bad-gateway                     resp/bad-gateway                     :server-error/bad-gateway)
+(def-render render-service-unavailable             resp/service-unavailable             :server-error/service-unavailable)
+(def-render render-gateway-timeout                 resp/gateway-timeout                 :server-error/gateway-timeout)
+(def-render render-http-version-not-supported      resp/http-version-not-supported      :server-error/http-version-not-supported)
+(def-render render-variant-also-negotiates         resp/variant-also-negotiates         :server-error/variant-also-negotiates)
+(def-render render-insufficient-storage            resp/insufficient-storage            :server-error/insufficient-storage)
+(def-render render-loop-detected                   resp/loop-detected                   :server-error/loop-detected)
+(def-render render-bandwidth-limit-exceeded        resp/bandwidth-limit-exceeded        :server-error/bandwidth-limit-exceeded)
+(def-render render-not-extended                    resp/not-extended                    :server-error/not-extended)
+(def-render render-network-authentication-required resp/network-authentication-required :server-error/network-authentication-required)
+(def-render render-network-read-timeout            resp/network-read-timeout            :server-error/read-timeout)
+(def-render render-network-connect-timeout         resp/network-connect-timeout         :server-error/connect-timeout)
 
 ;; Resource creation success, redirect with a possible body
 
-(def http-code-201 (keyword "http-code" (str 201)))
-
 (defn render-created
   "Renders 201 response with a redirect (possibly localized if a destination path is
-  language-parameterized) and a possible body."
+  language-parameterized) and a possible body. See `render` documentation to know
+  more about body rendering."
   ([]
    (common/render resp/created))
   ([req]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/page req)
-                  (render req nil nil nil nil nil)))
+   (if-some [resp (common/created req)]
+     (assoc resp :body (render req :ok/created nil nil nil nil nil))))
   ([req name-or-path]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/page req name-or-path)
-                  (render req nil nil nil nil nil)))
+   (if-some [resp (common/created req name-or-path)]
+     (assoc resp :body (render req :ok/created nil nil nil nil nil))))
   ([req name-or-path lang]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/page req name-or-path lang)
-                  (render req nil nil nil lang nil)))
+   (if-some [resp (common/created req name-or-path lang)]
+     (assoc resp :body (render req :ok/created nil nil nil lang nil))))
   ([req name-or-path lang params]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/page req name-or-path lang params)
-                  (render req nil nil nil lang nil)))
+   (if-some [resp (common/created req name-or-path lang params)]
+     (assoc resp :body (render req :ok/created nil nil nil lang nil))))
   ([req name-or-path lang params query-params]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/page req name-or-path lang params query-params)
-                  (render req nil nil nil lang nil)))
+   (if-some [resp (common/created req name-or-path lang params query-params)]
+     (assoc resp :body (render req :ok/created nil nil nil lang nil))))
   ([req name-or-path lang params query-params data]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/page req name-or-path lang params query-params)
-                  (render req data nil nil lang nil)))
+   (if-some [resp (common/created req name-or-path lang params query-params)]
+     (assoc resp :body (render req :ok/created data nil nil lang nil))))
   ([req name-or-path lang params query-params data view]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/page req name-or-path lang params query-params)
-                  (render req data view nil lang nil)))
+   (if-some [resp (common/created req name-or-path lang params query-params)]
+     (assoc resp :body (render req :ok/created data view nil lang nil))))
   ([req name-or-path lang params query-params data view layout]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/page req name-or-path lang params query-params)
-                  (render req data view layout lang nil)))
+   (if-some [resp (common/created req name-or-path lang params query-params)]
+     (assoc resp :body (render req :ok/created data view layout lang nil))) )
   ([req name-or-path lang params query-params data view layout session-map]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/page req name-or-path lang params query-params)
-                  (render req data view layout lang session-map))))
+   (if-some [resp (common/created req name-or-path lang params query-params)]
+     (assoc resp :body (render req :ok/created data view layout lang session-map)))))
 
 (defn localized-render-created
   "Renders 201 response with a redirect (possibly localized if a destination path is
   language-parameterized) and a possible body. Requires the destination
-  URL (specified by arguments before `data`) to be language parameterized."
+  URL (specified by arguments before `data`) to be language parameterized. See
+  `render` documentation to know more about body rendering."
   ([]
    (common/render resp/created))
   ([req]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/localized-page req)
-                  (render req nil nil nil nil nil)))
+   (if-some [resp (common/localized-created req)]
+     (assoc resp :body (render req :ok/created nil nil nil nil nil))))
   ([req name-or-path]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/localized-page req name-or-path)
-                  (render req nil nil nil nil nil)))
+   (if-some [resp (common/localized-created req name-or-path)]
+     (assoc resp :body (render req :ok/created nil nil nil nil nil))))
   ([req name-or-path lang]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/localized-page req name-or-path lang)
-                  (render req nil nil nil lang nil)))
+   (if-some [resp (common/localized-created req name-or-path lang)]
+     (assoc resp :body (render req :ok/created nil nil nil lang nil))))
   ([req name-or-path lang params]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/localized-page req name-or-path lang params)
-                  (render req nil nil nil lang nil)))
+   (if-some [resp (common/localized-created req name-or-path lang params)]
+     (assoc resp :body (render req :ok/created nil nil nil lang nil))))
   ([req name-or-path lang params query-params]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/localized-page req name-or-path lang params query-params)
-                  (render req nil nil nil lang nil)))
+   (if-some [resp (common/localized-created req name-or-path lang params query-params)]
+     (assoc resp :body (render req :ok/created nil nil nil lang nil))))
   ([req name-or-path lang params query-params data]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/localized-page req name-or-path lang params query-params)
-                  (render req data nil nil lang nil)))
+   (if-some [resp (common/localized-created req name-or-path lang params query-params)]
+     (assoc resp :body (render req :ok/created data nil nil lang nil))))
   ([req name-or-path lang params query-params data view]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/localized-page req name-or-path lang params query-params)
-                  (render req data view nil lang nil)))
+   (if-some [resp (common/localized-created req name-or-path lang params query-params)]
+     (assoc resp :body (render req :ok/created data view nil lang nil))))
   ([req name-or-path lang params query-params data view layout]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/localized-page req name-or-path lang params query-params)
-                  (render req data view layout lang nil)))
+   (if-some [resp (common/localized-created req name-or-path lang params query-params)]
+     (assoc resp :body (render req :ok/created data view layout lang nil))) )
   ([req name-or-path lang params query-params data view layout session-map]
-   (common/render resp/created
-                  (update req :app/data assoc :http/code http-code-201)
-                  (common/localized-page req name-or-path lang params query-params)
-                  (render req data view layout lang session-map))))
+   (if-some [resp (common/localized-created req name-or-path lang params query-params)]
+     (assoc resp :body (render req :ok/created data view layout lang session-map)))))
 
-;; Responses without a body
-
-(def http-code-100 (keyword "http-code" (str 100)))
-(def http-code-101 (keyword "http-code" (str 101)))
-(def http-code-102 (keyword "http-code" (str 102)))
-(def http-code-204 (keyword "http-code" (str 204)))
-(def http-code-205 (keyword "http-code" (str 205)))
+;; Responses without bodies
 
 (defn render-continue
   "Renders 100 response without a body."
-  ([]
-   (resp/continue))
-  ([req]
-   (common/render resp/continue
-                  (update req :app/data assoc :http/code http-code-100)))
-  ([req & more]
-   (common/render resp/continue
-                  (update req :app/data assoc :http/code http-code-100))))
+  ([]              (resp/continue))
+  ([req]           (common/render resp/continue req))
+  ([req & ignored] (common/render resp/continue req)))
 
 (defn render-switching-protocols
   "Renders 101 response without a body."
-  ([]
-   (resp/switching-protocols))
-  ([req]
-   (common/render resp/switching-protocols
-                  (update req :app/data assoc :http/code http-code-101)))
-  ([req & more]
-   (common/render resp/switching-protocols
-                  (update req :app/data assoc :http/code http-code-101))))
+  ([]              (resp/switching-protocols))
+  ([req]           (common/render resp/switching-protocols req))
+  ([req & ignored] (common/render resp/switching-protocols req)))
 
 (defn render-processing
   "Renders 102 response without a body."
-  ([]
-   (resp/processing))
-  ([req]
-   (common/render resp/processing
-                  (update req :app/data assoc :http/code http-code-102)))
-  ([req & more]
-   (common/render resp/processing
-                  (update req :app/data assoc :http/code http-code-102))))
+  ([]              (resp/processing))
+  ([req]           (common/render resp/processing req))
+  ([req & ignored] (common/render resp/processing req)))
 
 (defn render-no-content
   "Renders 204 response without a body."
-  ([]
-   (resp/no-content))
-  ([req]
-   (common/render resp/no-content
-                  (update req :app/data assoc :http/code http-code-204)))
-  ([req & more]
-   (common/render resp/no-content
-                  (update req :app/data assoc :http/code http-code-204))))
+  ([]              (resp/no-content))
+  ([req]           (common/render resp/no-content req))
+  ([req & ignored] (common/render resp/no-content req)))
 
 (defn render-reset-content
   "Renders 205 response without a body."
-  ([]
-   (resp/reset-content))
-  ([req]
-   (common/render resp/reset-content
-                  (update req :app/data assoc :http/code http-code-205)))
-  ([req & more]
-   (common/render resp/reset-content
-                  (update req :app/data assoc :http/code http-code-205))))
+  ([]              (resp/reset-content))
+  ([req]           (common/render resp/reset-content req))
+  ([req & ignored] (common/render resp/reset-content req)))
+
+;; Rendering based on application-logic error
+
+(defn render-error
+  "Renders error response."
+  ([]                   (resp/internal-server-error))
+  ([req]                (errors/render req nil nil req))
+  ([req status]         (errors/render req status nil req))
+  ([req status default] (errors/render req status default req))
+  ([req status default & more] (apply errors/render req status default req more)))
 
 ;; Linking helpers
 
@@ -693,20 +729,3 @@
 
 (p/import-vars [amelinium.common
                 lang-id lang-str lang-config lang-from-req])
-
-;; Errors to web responses
-
-(def error-to-response
-  {:verify/confirmed     render-already-reported
-   :verify/exists        render-conflict
-   :verify/not-confirmed render-unauthorized
-   :verify/expired       render-unauthorized
-   :verify/max-attempts  render-too-many-requests
-   :verify/bad-id        render-unauthorized
-   :verify/bad-code      render-unauthorized
-   :verify/bad-token     render-unauthorized
-   :verify/bad-email     render-unauthorized
-   :verify/bad-phone     render-unauthorized
-   :verify/not-found     render-unauthorized
-   :verify/bad-reason    render-forbidden
-   :verify/bad-result    render-internal-server-error})
