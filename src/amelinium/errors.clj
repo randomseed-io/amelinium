@@ -16,6 +16,7 @@
             [amelinium.http           :as          http]
             [io.randomseed.utils.time :as          time]
             [io.randomseed.utils.map  :as           map]
+            [io.randomseed.utils.var  :as           var]
             [io.randomseed.utils      :refer       :all]))
 
 (defrecord ErrorsConfig [priorities responses default-response])
@@ -90,7 +91,7 @@
 
 (defn init-errors
   [config]
-  (map->ErrorsConfig config))
+  (map->ErrorsConfig (map/map-values var/deref-symbol config)))
 
 (system/add-init  ::settings [_ config] (init-errors config))
 (system/add-halt! ::settings [_ config] nil)
