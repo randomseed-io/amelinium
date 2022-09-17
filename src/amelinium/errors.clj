@@ -18,7 +18,7 @@
             [io.randomseed.utils.map  :as           map]
             [io.randomseed.utils      :refer       :all]))
 
-(defrecord ErrorsConfig [priorities responses views])
+(defrecord ErrorsConfig [priorities responses default-response])
 
 (defprotocol ErrorsConfigurable
   (config [src]))
@@ -50,11 +50,6 @@
   ([config-src error default]
    (if error
      (if-some [config (config config-src)]
-       (or (.responses ^ErrorsConfig config) default)))))
-
-(defn to-view
-  "Returns a view sub-path for the given `config` (which may be of type `ErrorsConfig`,
-  a request map, or a `Match` object) and `error` (expressed as a keyword)."
   ([config-src error]
    (to-view config error nil))
   ([config-src error default]
