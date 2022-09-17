@@ -1,12 +1,13 @@
 {:amelinium.i18n/translations
  {:pl
   {:amelinium/missing-key "Brakujący klucz: {1}"
-   :ok                    "Sukces!"
-   :info                  {:continue            "Można kontynuować"
+   :info                  {:ok                  "OK"
+                           :continue            "Można kontynuować"
                            :switching-protocols "Zmiana protokołów"
                            :processing          "Przetwarzanie"
                            :early-hints         "Wstępne wskazówki"}
-   :ok                    {:found                         "OK"
+   :ok                    {:ok                            "OK"
+                           :found                         "OK"
                            :created                       "Utworzono"
                            :accepted                      "Zaakceptowano"
                            :non-authoritative-information "Informacja nieautorytatywna"
@@ -59,7 +60,8 @@
                            :retry-with                           "Spróbuj z"
                            :blocked-by-windows-parental-controls "Blocked By Windows Parental Controls"
                            :unavailable-for-legal-reasons        "Niedostępne z powodów prawnych"}
-   :server-error          {:internal                        "Wewnętrzny błąd serwera"
+   :server-error          {:ok                              "OK"
+                           :internal                        "Wewnętrzny błąd serwera"
                            :not-implemented                 "Niezaimplementowano"
                            :bad-gateway                     "Zła brama"
                            :service-unavailable             "Usługa niedostępna"
