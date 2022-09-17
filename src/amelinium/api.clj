@@ -21,6 +21,7 @@
             [ring.util.http-response              :as         resp]
             [ring.util.request                    :as          req]
             [amelinium.common                     :as       common]
+            [amelinium.errors                     :as       errors]
             [amelinium.i18n                       :as         i18n]
             [amelinium.http                       :as         http]
             [amelinium.http.middleware.roles      :as        roles]
@@ -119,7 +120,12 @@
 
 (defn render
   "Returns response body on a basis of a value associated with the `:response/body` key
-  of the `req`."
+  of the `req`.
+
+  If `status` is given and `:response/body` is a map, it adds two associations to it:
+  `:status` (with a keyword describing HTTP status as value) and `:message` (with a
+  string describing HTTP status translated using a detected language). If any key
+  already exists in `:response/body`, it will not be added."
   ([]
    (render nil))
   ([req]
@@ -128,19 +134,34 @@
        body
        (if (sequential? body)
          (seq body)
+         body))))
+  ([req status]
+   (let [body (get req :response/body)]
+     (if (map? body)
+       (-> body
+           (map/assoc-missing  :status  status)
+           (map/update-missing :message (i18n/no-default (i18n/tr req status))))
+       (if (sequential? body)
+         (seq body)
          body)))))
 
 (defn response?
   "Returns `true` if the `req` context map is already an API response."
   [req]
   (and (map? req)
-       (integer?  (:status req))
+       (integer?  (:status  req))
        (or (map?  (:headers req))
-           (coll? (:body req)))))
+           (coll? (:body    req)))))
 
 (defn render-response
-  "API response renderer. Uses the `render` function to render the response body unless
-  the `req` is already a valid response (then it is returned as-is)."
+  "API response renderer. Uses the `render` function to render the response
+  body (unless the `req` is already a valid response - in such case it is returned
+  as-is) and `resp-fn` function to construct the response map.
+
+  If `status` is given and `:response/body` is a map, it adds two associations to it:
+  `:status` (with a keyword describing HTTP status as value) and `:message` (with a
+  string describing HTTP status translated using a detected language). If any key
+  already exists in `:response/body`, it will not be added."
   ([]
    (render-response resp/ok nil))
   ([resp-fn]
@@ -148,20 +169,40 @@
   ([resp-fn req]
    (if (response? req)
      req
-     (if-some [headers (get req :response/headers)]
-       (assoc (resp-fn (render req)) :headers headers)
-       (resp-fn (render req))))))
+     (let [resp (resp-fn (render req))]
+       (if-some [headers (get req :response/headers)]
+         (assoc resp :headers headers)
+         resp))))
+  ([resp-fn status req]
+   (if (response? req)
+     req
+     (let [resp (resp-fn (render req status))]
+       (if-some [headers (get req :response/headers)]
+         (assoc resp :headers headers)
+         resp)))))
 
 (defn render-response-force
-  "API response renderer. Uses the `render` function to render the response body."
+  "API response renderer. Uses the `render` function to render the response body and
+  `resp-fn` function to construct the response map.
+
+  If `status` is given and `:response/body` is a map, it adds two associations to it:
+  `:status` (with a keyword describing HTTP status as value) and `:message` (with a
+  string describing HTTP status translated using a detected language). If any key
+  already exists in `:response/body`, it will not be added."
   ([]
    (render-response-force resp/ok nil))
   ([resp-fn]
    (render-response-force resp-fn nil))
   ([resp-fn req]
-   (if-some [headers (get req :response/headers)]
-     (assoc (resp-fn (render req)) :headers headers)
-     (resp-fn (render req)))))
+   (let [resp (resp-fn (render req))]
+     (if-some [headers (get req :response/headers)]
+       (assoc resp :headers headers)
+       (resp-fn resp))))
+  ([resp-fn status req]
+   (let [resp (resp-fn (render req status))]
+     (if-some [headers (get req :response/headers)]
+       (assoc resp :headers headers)
+       (resp-fn resp)))))
 
 ;; OK response
 
@@ -169,7 +210,27 @@
   "Renders 200 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/ok nil))
-  ([req] (render-response resp/ok req)))
+  ([req] (render-response resp/ok :ok/found req)))
+
+(defn render-page
+  "Renders 200 response with possible body taken from a request map (under the
+  `:response/body`)."
+  ([]    (render-response resp/ok nil))
+  ([req] (render-response resp/ok :ok/found req)))
+
+(defn render-found
+  "Renders 200 response with possible body taken from a request map (under the
+  `:response/body`)."
+  ([]    (render-response resp/ok nil))
+  ([req] (render-response resp/ok :ok/found req)))
+
+;; Informational responses with bodies
+
+(defn render-early-hints
+  "Renders 103 response with possible body taken from a request map (under the
+  `:response/body`)."
+  ([]    (render-response common/early-hints nil))
+  ([req] (render-response common/early-hints :info/early-hints req)))
 
 ;; Success responses with bodies
 
@@ -177,37 +238,43 @@
   "Renders 202 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/accepted nil))
-  ([req] (render-response resp/accepted req)))
+  ([req] (render-response resp/accepted :ok/accepted req)))
+
+(defn render-in-progress
+  "Renders 202 response with possible body taken from a request map (under the
+  `:response/body`)."
+  ([]    (render-response resp/accepted nil))
+  ([req] (render-response resp/accepted :ok/in-progress req)))
 
 (defn render-non-authoritative-information
   "Renders 203 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/non-authoritative-information nil))
-  ([req] (render-response resp/non-authoritative-information req)))
+  ([req] (render-response resp/non-authoritative-information :ok/non-authoritative-information req)))
 
 (defn render-partial-content
   "Renders 206 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/partial-content nil))
-  ([req] (render-response resp/partial-content req)))
+  ([req] (render-response resp/partial-content :ok/partial-content req)))
 
 (defn render-multi-status
   "Renders 207 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/multi-status nil))
-  ([req] (render-response resp/multi-status req)))
+  ([req] (render-response resp/multi-status :ok/multi-status req)))
 
 (defn render-already-reported
   "Renders 208 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/already-reported nil))
-  ([req] (render-response resp/already-reported req)))
+  ([req] (render-response resp/already-reported :ok/already-reported req)))
 
 (defn render-im-used
   "Renders 226 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/im-used nil))
-  ([req] (render-response resp/im-used req)))
+  ([req] (render-response resp/im-used :ok/im-used req)))
 
 ;; Error responses with possible bodies
 
@@ -215,289 +282,289 @@
   "Renders 400 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/bad-request nil))
-  ([req] (render-response resp/bad-request req)))
+  ([req] (render-response resp/bad-request :error/bad-request req)))
 
 (defn render-unauthorized
   "Renders 401 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/unauthorized nil))
-  ([req] (render-response resp/unauthorized req)))
+  ([req] (render-response resp/unauthorized :error/unauthorized req)))
 
 (defn render-payment-required
   "Renders 402 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/payment-required nil))
-  ([req] (render-response resp/payment-required req)))
+  ([req] (render-response resp/payment-required :error/payment-required req)))
 
 (defn render-forbidden
   "Renders 403 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/forbidden nil))
-  ([req] (render-response resp/forbidden req)))
+  ([req] (render-response resp/forbidden :error/forbidden req)))
 
 (defn render-not-found
   "Renders 404 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/not-found nil))
-  ([req] (render-response resp/not-found req)))
+  ([req] (render-response resp/not-found :error/not-found req)))
 
 (defn render-method-not-allowed
   "Renders 405 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/method-not-allowed nil))
-  ([req] (render-response resp/method-not-allowed req)))
+  ([req] (render-response resp/method-not-allowed :error/method-not-allowed req)))
 
 (defn render-not-acceptable
   "Renders 406 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/not-acceptable nil))
-  ([req] (render-response resp/not-acceptable req)))
+  ([req] (render-response resp/not-acceptable :error/not-acceptable req)))
 
 (defn render-proxy-authentication-required
   "Renders 407 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/proxy-authentication-required nil))
-  ([req] (render-response resp/proxy-authentication-required req)))
+  ([req] (render-response resp/proxy-authentication-required :error/proxy-authentication-required req)))
 
 (defn render-request-timeout
   "Renders 408 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/request-timeout nil))
-  ([req] (render-response resp/request-timeout req)))
+  ([req] (render-response resp/request-timeout :error/request-timeout req)))
 
 (defn render-conflict
   "Renders 409 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/conflict nil))
-  ([req] (render-response resp/conflict req)))
+  ([req] (render-response resp/conflict :error/conflict req)))
 
 (defn render-gone
   "Renders 410 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/gone nil))
-  ([req] (render-response resp/gone req)))
+  ([req] (render-response resp/gone :error/gone req)))
 
 (defn render-length-required
   "Renders 411 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/length-required nil))
-  ([req] (render-response resp/length-required req)))
+  ([req] (render-response resp/length-required :error/length-required req)))
 
 (defn render-precondition-failed
   "Renders 412 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/precondition-failed nil))
-  ([req] (render-response resp/precondition-failed req)))
+  ([req] (render-response resp/precondition-failed :error/precondition-failed req)))
 
 (defn render-request-entity-too-large
   "Renders 413 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/request-entity-too-large nil))
-  ([req] (render-response resp/request-entity-too-large req)))
+  ([req] (render-response resp/request-entity-too-large :error/entity-too-large req)))
 
 (defn render-request-uri-too-long
   "Renders 414 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/request-uri-too-long nil))
-  ([req] (render-response resp/request-uri-too-long req)))
+  ([req] (render-response resp/request-uri-too-long :error/request-uri-too-long req)))
 
 (defn render-unsupported-media-type
   "Renders 415 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/unsupported-media-type nil))
-  ([req] (render-response resp/unsupported-media-type req)))
+  ([req] (render-response resp/unsupported-media-type :error/unsupported-media-type req)))
 
 (defn render-requested-range-not-satisfiable
   "Renders 416 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/requested-range-not-satisfiable nil))
-  ([req] (render-response resp/requested-range-not-satisfiable req)))
+  ([req] (render-response resp/requested-range-not-satisfiable :error/requested-range-not-satifiable req)))
 
 (defn render-expectation-failed
   "Renders 417 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/expectation-failed nil))
-  ([req] (render-response resp/expectation-failed req)))
+  ([req] (render-response resp/expectation-failed :error/expectation-failed req)))
 
 (defn render-im-a-teapot
   "Renders 418 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response common/im-a-teapot nil))
-  ([req] (render-response common/im-a-teapot req)))
+  ([req] (render-response common/im-a-teapot :error/im-a-teapot req)))
 
 (defn render-enhance-your-calm
   "Renders 420 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/enhance-your-calm nil))
-  ([req] (render-response resp/enhance-your-calm req)))
+  ([req] (render-response resp/enhance-your-calm :error/enhance-your-calm req)))
 
 (defn render-misdirected-request
   "Renders 421 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response common/misdirected-request nil))
-  ([req] (render-response common/misdirected-request req)))
+  ([req] (render-response common/misdirected-request :error/misdirected-request req)))
 
 (defn render-unprocessable-entity
   "Renders 422 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/unprocessable-entity nil))
-  ([req] (render-response resp/unprocessable-entity req)))
+  ([req] (render-response resp/unprocessable-entity :error/unprocessable-entity req)))
 
 (defn render-bad-params
   "Renders 422 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/unprocessable-entity nil))
-  ([req] (render-response resp/unprocessable-entity req)))
+  ([req] (render-response resp/unprocessable-entity :error/bad-parameters req)))
 
 (defn render-locked
   "Renders 423 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/locked nil))
-  ([req] (render-response resp/locked req)))
+  ([req] (render-response resp/locked :error/locked req)))
 
 (defn render-failed-dependency
   "Renders 424 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/failed-dependency nil))
-  ([req] (render-response resp/failed-dependency req)))
+  ([req] (render-response resp/failed-dependency :error/failed-dependency req)))
 
 (defn render-unordered-collection
   "Renders 425 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/unordered-collection nil))
-  ([req] (render-response resp/unordered-collection req)))
+  ([req] (render-response resp/unordered-collection :error/unordered-collection req)))
 
 (defn render-too-early
   "Renders 425 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/unordered-collection nil))
-  ([req] (render-response resp/unordered-collection req)))
+  ([req] (render-response resp/unordered-collection :error/too-early req)))
 
 (defn render-upgrade-required
   "Renders 426 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/upgrade-required nil))
-  ([req] (render-response resp/upgrade-required req)))
+  ([req] (render-response resp/upgrade-required :error/upgrade-required req)))
 
 (defn render-precondition-required
   "Renders 428 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/precondition-required nil))
-  ([req] (render-response resp/precondition-required req)))
+  ([req] (render-response resp/precondition-required :error/precondition-failed req)))
 
 (defn render-too-many-requests
   "Renders 429 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/too-many-requests nil))
-  ([req] (render-response resp/too-many-requests req)))
+  ([req] (render-response resp/too-many-requests :error/too-many-requests req)))
 
 (defn render-request-header-fields-too-large
   "Renders 431 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/request-header-fields-too-large nil))
-  ([req] (render-response resp/request-header-fields-too-large req)))
+  ([req] (render-response resp/request-header-fields-too-large :error/request-header-fields-too-large req)))
 
 (defn render-retry-with
   "Renders 449 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/retry-with nil))
-  ([req] (render-response resp/retry-with req)))
+  ([req] (render-response resp/retry-with :error/retry-with req)))
 
 (defn render-blocked-by-windows-parental-controls
   "Renders 450 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/blocked-by-windows-parental-controls nil))
-  ([req] (render-response resp/blocked-by-windows-parental-controls req)))
+  ([req] (render-response resp/blocked-by-windows-parental-controls :error/blocked-by-windows-parental-controls req)))
 
 (defn render-unavailable-for-legal-reasons
   "Renders 451 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/unavailable-for-legal-reasons nil))
-  ([req] (render-response resp/unavailable-for-legal-reasons req)))
+  ([req] (render-response resp/unavailable-for-legal-reasons :error/unavailable-for-legal-reasons req)))
 
 (defn render-internal-server-error
   "Renders 500 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/internal-server-error nil))
-  ([req] (render-response resp/internal-server-error req)))
+  ([req] (render-response resp/internal-server-error :server-error/internal req)))
 
 (defn render-not-implemented
   "Renders 501 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/not-implemented nil))
-  ([req] (render-response resp/not-implemented req)))
+  ([req] (render-response resp/not-implemented :server-error/not-implemented req)))
 
 (defn render-bad-gateway
   "Renders 502 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/bad-gateway nil))
-  ([req] (render-response resp/bad-gateway req)))
+  ([req] (render-response resp/bad-gateway :server-error/bad-gateway req)))
 
 (defn render-service-unavailable
   "Renders 503 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/service-unavailable nil))
-  ([req] (render-response resp/service-unavailable req)))
+  ([req] (render-response resp/service-unavailable :server-error/service-unavailable req)))
 
 (defn render-gateway-timeout
   "Renders 504 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/gateway-timeout nil))
-  ([req] (render-response resp/gateway-timeout req)))
+  ([req] (render-response resp/gateway-timeout :server-error/gateway-timeout req)))
 
 (defn render-http-version-not-supported
   "Renders 505 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/http-version-not-supported nil))
-  ([req] (render-response resp/http-version-not-supported req)))
+  ([req] (render-response resp/http-version-not-supported :server-error/http-version-not-supported req)))
 
 (defn render-variant-also-negotiates
   "Renders 506 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/variant-also-negotiates nil))
-  ([req] (render-response resp/variant-also-negotiates req)))
+  ([req] (render-response resp/variant-also-negotiates :server-error/variant-also-negotiates req)))
 
 (defn render-insufficient-storage
   "Renders 507 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/insufficient-storage nil))
-  ([req] (render-response resp/insufficient-storage req)))
+  ([req] (render-response resp/insufficient-storage :server-error/insufficient-storage req)))
 
 (defn render-loop-detected
   "Renders 508 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/loop-detected nil))
-  ([req] (render-response resp/loop-detected req)))
+  ([req] (render-response resp/loop-detected :server-error/loop-detected req)))
 
 (defn render-bandwidth-limit-exceeded
   "Renders 509 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/bandwidth-limit-exceeded nil))
-  ([req] (render-response resp/bandwidth-limit-exceeded req)))
+  ([req] (render-response resp/bandwidth-limit-exceeded :server-error/bandwidth-limit-exceeded req)))
 
 (defn render-not-extended
   "Renders 510 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/not-extended nil))
-  ([req] (render-response resp/not-extended req)))
+  ([req] (render-response resp/not-extended :server-error/not-extended req)))
 
 (defn render-network-authentication-required
   "Renders 511 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/network-authentication-required nil))
-  ([req] (render-response resp/network-authentication-required req)))
+  ([req] (render-response resp/network-authentication-required :server-error/network-authentication-required req)))
 
 (defn render-network-read-timeout
   "Renders 598 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/network-read-timeout nil))
-  ([req] (render-response resp/network-read-timeout req)))
+  ([req] (render-response resp/network-read-timeout :server-error/network-read-timeout req)))
 
 (defn render-network-connect-timeout
   "Renders 599 response with possible body taken from a request map (under the
   `:response/body`)."
   ([]    (render-response resp/network-connect-timeout nil))
-  ([req] (render-response resp/network-connect-timeout req)))
+  ([req] (render-response resp/network-connect-timeout :server-error/network-connect-timeout req)))
 
 ;; Resource creation success, redirect with a possible body
 
@@ -506,25 +573,25 @@
   language-parameterized) and possible body taken from a request map (under the
   `:response/body`)."
   ([]
-   (render-response resp/created))
+   (common/render resp/created))
   ([req]
-   (render-response-force
-    (common/created req)))
+   (if-some [resp (common/created req)]
+     (assoc resp :body (render req :ok/created))))
   ([req name-or-path]
-   (render-response-force
-    (common/created req name-or-path)))
+   (if-some [resp (common/created req name-or-path)]
+     (assoc resp :body (render req :ok/created))))
   ([req name-or-path lang]
-   (render-response-force
-    (common/created req name-or-path lang)))
+   (if-some [resp (common/created req name-or-path lang)]
+     (assoc resp :body (render req :ok/created))))
   ([req name-or-path lang params]
-   (render-response-force
-    (common/created req name-or-path lang params)))
+   (if-some [resp (common/created req name-or-path lang params)]
+     (assoc resp :body (render req :ok/created))))
   ([req name-or-path lang params query-params]
-   (render-response-force
-    (common/created req name-or-path lang params query-params)))
+   (if-some [resp (common/created req name-or-path lang params query-params)]
+     (assoc resp :body (render req :ok/created))))
   ([req name-or-path lang params query-params & more]
-   (render-response-force
-    (apply common/created req name-or-path lang params query-params more))))
+   (if-some [resp (apply common/created req name-or-path lang params query-params more)]
+     (assoc resp :body (render req :ok/created)))))
 
 (defn render-localized-created
   "Renders 201 response with a localized redirect and possible body taken from a
@@ -532,23 +599,23 @@
   ([]
    (render-response resp/created))
   ([req]
-   (render-response-force
-    (common/localized-created req)))
+   (if-some [resp (common/localized-created req)]
+     (assoc resp :body (render req :ok/created))))
   ([req name-or-path]
-   (render-response-force
-    (common/localized-created req name-or-path)))
+   (if-some [resp (common/localized-created req name-or-path)]
+     (assoc resp :body (render req :ok/created))))
   ([req name-or-path lang]
-   (render-response-force
-    (common/localized-created req name-or-path lang)))
+   (if-some [resp (common/localized-created req name-or-path lang)]
+     (assoc resp :body (render req :ok/created))))
   ([req name-or-path lang params]
-   (render-response-force
-    (common/localized-created req name-or-path lang params)))
+   (if-some [resp (common/localized-created req name-or-path lang params)]
+     (assoc resp :body (render req :ok/created))))
   ([req name-or-path lang params query-params]
-   (render-response-force
-    (common/localized-created req name-or-path lang params query-params)))
+   (if-some [resp (common/localized-created req name-or-path lang params query-params)]
+     (assoc resp :body (render req :ok/created))))
   ([req name-or-path lang params query-params & more]
-   (render-response-force
-    (apply common/localized-created req name-or-path lang params query-params more))))
+   (if-some [resp (apply common/localized-created req name-or-path lang params query-params more)]
+     (assoc resp :body (render req :ok/created)))))
 
 ;; Responses without a body
 
@@ -581,6 +648,16 @@
   ([]           (resp/reset-content))
   ([req]        (common/render resp/reset-content req))
   ([req & more] (common/render resp/reset-content req)))
+
+;; Rendering based on application-logic error
+
+(defn render-error
+  "Renders error response."
+  ([]                   (resp/internal-server-error))
+  ([req]                (errors/render req nil nil req))
+  ([req status]         (errors/render req status nil req))
+  ([req status default] (errors/render req status default req))
+  ([req status default & more] (apply errors/render req status default req more)))
 
 ;; Linking helpers
 
@@ -661,7 +738,7 @@
   ([req smap translate-sub lang]
    (if (get smap :valid?)
      req
-     (let [translate-sub (or translate-sub (common/translator-sub req lang))
+     (let [translate-sub (or translate-sub (i18n/no-default (common/translator-sub req lang)))
            status        (session-status smap)
            message       (translate-sub :session status)]
        (update req :response/body assoc
@@ -682,18 +759,3 @@
    :verify/not-found     render-not-found
    :verify/bad-reason    render-forbidden
    :verify/bad-result    render-internal-server-error})
-
-(def error-to-status
-  {:verify/confirmed     :warning/already-reported
-   :verify/exists        :error/exists
-   :verify/not-confirmed :error/authorization
-   :verify/expired       :error/authorization
-   :verify/max-attempts  :error/too-many-requests
-   :verify/bad-id        :error/authorization
-   :verify/bad-code      :error/authorization
-   :verify/bad-token     :error/authorization
-   :verify/bad-email     :error/not-found
-   :verify/bad-phone     :error/not-found
-   :verify/not-found     :error/not-found
-   :verify/bad-reason    :error/authorization
-   :verify/bad-result    :error/internal})
