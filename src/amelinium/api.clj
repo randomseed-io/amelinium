@@ -140,7 +140,7 @@
      (if (map? body)
        (-> body
            (map/assoc-missing  :status  status)
-           (map/update-missing :message (i18n/no-default (i18n/tr req status))))
+           (map/update-missing :message (fn [_] (i18n/no-default (i18n/tr req status)))))
        (if (sequential? body)
          (seq body)
          body)))))

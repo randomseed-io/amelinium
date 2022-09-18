@@ -548,8 +548,8 @@
     (-> config
         (assoc :migrations (loader migration-dir))
         (map/assoc-missing  :initializer identity)
-        (map/assoc-missing  :reporter    (partial default-reporter db-key))
-        (map/update-missing :datastore   (:initializer config)))))
+        (map/assoc-missing  :reporter  (partial default-reporter db-key))
+        (map/update-missing :datastore (:initializer config)))))
 
 (defn init-mig
   [k config]
