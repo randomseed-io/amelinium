@@ -100,14 +100,42 @@
 
 ;; Response rendering
 
+(defn- add-missing-lang
+  [body req translation-keys]
+  (if (contains? body :lang)
+    body
+    (if (some #(contains? body %) translation-keys)
+      (if-some [l (get req :language/id)]
+        (assoc body :lang l)
+        body)
+      body)))
+
+(defn- add-missing-translation
+  ([body new-k k translation-fn]
+   (if (contains? body new-k)
+     body
+     (if-some [t (translation-fn k)] (assoc body new-k t) body)))
+  ([body new-k k suffix translation-fn]
+   (if (contains? body new-k)
+     body
+     (if-some [t (translation-fn (namespace k) (str (name k) suffix))]
+       (assoc body new-k t)
+       body))))
+
 (defn render
   "Returns response body on a basis of a value associated with the `:response/body` key
   of the `req`.
 
-  If `status` is given and `:response/body` is a map, it adds two associations to it:
-  `:status` (with a keyword describing HTTP status as value) and `:message` (with a
-  string describing HTTP status translated using a detected language). If any key
-  already exists in `:response/body`, it will not be added."
+  If `status` is given and `:response/body` is a map, it adds the following
+  associations to it: `:status` (with a keyword describing status as value),
+  `:status/title` (with a string describing status translated using a detected
+  language) and `:status/description` (with a longer string explaining the status,
+  based on a translation key created by adding \".full\" to the original status
+  key). If any key already exists in `:response/body`, it will not be added.
+
+  Additionally, if the body map contains `:status/title` or `:status/description` key
+  and does not contain `:lang` key, the `:lang` key will be added with an associated
+  value of `:language/id` taken from a request map `req`."
   ([]
    (render nil))
   ([req]
@@ -120,9 +148,14 @@
   ([req status]
    (let [body (get req :response/body)]
      (if (map? body)
-       (-> body
-           (map/assoc-missing  :status  status)
-           (map/update-missing :message (fn [_] (i18n/no-default (i18n/tr req status)))))
+       (if (contains? body :status)
+         (add-missing-lang body req [:status/title :status/description])
+         (let [tr-sub (i18n/no-default (i18n/translate-sub req))]
+           (-> body
+               (assoc :status status)
+               (add-missing-translation :status/title status tr-sub)
+               (add-missing-translation :status/description status ".full" tr-sub)
+               (add-missing-lang req [:status/title :status/description]))))
        (if (sequential? body)
          (seq body)
          body)))))
@@ -143,7 +176,11 @@
   If `status` is given and `:response/body` is a map, it adds two associations to it:
   `:status` (with a keyword describing HTTP status as value) and `:message` (with a
   string describing HTTP status translated using a detected language). If any key
-  already exists in `:response/body`, it will not be added."
+  already exists in `:response/body`, it will not be added.
+
+  Additionally, if the body map contains `:message` or `message/sub` key and does not
+  contain `:lang` key, it will be added with a value of `:language/id` taken from a
+  request map `req`."
   ([]
    (render-response resp/ok nil))
   ([resp-fn]
@@ -170,7 +207,11 @@
   If `status` is given and `:response/body` is a map, it adds two associations to it:
   `:status` (with a keyword describing HTTP status as value) and `:message` (with a
   string describing HTTP status translated using a detected language). If any key
-  already exists in `:response/body`, it will not be added."
+  already exists in `:response/body`, it will not be added.
+
+  Additionally, if the body map contains `:message` or `message/sub` key and does not
+  contain `:lang` key, it will be added with a value of `:language/id` taken from a
+  request map `req`."
   ([]
    (render-response-force resp/ok nil))
   ([resp-fn]
@@ -633,13 +674,100 @@
 
 ;; Rendering based on application-logic error
 
+(defn- add-missing-sub-status
+  [req resp sub-status]
+  (if sub-status
+    (update resp :body
+            (fn [body]
+              (if (contains? body :sub-status)
+                (add-missing-lang req [:sub-status/title :sub-status/description])
+                (let [tr-sub (i18n/no-default (i18n/translate-sub req))]
+                  (-> body
+                      (assoc :sub-status sub-status)
+                      (add-missing-translation :sub-status/title sub-status tr-sub)
+                      (add-missing-translation :sub-status/description sub-status ".full" tr-sub)
+                      (add-missing-lang req [:sub-status/title :sub-status/description]))))))
+    resp))
+
+(defn render-status
+  "Renders an error response for the given request map and optional `sub-status`
+  (a keyword, mapped to a response rendering function, using a map passed under the
+  `:errors/config` key in a route data). If it is not given (or its value is `nil` or
+  `false`) then `render-ok` will be used to generate the response.
+
+  The resulting response body will have the `:status` key set by the rendering
+  function and `:sub-status` added by this function. Additionally, `:status/title`,
+  `:status/description`, `:sub-status/title` and `:sub-status/description` will be
+  populated by strings explaining the status and sub-status.
+
+  Example:
+
+  `(render-status req :verify/bad-token)`
+
+  Will create a response with the following body:
+
+  ```
+  {:status                 :error/unauthorized
+   :status/title           \"Unauthorized\"
+   :status/description     \"You are not authorized to perform this action.\"
+   :sub-status             :verify/bad-token
+   :sub-status/title       \"Bad token\"
+   :sub-status/description \"The given token is malformed of has expired.\"
+   :lang                   :en}
+  ```"
+  ([]
+   (resp/ok))
+  ([req]
+   (errors/render req nil render-ok req))
+  ([req sub-status]
+   (if-some [resp (errors/render req sub-status render-ok req)]
+     (add-missing-sub-status req resp sub-status)))
+  ([req sub-status default]
+   (if-some [resp (errors/render req sub-status (or default render-ok) req)]
+     (add-missing-sub-status req resp sub-status)))
+  ([req sub-status default & more]
+   (if-some [resp (apply errors/render req sub-status (or default render-ok) req more)]
+     (add-missing-sub-status req resp sub-status))))
+
 (defn render-error
-  "Renders error response."
-  ([]                   (resp/internal-server-error))
-  ([req]                (errors/render req nil nil req))
-  ([req status]         (errors/render req status nil req))
-  ([req status default] (errors/render req status default req))
-  ([req status default & more] (apply errors/render req status default req more)))
+  "Renders an error response for the given request map and optional `sub-status`
+  (a keyword, mapped to a response rendering function, using a map passed under the
+  `:errors/config` key in a route data). If it is not given (or its value is `nil` or
+  `false`) then `render-internal-server-error` will be used to generate the response.
+
+  The resulting response body will have the `:status` key set by the rendering
+  function and `:sub-status` added by this function. Additionally, `:status/title`,
+  `:status/description`, `:sub-status/title` and `:sub-status/description` will be
+  populated by strings explaining the status and sub-status.
+
+  Example:
+
+  `(render-status req :verify/bad-token)`
+
+  Will create a response with the following body:
+
+  ```
+  {:status                 :error/unauthorized
+   :status/title           \"Unauthorized\"
+   :status/description     \"You are not authorized to perform this action.\"
+   :sub-status             :verify/bad-token
+   :sub-status/title       \"Bad token\"
+   :sub-status/description \"The given token is malformed of has expired.\"
+   :lang                   :en}
+  ```"
+  ([]
+   (resp/internal-server-error))
+  ([req]
+   (errors/render req nil render-internal-server-error req))
+  ([req sub-status]
+   (if-some [resp (errors/render req sub-status render-internal-server-error req)]
+     (add-missing-sub-status req resp sub-status)))
+  ([req sub-status default]
+   (if-some [resp (errors/render req sub-status (or default render-internal-server-error) req)]
+     (add-missing-sub-status req resp sub-status)))
+  ([req sub-status default & more]
+   (if-some [resp (apply errors/render req sub-status (or default render-internal-server-error) req more)]
+     (add-missing-sub-status req resp sub-status))))
 
 ;; Linking helpers
 
@@ -726,18 +854,3 @@
        (update req :response/body assoc
                :session/status  status
                :session/message message)))))
-
-(def error-to-response
-  {:verify/confirmed     render-already-reported
-   :verify/exists        render-conflict
-   :verify/not-confirmed render-unauthorized
-   :verify/expired       render-unauthorized
-   :verify/max-attempts  render-too-many-requests
-   :verify/bad-id        render-unauthorized
-   :verify/bad-code      render-unauthorized
-   :verify/bad-token     render-unauthorized
-   :verify/bad-email     render-not-found
-   :verify/bad-phone     render-not-found
-   :verify/not-found     render-not-found
-   :verify/bad-reason    render-forbidden
-   :verify/bad-result    render-internal-server-error})
