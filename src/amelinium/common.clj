@@ -1642,19 +1642,23 @@
 
 (defn translator
   ([req]
-   (or (get req :i18n/translator) (i18n/translator req)))
+   (or (get req (if i18n/*handle-missing-keys* :i18n/translator :i18n/translator-nd))
+       (i18n/translator req)))
   ([req lang]
    (if lang
      (i18n/translator req lang)
-     (or (get req :i18n/translator) (i18n/translator req)))))
+     (or (get req (if i18n/*handle-missing-keys* :i18n/translator :i18n/translator-nd))
+         (i18n/translator req)))))
 
 (defn translator-sub
   ([req]
-   (or (get req :i18n/translator-sub) (i18n/translator-sub req)))
+   (or (get req (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd))
+       (i18n/translator-sub req)))
   ([req lang]
    (if lang
      (i18n/translator-sub req lang)
-     (or (get req :i18n/translator-sub) (i18n/translator-sub req)))))
+     (or (get req (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd))
+         (i18n/translator-sub req)))))
 
 ;; Parameters
 

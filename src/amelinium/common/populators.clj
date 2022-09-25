@@ -81,6 +81,18 @@
   [req _ _]
   (delay (i18n/translator-sub req)))
 
+(defn i18n-translator-nd
+  "Creates shared translator for currently detected language. The translator returns
+  `nil` if the key is not found."
+  [req _ _]
+  (delay (i18n/no-default (i18n/translator req))))
+
+(defn i18n-translator-sub-nd
+  "Creates shared translator (supporting namespaces and keys) for currently detected
+  language. The translator returns `nil` if the key is not found."
+  [req _ _]
+  (delay (i18n/no-default (i18n/translator-sub req))))
+
 (defn populate-form-errors
   "Tries to obtain form errors from previously visited page, saved as a session
   variable `:form-errors` or as a query parameter `form-errors`."

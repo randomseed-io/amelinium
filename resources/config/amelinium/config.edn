@@ -211,16 +211,20 @@
  ;; Population
 
  :amelinium.http.middleware.populators/web
- [[:route/data          amelinium.common.populators/route-data]
-  [:language/user       amelinium.common.populators/user-lang]
-  [:oplog/logger        amelinium.common.populators/oplog-logger]
-  [:i18n/translator     amelinium.common.populators/i18n-translator]
-  [:i18n/translator-sub amelinium.common.populators/i18n-translator-sub]]
+ [[:route/data             amelinium.common.populators/route-data]
+  [:language/user          amelinium.common.populators/user-lang]
+  [:oplog/logger           amelinium.common.populators/oplog-logger]
+  [:i18n/translator        amelinium.common.populators/i18n-translator]
+  [:i18n/translator-sub    amelinium.common.populators/i18n-translator-sub]
+  [:i18n/translator-nd     amelinium.common.populators/i18n-translator-nd]
+  [:i18n/translator-sub-nd amelinium.common.populators/i18n-translator-sub-nd]]
 
  :amelinium.http.middleware.populators/post
- [[:i18n/translator     amelinium.common.populators/i18n-translator]
-  [:i18n/translator-sub amelinium.common.populators/i18n-translator-sub]
-  [:form/errors         amelinium.common.populators/form-errors]]
+ [[:i18n/translator        amelinium.common.populators/i18n-translator]
+  [:i18n/translator-sub    amelinium.common.populators/i18n-translator-sub]
+  [:i18n/translator-nd     amelinium.common.populators/i18n-translator-nd]
+  [:i18n/translator-sub-nd amelinium.common.populators/i18n-translator-sub-nd]
+  [:form/errors            amelinium.common.populators/form-errors]]
 
  :amelinium.http.middleware/web-renderer amelinium.web.controller/render!
  :amelinium.http.middleware/web-preparer amelinium.web.controller/prep!
