@@ -406,7 +406,8 @@
                                :verify/confirmed]
 
  :amelinium.errors/web {:priorities #ref :amelinium.errors/priorities
-                        :responses  {:verify/confirmed     amelinium.web/render-already-reported
+                        :responses  {:verify/sent          amelinium.web/render-in-progress
+                                     :verify/confirmed     amelinium.web/render-already-reported
                                      :verify/exists        amelinium.web/render-conflict
                                      :verify/not-confirmed amelinium.web/render-unauthorized
                                      :verify/expired       amelinium.web/render-unauthorized
@@ -421,7 +422,8 @@
                                      :verify/bad-result    amelinium.web/render-internal-server-error}}
 
  :amelinium.errors/api {:priorities #ref :amelinium.errors/priorities
-                        :responses  {:verify/confirmed     amelinium.api/render-already-reported
+                        :responses  {:verify/sent          amelinium.api/render-in-progress
+                                     :verify/confirmed     amelinium.api/render-already-reported
                                      :verify/exists        amelinium.api/render-conflict
                                      :verify/not-confirmed amelinium.api/render-unauthorized
                                      :verify/expired       amelinium.api/render-unauthorized

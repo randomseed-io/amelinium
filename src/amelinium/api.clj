@@ -680,7 +680,7 @@
     (update resp :body
             (fn [body]
               (if (contains? body :sub-status)
-                (add-missing-lang req [:sub-status/title :sub-status/description])
+                (add-missing-lang body req [:sub-status/title :sub-status/description])
                 (let [tr-sub (i18n/no-default (common/translator-sub req))]
                   (-> body
                       (assoc :sub-status sub-status)

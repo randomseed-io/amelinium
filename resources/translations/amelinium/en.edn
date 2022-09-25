@@ -61,7 +61,7 @@
                            :511 "Network Authentication Required"
                            :598 "Network Read Timeout"
                            :599 "Network Connect Timeout"}
-   :ok                    "Success!"
+   :ok                    {:in-progress "In progress..."}
    :error                 {:ok                "Success!"
                            :authorization     "Access denied."
                            :authentication    "Authentication error."

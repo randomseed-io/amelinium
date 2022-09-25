@@ -16,7 +16,8 @@
                            :partial-content               "Zawartość częściowa"
                            :multi-status                  "Multi-Status"
                            :already-reported              "Już zgłoszono"
-                           :im-used                       "Użyto IM"}
+                           :im-used                       "Użyto IM"
+                           :in-progress                   "Operacja w toku..."}
    :error                 {:ok                                   "Sukces!"
                            :authorization                        "Brak dostępu."
                            :authentication                       "Błąd uwierzytelniania."
