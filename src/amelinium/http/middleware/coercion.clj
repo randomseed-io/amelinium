@@ -13,6 +13,7 @@
             [amelinium.logging       :as       log]
             [amelinium.i18n          :as      i18n]
             [amelinium.schemas       :as   schemas]
+            [amelinium.common        :as    common]
             [reitit.coercion         :as  coercion]
             [reitit.ring.coercion    :as       rrc]
             [malli.core              :as         m]
@@ -48,10 +49,10 @@
                     (get param-error-properties :parameter/id)
                     (get param-error-properties :parameter/type)))
   ([req lang param-id param-type]
-   (translate-error (i18n/translator-sub req lang) param-id param-type))
+   (translate-error (common/translator-sub req lang) param-id param-type))
   ([req-or-sub param-id param-type]
    (if (map? req-or-sub)
-     (translate-error (i18n/translator-sub req-or-sub nil) param-id param-type nil nil)
+     (translate-error (common/translator-sub req-or-sub nil) param-id param-type nil nil)
      (translate-error req-or-sub param-id param-type nil nil)))
   ([translate-sub param-id param-type _ _]
    (let [param-type? (some? param-type)

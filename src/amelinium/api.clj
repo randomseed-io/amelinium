@@ -150,7 +150,7 @@
      (if (map? body)
        (if (contains? body :status)
          (add-missing-lang body req [:status/title :status/description])
-         (let [tr-sub (i18n/no-default (i18n/translate-sub req))]
+         (let [tr-sub (i18n/no-default (common/translator-sub req))]
            (-> body
                (assoc :status status)
                (add-missing-translation :status/title status tr-sub)
@@ -681,7 +681,7 @@
             (fn [body]
               (if (contains? body :sub-status)
                 (add-missing-lang req [:sub-status/title :sub-status/description])
-                (let [tr-sub (i18n/no-default (i18n/translate-sub req))]
+                (let [tr-sub (i18n/no-default (common/translator-sub req))]
                   (-> body
                       (assoc :sub-status sub-status)
                       (add-missing-translation :sub-status/title sub-status tr-sub)
