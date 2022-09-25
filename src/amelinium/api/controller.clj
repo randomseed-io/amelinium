@@ -239,9 +239,11 @@
 
 (defn render!
   [req]
-  (if (contains? req :response/fn)
-    ((get req :response/fn) req)
-    (api/render-ok req)))
+  (if-some [f (get req :response/fn)]
+    (f req)
+    (if-some [st (get req :response/status)]
+      (api/render-status req st)
+      (api/render-ok req))))
 
 (defn not-found!
   [req]
