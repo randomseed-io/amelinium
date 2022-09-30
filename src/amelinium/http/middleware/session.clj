@@ -142,7 +142,7 @@
     (if-some [remote-ip (ip/to-address remote-ip)]
       (if-not (or (= (ip/to-v6 remote-ip) (ip/to-v6 session-ip))
                   (= (ip/to-v4 remote-ip) (ip/to-v4 session-ip)))
-        {:cause    :bad-ip
+        {:cause    :session/bad-ip
          :reason   (str-spc "Session IP address" (str "(" (ip/plain-ip-str session-ip) ")")
                             "is different than the remote IP address"
                             (str "(" (ip/plain-ip-str remote-ip) ")")
@@ -152,7 +152,7 @@
         (if-not (or (= str-addr (ip/to-str session-ip))
                     (= str-addr (ip/to-str (ip/to-v4 session-ip)))
                     (= str-addr (ip/to-str (ip/to-v6 session-ip))))
-          {:cause    :bad-ip
+          {:cause    :session/bad-ip
            :reason   (str-spc "Session IP string" (str "(" (ip/to-str remote-ip) ")")
                               "is different than the remote IP string"
                               (str "(" str-addr ")")
@@ -209,7 +209,7 @@
   with the `:err/id` key is not `nil`."
   ([smap opts ip-address]
    (if-not (and smap (map? smap))
-     {:cause    :no-session-map
+     {:cause    :session/no-session-map
       :reason   (str-spc "No session map:" smap)
       :severity :info}
      (let [sid        (get smap :id)
@@ -220,34 +220,34 @@
            for-user   (delay (log/for-user user-id user-email
                                            (ip/plain-ip-str ip-address)))]
        (cond
-         (not any-sid)               {:cause    :no-session-id
+         (not any-sid)               {:cause    :session/no-id
                                       :reason   (some-str-spc "No session ID" @for-user)
                                       :severity :info}
-         (not sid)                   {:cause    :unknown-session-id
+         (not sid)                   {:cause    :session/unknown-id
                                       :reason   (some-str-spc "Unknown session ID" esid @for-user)
                                       :severity :info}
-         (not (sid-valid? any-sid))  {:cause    :malformed-session-id
+         (not (sid-valid? any-sid))  {:cause    :session/malformed-session-id
                                       :reason   (str "Malformed session ID " @for-user)
                                       :severity :info}
-         (not user-id)               {:cause    :malformed-user-id
+         (not user-id)               {:cause    :session/malformed-user-id
                                       :reason   (str "User ID not found or malformed " @for-user)
                                       :severity :info}
-         (not user-email)            {:cause    :malformed-user-email
+         (not user-email)            {:cause    :session/malformed-user-email
                                       :reason   (str "User e-mail not found or malformed " @for-user)
                                       :severity :info}
-         (not (created-valid? smap)) {:cause    :bad-creation-time
+         (not (created-valid? smap)) {:cause    :session/bad-creation-time
                                       :reason   (str "No creation time " @for-user)
                                       :severity :warn}
-         (not (active-valid? smap))  {:cause    :bad-last-active-time
+         (not (active-valid? smap))  {:cause    :session/bad-last-active-time
                                       :reason   (str "No last active time " @for-user)
                                       :severity :warn}
-         (expired? smap opts)        {:cause    :expired
+         (expired? smap opts)        {:cause    :session/expired
                                       :reason   (str "Session expired " @for-user)
                                       :severity :info}
-         (insecure? smap opts)       {:cause    :insecure
+         (insecure? smap opts)       {:cause    :session/insecure
                                       :reason   (str "Session not secured with encrypted token " @for-user)
                                       :severity :warn}
-         (security-failed? smap)     {:cause    :bad-security-token
+         (security-failed? smap)     {:cause    :session/bad-security-token
                                       :reason   (str "Bad session security token " @for-user)
                                       :severity :warn}
          :ip-address-check           (ip-state smap user-id user-email ip-address ))))))
@@ -329,8 +329,8 @@
    (mkbad (apply assoc smap k v pairs) opts))
   ([smap opts]
    (let [cause         (get (get smap :error) :cause)
-         expired?      (or (= :expired cause)
-                           (and (= :bad-ip cause) (get opts :wrong-ip-expires)))
+         expired?      (or (= :session/expired cause)
+                           (and (= :session/bad-ip cause) (get opts :wrong-ip-expires)))
          hard-expired? (and expired? (hard-expired? smap opts))
          err-id        (or (get smap :id) (get smap :err/id))]
      (-> (update-in smap [:error :severity] (fnil identity :warn))
@@ -645,7 +645,7 @@
          (mkbad {:id sid} opts
                 :session-id-path  (get opts :session-id-path)
                 :error {:reason   "Malformed session-id parameter"
-                        :cause    :malformed-session-id
+                        :cause    :session/malformed-session-id
                         :severity :info}))
        (let [remote-ip (get req :remote-ip)
              smap      (handler-fn sid remote-ip)]
@@ -659,7 +659,7 @@
                  (let [opts (config-options req opts-or-config-key)]
                    (mkbad smap opts
                           :error {:severity :error
-                                  :cause    :db-problem
+                                  :cause    :session/db-problem
                                   :reason   (some-str-spc
                                              "Problem updating session data"
                                              (log/for-user
@@ -764,7 +764,7 @@
                    (mkbad sess opts
                           :error  {:reason   (str "Session cannot be saved"
                                                   (log/for-user user-id user-email ipplain))
-                                   :cause    :db-problem
+                                   :cause    :session/db-problem
                                    :severity :error}))))))))))
 
 ;; Initialization
