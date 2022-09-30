@@ -674,23 +674,59 @@
 
 ;; Rendering based on application-logic error
 
-(defn- add-missing-sub-status
-  [req resp sub-status]
-  (if sub-status
-    (update resp :body
-            (fn [body]
-              (if (contains? body :sub-status)
-                (add-missing-lang body req [:sub-status/title :sub-status/description])
-                (let [tr-sub (i18n/no-default (common/translator-sub req))]
-                  (-> body
-                      (assoc :sub-status sub-status)
-                      (add-missing-translation :sub-status/title sub-status tr-sub)
-                      (add-missing-translation :sub-status/description sub-status ".full" tr-sub)
-                      (add-missing-lang req [:sub-status/title :sub-status/description]))))))
-    resp))
+(defn add-missing-sub-status-to-response
+  ([req resp sub-status]
+   (add-missing-sub-status-to-response req resp sub-status :sub-status :body
+                                       :sub-status/title :sub-status/description
+                                       :status/see-also))
+  ([req resp sub-status sub-key]
+   (add-missing-sub-status-to-response req resp sub-status sub-key :body))
+  ([req resp sub-status sub-key main-key]
+   (add-missing-sub-status-to-response req resp sub-status sub-key main-key nil))
+  ([req resp sub-status sub-key main-key tr-sub]
+   (let [sub-ns        (name sub-key)
+         sub-title-key (keyword sub-ns "title")
+         sub-desc-key  (keyword sub-ns "description")]
+     (add-missing-sub-status-to-response req resp sub-status sub-key main-key
+                                         sub-title-key sub-desc-key :status/see-also nil)))
+  ([req resp sub-status sub-key main-key sub-title-key sub-desc-key see-also-key]
+   (add-missing-sub-status-to-response req resp sub-status sub-key main-key
+                                       sub-title-key sub-desc-key see-also-key nil))
+  ([req resp sub-status sub-key main-key sub-title-key sub-desc-key see-also-key tr-sub]
+   (if sub-status
+     (let [tr-sub (or tr-sub (i18n/no-default (common/translator-sub req)))]
+       (update resp main-key
+               (fn [body]
+                 (if (contains? body sub-key)
+                   (add-missing-lang body req [sub-status-title-key sub-status-desc-key])
+                   (let [see-also (conj (or (get body see-also-key) []) sub-key)]
+                     (-> body
+                         (assoc sub-key sub-status see-also-key see-also)
+                         (add-missing-translation sub-status-title-key sub-status tr-sub)
+                         (add-missing-translation sub-status-desc-key  sub-status ".full" tr-sub)
+                         (add-missing-lang req [sub-status-title-key sub-status-desc-key])))))))
+     resp)))
+
+(defn add-missing-sub-status
+  ([req sub-status]
+   (add-missing-sub-status-to-response req req sub-status :sub-status :response/body
+                                       :sub-status/title :sub-status/description
+                                       :status/see-also))
+  ([req sub-status sub-key]
+   (add-missing-sub-status-to-response req req sub-status sub-key :response/body))
+  ([req sub-status sub-key main-key]
+   (add-missing-sub-status-to-response req req sub-status sub-key main-key nil))
+  ([req sub-status sub-key main-key tr-sub]
+   (add-missing-sub-status-to-response req req sub-status sub-key main-key tr-sub))
+  ([req sub-status sub-key main-key sub-title-key sub-desc-key see-also-key]
+   (add-missing-sub-status-to-response req req sub-status sub-key main-key
+                                       sub-title-key sub-desc-key see-also-key nil))
+  ([req sub-status sub-key main-key sub-title-key sub-desc-key see-also-key tr-sub]
+   (add-missing-sub-status-to-response req req sub-status sub-key main-key
+                                       sub-title-key sub-desc-key see-also-key tr-sub)))
 
 (defn render-status
-  "Renders an error response for the given request map and optional `sub-status`
+  "Renders a status response for the given request map and optional `sub-status`
   (a keyword, mapped to a response rendering function, using a map passed under the
   `:errors/config` key in a route data). If it is not given (or its value is `nil` or
   `false`) then `render-ok` will be used to generate the response.
@@ -721,13 +757,13 @@
    (errors/render req nil render-ok req))
   ([req sub-status]
    (if-some [resp (errors/render req sub-status render-ok req)]
-     (add-missing-sub-status req resp sub-status)))
+     (add-missing-sub-status-to-response req resp sub-status)))
   ([req sub-status default]
    (if-some [resp (errors/render req sub-status (or default render-ok) req)]
-     (add-missing-sub-status req resp sub-status)))
+     (add-missing-sub-status-to-response req resp sub-status)))
   ([req sub-status default & more]
    (if-some [resp (apply errors/render req sub-status (or default render-ok) req more)]
-     (add-missing-sub-status req resp sub-status))))
+     (add-missing-sub-status-to-response req resp sub-status))))
 
 (defn render-error
   "Renders an error response for the given request map and optional `sub-status`
@@ -761,13 +797,13 @@
    (errors/render req nil render-internal-server-error req))
   ([req sub-status]
    (if-some [resp (errors/render req sub-status render-internal-server-error req)]
-     (add-missing-sub-status req resp sub-status)))
+     (add-missing-sub-status-to-response req resp sub-status)))
   ([req sub-status default]
    (if-some [resp (errors/render req sub-status (or default render-internal-server-error) req)]
-     (add-missing-sub-status req resp sub-status)))
+     (add-missing-sub-status-to-response req resp sub-status)))
   ([req sub-status default & more]
    (if-some [resp (apply errors/render req sub-status (or default render-internal-server-error) req more)]
-     (add-missing-sub-status req resp sub-status))))
+     (add-missing-sub-status-to-response req resp sub-status))))
 
 ;; Linking helpers
 
@@ -836,7 +872,7 @@
   [smap]
   (if-not smap
     :missing
-    (or (some-keyword-simple (get (get smap :error) :cause)) :unknown-error)))
+    (or (some-keyword (get (get smap :error) :cause)) :session/unknown-error)))
 
 (defn body-add-session-errors
   ([req]
@@ -852,5 +888,6 @@
            status        (session-status smap)
            message       (translate-sub :session status)]
        (update req :response/body assoc
+               :status/see-also :session/status
                :session/status  status
-               :session/message message)))))
+               :session/title   message)))))
