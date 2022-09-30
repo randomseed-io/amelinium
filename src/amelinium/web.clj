@@ -707,6 +707,17 @@
 
 ;; Rendering based on application-logic error
 
+(defn- add-missing-sub-key
+  [req resp sub-key sub-status]
+  (if sub-key
+    (update
+     resp :body
+     (fn [m]
+       (-> m
+           (map/assoc-missing  :status/sub  sub-key sub-key sub-status)
+           (map/update-missing :message/sub (fn [_] (i18n/no-default (i18n/tr req sub-status)))))))
+    resp))
+
 (defn render-error
   "Renders error response."
   ([]                   (resp/internal-server-error))
@@ -714,6 +725,20 @@
   ([req status]         (errors/render req status nil req))
   ([req status default] (errors/render req status default req))
   ([req status default & more] (apply errors/render req status default req more)))
+
+(defn render-error
+  "Renders error response."
+  ([]
+   (resp/internal-server-error))
+  ([req]
+   (if-some [resp (errors/render req nil nil req)]
+     (add-missing-sub-key)))
+  ([req status]
+   (errors/render req status nil req))
+  ([req status default]
+   (errors/render req status default req))
+  ([req status default & more]
+   (apply errors/render req status default req more)))
 
 ;; Linking helpers
 
