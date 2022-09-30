@@ -59,12 +59,8 @@
       req
       (let [lang          (or lang (api/pick-language req))
             smap          (common/session req)
-            astatus       (get req :auth/status)
-            status        (controller/auth-status-to-status astatus)
-            resp-fn       (controller/auth-status-to-resp   astatus)
+            status        (get req :response/status)
             translate-sub (common/translator-sub req lang)
-            amessage      (translate-sub :auth  astatus)
-            message       (translate-sub :error status)
             sess-err?     (= status :error/session)
             substatus     (if sess-err? :session/status  :auth/status)
             submessage    (if sess-err? :session/message :auth/message)
@@ -77,9 +73,11 @@
                                                      :auth/message amessage})
                               (language/force lang)
                               (api/body-add-lang lang))]
-        (api/render-response resp-fn (if sess-err?
-                                       (api/body-add-session-errors req smap translate-sub lang)
-                                       (api/body-add-session-id req smap)))))))
+        (api/render-response
+         resp-fn
+         (if sess-err?
+           (api/body-add-session-errors req smap translate-sub lang)
+           (api/body-add-session-id req smap)))))))
 
 (defn authenticate!
   "Logs user in when user e-mail and password are given, or checks if the session is
