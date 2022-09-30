@@ -126,12 +126,12 @@
   (let [req (super/auth-user-with-password! req user-email password sess route-data)]
     (if (web/response? req)
       req
-      (case (get req :auth/status)
-        :ok            (language/force req (or lang (web/pick-language-str req)))
-        :locked        (common/move-to req (get route-data :auth/locked        :login/account-locked))
-        :soft-locked   (common/move-to req (get route-data :auth/soft-locked   :login/account-soft-locked))
-        :bad-password  (common/move-to req (get route-data :auth/bad-password  :login/bad-password))
-        :session-error (common/go-to   req (get route-data :auth/session-error :login/session-error))
+      (case (get req :response/status)
+        :auth/ok            (language/force req (or lang (web/pick-language-str req)))
+        :auth/locked        (common/move-to req (get route-data :auth/locked        :login/account-locked))
+        :auth/soft-locked   (common/move-to req (get route-data :auth/soft-locked   :login/account-soft-locked))
+        :auth/bad-password  (common/move-to req (get route-data :auth/bad-password  :login/bad-password))
+        :auth/session-error (common/go-to   req (get route-data :auth/session-error :login/session-error))
         (common/go-to req (get route-data :auth/error :login/error))))))
 
 (defn authenticate!
