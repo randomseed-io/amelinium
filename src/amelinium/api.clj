@@ -698,13 +698,13 @@
        (update resp main-key
                (fn [body]
                  (if (contains? body sub-key)
-                   (add-missing-lang body req [sub-status-title-key sub-status-desc-key])
+                   (add-missing-lang body req [sub-title-key sub-desc-key])
                    (let [see-also (conj (or (get body see-also-key) []) sub-key)]
                      (-> body
                          (assoc sub-key sub-status see-also-key see-also)
-                         (add-missing-translation sub-status-title-key sub-status tr-sub)
-                         (add-missing-translation sub-status-desc-key  sub-status ".full" tr-sub)
-                         (add-missing-lang req [sub-status-title-key sub-status-desc-key])))))))
+                         (add-missing-translation sub-title-key sub-status tr-sub)
+                         (add-missing-translation sub-desc-key  sub-status ".full" tr-sub)
+                         (add-missing-lang req [sub-title-key sub-desc-key])))))))
      resp)))
 
 (defn add-missing-sub-status
