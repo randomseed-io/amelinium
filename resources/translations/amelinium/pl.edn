@@ -22,7 +22,7 @@
                            :authorization                        "Brak dostępu."
                            :authentication                       "Błąd uwierzytelniania."
                            :session                              "Błąd sesji."
-                           :bad-parameters                       "Wysłano błędne parametry."
+                           :bad-parameters                       "Otrzymano błędne parametry."
                            :parameters                           "Błędne parametry."
                            :parameter                            "Parametr {1} jest błędny."
                            :parameter-of-type                    "Parametr typu {1} jest błędny."
