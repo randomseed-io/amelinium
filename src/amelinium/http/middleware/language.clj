@@ -25,6 +25,8 @@
 ;; Configuration getters
 
 (defn default-lang-id
+  "Returns an ID (a keyword) of a default language set in config (under the `:default`
+  key) or a value of the `default-fallback-language` variable (`:en`)."
   ([req]
    (default-lang-id nil (get req :language/settings)))
   ([_ config]
@@ -79,14 +81,14 @@
   "Picks the right language using a chain of picking functions identified by a
   keyword. In its unary variant it obtains language picker chains configuration from
   a request map (under `:language/pickers` key) and looks for the picker chain
-  identified by the `:default` key. When it's not `nil`, it is run.
+  identified by the `:default` key. When it's not `nil`, it is used.
 
   In its binary variant it takes a request map and pickers configuration given as a
-  map OR a request map and an ID of a picker. When a map is given, the picker chain
-  associated with the `:default` key will be used. When a picker ID is given the
-  chain will be selected from picker chains obtained from the `req` under the key
-  `:language/pickers`. Next, the picker chain will be run with a request map as its
-  argument and the result will be then returned.
+  map OR a request map and an ID of a picker given as a keyword. When a map is given,
+  the picker chain associated with the `:default` key will be used. When a picker ID
+  is given the chain will be selected from picker chains obtained from the `req`
+  under the key `:language/pickers`. Next, the picker chain will be run with a
+  request map as its argument and the result will be then returned.
 
   In its ternary variant the given `pickers` map will be used to look for a chain
   under the given `picker-id`. This chain will be run with a request map as its
