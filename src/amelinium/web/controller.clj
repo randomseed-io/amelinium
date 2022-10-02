@@ -361,20 +361,20 @@
   overriden by the `:form-errors/page` configuration option associated with HTTP
   route data.
 
-  If the destination URI cannot be established or if a coercion error happened during
+  If the destination URI cannot be established, or if a coercion error happened during
   handling some previous coercion error (so current page is where the browser had
-  been redirected to) then instead of generating a redirect, a regular page is
+  been redirected to), then instead of generating a redirect, a regular page is
   rendered with HTTP code of 422. The `:app/data` key of a request map is updated
   with:
 
-  - `:title` (translated message of `:error/parameters`),
+  - `:title` (translated message of `:parameters/error`),
   - `:form/errors` (result of `amelinium.http.middleware.coercion/map-errors`),
   - `:coercion/errors` (result of `amelinium.http.middleware.coercion/explain-errors`).
 
   When a coercion error is detected during response processing, a web page of HTTP
   code 500 is rendered. The `:app/data` key of a request map is updated with the:
 
-  - `:title` (translated message of `:error/parameters`),
+  - `:title` (translated message of `:output/error`),
   - `:form/errors` (result of `amelinium.http.middleware.coercion/explain-errors`)."
   [e respond raise]
   (let [data  (ex-data e)
@@ -417,7 +417,7 @@
              (-> req
                  (map/assoc-missing :app/data common/empty-lazy-map)
                  (update :app/data assoc
-                         :title           (delay (translate-sub :error/parameters))
+                         :title           (delay (translate-sub :parameters/error))
                          :form/errors     (delay (coercion/map-errors data))
                          :coercion/errors (delay (coercion/explain-errors data translate-sub)))
                  web/render-bad-params))))) ;; TODO: template for listing bad params / update existing template and check
@@ -426,7 +426,7 @@
       (respond
        (-> req
            (map/assoc-missing :app/data common/empty-lazy-map)
-           (update :app/data assoc :title (delay (i18n/no-default (i18n/tr req :error/parameters))))
+           (update :app/data assoc :title (delay (i18n/no-default (i18n/tr req :output/error))))
            web/render-internal-server-error))
 
       (raise e))))

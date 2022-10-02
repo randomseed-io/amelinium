@@ -63,8 +63,8 @@
                            :unavailable-for-legal-reasons        "Niedostępne z powodów prawnych"}
    :server-error          {:ok                              "OK"
                            :internal                        "Wewnętrzny błąd serwera"
-                           :not-implemented                 "Niezaimplementowano"
-                           :bad-gateway                     "Zła brama"
+                           :not-implemented                 "Nie zaimplementowano"
+                           :bad-gateway                     "Zła brama sieciowa"
                            :service-unavailable             "Usługa niedostępna"
                            :gateway-timeout                 "Przekroczony czas oczekiwania w komunikacji z bramą"
                            :http-version-not-supported      "Nieobsługiwana wersja HTTP"
@@ -92,7 +92,7 @@
                            :unknown-error        "Wystąpił nieznany błąd związany z sesją."
                            :missing              "Brak sesji użytkownika."}
    :auth                  {:ok            "Udane logowanie!"
-                           :session-error "Błąd podczas tworzenia sesji! Spróbuj za kilka minut, a jeżeli błąd się powtarza, skontaktuj się z pomocą techniczną."
+                           :session-error "Błąd podczas tworzenia sesji! Spróbuj za kilka minut, a jeżeli problem się powtarza, skontaktuj się z pomocą techniczną."
                            :locked        "Konto zablokowane! Skontaktuj się z pomocą techniczną."
                            :soft-locked   "Dostęp tymczasowo zablokowany z powodu zbyt wielu nieudanych prób logowania."
                            :bad-password  "Nieprawidłowa nazwa użytkownika lub hasło."}
@@ -110,6 +110,8 @@
                            :user      "Użytkownik zalogowany"
                            :self      "Właściciel zasobu"
                            :banned    "Konto zablokowane"}
+   :output                {:error            "Błędne dane wyjściowe"}
+   :parameters            {:error            "Błędne parametry"}
    :parameter             {:phone            "Numer telefoniczny"
                            :email            "Adres e-mailowy"
                            :login            "Login"
