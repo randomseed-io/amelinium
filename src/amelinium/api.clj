@@ -793,7 +793,7 @@
 
   Example:
 
-  `(render-status req :verify/bad-token)`
+  `(render-error req :verify/bad-token)`
 
   Will create a response with the following body:
 
