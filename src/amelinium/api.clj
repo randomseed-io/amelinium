@@ -139,6 +139,9 @@
   based on a translation key created by adding \".full\" to the original status
   key). If any key already exists in `:response/body`, it will not be added.
 
+  If `status` is given and the `:response/body` does not exist in `req`, it adds it
+  and associates it with an empty, performing the calculations described above.
+
   Additionally, if the body map contains `:status/title` or `:status/description` key
   and does not contain `:lang` key, the `:lang` key will be added with an associated
   value of `:language/id` taken from a request map `req`."
@@ -152,7 +155,7 @@
          (seq body)
          body))))
   ([req status]
-   (let [body (get req :response/body)]
+   (let [body (get req :response/body {})]
      (if (map? body)
        (if (contains? body :status)
          (add-missing-lang body req [:status/title :status/description])
