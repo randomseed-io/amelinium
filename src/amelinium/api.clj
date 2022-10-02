@@ -51,12 +51,6 @@
                 temporary-redirect localized-temporary-redirect
                 move-to see-other localized-see-other go-to])
 
-;; Language
-
-(p/import-vars [amelinium.common
-                pick-language pick-language-without-fallback
-                pick-language-str pick-language-str-without-fallback])
-
 ;; Special redirects
 
 (p/import-vars [amelinium.common
