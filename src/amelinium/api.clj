@@ -885,6 +885,6 @@
 
 (defn session-status
   [smap]
-  (if-not smap
-    :missing
+  (if-not (map? smap)
+    :session/missing
     (or (some-keyword (get (get smap :error) :cause)) :session/unknown-error)))
