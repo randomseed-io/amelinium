@@ -14,7 +14,7 @@
             [clojure.string                     :as           str]
             [amelinium.logging                  :as           log]
             [amelinium.common                   :as        common]
-            [amelinium.common.controller        :as    controller]
+            [amelinium.common.controller        :as         super]
             [io.randomseed.utils.map            :as           map]
             [io.randomseed.utils                :refer       :all]
             [amelinium.i18n                     :as          i18n]
@@ -50,34 +50,24 @@
     (and (contains? bparams :password)
          (contains? bparams :login))))
 
+(defn add-session-status
+  [req smap translate-sub]
+  (if (= (get req :response/status) :error/session)
+    (api/add-missing-sub-status req (api/session-status (or smap (common/session req)))
+                                :session-status :response/body translate-sub)
+    (api/body-add-session-id req)))
+
 (defn auth-user-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
   conditions and may render a response."
   [req user-email password sess route-data lang]
-  (let [req (controller/auth-user-with-password! req user-email password sess route-data)]
+  (let [req (super/auth-user-with-password! req user-email password sess route-data)]
     (if (api/response? req)
       req
-      (let [lang          (or lang (api/pick-language req))
-            smap          (common/session req)
-            status        (get req :response/status)
-            translate-sub (common/translator-sub req lang)
-            sess-err?     (= status :error/session)
-            substatus     (if sess-err? :session/status  :auth/status)
-            submessage    (if sess-err? :session/message :auth/message)
-            req           (-> req
-                              (assoc :response/body {:status       status
-                                                     :message      message
-                                                     :status/sub   substatus
-                                                     :message/sub  submessage
-                                                     :auth/status  astatus
-                                                     :auth/message amessage})
-                              (language/force lang)
-                              (api/body-add-lang lang))]
-        (api/render-response
-         resp-fn
-         (if sess-err?
-           (api/body-add-session-errors req smap translate-sub lang)
-           (api/body-add-session-id req smap)))))))
+      (let [lang (or lang (common/pick-language req))]
+        (-> req
+            (language/force lang)
+            (add-session-status sess (common/translator-sub req lang)))))))
 
 (defn authenticate!
   "Logs user in when user e-mail and password are given, or checks if the session is
@@ -102,7 +92,7 @@
         sess        (common/session req)
         route-data  (http/get-route-data req)]
     (cond
-      password           (controller/auth-user-with-password! req user-email password sess route-data)
+      password           (auth-user-with-password! req user-email password sess route-data nil)
       (get sess :valid?) req
       :invalid!          (api/move-to req (get route-data :auth/info :auth/info)))))
 
@@ -139,16 +129,7 @@
       ;; Request is invalid.
 
       (not (get req :validators/params-valid?))
-      (let [lang      (common/lang-id    req)
-            translate (common/translator req)]
-        (-> req
-            (assoc :response/body
-                   {:status        :error/bad-parameters
-                    :message       (translate :error/bad-parameters)
-                    :status/sub    :params/errors
-                    :params/errors (get req :validators/reasons)})
-            (api/body-add-lang lang)
-            api/render-bad-params))
+      (api/render-error req :parameters/error)
 
       ;; There is no session. Short-circuit.
 
@@ -163,7 +144,6 @@
             ip-addr   (:remote-ip/str req)
             for-user  (log/for-user user-id email ip-addr)
             for-mail  (log/for-user nil email ip-addr)
-            lang      (common/lang-id req)
             translate (common/translator req)]
         (log/wrn "Hard-locked account access attempt" for-user)
         (api/oplog req
@@ -171,28 +151,19 @@
                    :op      :access-denied
                    :level   :warning
                    :msg     (str "Permanent lock " for-mail))
-        (-> req
-            (assoc :response/body
-                   {:status       :error/authorization
-                    :message      (translate :error/authorization)
-                    :status/sub   :auth/status
-                    :message/sub  :auth/message
-                    :auth/status  :locked
-                    :auth/message (translate :auth/locked)})
-            (api/body-add-lang lang)
-            api/render-unauthorized))
+        (api/render-error req :auth/locked))
 
       ;; Session is not valid.
 
       (and (not @valid-session?) (not (and @auth? @login-data?)))
       (let [req           (cleanup-req req @auth-state)
             expired?      (get sess :expired?)
-            user-id       (:user/id      sess)
-            email         (:user/email   sess)
+            user-id       (get sess :user/id)
+            email         (get sess :user/email)
+            reason        (get (get sess :error) :reason)
             ip-addr       (:remote-ip/str req)
             for-user      (log/for-user user-id email ip-addr)
             for-mail      (log/for-user nil email ip-addr)
-            lang          (common/lang-id req)
             translate-sub (common/translator-sub req)]
 
         ;; Log the event.
@@ -206,7 +177,7 @@
                          :ok?     false
                          :msg     (str "Expired " for-mail)))
           ;; Session invalid in another way.
-          (when-some [reason (:reason (:error sess))]
+          (when (some? reason)
             (api/oplog req
                        :user-id (:user/id sess)
                        :op      :session
@@ -218,13 +189,8 @@
         ;; Generate a response describing an invalid session.
 
         (-> req
-            (assoc :response/body {:status      :error/session
-                                   :status/sub  :session/status
-                                   :message/sub :session/message
-                                   :message     (translate-sub :error/session)})
-            (api/body-add-lang lang)
-            (api/body-add-session-errors sess translate-sub lang)
-            api/render-forbidden))
+            (api/add-missing-sub-status reason :session-error :response/body translate-sub)
+            (api/render-error :auth/session-error)))
 
       :----pass
 
@@ -254,7 +220,7 @@
   middleware chain. Takes exception object `e`, response wrapper `respond` and
   `raise` function.
 
-  When a coercion error is detected during request processing, it creates a sequence
+  When a coercion error is detected during **request processing**, it creates a sequence
   of maps (by calling `amelinium.http.middleware.coercion/explain-errors`) where each
   contains the following keys:
 
@@ -266,13 +232,24 @@
   - `:error/description`.
 
   The sequence is then stored in a map identified with the `:response/body` key of a
-  request map, under the key `:error/parameters`. Additionally, the following keys
+  request map, under the key `:parameters/errors`. Additionally, the following keys
   are added to the response body:
 
   - `:lang` (current language),
-  - `:status` (always set to `:error/parameters`),
-  - `:status/message` (a result of translation of the `:error/parameters` key),
-  - `:status/sub` (always set to `:error/parameters`)."
+  - `:status` (always set to `:error/bad-parameters`),
+  - `:status/title` (a result of translation of the `:error/bad-parameters` key),
+  - `:status/description` (a result of translation of the `:error/bad-parameters.full` key).
+
+  When a coercion error is detected during **response processing**, it creates a 500 status
+  response with the following body:
+
+  - `:lang` (current language),
+  - `:status` (always set to `:server-error/internal`),
+  - `:status/title` (a result of translation of the `:server-error/internal` key),
+  - `:status/description` (a result of translation of the `:server-error/internal.full` key),
+  - `:sub-status` (always set to `:output/error`),
+  - `:sub-status/title` (a result of translation of the `:output/error` key),
+  - `:sub-status/description` (a result of translation of the `:output/error.full` key)."
   [e respond raise]
   (let [data  (ex-data e)
         req   (get data :request)
@@ -281,30 +258,18 @@
     (case ctype
 
       :reitit.coercion/request-coercion
-      (respond
-       (let [lang          (common/lang-id req)
-             translate-sub (common/translator-sub req)]
-         (-> req
-             (assoc :response/body {:lang             lang
-                                    :status           :error/parameters
-                                    :status/message   (translate-sub :error/parameters)
-                                    :status/sub       :error/parameters
-                                    :error/parameters (coercion/explain-errors data translate-sub)})
-             api/render-bad-params)))
+      (let [tr-sub (common/translator-sub req)
+            errors (coercion/explain-errors data tr-sub)]
+        (-> req
+            (update :response/body assoc :parameters/errors errors)
+            (api/render-bad-params)
+            (respond)))
 
       :reitit.coercion/response-coercion
-      (respond
-       (let [data       (dissoc data :response)
-             lang       (common/lang-id req)
-             translate  (common/translator req)
-             error-list (coercion/list-errors data)]
-         (log/err "Response coercion error:" (coercion/join-errors error-list))
-         (-> req
-             (assoc :response/body {:lang           lang
-                                    :status         :error/internal
-                                    :status/message (translate :error/internal)
-                                    :status/sub     :error/parameters})
-             api/render-internal-server-error)))
+      (let [data       (dissoc data :response)
+            error-list (coercion/list-errors data)]
+        (log/err "Response coercion error:" (coercion/join-errors error-list))
+        (respond (api/render-error req :output/error)))
 
       (raise e))))
 

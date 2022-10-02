@@ -891,21 +891,3 @@
   (if-not smap
     :missing
     (or (some-keyword (get (get smap :error) :cause)) :session/unknown-error)))
-
-(defn body-add-session-errors
-  ([req]
-   (body-add-session-errors req (common/session req) nil nil))
-  ([req smap]
-   (body-add-session-errors req smap nil nil))
-  ([req smap translate-sub]
-   (body-add-session-errors req smap translate-sub nil))
-  ([req smap translate-sub lang]
-   (if (get smap :valid?)
-     req
-     (let [translate-sub (or translate-sub (i18n/no-default (common/translator-sub req lang)))
-           status        (session-status smap)
-           message       (translate-sub :session status)]
-       (update req :response/body assoc
-               :status/see-also :session/status
-               :session/status  status
-               :session/title   message)))))
