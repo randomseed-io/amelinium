@@ -57,6 +57,12 @@
 
 ;; Generation of confirmation tokens and codes
 
+(defn- calc-attempts-query
+  [dec-att?]
+  (if dec-att?
+    (str "IF(attempts > 0, attempts - 1, attempts)")
+    (str "attempts")))
+
 (defn gen-confirmation-query
   [id-column dec-att?]
   (str-squeeze-spc
@@ -69,7 +75,7 @@
    "ON DUPLICATE KEY UPDATE"
    "user_id           = IF(NOW()>expires, VALUE(user_id),      user_id),"
    "user_uid          = IF(NOW()>expires, VALUE(user_uid),     user_uid),"
-   "attempts          = IF(NOW()>expires, VALUE(attempts)," (str "attempts" (if dec-att? " - 1") "),")
+   "attempts          = IF(NOW()>expires, VALUE(attempts),"    (str (calc-attempts-query dec-att?) "),")
    "code              = IF(NOW()>expires, VALUE(code),         code),"
    "token             = IF(NOW()>expires, VALUE(token),        token),"
    "created           = IF(NOW()>expires, NOW(),               created),"
@@ -387,7 +393,7 @@
    "SELECT * FROM confirmations"
    "WHERE id = ? AND reason = ? AND expires > NOW()"
    "ON DUPLICATE KEY UPDATE"
-   "attempts = IF(VALUE(confirmed) = FALSE AND VALUE(attempts)  > 0,"
+   "attempts = IF(VALUE(confirmed) = FALSE AND VALUE(attempts) > 0,"
    "              VALUE(attempts)-1, VALUE(attempts))"
    "RETURNING id,user_id,user_uid,account_type,attempts,code,token,created,confirmed,expires"))
 
