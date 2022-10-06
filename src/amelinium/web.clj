@@ -362,7 +362,8 @@
   ([req status data view layout lang]
    (render req status data view layout lang nil))
   ([req status data view layout lang sess]
-   (let [lang        (or lang (if-not (false? lang) (pick-language-str req)))
+   (let [lang        (if lang (some-str lang))
+         lang        (if (false? lang) nil (pick-language-str req))
          [layt view] (error-lv req status layout view)
          layt        (resolve-layout req lang layt)
          view        (resolve-view   req lang view)]
