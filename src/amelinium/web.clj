@@ -477,21 +477,21 @@
   - value of `:app/error-view` (in a route data or a request map),
   - \"error\"."
   ([]
-   (render-response resp/ok :ok/found nil nil nil nil nil nil))
+   (render-response-force resp/ok :ok/found nil nil nil nil nil nil))
   ([resp-fn]
-   (render-response resp-fn nil nil nil nil nil nil nil))
+   (render-response-force resp-fn nil nil nil nil nil nil nil))
   ([resp-fn req]
-   (render-response resp-fn nil req nil nil nil nil nil))
+   (render-response-force resp-fn nil req nil nil nil nil nil))
   ([resp-fn status req]
-   (render-response resp-fn status req nil nil nil nil nil))
+   (render-response-force resp-fn status req nil nil nil nil nil))
   ([resp-fn status req data]
-   (render-response resp-fn status req data nil nil nil nil))
+   (render-response-force resp-fn status req data nil nil nil nil))
   ([resp-fn status req data view]
-   (render-response resp-fn status req data view nil nil nil))
+   (render-response-force resp-fn status req data view nil nil nil))
   ([resp-fn status req data view layout]
-   (render-response resp-fn status req status data view layout nil nil))
+   (render-response-force resp-fn status req data view layout nil nil))
   ([resp-fn status req data view layout lang]
-   (render-response resp-fn status req data view layout lang nil))
+   (render-response-force resp-fn status req data view layout lang nil))
   ([resp-fn status req data view layout lang sess]
    (if-some [headers (get req :response/headers)]
      (-> (render req status data view layout lang sess) resp-fn (update :headers conj headers))
