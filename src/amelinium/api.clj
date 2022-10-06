@@ -94,40 +94,6 @@
 
 ;; Response rendering
 
-(defn- add-missing-lang
-  [body req translation-keys]
-  (if (contains? body :lang)
-    body
-    (if (some #(contains? body %) translation-keys)
-      (if-some [l (get req :language/id)]
-        (assoc body :lang l)
-        body)
-      body)))
-
-(defn- try-namespace
-  [v]
-  (if (ident? v) (namespace v) v))
-
-(defn- try-name
-  [v]
-  (if (ident? v) (name v) v))
-
-(defn- add-missing-translation
-  ([body new-k k translation-fn]
-   (if (contains? body new-k)
-     body
-     (if-some [t (translation-fn k)] (assoc body new-k t) body)))
-  ([body new-k k suffix translation-fn]
-   (if (contains? body new-k)
-     body
-     (if-some [t (translation-fn (try-namespace k) (str (try-name k) suffix))]
-       (assoc body new-k t)
-       body))))
-
-(defn- untranslatable?
-  [v]
-  (not (or (ident? v) (string? v))))
-
 (defn render
   "Returns response body on a basis of a value associated with the `:response/body` key
   of the `req`.
@@ -158,17 +124,17 @@
    (let [body (get req :response/body {})]
      (if (map? body)
        (if (contains? body :status)
-         (add-missing-lang body req [:status/title :status/description])
-         (if (untranslatable? status)
+         (common/add-missing-lang body req [:status/title :status/description])
+         (if (common/untranslatable? status)
            (-> body
                (assoc :status status)
-               (add-missing-lang req [:status/title :status/description]))
+               (common/add-missing-lang req [:status/title :status/description]))
            (let [tr-sub (i18n/no-default (common/translator-sub req))]
              (-> body
                  (assoc :status status)
-                 (add-missing-translation :status/title status tr-sub)
-                 (add-missing-translation :status/description status ".full" tr-sub)
-                 (add-missing-lang req [:status/title :status/description])))))
+                 (common/add-missing-translation :status/title status tr-sub)
+                 (common/add-missing-translation :status/description status ".full" tr-sub)
+                 (common/add-missing-lang req [:status/title :status/description])))))
        (if (sequential? body)
          (seq body)
          body)))))
@@ -711,16 +677,16 @@
        (update resp main-key
                (fn [body]
                  (if (contains? body sub-key)
-                   (add-missing-lang body req [sub-title-key sub-desc-key])
+                   (common/add-missing-lang body req [sub-title-key sub-desc-key])
                    (let [see-also (conj (or (get body see-also-key) []) sub-key)
                          body     (assoc body sub-key sub-status see-also-key see-also)]
-                     (if (untranslatable? sub-status)
-                       (add-missing-lang body req [sub-title-key sub-desc-key])
+                     (if (common/untranslatable? sub-status)
+                       (common/add-missing-lang body req [sub-title-key sub-desc-key])
                        (-> body
-                           (add-missing-translation sub-title-key sub-status tr-sub)
-                           (add-missing-translation sub-desc-key  sub-status ".full" tr-sub)
-                           (add-missing-lang req [sub-title-key sub-desc-key]))))))))
      resp)))
+                           (common/add-missing-translation sub-title-key sub-status tr-sub)
+                           (common/add-missing-translation sub-desc-key  sub-status ".full" tr-sub)
+                           (common/add-missing-lang req [sub-title-key sub-desc-key]))))))))
 
 (defn add-missing-sub-status
   ([req sub-status]

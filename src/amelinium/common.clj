@@ -1651,6 +1651,19 @@
   [req]
   (get req :language/settings))
 
+(defn add-missing-lang
+  "For the given `body` map it adds a language under the `:lang` key if it does not
+  exists yet. The language is obtained from the request map `req` by reading a value
+  associated with the `:language/id` key."
+  [body req translation-keys]
+  (if (contains? body :lang)
+    body
+    (if (some #(contains? body %) translation-keys)
+      (if-some [l (lang-id req)]
+        (assoc body :lang l)
+        body)
+      body)))
+
 ;; I18n
 
 (defn translator
@@ -1672,6 +1685,36 @@
      (i18n/translator-sub req lang)
      (or (get req (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd))
          (i18n/translator-sub req)))))
+
+(defn try-namespace
+  [v]
+  (if (ident? v) (namespace v) v))
+
+(defn try-name
+  [v]
+  (if (ident? v) (name v) v))
+
+(defn add-missing-translation
+  "For the given `body` map, a new key, an existing key and a translation function it
+  tries to add a translation under the key `new-k` if it does not exist. The
+  translation key is `k`."
+  ([body new-k k sub-translation-fn]
+   (if (contains? body new-k)
+     body
+     (if-some [t (sub-translation-fn k)]
+       (assoc body new-k t)
+       body)))
+  ([body new-k k suffix sub-translation-fn]
+   (if (contains? body new-k)
+     body
+     (if-some [t (sub-translation-fn (try-namespace k) (str (try-name k) suffix))]
+       (assoc body new-k t)
+       body))))
+
+(defn untranslatable?
+  "Returns true if the given argument cannot be used as a translation key."
+  [v]
+  (not (or (ident? v) (string? v))))
 
 ;; Parameters
 
