@@ -744,16 +744,64 @@
 (defn render-error
   "Renders error response."
   ([]
-   (resp/internal-server-error))
+   (render-internal-server-error))
   ([req]
-   (if-some [resp (errors/render req nil nil req)]
-     (add-missing-sub-key)))
+   (errors/render req nil render-internal-server-error req))
   ([req status]
-   (errors/render req status nil req))
+   (let [req (update-status req status nil :app-status :app-status/title :app-status/description)]
+     (errors/render req status render-internal-server-error req)))
   ([req status default]
-   (errors/render req status default req))
-  ([req status default & more]
-   (apply errors/render req status default req more)))
+   (let [req (update-status req status nil :app-status :app-status/title :app-status/description)]
+     (errors/render req status (or default render-internal-server-error) req)))
+  ([req status default data]
+   (let [data (update-status data req status nil :app-status :app-status/title :app-status/description)]
+     (errors/render req status (or default render-internal-server-error) req data)))
+  ([req status default data view]
+   (let [data (update-status data req status nil :app-status :app-status/title :app-status/description)]
+     (errors/render req status (or default render-internal-server-error) req data view)))
+  ([req status default data view layout]
+   (let [data (update-status data req status nil :app-status :app-status/title :app-status/description)]
+     (errors/render req status (or default render-internal-server-error) req data view layout)))
+  ([req status default data view layout lang]
+   (let [data (update-status data req status lang :app-status :app-status/title :app-status/description)]
+     (errors/render req status (or default render-internal-server-error) req data view layout lang)))
+  ([req status default data view layout lang session-map]
+   (let [data (update-status data req status lang :app-status :app-status/title :app-status/description)]
+     (errors/render req status (or default render-internal-server-error) req data view layout lang session-map)))
+  ([req status default data view layout lang session-map & more]
+   (let [data (update-status data req status lang :app-status :app-status/title :app-status/description)]
+     (apply errors/render req status (or default render-internal-server-error) req data view layout lang session-map more))))
+
+(defn render-status
+  "Renders status response."
+  ([]
+   (render-ok))
+  ([req]
+   (errors/render req nil render-ok req))
+  ([req status]
+   (let [req (update-status req status nil :app-status :app-status/title :app-status/description)]
+     (errors/render req status render-ok req)))
+  ([req status default]
+   (let [req (update-status req status nil :app-status :app-status/title :app-status/description)]
+     (errors/render req status (or default render-ok) req)))
+  ([req status default data]
+   (let [data (update-status data req status nil :app-status :app-status/title :app-status/description)]
+     (errors/render req status (or default render-ok) req data)))
+  ([req status default data view]
+   (let [data (update-status data req status nil :app-status :app-status/title :app-status/description)]
+     (errors/render req status (or default render-ok) req data view)))
+  ([req status default data view layout]
+   (let [data (update-status data req status nil :app-status :app-status/title :app-status/description)]
+     (errors/render req status (or default render-ok) req data view layout)))
+  ([req status default data view layout lang]
+   (let [data (update-status data req status lang :app-status :app-status/title :app-status/description)]
+     (errors/render req status (or default render-ok) req data view layout lang)))
+  ([req status default data view layout lang session-map]
+   (let [data (update-status data req status lang :app-status :app-status/title :app-status/description)]
+     (errors/render req status (or default render-ok) req data view layout lang session-map)))
+  ([req status default data view layout lang session-map & more]
+   (let [data (update-status data req status lang :app-status :app-status/title :app-status/description)]
+     (apply errors/render req status (or default render-ok) req data view layout lang session-map more))))
 
 ;; Linking helpers
 
