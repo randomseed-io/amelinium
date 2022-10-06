@@ -622,71 +622,74 @@
 (defn render-created
   "Renders 201 response with a redirect (possibly localized if a destination path is
   language-parameterized) and a possible body. See `render` documentation to know
-  more about body rendering."
+  more about body rendering. The destination for a redirect is taken from
+  `name-or-path` argument or, if not given, from the `:response/location` key of the
+  given request map (`req`)."
   ([]
    (common/render resp/created))
   ([req]
-   (if-some [resp (common/created req)]
+   (if-some [resp (common/created req (get req :response/location))]
      (assoc resp :body (render req :ok/created nil nil nil nil nil))))
-  ([req name-or-path]
-   (if-some [resp (common/created req name-or-path)]
-     (assoc resp :body (render req :ok/created nil nil nil nil nil))))
-  ([req name-or-path lang]
+  ([req data]
+   (if-some [resp (common/created req (get req :response/location))]
+     (assoc resp :body (render req :ok/created data nil nil nil nil))))
+  ([req data view]
+   (if-some [resp (common/created req (get req :response/location))]
+     (assoc resp :body (render req :ok/created data view nil nil nil))))
+  ([req data view layout]
+   (if-some [resp (common/created req (get req :response/location))]
+     (assoc resp :body (render req :ok/created data view layout nil nil))))
+  ([req data view layout lang]
+   (when-some [resp (common/created req (get req :response/location) lang)]
+     (assoc resp :body (render req :ok/created data view layout lang nil))))
+  ([req data view layout lang smap]
+   (if-some [resp (common/created req (get req :response/location) lang)]
+     (assoc resp :body (render req :ok/created data view layout lang smap))))
+  ([req data view layout lang smap name-or-path]
    (if-some [resp (common/created req name-or-path lang)]
-     (assoc resp :body (render req :ok/created nil nil nil lang nil))))
-  ([req name-or-path lang params]
+     (assoc resp :body (render req :ok/created data view layout lang smap))))
+  ([req data view layout lang smap name-or-path params]
    (if-some [resp (common/created req name-or-path lang params)]
-     (assoc resp :body (render req :ok/created nil nil nil lang nil))))
-  ([req name-or-path lang params query-params]
+     (assoc resp :body (render req :ok/created data view layout lang smap))))
+  ([req data view layout lang smap name-or-path params query-params]
    (if-some [resp (common/created req name-or-path lang params query-params)]
-     (assoc resp :body (render req :ok/created nil nil nil lang nil))))
-  ([req name-or-path lang params query-params data]
-   (if-some [resp (common/created req name-or-path lang params query-params)]
-     (assoc resp :body (render req :ok/created data nil nil lang nil))))
-  ([req name-or-path lang params query-params data view]
-   (if-some [resp (common/created req name-or-path lang params query-params)]
-     (assoc resp :body (render req :ok/created data view nil lang nil))))
-  ([req name-or-path lang params query-params data view layout]
-   (if-some [resp (common/created req name-or-path lang params query-params)]
-     (assoc resp :body (render req :ok/created data view layout lang nil))) )
-  ([req name-or-path lang params query-params data view layout session-map]
-   (if-some [resp (common/created req name-or-path lang params query-params)]
-     (assoc resp :body (render req :ok/created data view layout lang session-map)))))
+     (assoc resp :body (render req :ok/created data view layout lang smap)))))
 
 (defn localized-render-created
   "Renders 201 response with a redirect (possibly localized if a destination path is
   language-parameterized) and a possible body. Requires the destination
-  URL (specified by arguments before `data`) to be language parameterized. See
-  `render` documentation to know more about body rendering."
+  URL (specified by arguments or by the `:response/location` key of the given `req`)
+  to be language parameterized. See `render` documentation to know more about body
+  rendering."
   ([]
    (common/render resp/created))
   ([req]
-   (if-some [resp (common/localized-created req)]
+   (if-some [resp (common/localized-created req (get req :response/location))]
      (assoc resp :body (render req :ok/created nil nil nil nil nil))))
-  ([req name-or-path]
-   (if-some [resp (common/localized-created req name-or-path)]
-     (assoc resp :body (render req :ok/created nil nil nil nil nil))))
-  ([req name-or-path lang]
+  ([req data]
+   (if-some [resp (common/localized-created req (get req :response/location))]
+     (assoc resp :body (render req :ok/created data nil nil nil nil))))
+  ([req data view]
+   (if-some [resp (common/localized-created req (get req :response/location))]
+     (assoc resp :body (render req :ok/created data view nil nil nil))))
+  ([req data view layout]
+   (if-some [resp (common/localized-created req (get req :response/location))]
+     (assoc resp :body (render req :ok/created data view layout nil nil))))
+  ([req data view layout lang]
+   (if-some [resp (common/localized-created req (get req :response/location) lang)]
+     (assoc resp :body (render req :ok/created data view layout lang nil))))
+  ([req data view layout lang smap]
+   (if-some [resp (common/localized-created req (get req :response/location) lang)]
+     (assoc resp :body (render req :ok/created data view layout lang smap))))
+  ([req data view layout lang smap name-or-path]
    (if-some [resp (common/localized-created req name-or-path lang)]
-     (assoc resp :body (render req :ok/created nil nil nil lang nil))))
-  ([req name-or-path lang params]
+     (assoc resp :body (render req :ok/created data view layout lang smap))))
+  ([req data view layout lang smap name-or-path params]
    (if-some [resp (common/localized-created req name-or-path lang params)]
-     (assoc resp :body (render req :ok/created nil nil nil lang nil))))
-  ([req name-or-path lang params query-params]
+     (assoc resp :body (render req :ok/created data view layout lang smap))))
+  ([req data view layout lang smap name-or-path params query-params]
    (if-some [resp (common/localized-created req name-or-path lang params query-params)]
-     (assoc resp :body (render req :ok/created nil nil nil lang nil))))
-  ([req name-or-path lang params query-params data]
-   (if-some [resp (common/localized-created req name-or-path lang params query-params)]
-     (assoc resp :body (render req :ok/created data nil nil lang nil))))
-  ([req name-or-path lang params query-params data view]
-   (if-some [resp (common/localized-created req name-or-path lang params query-params)]
-     (assoc resp :body (render req :ok/created data view nil lang nil))))
-  ([req name-or-path lang params query-params data view layout]
-   (if-some [resp (common/localized-created req name-or-path lang params query-params)]
-     (assoc resp :body (render req :ok/created data view layout lang nil))) )
-  ([req name-or-path lang params query-params data view layout session-map]
-   (if-some [resp (common/localized-created req name-or-path lang params query-params)]
-     (assoc resp :body (render req :ok/created data view layout lang session-map)))))
+     (assoc resp :body (render req :ok/created data view layout lang smap)))))
 
 ;; Responses without bodies
 
