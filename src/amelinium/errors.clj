@@ -76,9 +76,10 @@
     (.default-response ^ErrorsConfig config)))
 
 (defn render
-  "Renders an error response using `render-fn`. If the response rendering function
-  cannot be established, configuration default is used. Returns `nil` when
-  `config-src` is `nil`."
+  "Renders an error or status response using `render-fn`. If the response rendering
+  function cannot be established, configuration default is used. Returns `nil` when
+  `config-src` is `nil`. Any additional arguments, including (and starting from)
+  `req` are passed to the rendering function call."
   ([config-src]
    (render config-src nil nil))
   ([config-src error]
@@ -93,11 +94,36 @@
      (if-some [render-fn (or (render-fn config error default)
                              (.default-response ^ErrorsConfig config))]
        (render-fn req))))
-  ([config-src error default req & more]
+  ([config-src error default req a]
    (if-some [config (config config-src)]
      (if-some [render-fn (or (render-fn config error default)
                              (.default-response ^ErrorsConfig config))]
-       (apply render-fn req more)))))
+       (render-fn req a))))
+  ([config-src error default req a b]
+   (if-some [config (config config-src)]
+     (if-some [render-fn (or (render-fn config error default)
+                             (.default-response ^ErrorsConfig config))]
+       (render-fn req a b))))
+  ([config-src error default req a b c]
+   (if-some [config (config config-src)]
+     (if-some [render-fn (or (render-fn config error default)
+                             (.default-response ^ErrorsConfig config))]
+       (render-fn req a b c))))
+  ([config-src error default req a b c d]
+   (if-some [config (config config-src)]
+     (if-some [render-fn (or (render-fn config error default)
+                             (.default-response ^ErrorsConfig config))]
+       (render-fn req a b c d))))
+  ([config-src error default req a b c d e]
+   (if-some [config (config config-src)]
+     (if-some [render-fn (or (render-fn config error default)
+                             (.default-response ^ErrorsConfig config))]
+       (render-fn req a b c d e))))
+  ([config-src error default req a b c d e & more]
+   (if-some [config (config config-src)]
+     (if-some [render-fn (or (render-fn config error default)
+                             (.default-response ^ErrorsConfig config))]
+       (apply render-fn req a b c d e more)))))
 
 (defn specific-id
   "Makes errors `errors` more specific by replacing generic bad ID error (as a keyword)
