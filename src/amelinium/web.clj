@@ -725,24 +725,21 @@
 
 ;; Rendering based on application-logic error
 
-(defn- add-missing-sub-key
-  [req resp sub-key sub-status]
-  (if sub-key
-    (update
-     resp :body
-     (fn [m]
-       (-> m
-           (map/assoc-missing  :status/sub  sub-key sub-key sub-status)
-           (map/update-missing :message/sub (fn [_] (i18n/no-default (i18n/tr req sub-status)))))))
-    resp))
-
-(defn render-error
-  "Renders error response."
-  ([]                   (resp/internal-server-error))
-  ([req]                (errors/render req nil nil req))
-  ([req status]         (errors/render req status nil req))
-  ([req status default] (errors/render req status default req))
-  ([req status default & more] (apply errors/render req status default req more)))
+(defn add-missing-sub-status
+  ([req sub-status sub-key]
+   (let [sub-ns        (name sub-key)
+         sub-title-key (keyword sub-ns "title")
+         sub-desc-key  (keyword sub-ns "description")]
+     (update-status req sub-status nil sub-key sub-title-key sub-desc-key)))
+  ([data req sub-status sub-key]
+   (let [sub-ns        (name sub-key)
+         sub-title-key (keyword sub-ns "title")
+         sub-desc-key  (keyword sub-ns "description")]
+     (update-status data req sub-status nil sub-key sub-title-key sub-desc-key)))
+  ([data req sub-status lang sub-key title-key description-key]
+   (update-status data req sub-status lang sub-key title-key description-key))
+  ([req sub-status lang sub-key title-key description-key]
+   (update-status req sub-status lang sub-key title-key description-key)))
 
 (defn render-error
   "Renders error response."
