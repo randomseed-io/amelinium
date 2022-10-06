@@ -654,27 +654,27 @@
 ;; Rendering based on application-logic error
 
 (defn add-missing-sub-status-to-response
-  ([req resp sub-status]
-   (add-missing-sub-status-to-response req resp sub-status :sub-status :body
+  ([req out sub-status]
+   (add-missing-sub-status-to-response req out sub-status :sub-status :body
                                        :sub-status/title :sub-status/description
                                        :status/see-also))
-  ([req resp sub-status sub-key]
-   (add-missing-sub-status-to-response req resp sub-status sub-key :body))
-  ([req resp sub-status sub-key main-key]
-   (add-missing-sub-status-to-response req resp sub-status sub-key main-key nil))
-  ([req resp sub-status sub-key main-key tr-sub]
+  ([req out sub-status sub-key]
+   (add-missing-sub-status-to-response req out sub-status sub-key :body))
+  ([req out sub-status sub-key main-key]
+   (add-missing-sub-status-to-response req out sub-status sub-key main-key nil))
+  ([req out sub-status sub-key main-key tr-sub]
    (let [sub-ns        (name sub-key)
          sub-title-key (keyword sub-ns "title")
          sub-desc-key  (keyword sub-ns "description")]
-     (add-missing-sub-status-to-response req resp sub-status sub-key main-key
+     (add-missing-sub-status-to-response req out sub-status sub-key main-key
                                          sub-title-key sub-desc-key :status/see-also nil)))
-  ([req resp sub-status sub-key main-key sub-title-key sub-desc-key see-also-key]
-   (add-missing-sub-status-to-response req resp sub-status sub-key main-key
+  ([req out sub-status sub-key main-key sub-title-key sub-desc-key see-also-key]
+   (add-missing-sub-status-to-response req out sub-status sub-key main-key
                                        sub-title-key sub-desc-key see-also-key nil))
-  ([req resp sub-status sub-key main-key sub-title-key sub-desc-key see-also-key tr-sub]
+  ([req out sub-status sub-key main-key sub-title-key sub-desc-key see-also-key tr-sub]
    (if sub-status
      (let [tr-sub (or tr-sub (i18n/no-default (common/translator-sub req)))]
-       (update resp main-key
+       (update out main-key
                (fn [body]
                  (if (contains? body sub-key)
                    (common/add-missing-lang body req [sub-title-key sub-desc-key])
@@ -683,10 +683,10 @@
                      (if (common/untranslatable? sub-status)
                        (common/add-missing-lang body req [sub-title-key sub-desc-key])
                        (-> body
-     resp)))
                            (common/add-missing-translation sub-title-key sub-status tr-sub)
                            (common/add-missing-translation sub-desc-key  sub-status ".full" tr-sub)
                            (common/add-missing-lang req [sub-title-key sub-desc-key]))))))))
+     out)))
 
 (defn add-missing-sub-status
   ([req sub-status]
