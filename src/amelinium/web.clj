@@ -270,18 +270,32 @@
 
 ;; Response rendering
 
-(defn- update-status-messages
-  [data req status lang]
-  (if (some? status)
-    (let [translate-sub (delay (i18n/no-default (common/translator-sub req lang)))]
-      (map/assoc-missing
-       data
-       :http/status             status
-       :http/status-name        (delay (@translate-sub status))
-       :http/status-description (delay (@translate-sub (namespace status) (str (name status) ".full")))))
-    data))
+(defn update-status
+  ([req status lang status-key title-key description-key]
+   (if status
+     (update req :app/data update-status req status lang status-key title-key description-key)
+     req))
+  ([data req status lang status-key title-key description-key]
+   (if status
+     (if (common/untranslatable? status)
+       (map/assoc-missing (or data common/empty-lazy-map) status-key status)
+       (let [translate-sub (delay (i18n/no-default (common/translator-sub req lang)))]
+         (map/assoc-missing
+          (or data common/empty-lazy-map)
+          status-key      status
+          title-key       (delay (@translate-sub status))
+          description-key (delay (@translate-sub
+                                  (common/try-namespace status)
+                                  (str (common/try-name status) ".full"))))))
+     data))
+  ([data req status lang]
+   (update-status data req status lang :status :status/title :status/description))
+  ([req status lang]
+   (update-status req status lang :status :status/title :status/description)))
 
 (defn- error-lv
+  "Sets a different sub-path for layout and view when a namespace of status is not
+  \"ok\" nor \"info\"."
   [req status layout view]
   (if (or (nil? status)
           (and layout view)
@@ -306,7 +320,7 @@
   `req` to obtain optional subdirectories to be looked up when searching for views
   and layouts.
 
-  It will add `:http/status`, `:http/status-name` and `:http/status-message` entries
+  It will add `:status`, `:status/title` and `:status/description` entries
   to `:app/data` map (unless it already contains one), using configuration maps
   associated with the `:errors/config` key of a route data.
 
@@ -359,7 +373,7 @@
                                      :url  (delay (req/request-url req))
                                      :path (delay (common/page req))
                                      :lang dlng)
-             data (update-status-messages data req status dlng)
+             data (update-status data req status dlng)
              html (selmer/render-file view data)
              rndr (assoc data :body [:safe html])
              resp (selmer/render-file layt rndr)]
@@ -377,7 +391,7 @@
   headers (using the `:response/headers` value), unless the `req` is already a valid
   response.
 
-  It will add `:http/status`, `:http/status-name` and `:http/status-message` entries
+  It will add `:status`, `:status/title` and `:status/description` entries
   to `:app/data` map (unless it already contains one), using configuration maps
   associated with the `:errors/config` key of a route data.
 
@@ -434,7 +448,7 @@
   `:response/headers` value), regardless if the `req` is already a valid response or
   not.
 
-  It will add `:http/status`, `:http/status-name` and `:http/status-message` entries
+  It will add `:status`, `:status/title` and `:status/description` entries
   to `:app/data` map (unless it already contains one), using configuration maps
   associated with the `:errors/config` key of a route data.
 
@@ -506,11 +520,11 @@
              "obtained from a request map (`:app/layout`, `:app/view`, `:app/data` keys).\n  "
              "Uses `" f-or-doc "` to set the response code."
              (if status
-               (str " Additionaly, associates `:http/status` key\n  "
+               (str " Additionaly, associates `:status` key\n  "
                     "with `" (str status) "` in `:app/data` "
                     "by passing it as an argument to `render-response`\n  "
-                    "(which will also set the `:http/status-name` "
-                    "and `:http/status-description` if possible).")))
+                    "(which will also set the `:status/title` "
+                    "and `:status/description` if possible).")))
         f status))))
   ([name doc f status]
    `(let [f# ~f
