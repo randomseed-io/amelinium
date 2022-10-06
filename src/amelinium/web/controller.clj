@@ -325,9 +325,11 @@
   `:response/fn` is set then it will be used instead of `web/render-ok` to render an
   HTML response."
   [req]
-  (if-some [f (get req :response/fn)]
-    (f req)
-    (web/render-ok req)))
+  (if-some [st (get req :response/status)]
+    (web/render-status req st)
+    (if-some [f (get req :response/fn)]
+      (f req)
+      (web/render-ok req))))
 
 (defn default
   [req]
