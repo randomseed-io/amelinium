@@ -882,7 +882,7 @@
 ;; Rendering
 
 (defn render
-  "Universal, response renderer. Returns the result of calling the `resp-fn` with
+  "Universal response renderer. Returns the result of calling the `resp-fn` with
   headers attached (from `:response/headers` key of the `req`) unless the req is
   already a valid response. Arguments from the third are passed to `resp-fn`
   function."
@@ -912,17 +912,25 @@
        (if-some [headers (get req :response/headers)]
          (update (resp-fn a b) :headers conj headers)
          (resp-fn a b)))))
-  ([resp-fn req a b & more]
+  ([resp-fn req a b c]
    (if (nil? req)
-     (apply resp-fn a b more)
+     (apply resp-fn a b c)
      (if (resp/response? req)
        req
        (if-some [headers (get req :response/headers)]
-         (update (resp-fn a b more) :headers conj headers)
-         (apply resp-fn a b more))))))
+         (update (resp-fn a b c) :headers conj headers)
+         (resp-fn a b c)))))
+  ([resp-fn req a b c & more]
+   (if (nil? req)
+     (apply resp-fn a b c more)
+     (if (resp/response? req)
+       req
+       (if-some [headers (get req :response/headers)]
+         (update (apply resp-fn a b c more) :headers conj headers)
+         (apply resp-fn a b c more))))))
 
 (defn render-force
-  "Universal, body-less response renderer. Returns the result of calling the `resp-fn`
+  "Universal body-less response renderer. Returns the result of calling the `resp-fn`
   with headers attached (from `:response/headers` key of the `req`). Arguments from
   the third are passed to `resp-fn` function."
   ([resp-fn]
@@ -945,13 +953,18 @@
      (if-some [headers (get req :response/headers)]
        (update (resp-fn a b) :headers conj headers)
        (resp-fn a b))))
-  ([resp-fn req a b & more]
-   ([resp-fn req a b]
-    (if (nil? req)
-      (apply resp-fn a b more)
-      (if-some [headers (get req :response/headers)]
-        (update (apply resp-fn a b more) :headers conj headers)
-        (apply resp-fn a b more))))))
+  ([resp-fn req a b c]
+   (if (nil? req)
+     (resp-fn a b c)
+     (if-some [headers (get req :response/headers)]
+       (update (resp-fn a b c) :headers conj headers)
+       (resp-fn a b c))))
+  ([resp-fn req a b c & more]
+   (if (nil? req)
+     (apply resp-fn a b c more)
+     (if-some [headers (get req :response/headers)]
+       (update (apply resp-fn a b c more) :headers conj headers)
+       (apply resp-fn a b c more)))))
 
 ;; Redirects
 
