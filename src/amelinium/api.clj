@@ -573,11 +573,12 @@
 (defn render-created
   "Renders 201 response with a redirect (possibly localized if a destination path is
   language-parameterized) and possible body taken from a request map (under the
-  `:response/body`)."
+  `:response/body`). If a name or a path is not given as `name-or-path`, it is looked
+  up in `req` under the `:response/location` key."
   ([]
    (common/render resp/created))
   ([req]
-   (if-some [resp (common/created req)]
+   (if-some [resp (common/created req (get req :response/location))]
      (assoc resp :body (render req :ok/created))))
   ([req name-or-path]
    (if-some [resp (common/created req name-or-path)]
@@ -597,11 +598,12 @@
 
 (defn render-localized-created
   "Renders 201 response with a localized redirect and possible body taken from a
-  request map (under the `:response/body`)."
+  request map (under the `:response/body`). If a name or a path is not given as
+  `name-or-path`, it is looked up in `req` under the `:response/location` key."
   ([]
    (render-response resp/created))
   ([req]
-   (if-some [resp (common/localized-created req)]
+   (if-some [resp (common/localized-created req (get req :response/location))]
      (assoc resp :body (render req :ok/created))))
   ([req name-or-path]
    (if-some [resp (common/localized-created req name-or-path)]
