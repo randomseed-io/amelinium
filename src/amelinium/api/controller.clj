@@ -210,10 +210,10 @@
   should be a keyword). If `:response/fn` key is present in `req` and it is not
   `nil`, it should be a function which will be called with `req` argument."
   [req]
-  (if-some [f (get req :response/fn)]
-    (f req)
-    (if-some [st (get req :response/status)]
-      (api/render-status req st)
+  (if-some [st (get req :response/status)]
+    (api/render-status req st)
+    (if-some [f (get req :response/fn)]
+      (f req)
       (api/render-ok req))))
 
 (defn not-found!
