@@ -237,6 +237,7 @@
    :verify/confirmed])
 
 (defn most-significant-error
+  "Returns the most significant error from a collection of `errors`."
   [errors]
   (if errors
     (or (some errors errs-prioritized) (first errors))))

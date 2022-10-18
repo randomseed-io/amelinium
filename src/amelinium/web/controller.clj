@@ -422,7 +422,7 @@
                          :title           (delay (translate-sub :parameters/error))
                          :form/errors     (delay (coercion/map-errors data))
                          :coercion/errors (delay (coercion/explain-errors data translate-sub)))
-                 web/render-bad-params))))) ;; TODO: template for listing bad params / update existing template and check
+                 web/render-bad-params)))))
 
       :reitit.coercion/response-coercion
       (respond

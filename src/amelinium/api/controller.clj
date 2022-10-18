@@ -115,7 +115,9 @@
                                        t/now)))))
 
 (defn prep-request!
-  "Prepares a request before any controller is called."
+  "Prepares a request before any controller is called. Checks if parameters are
+  valid (if validators are configured). If there is a session present, checks for its
+  validity and tests if an account is locked."
   [req]
   (let [sess           (common/session req)
         auth-state     (delay (common/login-auth-state req :login-page? :auth-page?))
@@ -202,6 +204,11 @@
       (cleanup-req req [nil @auth?]))))
 
 (defn render!
+  "Renders a response by calling `render-ok` on a `req` request map. If
+  `:response/status` key is present in `req` and is not `nil`, it will call
+  `render-status` instead with `req` and a value associated with this key (which
+  should be a keyword). If `:response/fn` key is present in `req` and it is not
+  `nil`, it should be a function which will be called with `req` argument."
   [req]
   (if-some [f (get req :response/fn)]
     (f req)
@@ -210,6 +217,7 @@
       (api/render-ok req))))
 
 (defn not-found!
+  "Calls `render-not-found` on `req`."
   [req]
   (api/render-not-found req))
 

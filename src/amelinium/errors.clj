@@ -35,11 +35,13 @@
     (http/get-route-data src :errors/config)))
 
 (defn config?
+  "Returns `true` if the given object is an instance of `ErrorsConfig`."
   [v]
   (instance? ErrorsConfig v))
 
 (defn configurable?
   [v]
+  "Returns `true` if the given object implements `ErrorsConfigurable` protocol."
   (satisfies? ErrorsConfigurable v))
 
 (defn most-significant
@@ -147,6 +149,7 @@
 ;; Initializers
 
 (defn init-errors
+  "Initializes errors configuration. Returns `ErrorsConfig` record."
   [config]
   (map->ErrorsConfig (map/map-values var/deref-symbol config)))
 

@@ -319,6 +319,9 @@
 ;; Marking
 
 (defn mkgood
+  "Marks session as valid by setting `:valid?` to `true` and removing
+  `:expired?`, `:hard-expired?` and `:error` keys from a session map
+  `smap`."
   [smap]
   (-> (assoc smap :valid? true)
       (dissoc :expired? :hard-expired? :error)))

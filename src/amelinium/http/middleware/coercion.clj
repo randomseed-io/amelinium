@@ -38,7 +38,7 @@
   parameter ID and parameter type and tries to find the best translations describing
   the erroneous field. Returns a map with the following keys `:parameter/name`,
   `:error/summary` and `:error/description`. To be used after receiving form errors
-  data after redirect."
+  data after a redirect."
   {:arglists '([req param-error-properties
                 req param-id param-type
                 req lang param-id param-type

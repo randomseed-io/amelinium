@@ -396,7 +396,7 @@
   to `:app/data` map (unless it already contains one), using configuration maps
   associated with the `:errors/config` key of a route data.
 
-    In case of a regular response page (when the namespace of a `status` keyword is
+  In case of a regular response page (when the namespace of a `status` keyword is
   \"ok\" or \"info\") the following sources are checked to find a layout path:
   - the given `layout`,
   - value of `:app/layout` (in a route data or a request map).
