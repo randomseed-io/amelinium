@@ -127,15 +127,6 @@
     :session-error resp/forbidden
     resp/forbidden))
 
-(defn auth-status-to-status
-  "Returns generic status on a basis of auth status."
-  [astatus]
-  (case astatus
-    :ok            :ok
-    :bad-password  :error/authentication
-    :session-error :error/session
-    :error/authorization))
-
 (defn auth-user-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
   conditions and may emit a redirect or render a response."
