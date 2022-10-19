@@ -23,13 +23,12 @@
             [amelinium.http.middleware.language :as      language]
             [amelinium.http.middleware.coercion :as      coercion]))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Authentication
-
 (p/import-vars [amelinium.common.controller
                 check-password lock-remaining-mins
                 account-locked? prolongation? prolongation-auth?
                 regular-auth? hard-expiry? keywordize-params? kw-form-data])
+
+;; Helpers
 
 (defn remove-login-data
   "Removes login data from the form params and body part of a request map."
@@ -69,20 +68,24 @@
             (language/force lang)
             (add-session-status sess (common/translator-sub req lang)))))))
 
+;; Controllers
+
 (defn authenticate!
   "Logs user in when user e-mail and password are given, or checks if the session is
   valid to serve a current page.
 
   Takes a request map and obtains database connection, client IP address and
   authentication configuration from it. Also gets a user e-mail and a password from a
-  map associated with the `:body-params` key of the `req`. Calls `auth-user-with-password!`
-  to get a result or a redirect if authentication was not successful.
+  map associated with the `:body-params` key of the `req`. Calls
+  `auth-user-with-password!` to get a result or a redirect if authentication was not
+  successful.
 
   If there is no e-mail nor password given (the value is `nil`, `false` or an empty
-  string) then authentication is not performed but instead validity of a session is
-  tested. If the session is invalid then redirect to a login page is performed. The
-  destination URL is obtained via the route name taken from the `:auth/info` key of
-  a route data, or from the `:auth/info` route identifier (as a default).
+  string) then authentication is not performed but instead the validity of a session
+  is tested. If the session is invalid then a redirect to a login page is
+  performed. Its destination URL is obtained via a route name taken from the
+  `:auth/info` key of a route data, or from the `:auth/info` route identifier (as a
+  default fallback).
 
   If the session is valid then the given request map is returned as is."
   [req]
@@ -113,6 +116,7 @@
                                        (api/auth-db req)
                                        (if @prolonged? sess)
                                        t/now)))))
+;; Request preparation handler
 
 (defn prep-request!
   "Prepares a request before any controller is called. Checks if parameters are
@@ -203,6 +207,8 @@
 
       (cleanup-req req [nil @auth?]))))
 
+;; Response rendering handlers
+
 (defn render!
   "Renders a response by calling `render-ok` on a `req` request map. If
   `:response/status` key is present in `req` and is not `nil`, it will call
@@ -281,10 +287,11 @@
 
       (raise e))))
 
-;; Handle options method
+;; Handler for OPTIONS method
 
 (defn handle-options
-  "Default handler for OPTIONS method."
+  "Default handler for the OPTIONS method. Adds `Access-Control-Allow-Methods` header
+  with supported methods listed (separated by commas and space characters)."
   [req]
   (render!
    (assoc req :response/headers
