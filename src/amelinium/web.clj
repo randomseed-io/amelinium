@@ -640,7 +640,7 @@
    (if-some [resp (common/created req (get req :response/location))]
      (assoc resp :body (render req :ok/created data view layout nil nil))))
   ([req data view layout lang]
-   (when-some [resp (common/created req (get req :response/location) lang)]
+   (if-some [resp (common/created req (get req :response/location) lang)]
      (assoc resp :body (render req :ok/created data view layout lang nil))))
   ([req data view layout lang smap]
    (if-some [resp (common/created req (get req :response/location) lang)]
