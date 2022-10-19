@@ -221,27 +221,6 @@
 (def verify-bad-token-set
   #{:verify/not-found :verify/bad-token})
 
-(def ^:private ^:const errs-prioritized
-  [:verify/bad-result
-   :verify/bad-token
-   :verify/bad-code
-   :verify/bad-email
-   :verify/bad-phone
-   :verify/bad-id
-   :verify/not-found
-   :verify/bad-reason
-   :verify/expired
-   :verify/too-many-requests
-   :verify/exists
-   :verify/not-confirmed
-   :verify/confirmed])
-
-(defn most-significant-error
-  "Returns the most significant error from a collection of `errors`."
-  [errors]
-  (if errors
-    (or (some errors errs-prioritized) (first errors))))
-
 (defn- process-errors
   [r should-be-confirmed?]
   (if r
@@ -353,8 +332,7 @@
              (if (and (= 1 (count errs)) (contains? errs :verify/confirmed))
                {:confirmed? true}
                {:confirmed? false
-                :errors     errs
-                :error      (most-significant-error errs)})))))))
+                :errors     errs})))))))
   ([db id code token exp-inc reason]
    (if-some [token (some-str token)]
      (establish db token   exp-inc reason)
@@ -374,8 +352,7 @@
                  {:confirmed true}
                  {:confirmed? false
                   :token      token
-                  :errors     errs
-                  :error      (most-significant-error errs)})))))))))
+                  :errors     errs})))))))))
 
 (defn delete
   "Deletes confirmation identified with an `id` from a database."
@@ -411,8 +388,8 @@
               (map/update-existing :account-type some-keyword))
           (let [errs (report-errors db id nil reason false)
                 errs (specific-id errs id :verify/bad-id :verify/bad-email :verify/bad-phone)]
-            {:errors errs
-             :error  (most-significant-error errs)}))))))
+            {:confirmed? false
+             :errors     errs}))))))
 
 (defn retry-email
   ([udata]

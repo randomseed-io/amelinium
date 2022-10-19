@@ -515,8 +515,7 @@
         (assoc r :created? true :uid (db/as-uuid (get r :uid)))
         (let [errs (confirmation/report-errors db token "creation" true)]
           {:created? false
-           :errors   errs
-           :error    (confirmation/most-significant-error errs)})))))
+           :errors   errs})))))
 
 (def ^:const create-with-code-query
   (str-squeeze-spc
@@ -538,8 +537,7 @@
         (assoc r :created? true :uid (db/as-uuid (get r :uid)))
         (let [errs (confirmation/report-errors db email code "creation" true)]
           {:created? false
-           :errors   errs
-           :error    (confirmation/most-significant-error errs)})))))
+           :errors   errs})))))
 
 (defn create-with-token-or-code
   [db email token code]
