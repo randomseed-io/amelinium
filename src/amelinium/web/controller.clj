@@ -324,12 +324,18 @@
   populated with common keys which should be present in `:app/data`. If the
   `:response/fn` is set then it will be used instead of `web/render-ok` to render an
   HTML response."
-  [req]
-  (if-some [st (get req :response/status)]
-    (web/render-status req st)
-    (if-some [f (get req :response/fn)]
-      (f req)
-      (web/render-ok req))))
+  ([req]
+   (if-some [st (get req :response/status)]
+     (web/render-status req st)
+     (if-some [f (get req :response/fn)]
+       (f req)
+       (web/render-ok req))))
+  ([req status-or-fn]
+   (if (ident? status-or-fn)
+     (web/render-status req status-or-fn)
+     (if (fn? status-or-fn)
+       (status-or-fn req)
+       (web/render-ok req)))))
 
 (defn default
   [req]
