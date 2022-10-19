@@ -431,10 +431,8 @@
                  web/render-bad-params)))))
 
       :reitit.coercion/response-coercion
-      (respond
-       (-> req
-           (map/assoc-missing :app/data common/empty-lazy-map)
-           (update :app/data assoc :title (delay (i18n/no-default (i18n/tr req :output/error))))
-           web/render-internal-server-error))
+      (let [error-list (coercion/list-errors data)]
+        (log/err "Response coercion error:" (coercion/join-errors-with-values error-list))
+        (respond (web/render-error req :output/error)))
 
       (raise e))))
