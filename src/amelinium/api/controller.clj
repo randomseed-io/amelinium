@@ -102,20 +102,18 @@
 (defn info!
   "Returns login information."
   [req]
-  (let [sess-opts  (get req :session/config)
+  (let [auth-db    (api/auth-db req)
+        sess-opts  (get req :session/config)
         sess-key   (or (get sess-opts :session-key) :session)
         sess       (get req sess-key)
-        prolonged? (delay (some? (and (get sess :expired?) (get req :goto-uri))))]
-    (-> req
-        (assoc sess-key
-               (delay (if @prolonged?
-                        (assoc sess :id (or (get sess :id) (get sess :err/id)) :prolonged? true)
-                        (assoc sess :prolonged? false))))
-        (assoc-in [:response/body :lock-remains]
-                  (lock-remaining-mins req
-                                       (api/auth-db req)
-                                       (if @prolonged? sess)
-                                       t/now)))))
+        prolonged? (some? (and (get sess :expired?) (get req :goto-uri)))
+        remaining  (lock-remaining-mins req auth-db (if prolonged? sess) t/now)
+        body       (assoc (get req :response/body {}) :lock-remains remaining)]
+    (assoc req
+           :response/body body
+           sess-key (delay (if @prolonged?
+                             (assoc sess :id (or (get sess :id) (get sess :err/id)) :prolonged? true)
+                             (assoc sess :prolonged? false))))))
 ;; Request preparation handler
 
 (defn prep-request!
