@@ -27,7 +27,7 @@
 (defn param-type
   "Takes a coercion error expressed as a map `e` and returns a string with parameter
   type if the type can easily be obtained (is a simple name expressed as a string or
-  a string representation of keyword)."
+  a string representation of keyword). For complex schemas it returns `nil`."
   [e]
   (if-some [s (some-str (get e :schema))]
     (if (some? (re-find #"^\:?[a-zA-Z0-9\-_\+\?\!]+$" s))
@@ -106,7 +106,7 @@
 (defn recode-errors
   "Uses exception data to recode coercion errors in a form of a map. To be used mainly
   with API handlers. For web form error reporting `map-errors`, `list-errors`
-  and `explain-errors` are better suited. "
+  and `explain-errors` are better suited."
   [data]
   (let [dat (coercion/encode-error data)
         src (get dat :in)
@@ -122,10 +122,11 @@
               (if (map? e)
                 (if-some [param-path (get e :path)]
                   (if-some [param-id (and (coll? param-path) (some-str (first param-path)))]
-                    {:parameter/id   param-id
-                     :parameter/src  src
-                     :parameter/path param-path
-                     :parameter/type (param-type e)})))))
+                    {:parameter/id    param-id
+                     :parameter/src   src
+                     :parameter/path  param-path
+                     :parameter/type  (param-type e)
+                     :parameter/value (get e :value)})))))
            (filter identity)))))
 
 (defn explain-errors
@@ -138,23 +139,25 @@
     (map #(into % (translate-error translate-sub %)) r)))
 
 (defn list-errors
-  "Returns a sequence of coercion errors containing 2-element sequences. First element
-  of each being a parameter identifier, second element being a parameter type. Takes
-  an exception data map which should contains `:coercion` key. Used to expose form
-  errors to another page which should indicate them to a visitor."
+  "Returns a sequence of coercion errors containing 3-element sequences. First element
+  of each being a parameter identifier, second element being a parameter type
+  described by schema (if detected), and third being its current value. Takes an
+  exception data map which should contain the `:coercion` key. Used, among other
+  applications, to expose form errors to another page which should indicate them to
+  a visitor."
   [data]
   (let [dat (coercion/encode-error data)
         err (get dat :errors)
         err (if (coll? err) err (if (some? err) (cons err nil)))]
-    (->> err (filter identity) (map (juxt-seq (comp some-str first :path) param-type)))))
+    (->> err (filter identity) (map (juxt-seq (comp some-str first :path) param-type :value)))))
 
 (defn map-errors
   "Like `list-errors` but returns a map in which keys are parameter names and values
   are parameter types (as defined in a schema used to validate and coerce them). Used
-  to expose form errors to another page which should expose them to a visitor."
+  to pass form errors to another page which should expose them to a visitor."
   [data]
   (if-some [r (list-errors data)]
-    (reduce (partial apply assoc) {} r)))
+    (reduce (partial apply assoc) {} (map butlast r))))
 
 (defn join-errors
   "Used to produce a string containing parameter names and their types (as defined in
@@ -169,7 +172,7 @@
     errors
     (if-some [errors (seq errors)]
       (->> errors
-           (map (fn [[param-id param-type]]
+           (map (fn [[param-id param-type _]]
                   (if-some [param-id (and param-id (some-str (str/trim (str param-id))))]
                     (if-some [param-type (and param-type (some-str (str/trim (str param-type))))]
                       (str param-id ":" param-type)
@@ -177,13 +180,48 @@
            (filter identity)
            (str/join ",")))))
 
+(defn join-errors-with-values
+  "Used to produce a string containing parameter names and their types (as defined in
+  schema) from a coercion errors simple map or coercion errors sequence (produced by
+  `list-errors` or `map-errors` respectively). For anon-empty string it simply
+  returns it. Used to generate a query string containing form errors in a form of
+  `parameter-id` or `parameter-id:parameter-type:parameter-value` separated by
+  commas. The whole string can then be encoded and used as a query parameter
+  `:form-errors` when redirecting anonymous user to a page with a previous form which
+  needs to be corrected. Be aware that it might be hard to parse the output string if
+  a value contains a comma character."
+  [errors]
+  (if (and (string? errors) (pos? (count errors)))
+    errors
+    (if-some [errors (seq errors)]
+      (->> errors
+           (map (fn [[param-id param-type param-value]]
+                  (if-some [param-id (and param-id (some-str (str/trim (str param-id))))]
+                    (let [param-type (and param-type (some-str (str/trim (str param-type))))]
+                      (str param-id ":" param-type ":" param-value)))))
+           (filter identity)
+           (str/join ",")))))
+
 (defn split-error
   "Takes `param-id` and optional `param-type` and tries to clean-up their string
-  representations to produce a 2-element vector. When only 1 argument is present or
+  representations to produce a 3-element vector. When only 1 argument is present or
   when the second argument is `nil` or empty, it will try to parse the first argument
-  so if it contains a colon character it will be split into two parts: parameter ID
-  and parameter type. Used as a helper by `parse-errors` and by argument parsers in
-  template tags."
+  so if it contains a colon character it will be split into three parts: parameter
+  ID, parameter type and value. Used as a helper by `parse-errors` and by argument
+  parsers in template tags."
+  ([param-id param-type param-value]
+   (if-not param-type
+     (if param-value
+       (if param-id (split-error param-id nil))
+       (if param-id (split-error param-id)))
+     (let [id (some-str param-id)
+           ty (some-str param-type)
+           va (some-str param-value)
+           id (if id (str/trim id))
+           ty (if ty (str/trim ty))]
+       (if (or (and id (pos? (count id)))
+               (and ty (pos? (count ty))))
+         [id ty va]))))
   ([param-id param-type]
    (if-not param-type
      (if param-id (split-error param-id))
@@ -193,15 +231,16 @@
            ty (if ty (str/trim ty))]
        (if (or (and id (pos? (count id)))
                (and ty (pos? (count ty))))
-         [id ty]))))
+         [id ty nil]))))
   ([param-id]
    (if (and (sequential? param-id) (seq param-id))
-     (split-error (first param-id) (second param-id))
+     (apply split-error (take 3 param-id))
      (if-some [param-id (some-str param-id)]
-       (let [[f s] (str/split (str/trim param-id) #":" 2)
-             f     (if f (some-str (str/trim f)))
-             s     (if s (some-str (str/trim s)))]
-         (if (or f s) [f s]))))))
+       (let [[f s v] (str/split (str/trim param-id) #":" 3)
+             f       (if f (some-str (str/trim f)))
+             s       (if s (some-str (str/trim s)))
+             v       (if v (some-str v))]
+         (if (or f s) [f s v]))))))
 
 (defn parse-errors
   "Transforms a string previously exposed with `join-errors`, a list created
@@ -217,6 +256,7 @@
     (string?     errors) (if (pos? (count errors))
                            (->> (str/split errors #",+" 108)
                                 (map split-error)
+                                (map #(take 2 %))
                                 (filter identity)
                                 (into {})
                                 not-empty))
