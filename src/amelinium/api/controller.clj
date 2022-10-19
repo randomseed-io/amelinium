@@ -114,6 +114,7 @@
            sess-key (delay (if @prolonged?
                              (assoc sess :id (or (get sess :id) (get sess :err/id)) :prolonged? true)
                              (assoc sess :prolonged? false))))))
+
 ;; Request preparation handler
 
 (defn prep-request!
@@ -213,12 +214,18 @@
   `render-status` instead with `req` and a value associated with this key (which
   should be a keyword). If `:response/fn` key is present in `req` and it is not
   `nil`, it should be a function which will be called with `req` argument."
-  [req]
-  (if-some [st (get req :response/status)]
-    (api/render-status req st)
-    (if-some [f (get req :response/fn)]
-      (f req)
-      (api/render-ok req))))
+  ([req]
+   (if-some [st (get req :response/status)]
+     (api/render-status req st)
+     (if-some [f (get req :response/fn)]
+       (f req)
+       (api/render-ok req))))
+  ([req status-or-fn]
+   (if (ident? status-or-fn)
+     (api/render-status req status-or-fn)
+     (if (fn? status-or-fn)
+       (status-or-fn req)
+       (api/render-ok req)))))
 
 (defn not-found!
   "Calls `render-not-found` on `req`."
