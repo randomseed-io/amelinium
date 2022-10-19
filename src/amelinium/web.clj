@@ -743,65 +743,133 @@
 
 (defn render-error
   "Renders error response."
+  {:arglists '([]
+               [req]
+               [req app-status]
+               [req app-statuses]
+               [req app-status default]
+               [req app-statuses default]
+               [req app-status default data]
+               [req app-statuses default data]
+               [req app-status default data view]
+               [req app-statuses default data view]
+               [req app-status default data view layout]
+               [req app-statuses default data view layout]
+               [req app-status default data view layout lang]
+               [req app-statuses default data view layout lang]
+               [req app-status default data view layout lang session-map]
+               [req app-statuses default data view layout lang session-map]
+               [req app-status default data view layout lang session-map & more]
+               [req app-statuses default data view layout lang session-map & more])}
   ([]
    (render-internal-server-error))
   ([req]
    (errors/render req nil render-internal-server-error req))
-  ([req status]
-   (let [req (update-status req status nil :app-status :app-status/title :app-status/description)]
-     (errors/render req status render-internal-server-error req)))
-  ([req status default]
-   (let [req (update-status req status nil :app-status :app-status/title :app-status/description)]
-     (errors/render req status (or default render-internal-server-error) req)))
-  ([req status default data]
-   (let [data (update-status data req status nil :app-status :app-status/title :app-status/description)]
-     (errors/render req status (or default render-internal-server-error) req data)))
-  ([req status default data view]
-   (let [data (update-status data req status nil :app-status :app-status/title :app-status/description)]
-     (errors/render req status (or default render-internal-server-error) req data view)))
-  ([req status default data view layout]
-   (let [data (update-status data req status nil :app-status :app-status/title :app-status/description)]
-     (errors/render req status (or default render-internal-server-error) req data view layout)))
-  ([req status default data view layout lang]
-   (let [data (update-status data req status lang :app-status :app-status/title :app-status/description)]
-     (errors/render req status (or default render-internal-server-error) req data view layout lang)))
-  ([req status default data view layout lang session-map]
-   (let [data (update-status data req status lang :app-status :app-status/title :app-status/description)]
-     (errors/render req status (or default render-internal-server-error) req data view layout lang session-map)))
-  ([req status default data view layout lang session-map & more]
-   (let [data (update-status data req status lang :app-status :app-status/title :app-status/description)]
-     (apply errors/render req status (or default render-internal-server-error) req data view layout lang session-map more))))
+  ([req app-status]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status render-internal-server-error req)))
+  ([req app-status default]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status (or default render-internal-server-error) req)))
+  ([req app-status default data]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status (or default render-internal-server-error) req data)))
+  ([req app-status default data view]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status (or default render-internal-server-error) req data view)))
+  ([req app-status default data view layout]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status (or default render-internal-server-error) req data view layout)))
+  ([req app-status default data view layout lang]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status (or default render-internal-server-error) req data view layout lang)))
+  ([req app-status default data view layout lang session-map]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status (or default render-internal-server-error) req data view layout lang session-map)))
+  ([req app-status default data view layout lang session-map & more]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+     (apply errors/render err-config app-status (or default render-internal-server-error) req data view layout lang session-map more))))
 
 (defn render-status
   "Renders status response."
+  {:arglists '([]
+               [req]
+               [req app-status]
+               [req app-statuses]
+               [req app-status default]
+               [req app-statuses default]
+               [req app-status default data]
+               [req app-statuses default data]
+               [req app-status default data view]
+               [req app-statuses default data view]
+               [req app-status default data view layout]
+               [req app-statuses default data view layout]
+               [req app-status default data view layout lang]
+               [req app-statuses default data view layout lang]
+               [req app-status default data view layout lang session-map]
+               [req app-statuses default data view layout lang session-map]
+               [req app-status default data view layout lang session-map & more]
+               [req app-statuses default data view layout lang session-map & more])}
   ([]
    (render-ok))
   ([req]
    (errors/render req nil render-ok req))
-  ([req status]
-   (let [req (update-status req status nil :app-status :app-status/title :app-status/description)]
-     (errors/render req status render-ok req)))
-  ([req status default]
-   (let [req (update-status req status nil :app-status :app-status/title :app-status/description)]
-     (errors/render req status (or default render-ok) req)))
-  ([req status default data]
-   (let [data (update-status data req status nil :app-status :app-status/title :app-status/description)]
-     (errors/render req status (or default render-ok) req data)))
-  ([req status default data view]
-   (let [data (update-status data req status nil :app-status :app-status/title :app-status/description)]
-     (errors/render req status (or default render-ok) req data view)))
-  ([req status default data view layout]
-   (let [data (update-status data req status nil :app-status :app-status/title :app-status/description)]
-     (errors/render req status (or default render-ok) req data view layout)))
-  ([req status default data view layout lang]
-   (let [data (update-status data req status lang :app-status :app-status/title :app-status/description)]
-     (errors/render req status (or default render-ok) req data view layout lang)))
-  ([req status default data view layout lang session-map]
-   (let [data (update-status data req status lang :app-status :app-status/title :app-status/description)]
-     (errors/render req status (or default render-ok) req data view layout lang session-map)))
-  ([req status default data view layout lang session-map & more]
-   (let [data (update-status data req status lang :app-status :app-status/title :app-status/description)]
-     (apply errors/render req status (or default render-ok) req data view layout lang session-map more))))
+  ([req app-status]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status render-ok req)))
+  ([req app-status default]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status (or default render-ok) req)))
+  ([req app-status default data]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status (or default render-ok) req data)))
+  ([req app-status default data view]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status (or default render-ok) req data view)))
+  ([req app-status default data view layout]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status (or default render-ok) req data view layout)))
+  ([req app-status default data view layout lang]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status (or default render-ok) req data view layout lang)))
+  ([req app-status default data view layout lang session-map]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+     (errors/render err-config app-status (or default render-ok) req data view layout lang session-map)))
+  ([req app-status default data view layout lang session-map & more]
+   (let [err-config (errors/config req)
+         app-status (errors/most-significant err-config app-status)
+         data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+     (apply errors/render err-config app-status (or default render-ok) req data view layout lang session-map more))))
 
 ;; Linking helpers
 

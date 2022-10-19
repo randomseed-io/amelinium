@@ -734,19 +734,33 @@
    :sub-status/description \"The given token is malformed of has expired.\"
    :lang                   :en}
   ```"
+  {:arglists '([]
+               [req]
+               [req sub-status]
+               [req sub-statuses]
+               [req sub-status default]
+               [req sub-statuses default]
+               [req sub-status default & more]
+               [req sub-statuses default & more])}
   ([]
    (resp/ok))
   ([req]
    (errors/render req nil render-ok req))
   ([req sub-status]
-   (if-some [resp (errors/render req sub-status render-ok req)]
-     (add-missing-sub-status-to-response req resp sub-status)))
+   (let [err-config (errors/config req)
+         sub-status (errors/most-significant err-config sub-status)]
+     (if-some [resp (errors/render err-config sub-status render-ok req)]
+       (add-missing-sub-status-to-response req resp sub-status))))
   ([req sub-status default]
-   (if-some [resp (errors/render req sub-status (or default render-ok) req)]
-     (add-missing-sub-status-to-response req resp sub-status)))
+   (let [err-config (errors/config req)
+         sub-status (errors/most-significant err-config sub-status)]
+     (if-some [resp (errors/render err-config sub-status (or default render-ok) req)]
+       (add-missing-sub-status-to-response req resp sub-status))))
   ([req sub-status default & more]
-   (if-some [resp (apply errors/render req sub-status (or default render-ok) req more)]
-     (add-missing-sub-status-to-response req resp sub-status))))
+   (let [err-config (errors/config req)
+         sub-status (errors/most-significant err-config sub-status)]
+     (if-some [resp (apply errors/render err-config sub-status (or default render-ok) req more)]
+       (add-missing-sub-status-to-response req resp sub-status)))))
 
 (defn render-error
   "Renders an error response for the given request map and optional `sub-status`
@@ -774,19 +788,33 @@
    :sub-status/description \"The given token is malformed of has expired.\"
    :lang                   :en}
   ```"
+  {:arglists '([]
+               [req]
+               [req sub-status]
+               [req sub-statuses]
+               [req sub-status default]
+               [req sub-statuses default]
+               [req sub-status default & more]
+               [req sub-statuses default & more])}
   ([]
    (resp/internal-server-error))
   ([req]
    (errors/render req nil render-internal-server-error req))
   ([req sub-status]
-   (if-some [resp (errors/render req sub-status render-internal-server-error req)]
-     (add-missing-sub-status-to-response req resp sub-status)))
+   (let [err-config (errors/config req)
+         sub-status (errors/most-significant err-config sub-status)]
+     (if-some [resp (errors/render err-config sub-status render-internal-server-error req)]
+       (add-missing-sub-status-to-response req resp sub-status))))
   ([req sub-status default]
-   (if-some [resp (errors/render req sub-status (or default render-internal-server-error) req)]
-     (add-missing-sub-status-to-response req resp sub-status)))
+   (let [err-config (errors/config req)
+         sub-status (errors/most-significant err-config sub-status)]
+     (if-some [resp (errors/render err-config sub-status (or default render-internal-server-error) req)]
+       (add-missing-sub-status-to-response req resp sub-status))))
   ([req sub-status default & more]
-   (if-some [resp (apply errors/render req sub-status (or default render-internal-server-error) req more)]
-     (add-missing-sub-status-to-response req resp sub-status))))
+   (let [err-config (errors/config req)
+         sub-status (errors/most-significant err-config sub-status)]
+     (if-some [resp (apply errors/render err-config sub-status (or default render-internal-server-error) req more)]
+       (add-missing-sub-status-to-response req resp sub-status)))))
 
 ;; Linking helpers
 

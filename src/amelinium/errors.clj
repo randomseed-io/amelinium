@@ -51,7 +51,7 @@
   Returns `nil` when `config-src` is `nil` or `errors` is `nil`."
   [config-src errors]
   (if errors
-    (if (keyword? errors)
+    (if (ident? errors)
       errors
       (if-some [config (config config-src)]
         (or (some errors (.priorities ^ErrorsConfig config))
