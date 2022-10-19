@@ -47,8 +47,8 @@
 (defn most-significant
   "Returns a most significant error from the given `errors` using the given
   `config` (which may be of type `ErrorsConfig`, a request map, or a `Match`
-  object). If `errors` is not a sequence but a keyword, it is returned as-is. Returns
-  `nil` when `config-src` or `errors` is `nil`."
+  object). If `errors` is not a sequence but a keyword, it is returned as-is.
+  Returns `nil` when `config-src` is `nil` or `errors` is `nil`."
   [config-src errors]
   (if errors
     (if (keyword? errors)
@@ -60,14 +60,14 @@
 (defn render-fn
   "Gets a response rendering function using the given configuration source `config-src`
   (which may be of type `ErrorsConfig`, a request map, or a `Match` object) and
-  `error` (expressed as a keyword). Returns `nil` when `config-src` or `error` is
-  `nil`."
-  ([config-src error]
-   (render-fn config-src error nil))
-  ([config-src error default]
-   (if error
+  `errors` (expressed as a keyword or a sequence of keywords). Returns `nil` when
+  `config-src` or `error` is `nil`."
+  ([config-src errors]
+   (render-fn config-src errors nil))
+  ([config-src errors default]
+   (if errors
      (if-some [config (config config-src)]
-       (or (get (.responses ^ErrorsConfig config) (most-significant config error))
+       (or (get (.responses ^ErrorsConfig config) (most-significant config errors))
            default)))))
 
 (defn default-response
