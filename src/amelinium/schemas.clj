@@ -435,10 +435,10 @@
      {:type            :ipv4-address
       :pred            ip/is-ipv4?
       :type-properties {:error/message       "should be a valid IPv4 address"
-                        :encode/json         str->ipv4
-                        :decode/json         ipv4->str
-                        :encode/string       str->ipv4
-                        :decode/string       ipv4->str
+                        :encode/json         ipv4->str
+                        :decode/json         str->ipv4
+                        :encode/string       ipv4->str
+                        :decode/string       str->ipv4
                         :json-schema/type    "string"
                         :json-schema/format  "ipv4"
                         :json-schema/example (ipv4->str (gen/generate gen-ipv4-address))
@@ -451,10 +451,10 @@
      {:type            :ipv6-address
       :pred            ip/is-ipv6?
       :type-properties {:error/message       "should be a valid IPv6 address"
-                        :encode/json         str->ipv6
-                        :decode/json         ipv6->str
-                        :encode/string       str->ipv6
-                        :decode/string       ipv6->str
+                        :encode/json         ipv6->str
+                        :decode/json         str->ipv6
+                        :encode/string       ipv6->str
+                        :decode/string       str->ipv6
                         :json-schema/type    "string"
                         :json-schema/format  "ipv6"
                         :json-schema/example (ipv6->str (gen/generate gen-ipv6-address))
@@ -467,10 +467,10 @@
      {:type            :ip-address-mapped
       :pred            ip/is-ipv6?
       :type-properties {:error/message       "should be a valid IP address which can be mapped to IPv6"
-                        :encode/json         str->ipv6
-                        :decode/json         ip->str
-                        :encode/string       str->ipv6
-                        :decode/string       ip->str
+                        :encode/json         ip->str
+                        :decode/json         str->ipv6
+                        :encode/string       ip->str
+                        :decode/string       str->ipv6
                         :json-schema/type    "string"
                         :json-schema/format  "ipv6"
                         :json-schema/x-anyOf [{:type    "string"
