@@ -203,8 +203,8 @@
   (t/instant? (get smap :active)))
 
 (defn state
-  "Returns session state. If there is anything wrong it returns an error
-  string. Otherwise it returns nil. Unknown session detection is performed by
+  "Returns session state. If there is anything wrong it, returns an error
+  string. Otherwise it returns `nil`. Unknown session detection is performed by
   checking if a value associated with the `:id` key is `nil` and a value associated
   with the `:err/id` key is not `nil`."
   ([smap opts ip-address]
@@ -215,8 +215,11 @@
      (let [sid        (get smap :id)
            esid       (get smap :err/id)
            any-sid    (or sid esid)
-           user-id    (valuable (get smap :user/id))
-           user-email (some-str (get smap :user/email))
+           user-id    (get smap :user/id)
+           user-email (get smap :user/email)
+           user-ident (or user-id user-email)
+           user-id    (valuable user-id)
+           user-email (some-str user-email)
            for-user   (delay (log/for-user user-id user-email
                                            (ip/plain-ip-str ip-address)))]
        (cond
@@ -228,6 +231,9 @@
                                       :severity :info}
          (not (sid-valid? any-sid))  {:cause    :session/malformed-session-id
                                       :reason   (str "Malformed session ID " @for-user)
+                                      :severity :info}
+         (not user-ident)            {:cause    :session/unknown-id
+                                      :reason   (some-str-spc "Unknown session ID" sid @for-user)
                                       :severity :info}
          (not user-id)               {:cause    :session/malformed-user-id
                                       :reason   (str "User ID not found or malformed " @for-user)
