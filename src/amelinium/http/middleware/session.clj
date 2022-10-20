@@ -209,7 +209,7 @@
   with the `:err/id` key is not `nil`."
   ([smap opts ip-address]
    (if-not (and smap (map? smap))
-     {:cause    :session/no-session-map
+     {:cause    :session/missing
       :reason   (str-spc "No session map:" smap)
       :severity :info}
      (let [sid        (get smap :id)
