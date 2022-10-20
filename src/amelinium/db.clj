@@ -19,6 +19,7 @@
             [ragtime.repl                  :as           ragtime-repl]
             [potemkin.namespaces           :as                      p]
             [io.randomseed.utils           :refer                :all]
+            [io.randomseed.utils.ip        :as                     ip]
             [io.randomseed.utils.db        :as                     db]
             [io.randomseed.utils.db.types  :as               db-types]
             [io.randomseed.utils.fs        :as                     fs]
@@ -110,6 +111,18 @@
   ([caches-obj] (db/print-caches caches-obj)))
 
 (defn list-caches [] (print-caches))
+
+;; Keywordized properties mapping
+
+(defn key-as-keyword
+  [m k]
+  (map/update-existing m k keyword))
+
+;; IP properties mapping
+
+(defn key-as-ip
+  [m k]
+  (map/update-existing m k ip/string-to-address))
 
 ;; UUID mapping
 
