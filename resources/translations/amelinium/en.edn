@@ -76,7 +76,7 @@
                            :network-read-timeout            "Network Read Timeout"
                            :network-connect-timeout         "Network Connect Timeout"}
    :session               {:ok                   "Session is correct."
-                           :unknown-session-id   "Unknown session ID has been received."
+                           :unknown-id           "Unknown session ID has been received."
                            :no-session-id        "No required session ID."
                            :malformed-session-id "Malformed session ID."
                            :malformed-user-id    "User ID is invalid."

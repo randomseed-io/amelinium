@@ -77,7 +77,7 @@
                            :network-read-timeout            "Przekroczono czas odczytu z sieci"
                            :network-connect-timeout         "Przekroczono czas połączenia sieciowego"}
    :session               {:ok                   "Sesja jest poprawna."
-                           :unknown-session-id   "Odebrano nieznany identyfikator sesji."
+                           :unknown-id           "Odebrano nieznany identyfikator sesji."
                            :no-session-id        "Brak wymaganego identyfikatora sesji."
                            :malformed-session-id "Identyfikator sesji jest uszkodzony."
                            :malformed-user-id    "Identyfikator użytkownika jest niepoprawny."
