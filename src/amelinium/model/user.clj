@@ -244,13 +244,17 @@
    :last_attempt :last_login :created :created_by
    :soft_locked :locked])
 
-(defn info-coercer-coll
-  [coll]
-  (map/map-vals #(db/key-as-uuid % :uid) coll))
-
 (defn info-coercer
   [m]
-  (db/key-as-uuid m :uid))
+  (-> m
+      (db/key-as-uuid    :uid)
+      (db/key-as-keyword :account-type)
+      (db/key-as-ip      :last-ok-ip)
+      (db/key-as-ip      :last-failed-ip)))
+
+(defn info-coercer-coll
+  [coll]
+  (map/map-vals info-coercer coll))
 
 (def ^{:arglists '([db ids])}
   info-getter-coll
