@@ -293,14 +293,14 @@
                                :op      :session
                                :ok?     false
                                :msg     (str "Expired " for-mail)))
-               (when-some [reason (:reason (:error sess))]
+               (when-some [sess-err (:error sess)]
                  (common/oplog req
                                :user-id (:user/id sess)
                                :op      :session
                                :ok?     false
-                               :level   (:error sess)
-                               :msg     reason)
-                 (log/log (:severity (:error sess) :warn) reason))))
+                               :level   (:severity sess-err)
+                               :msg     (:reason   sess-err "Unknown error"))
+                 (log/log (:severity sess-err :warn) (:reason sess-err "Unknown error")))))
 
         ;; Remove goto session variable as we already injected it into a response.
         ;; Remove goto session variable if it seems broken.

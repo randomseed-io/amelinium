@@ -51,10 +51,13 @@
 
 (defn add-session-status
   [req smap translate-sub]
-  (if (= (get req :response/status) :error/session)
-    (api/add-missing-sub-status req (api/session-status (or smap (common/session req)))
-                                :session-status :response/body translate-sub)
-    (api/body-add-session-id req)))
+  (let [rstatus (get req :response/status)]
+    (if (or (= rstatus :auth/session-error)
+            (= rstatus :error/session))
+      (api/add-missing-sub-status req
+                                  (api/session-status (or smap (common/session req)))
+                                  :session-status :response/body translate-sub)
+      (api/body-add-session-id req))))
 
 (defn auth-user-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
@@ -66,7 +69,7 @@
       (let [lang (or lang (common/pick-language req))]
         (-> req
             (language/force lang)
-            (add-session-status sess (common/translator-sub req lang)))))))
+            (add-session-status sess (i18n/no-default (common/translator-sub req lang))))))))
 
 ;; Controllers
 
@@ -165,7 +168,9 @@
             expired?      (get sess :expired?)
             user-id       (get sess :user/id)
             email         (get sess :user/email)
-            reason        (get (get sess :error) :reason)
+            sess-err      (get sess :error)
+            reason        (get sess-err :reason)
+            cause         (get sess-err :cause)
             ip-addr       (:remote-ip/str req)
             for-user      (log/for-user user-id email ip-addr)
             for-mail      (log/for-user nil email ip-addr)
@@ -182,19 +187,19 @@
                          :ok?     false
                          :msg     (str "Expired " for-mail)))
           ;; Session invalid in another way.
-          (when (some? reason)
+          (when (some? cause)
             (api/oplog req
                        :user-id (:user/id sess)
                        :op      :session
                        :ok?     false
-                       :level   (:error sess)
+                       :level   (:severity sess-err)
                        :msg     reason)
-            (log/log (:severity (:error sess) :warn) reason)))
+            (log/log (:severity sess-err :warn) reason)))
 
         ;; Generate a response describing an invalid session.
 
         (-> req
-            (api/add-missing-sub-status reason :session-error :response/body translate-sub)
+            (api/add-missing-sub-status cause :session-status :response/body translate-sub)
             (api/render-error :auth/session-error)))
 
       :----pass

@@ -118,14 +118,14 @@
       false))
 
 (defn auth-status-to-resp
-  "Returns rendering function which matches authentication error code."
+  "DEPRECATED. Returns rendering function which matches authentication error code."
   [astatus]
   (case astatus
     :ok            resp/ok
     :bad-password  resp/unauthorized
     :locked        resp/forbidden
     :soft-locked   resp/forbidden
-    :session-error resp/forbidden
+    :session-status resp/forbidden
     resp/forbidden))
 
 (defn auth-user-with-password!
@@ -179,10 +179,11 @@
         (if-not (get sess :valid?)
 
           (let [e (get sess :error)
-                r (:reason e)]
+                r (:reason   e)
+                s (:severity e)]
             (when r
-              (log/log (:severity e :warn) r)
-              (oplog :level e :user-id user-id :op :session :ok? false :msg r))
+              (log/log (or s :warn) r)
+              (oplog :level s :user-id user-id :op :session :ok? false :msg r))
             (assoc req :auth/ok? false :response/status :auth/session-error))
 
           (if goto-uri
