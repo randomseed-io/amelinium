@@ -25,6 +25,8 @@
             [io.randomseed.utils.fs        :as                     fs]
             [io.randomseed.utils.var       :as                    var]
             [io.randomseed.utils.map       :as                    map]
+            [phone-number.util             :as                 phutil]
+            [phone-number.core             :as                  phone]
             [amelinium.app                 :as                    app]
             [amelinium.system              :as                 system]
             [amelinium.logging             :as                    log])
@@ -123,6 +125,16 @@
 (defn key-as-ip
   [m k]
   (map/update-existing m k ip/string-to-address))
+
+;; Phone number mapping
+
+(defn- parse-phone
+  [v]
+  (phutil/try-parse (phone/number v)))
+
+(defn key-as-phone
+  [m k]
+  (map/update-existing m k parse-phone))
 
 ;; UUID mapping
 

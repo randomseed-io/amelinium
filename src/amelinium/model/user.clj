@@ -250,7 +250,8 @@
       (db/key-as-uuid    :uid)
       (db/key-as-keyword :account-type)
       (db/key-as-ip      :last-ok-ip)
-      (db/key-as-ip      :last-failed-ip)))
+      (db/key-as-ip      :last-failed-ip)
+      (db/key-as-phone   :phone)))
 
 (defn info-coercer-coll
   [coll]
