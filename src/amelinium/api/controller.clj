@@ -52,14 +52,18 @@
 (defn auth-user-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
   conditions and may render a response."
-  [req user-email password sess route-data lang]
-  (let [req (super/auth-user-with-password! req user-email password sess route-data)]
-    (if (api/response? req)
-      req
-      (let [lang (or lang (common/pick-language req))]
-        (-> req
-            (language/force lang)
-            (add-session-status sess (i18n/no-default (common/translator-sub req lang))))))))
+  ([req user-email password sess route-data lang]
+   (auth-user-with-password! req user-email password sess route-data lang false))
+  ([req user-email password sess route-data lang auth-only-mode]
+   (let [req (super/auth-user-with-password! req user-email password sess route-data auth-only-mode)]
+     (if (api/response? req)
+       req
+       (let [lang (or lang (common/pick-language req))]
+         (-> req
+             (language/force lang)
+             (api/body-add-session-status
+              sess
+              (i18n/no-default (common/translator-sub req lang)))))))))
 
 ;; Controllers
 
@@ -88,7 +92,7 @@
         sess        (common/session req)
         route-data  (http/get-route-data req)]
     (cond
-      password           (auth-user-with-password! req user-email password sess route-data nil)
+      password           (auth-user-with-password! req user-email password sess route-data nil false)
       (get sess :valid?) req
       :invalid!          (api/move-to req (get route-data :auth/info :auth/info)))))
 
