@@ -119,68 +119,79 @@
 
 (defn auth-user-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
-  conditions and may emit a redirect or render a response."
-  [req user-email password sess route-data]
-  (let [ipaddr       (get req :remote-ip)
-        ipplain      (get req :remote-ip/str)
-        oplog        (or (get req :oplog/logger) (common/oplog-logger req route-data))
-        auth-db      (common/auth-db req)
-        user         (user/get-login-data auth-db user-email)
-        user-id      (get user :id)
-        pwd-suites   (select-keys user [:intrinsic :shared])
-        auth-config  (common/auth-config req (get user :account-type))
-        auth-db      (get auth-config :db)
-        for-user     (log/for-user user-id user-email ipplain)
-        for-mail     (log/for-user nil user-email ipplain)
-        hard-locked? (fn [] (common/hard-locked? user))
-        soft-locked? (fn [] (common/soft-locked? user auth-config (t/now)))
-        invalid-pwd? (fn [] (not (check-password user password auth-config)))]
+  conditions and may emit a redirect or set the `:response/status`. The last
+  `auth-only-mode` argument, when set to `true` (default is `false` when not given)
+  causes session creation and prolongation to be skipped if the authentication is
+  successful."
+  ([req user-email password sess route-data]
+   (auth-user-with-password! req user-email password sess route-data false))
+  ([req user-email password sess route-data auth-only-mode]
+   (let [ipaddr       (get req :remote-ip)
+         ipplain      (get req :remote-ip/str)
+         auth-db      (common/auth-db req)
+         user         (user/get-login-data auth-db user-email)
+         user-id      (get user :id)
+         pwd-suites   (select-keys user [:intrinsic :shared])
+         auth-config  (common/auth-config req (get user :account-type))
+         auth-db      (get auth-config :db)
+         for-user     (log/for-user user-id user-email ipplain)
+         for-mail     (log/for-user nil user-email ipplain)
+         opname       (if auth-only-mode :auth :login)
+         oplog-fn     (common/oplog-logger-populated req route-data)
+         oplog        (fn [ok? l m a] (oplog-fn :ok? ok? :user-id user-id :opname opname
+                                                :level l :msg (str m " " a)))
+         hard-locked? (fn [] (common/hard-locked? user))
+         soft-locked? (fn [] (common/soft-locked? user auth-config (t/now)))
+         invalid-pwd? (fn [] (not (check-password user password auth-config)))]
 
-    (cond
+     (cond
 
-      (hard-locked?) (do (log/wrn "Account locked permanently" for-user)
-                         (oplog :user-id user-id :op :login :ok? false :msg (str "Permanent lock " for-mail))
-                         (assoc req :auth/ok? false :response/status :auth/locked))
+       (hard-locked?) (do (log/wrn "Account locked permanently" for-user)
+                          (oplog false :info "Permanent lock" for-mail)
+                          (assoc req :auth/ok? false :response/status :auth/locked))
 
-      (soft-locked?) (do (log/msg "Account locked temporarily" for-user)
-                         (oplog :user-id user-id :op :login :ok? false :msg (str "Temporary lock " for-mail))
-                         (assoc req :auth/ok? false :response/status :auth/soft-locked))
+       (soft-locked?) (do (log/msg "Account locked temporarily" for-user)
+                          (oplog false :info "Temporary lock" for-mail)
+                          (assoc req :auth/ok? false :response/status :auth/soft-locked))
 
-      (invalid-pwd?) (do (log/wrn "Incorrect password or user not found" for-user)
-                         (when user-id
-                           (oplog :level :warning :user-id user-id :op :login :ok? false :msg (str "Bad password " for-mail))
-                           (user/update-login-failed auth-db user-id ipaddr
-                                                     (get auth-config :locking/max-attempts)
-                                                     (get auth-config :locking/fail-expires)))
-                         (assoc req :auth/ok? false :response/status :auth/bad-password))
+       (invalid-pwd?) (do (log/wrn "Incorrect password or user not found" for-user)
+                          (when user-id
+                            (oplog false :warn "Bad password" for-mail)
+                            (user/update-login-failed auth-db user-id ipaddr
+                                                      (get auth-config :locking/max-attempts)
+                                                      (get auth-config :locking/fail-expires)))
+                          (assoc req :auth/ok? false :response/status :auth/bad-password))
 
-      (do (log/msg "Authentication successful" for-user)
-          (common/oplog req :user-id user-id :op :login :message (str "Login OK " for-mail))
-          (user/update-login-ok auth-db user-id ipaddr)
-          :authenticated!)
+       auth-only-mode (do (log/msg "Authentication successful" for-user)
+                          (oplog true :info "Authentication OK" for-mail)
+                          (user/update-login-ok auth-db user-id ipaddr)
+                          (assoc req :auth/ok? true :response/status :auth/ok))
 
-      (let [goto-uri  (if (get sess :expired?) (get req :goto-uri))
-            sess-opts (get req :session/config)
-            sess      (if goto-uri
-                        (user/prolong-session sess-opts sess ipaddr)
-                        (user/create-session  sess-opts user-id user-email ipaddr))]
+       :authenticate! (do (log/msg "Login successful" for-user)
+                          (oplog true :info "Login OK" for-mail)
+                          (user/update-login-ok auth-db user-id ipaddr)
+                          (let [goto-uri  (if (get sess :expired?) (get req :goto-uri))
+                                sess-opts (get req :session/config)
+                                sess      (if goto-uri
+                                            (user/prolong-session sess-opts sess ipaddr)
+                                            (user/create-session  sess-opts user-id user-email ipaddr))]
 
-        (if-not (get sess :valid?)
+                            (if-not (get sess :valid?)
 
-          (let [e (get sess :error)
-                r (:reason   e)
-                s (:severity e)]
-            (when r
-              (log/log (or s :warn) r)
-              (oplog :level s :user-id user-id :op :session :ok? false :msg r))
-            (assoc req :auth/ok? false :response/status :auth/session-error))
+                              (let [e (get sess :error)
+                                    r (:reason   e)
+                                    s (:severity e)]
+                                (when r
+                                  (log/log (or s :warn) r)
+                                  (oplog-fn :level s :user-id user-id :op :session :ok? false :msg r))
+                                (assoc req :auth/ok? false :response/status :auth/session-error))
 
-          (if goto-uri
-            (resp/temporary-redirect goto-uri)
-            (-> req
-                (assoc (or (get sess-opts :session-key) :session) sess
-                       :auth/ok? true :response/status :auth/ok)
-                ((get (get req :roles/config) :handler identity)))))))))
+                              (if goto-uri
+                                (resp/temporary-redirect goto-uri)
+                                (-> req
+                                    (assoc (or (get sess-opts :session-key) :session) sess
+                                           :auth/ok? true :response/status :auth/ok)
+                                    ((get (get req :roles/config) :handler identity)))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
