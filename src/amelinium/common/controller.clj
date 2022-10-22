@@ -54,6 +54,7 @@
      form-data)))
 
 (defn check-password
+  "Check password using authentication configuration."
   [user password auth-config]
   (if (and user password)
     (auth/check-password-json password
@@ -148,11 +149,13 @@
 
        (hard-locked?) (do (log/wrn "Account locked permanently" for-user)
                           (oplog false :info "Permanent lock" for-mail)
-                          (assoc req :auth/ok? false :response/status :auth/locked))
+                          (assoc req :user/authorized? false :user/authenticated? false
+                                 :auth/ok? false :response/status :auth/locked))
 
        (soft-locked?) (do (log/msg "Account locked temporarily" for-user)
                           (oplog false :info "Temporary lock" for-mail)
-                          (assoc req :auth/ok? false :response/status :auth/soft-locked))
+                          (assoc req :user/authenticated? false :user/authorized? false
+                                 :auth/ok? false :response/status :auth/soft-locked))
 
        (invalid-pwd?) (do (log/wrn "Incorrect password or user not found" for-user)
                           (when user-id
@@ -160,7 +163,8 @@
                             (user/update-login-failed auth-db user-id ipaddr
                                                       (get auth-config :locking/max-attempts)
                                                       (get auth-config :locking/fail-expires)))
-                          (assoc req :auth/ok? false :response/status :auth/bad-password))
+                          (assoc req :user/authorized? false :user/authenticated? false
+                                 :auth/ok? false :response/status :auth/bad-password))
 
        auth-only-mode (do (log/msg "Authentication successful" for-user)
                           (oplog true :info "Authentication OK" for-mail)
@@ -184,7 +188,8 @@
                                 (when r
                                   (log/log (or s :warn) r)
                                   (oplog-fn :level s :user-id user-id :op :session :ok? false :msg r))
-                                (assoc req :auth/ok? false :response/status :auth/session-error))
+                                (assoc req :user/authenticated? false :user/authorized? false
+                                       :auth/ok? false :response/status :auth/session-error))
 
                               (if goto-uri
                                 (resp/temporary-redirect goto-uri)
