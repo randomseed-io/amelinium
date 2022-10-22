@@ -98,10 +98,16 @@
 
 (defn oplog-logger-populated
   "Creates operations logging function on a basis of operations logger retrieved by
-  getting `:oplog/logger` key of the request (`req`) or by calling `oplog-logger`
-  function."
+  getting `:oplog/logger` key of the request (`req`), and if that fails by calling
+  `oplog-logger-from-route-data` (when `route-data` is given), and if that fails by
+  calling `oplog-logger` function on a `req` (which falls back to
+  `amelinium.common.oplog.auth/log`)."
   ([req]
    (or (get req :oplog/logger)
+       (oplog-logger req)))
+  ([req route-data]
+   (or (get req :oplog/logger)
+       (oplog-logger-from-route-data route-data)
        (oplog-logger req))))
 
 (defn oplog
