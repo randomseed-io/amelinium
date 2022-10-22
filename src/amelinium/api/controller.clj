@@ -96,6 +96,24 @@
       (get sess :valid?) req
       :invalid!          (api/move-to req (get route-data :auth/info :auth/info)))))
 
+(defn authenticate-only!
+  "Logs user in when user e-mail and password are given.
+
+  Takes a request map and obtains database connection, client IP address and
+  authentication configuration from it. Also gets a user e-mail and a password from a
+  map associated with the `:body-params` key of the `req`. Calls
+  `auth-user-with-password!` to get a result.
+
+  If there is no e-mail nor password given (the value is `nil`, `false` or an empty
+  string) then authentication is not performed."
+  [req]
+  (let [body-params (get req :body-params)
+        user-email  (some-str (get body-params :login))
+        password    (if user-email (some-str (get body-params :password)))
+        route-data  (http/get-route-data req)
+        sess        (common/session req)]
+    (auth-user-with-password! req user-email password sess route-data nil true)))
+
 (defn info!
   "Returns login information."
   [req]
