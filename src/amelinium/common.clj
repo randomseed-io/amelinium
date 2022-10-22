@@ -71,8 +71,7 @@
   "Returns operations logger configuration obtained from a request or a `Match`
   object."
   [req-or-match]
-  (or (http/get-route-data req-or-match :oplog/config)
-      oplog-auth/log))
+  (http/get-route-data req-or-match :oplog/config))
 
 (defn oplog-logger-from-route-data
   "Retrieves operations logger function from a given route data map (via
