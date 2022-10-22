@@ -74,6 +74,15 @@
   (or (http/get-route-data req-or-match :oplog/config)
       oplog-auth/log))
 
+(defn oplog-logger-from-route-data
+  "Retrieves operations logger function from a given route data map (via
+  `:oplog/config` key and then the `:fn/reporter` key) and creates a wrapper for
+  handling keyword arguments."
+  [route-data]
+  (if-some [lgr (get (get route-data :oplog/config) :fn/reporter)]
+    (fn [& {:as message}] (lgr message))
+    (constantly nil)))
+
 (defn oplog-logger
   "Retrieves operations logger function from a current route data (via `:oplog/config`
   key and then the `:fn/reporter` key), and if that fails, tries to retrieve it using
