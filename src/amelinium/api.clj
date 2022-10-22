@@ -880,7 +880,33 @@
            (get smap :id))))
 
 (defn session-status
+  "Returns session status for the given session map `smap`."
   [smap]
   (if-not (map? smap)
     :session/missing
     (or (some-keyword (get (get smap :error) :cause)) :session/unknown-error)))
+
+(defn body-add-session-status
+  "Gets the value of `:response/status` key of the given `req` and if it is set to
+  `:auth/session-error` or `:error/session`, adds `:session-status` to a response
+  body with a value set to a result of calling `session-status` on a current
+  session. If there is no session error detected, it simply calls `body-add-session`
+  to add session ID to the response body."
+  ([req]
+   (body-add-session-status req nil))
+  ([req smap]
+   (let [rstatus (get req :response/status)]
+     (if (or (= rstatus :auth/session-error)
+             (= rstatus :error/session))
+       (add-missing-sub-status req
+                               (session-status (or smap (common/session req)))
+                               :session-status :response/body)
+       (body-add-session-id req))))
+  ([req smap translate-sub]
+   (let [rstatus (get req :response/status)]
+     (if (or (= rstatus :auth/session-error)
+             (= rstatus :error/session))
+       (add-missing-sub-status req
+                               (session-status (or smap (common/session req)))
+                               :session-status :response/body translate-sub)
+       (body-add-session-id req)))))

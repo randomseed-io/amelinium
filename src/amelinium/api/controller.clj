@@ -49,16 +49,6 @@
     (and (contains? bparams :password)
          (contains? bparams :login))))
 
-(defn add-session-status
-  [req smap translate-sub]
-  (let [rstatus (get req :response/status)]
-    (if (or (= rstatus :auth/session-error)
-            (= rstatus :error/session))
-      (api/add-missing-sub-status req
-                                  (api/session-status (or smap (common/session req)))
-                                  :session-status :response/body translate-sub)
-      (api/body-add-session-id req))))
-
 (defn auth-user-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
   conditions and may render a response."
