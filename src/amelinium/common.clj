@@ -1299,7 +1299,7 @@
   map or given as a time duration. Does not connect to a database."
   [auth-config-or-lock-wait]
   (or (if (map? auth-config-or-lock-wait)
-        (get auth-config-or-lock-wait :locking/lock-wait)
+        (get (get auth-config-or-lock-wait :locking) :lock-wait)
         auth-config-or-lock-wait)
       lock-wait-default))
 
