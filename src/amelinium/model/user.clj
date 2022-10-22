@@ -763,11 +763,13 @@
 (def ^:const login-failed-update-query
   (str-spc
    "UPDATE users"
-   "SET last_failed_ip = ?,"
-   " login_attempts = 1 + GREATEST(login_attempts -"
+   "SET"
+   "last_failed_ip = ?,"
+   "login_attempts = 1 + GREATEST(login_attempts -"
    "  FLOOR(TIME_TO_SEC(TIMEDIFF(NOW(), last_attempt)) / ?),"
    "  0),"
-   " last_attempt = NOW()"
+   "last_attempt = NOW(),"
+   "soft_locked = IF(login_attempts > ?, NOW(), soft_locked)"
    "WHERE id = ?"))
 
 (def ^:const soft-lock-update-query
@@ -777,15 +779,24 @@
    "WHERE id = ? AND login_attempts > ?"))
 
 (defn update-login-failed
-  [db user-id ip-address max-attempts attempt-expires-after-secs]
-  (when (and db user-id)
-    (jdbc/execute-one! db [login-failed-update-query
-                           (ip/to-str-v6 ip-address)
-                           (time/seconds attempt-expires-after-secs 1)
-                           user-id])
-    (jdbc/execute-one! db [soft-lock-update-query
-                           user-id
-                           (or max-attempts 1)])))
+  "Updates `users` table with failed login data (attempts, IP address) according to
+  authentication configuration and sets a soft lock if a number of attempts
+  exceeded the configured value."
+  ([auth-config user-id ip-address]
+   (if auth-config
+     (if-some [db (.db ^AuthConfig auth-config)]
+       (if-some [locking (.locking ^AuthConfig auth-config)]
+         (update-login-failed db user-id ip-address
+                              (.max-attempts ^AuthLocking locking)
+                              (.fail-expires ^AuthLocking locking))
+         (update-login-failed db user-id ip-address nil nil)))))
+  ([db user-id ip-address max-attempts attempt-expires-after-secs]
+   (when (and db user-id)
+     (jdbc/execute-one! db [login-failed-update-query
+                            ip-address
+                            (time/seconds attempt-expires-after-secs 10)
+                            (or max-attempts 3)
+                            user-id]))))
 
 ;; Other
 
