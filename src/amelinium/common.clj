@@ -85,16 +85,14 @@
 (defn oplog-logger
   "Retrieves operations logger function from a current route data (via `:oplog/config`
   key and then the `:fn/reporter` key), and if that fails, tries to retrieve it using
-  `:oplog/config` key of the request map (and `:fn/reporter sub-key). When everything
+  `:oplog/config` key of the request map (and `:fn/reporter` sub-key). When everything
   fails it will fall back to a global variable `amelinium.common.oplog.auth/log`. The
-  given argument can be either a request map or a `Match` object. In its binary
-  variant the second argument is tested first and it should be an operations logger
-  configuration map containing the `:fn/reporter` key."
-  ([req-or-match]
-   (if-some [lgr (or (get (http/get-route-data req-or-match :oplog/config) :fn/reporter)
-                     oplog-auth/log)]
-     (fn [& {:as message}] (lgr message))
-     (constantly nil))))
+  given argument can be either a request map or a `Match` object."
+  [req-or-match]
+  (if-some [lgr (or (get (http/get-route-data req-or-match :oplog/config) :fn/reporter)
+                    oplog-auth/log)]
+    (fn [& {:as message}] (lgr message))
+    (constantly nil)))
 
 (defn oplog-logger-populated
   "Creates operations logging function on a basis of operations logger retrieved by
