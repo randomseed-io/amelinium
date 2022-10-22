@@ -757,7 +757,8 @@
                               :soft_locked    nil
                               :last_attempt   login-time
                               :last_login     login-time
-                              :last_ok_ip     (ip/to-str-v6 ip)} {:id id}))))
+                              :last_ok_ip     ip}
+                   {:id id}))))
 
 (def ^:const login-failed-update-query
   (str-spc
