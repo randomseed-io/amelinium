@@ -160,9 +160,7 @@
        (invalid-pwd?) (do (log/wrn "Incorrect password or user not found" for-user)
                           (when user-id
                             (oplog false :warn "Bad password" for-mail)
-                            (user/update-login-failed auth-db user-id ipaddr
-                                                      (get auth-config :locking/max-attempts)
-                                                      (get auth-config :locking/fail-expires)))
+                            (user/update-login-failed auth-config user-id ipaddr))
                           (assoc req :user/authorized? false :user/authenticated? false
                                  :auth/ok? false :response/status :auth/bad-password))
 
