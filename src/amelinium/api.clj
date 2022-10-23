@@ -923,3 +923,17 @@
   (if (and (coll? body) (> (count body) 1))
     `(let [req# ~req] (if (response? req#) req# (do ~@body)))
     `(let [req# ~req] (if (response? req#) req# ~@body))))
+
+(defmacro add-body
+  "Adds response body to a request map `req` under its key `:response/body` using
+  `clojure.core/assoc`. The body is a result of evaluating expressions passed as additional
+  arguments. Returns updated `req`."
+  [req & body]
+  (if (and (coll? body) (> (count body) 1))
+    `(assoc ~req :response/body (do ~@body))
+    `(assoc ~req :response/body ~@body)))
+
+(defmacro remove-status
+  "Removes `:response/status` from `req` using `clojure.core/dissoc`."
+  [req]
+  `(dissoc ~req :response/status))
