@@ -58,12 +58,11 @@
    (let [req (super/auth-user-with-password! req user-email password sess route-data auth-only-mode)]
      (if (api/response? req)
        req
-       (let [lang (or lang (common/pick-language req))]
+       (let [lang   (or lang (common/pick-language req))
+             tr-sub (i18n/no-default (common/translator-sub req lang))]
          (-> req
              (language/force lang)
-             (api/body-add-session-status
-              sess
-              (i18n/no-default (common/translator-sub req lang)))))))))
+             (api/body-add-session-status sess tr-sub)))))))
 
 ;; Controllers
 
