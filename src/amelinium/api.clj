@@ -872,11 +872,16 @@
      req))
   ([req smap]
    (update req :response/body assoc
-           (or (get smap :session-id-field) :session-id)
+           (or (get smap :session-id-field)
+               (get (get req :session/config) :session-id-field)
+               :session-id)
            (get smap :id)))
   ([req smap field]
    (update req :response/body assoc
-           (or field (get smap :session-id-field) :session-id)
+           (or field
+               (get smap :session-id-field)
+               (get (get req :session/config) :session-id-field)
+               :session-id)
            (get smap :id))))
 
 (defn session-status

@@ -352,14 +352,14 @@
 ;; Configuration
 
 (defn session-field
-  "Returns a string of configured session ID field name by extracting it from `opts`
-  which can be a map containing the last (or only) element of `:session-id-path`
-  configuration option (exposed as `:session-id-field`), a request map containing the
-  given `result-key` associated with a map with `:session-id-field`, a request map
-  containing the given `config-key` associated with a map with `:session-id-field` or
-  a keyword (returned immediately). Optional `other` map can be provided which will
-  be used as a second try when `opts` lookup will fail. The function returns
-  \"session-id\" string when all methods fail."
+  "Returns a string or an ident of configured session ID field name by extracting it
+  from `opts` which can be a map containing the last (or only) element of
+  `:session-id-path` configuration option (exposed as `:session-id-field`), a request
+  map containing the given `result-key` associated with a map with
+  `:session-id-field`, a request map containing the given `config-key` associated
+  with a map with `:session-id-field` or a keyword (returned immediately). Optional
+  `other` map can be provided which will be used as a second try when `opts` lookup
+  will fail. The function returns \"session-id\" string when all methods fail."
   ([opts]
    (session-field opts :session :session/config))
   ([opts other]
@@ -821,6 +821,7 @@
                                (update :session-key      #(or (some-keyword %) :session))
                                (update :config-key       #(or (some-keyword %) :session/config))
                                (update :session-id-path  #(if (valuable? %) (if (coll? %) (vec %) %) "session-id"))
+                               (update :session-id-field #(if (ident? %) % (some-str %)))
                                (update :single-session?  boolean)
                                (update :secured?         boolean)
                                (calc-cache-expires))
@@ -830,11 +831,12 @@
         sessions-table     (get config :table/sessions)
         variables-table    (get config :table/variables)
         session-id-path    (get config :session-id-path)
+        session-id-field   (get config :session-id-field)
         cache-expires      (get config :expires)
         single-session?    (get config :single-session?)
         secured?           (get config :secured?)
         checker-config     (set/rename-keys config {:token-cache-size :cache-size :token-cache-ttl :cache-ttl})
-        session-id-field   (if (coll? session-id-path) (last session-id-path) session-id-path)
+        session-id-field   (or session-id-field (if (coll? session-id-path) (last session-id-path) session-id-path))
         config             (assoc config :session-id-field (or session-id-field "session-id"))
         identifier-fn      (setup-id-fn session-id-path)
         config             (assoc config :fn/identifier identifier-fn)
