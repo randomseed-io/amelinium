@@ -915,3 +915,11 @@
              (= rstatus :error/session))
        (add-missing-sub-status req (session-status smap) :session-status :response/body translate-sub)
        (body-add-session-id req smap)))))
+
+(defmacro response
+  "Creates a response block. If the given `req` is already a response then it is simply
+  returned. Otherwise the expressions from `body` are evaluated."
+  [req & body]
+  (if (and (coll? body) (> (count body) 1))
+    `(let [req# ~req] (if (response? req#) req# (do ~@body)))
+    `(let [req# ~req] (if (response? req#) req# ~@body))))
