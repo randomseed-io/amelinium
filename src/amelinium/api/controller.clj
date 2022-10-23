@@ -150,6 +150,10 @@
       (not (get req :validators/params-valid?))
       (api/render-error req :parameters/error)
 
+      ;; Authorization failed.
+      (not (get req :user/authorized?))
+      (-> req (cleanup-req @auth-state) (api/render-error :auth/access-denied))
+
       ;; There is no session. Short-circuit.
 
       (not (and sess (or (get sess :id) (get sess :err/id))))
@@ -208,7 +212,6 @@
             (log/log (:severity sess-err :warn) reason)))
 
         ;; Generate a response describing an invalid session.
-
         (-> req
             (api/add-missing-sub-status cause :session-status :response/body translate-sub)
             (api/render-error :auth/session-error)))
