@@ -900,18 +900,18 @@
   ([req]
    (body-add-session-status req nil))
   ([req smap]
-   (let [rstatus (get req :response/status)]
+   (let [rstatus (get req :response/status)
+         smap?   (and smap (or (get smap :id) (get smap :err/id)) true)
+         smap    (if smap? smap (common/session req))]
      (if (or (= rstatus :auth/session-error)
              (= rstatus :error/session))
-       (add-missing-sub-status req
-                               (session-status (or smap (common/session req)))
-                               :session-status :response/body)
-       (body-add-session-id req))))
+       (add-missing-sub-status req (session-status smap) :session-status :response/body)
+       (body-add-session-id req smap))))
   ([req smap translate-sub]
-   (let [rstatus (get req :response/status)]
+   (let [rstatus (get req :response/status)
+         smap?   (and smap (or (get smap :id) (get smap :err/id)) true)
+         smap    (if smap? smap (common/session req))]
      (if (or (= rstatus :auth/session-error)
              (= rstatus :error/session))
-       (add-missing-sub-status req
-                               (session-status (or smap (common/session req)))
-                               :session-status :response/body translate-sub)
-       (body-add-session-id req)))))
+       (add-missing-sub-status req (session-status smap) :session-status :response/body translate-sub)
+       (body-add-session-id req smap)))))
