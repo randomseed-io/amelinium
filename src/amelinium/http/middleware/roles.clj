@@ -84,8 +84,8 @@
   ([req in-context config]
    (user-authorized? req in-context nil
                      (get config :authorize-default? true)))
-  ([req in-context _ auth-default?]
-   (if-some [data (not-empty (get (ring/get-match req) :data))]
+  ([req in-context data auth-default?]
+   (if-some [data (or data (not-empty (get (ring/get-match req) :data)))]
      (if-not (some-> (get data :roles/forbidden) (contains-some? in-context))
        (if-some [roles-any (not-empty (get data :roles/any))]
          (or  (contains-some? roles-any in-context)
@@ -93,6 +93,15 @@
          (if-some [roles-all (get data :roles/all)]
            (set/subset? roles-all in-context)
            auth-default?)))
+     auth-default?))
+  ([req in-context auth-default? roles-forbidden roles-any roles-all]
+   (if-not (some-> roles-forbidden (contains-some? in-context))
+     (if roles-any
+       (or (contains-some? roles-any in-context)
+           (some-> roles-all (set/subset? in-context)) false)
+       (if roles-all
+         (set/subset? roles-all in-context)
+         auth-default?))
      auth-default?)))
 
 (defn- rename-context-column
@@ -297,6 +306,20 @@
   ([req config processor rcfn srfn
     anonymous-role known-user-role self-role
     global-context authorize-default? session-key]
+   (let [data        (not-empty (get (ring/get-match req) :data))
+         [roles-forbidden
+          roles-any
+          roles-all] (if data [(not-empty (get data :roles/forbidden))
+                               (not-empty (get data :roles/any))
+                               (not-empty (get data :roles/all))])]
+     (inject-roles req config processor rcfn srfn
+                   anonymous-role known-user-role self-role
+                   global-context authorize-default? session-key
+                   roles-forbidden roles-any roles-all)))
+  ([req config processor rcfn srfn
+    anonymous-role known-user-role self-role
+    global-context authorize-default? session-key
+    roles-forbidden roles-any roles-all]
    (let [session        (get req session-key)
          authenticated? (delay (user-authenticated? session))
          roles          (delay (let [sr (if (and self-role @authenticated?) (srfn req))]
@@ -308,7 +331,8 @@
                                    sr (update global-context (fnil #(conj % sr) #{})))))
          context        (delay (rcfn req))
          in-context     (delay (filter-in-context @context @roles config))
-         authorized?    (delay (user-authorized? req @in-context nil authorize-default?))
+         authorized?    (delay (user-authorized? req @in-context authorize-default?
+                                                 roles-forbidden roles-any roles-all))
          unauth-redir   (get config :unauthorized-redirect)
          req            (-> req
                             (map/assoc-missing :roles/config config)
@@ -471,16 +495,19 @@
       (log/msg "Installing role-based access control handler:" handler-name)
       (log/msg "Using database" dbname "for permissions")
       {:name    ::roles
-       :compile (fn [{:keys [no-roles?]} opts]
+       :compile (fn [{:keys [no-roles?] :as data} opts]
                   (if (and (not no-roles?) db)
-                    (fn [h]
-                      (fn [req]
-                        (h
-                         (inject-roles req config mem-processor
-                                       req-context-fn req-self-role-fn
-                                       anonymous-role known-user-role self-role
-                                       global-context authorize-default?
-                                       session-key))))))})))
+                    (let [roles-forbidden (not-empty (get data :roles/forbidden))
+                          roles-any       (not-empty (get data :roles/any))
+                          roles-all       (not-empty (get data :roles/all))]
+                      (fn [h]
+                        (fn [req]
+                          (h
+                           (inject-roles req config mem-processor
+                                         req-context-fn req-self-role-fn
+                                         anonymous-role known-user-role self-role
+                                         global-context authorize-default? session-key
+                                         roles-forbidden roles-any roles-all)))))))})))
 
 (system/add-prep  ::default [_ config] (prep-config config))
 (system/add-init  ::default [_ config] (wrap-roles  config))
