@@ -136,12 +136,14 @@
   valid (if validators are configured). If there is a session present, checks for its
   validity and tests if an account is locked."
   [req]
-  (let [sess           (common/session req)
-        auth-state     (delay (common/login-auth-state req :login-page? :auth-page?))
-        auth?          (delay (nth @auth-state 1 false))
-        login-data?    (delay (login-data? req))
-        auth-db        (delay (api/auth-db req))
-        valid-session? (delay (get sess :valid?))]
+  (let [sess          (common/session req)
+        auth-state    (delay (common/login-auth-state req :login-page? :auth-page?))
+        auth?         (delay (nth @auth-state 1 false))
+        login-data?   (delay (login-data? req))
+        auth-db       (delay (api/auth-db req))
+        session-error (and sess (get sess :error))
+        no-session?   (not (or (and sess (or (get sess :id) (get sess :err/id))) session-error))
+        authorized?   (get req :user/authorized?)]
 
     (cond
 
@@ -151,12 +153,13 @@
       (api/render-error req :parameters/error)
 
       ;; Authorization failed.
-      (not (get req :user/authorized?))
+
+      (not (or session-error authorized?))
       (-> req (cleanup-req @auth-state) (api/render-error :auth/access-denied))
 
       ;; There is no session. Short-circuit.
 
-      (not (and sess (or (get sess :id) (get sess :err/id))))
+      no-session?
       (-> req (cleanup-req @auth-state))
 
       ;; Account is manually hard-locked.
@@ -178,14 +181,13 @@
 
       ;; Session is not valid.
 
-      (and (not @valid-session?) (not (and @auth? @login-data?)))
+      (and (not (get sess :valid?)) (not (and @auth? @login-data?)))
       (let [req           (cleanup-req req @auth-state)
             expired?      (get sess :expired?)
             user-id       (get sess :user/id)
             email         (get sess :user/email)
-            sess-err      (get sess :error)
-            reason        (get sess-err :reason)
-            cause         (get sess-err :cause)
+            reason        (get session-error :reason)
+            cause         (get session-error :cause)
             ip-addr       (:remote-ip/str req)
             for-user      (log/for-user user-id email ip-addr)
             for-mail      (log/for-user nil email ip-addr)
@@ -207,18 +209,23 @@
                        :user-id (:user/id sess)
                        :op      :session
                        :ok?     false
-                       :level   (:severity sess-err)
+                       :level   (:severity session-error)
                        :msg     reason)
-            (log/log (:severity sess-err :warn) reason)))
+            (log/log (:severity session-error :warn) reason)))
 
         ;; Generate a response describing an invalid session.
         (-> req
             (api/add-missing-sub-status cause :session-status :response/body translate-sub)
             (api/render-error :auth/session-error)))
 
+      ;; Authorization failed but session error was not handled for some strange reason.
+
+      (not authorized?)
+      (-> req (cleanup-req @auth-state) (api/render-error :auth/access-denied))
+
       :----pass
 
-      ;; We have a valid session.
+      ;; We have a valid session and authorization.
       ;;
       ;; Remove login data from the request if we are not authenticating a user.
       ;; Take care about broken go-to (move to a login page in such case).
