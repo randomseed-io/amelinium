@@ -1365,6 +1365,23 @@
      [cfg (get req (or (get cfg :session-key) :session))]
      [nil nil])))
 
+(defn session-inject
+  "Adds session data to a request map. Session key is obtained from `cfg` (if given),
+  then from the given session map `smap`, and then from a configuration associated
+  with the `:session/config` key of `req`. If all of that fails, `:session` is used
+  as a key."
+  ([req smap]
+   (assoc req (or (get smap :session-key)
+                  (get (get req :session/config) :session-key)
+                  :session)
+          smap))
+  ([req smap cfg]
+   (assoc req (or (get cfg  :session-key)
+                  (get smap :session-key)
+                  (get (get req :session/config) :session-key)
+                  :session)
+          smap)))
+
 (defn session-variable-get-failed?
   [v]
   (session/get-variable-failed? v))
@@ -1394,6 +1411,10 @@
     smap))
 
 ;; Context and roles
+
+(defn roles-refresh
+  [req]
+  (roles/refresh req))
 
 (defn has-any-role?
   [req role]

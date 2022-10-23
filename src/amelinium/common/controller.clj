@@ -192,9 +192,9 @@
                               (if goto-uri
                                 (resp/temporary-redirect goto-uri)
                                 (-> req
-                                    (assoc (or (get sess-opts :session-key) :session) sess
-                                           :auth/ok? true :response/status :auth/ok)
-                                    ((get (get req :roles/config) :handler identity)))))))))))
+                                    (assoc :auth/ok? true :response/status :auth/ok)
+                                    (common/session-inject sess sess-opts)
+                                    (common/roles-refresh))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)

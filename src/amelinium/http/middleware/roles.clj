@@ -321,6 +321,15 @@
        (resp/see-other unauth-redir)
        req))))
 
+(defn refresh
+  "Recalculates roles by calling configured handler on a request map."
+  [req]
+  (if-some [cfg (get req :roles/config)]
+    (if-some [hdl (get cfg :handler)]
+      (hdl req)
+      req)
+    req))
+
 ;; Initialization
 
 (defn- update-built-in-role
