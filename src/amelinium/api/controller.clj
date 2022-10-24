@@ -304,8 +304,7 @@
       :reitit.coercion/request-coercion
       (let [tr-sub (common/translator-sub req)
             errors (coercion/explain-errors data tr-sub)]
-        (-> req
-            (update :response/body assoc :parameters/errors errors)
+        (-> (api/update-body req assoc :parameters/errors errors)
             (api/render-bad-params)
             (respond)))
 

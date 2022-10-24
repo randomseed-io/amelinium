@@ -933,6 +933,13 @@
     `(assoc ~req :response/body (do ~@body))
     `(assoc ~req :response/body ~@body)))
 
+(defmacro update-body
+  "Updates response body in a request map `req` under its key `:response/body` using
+  `clojure.core/update`. The body is a result of evaluating expressions passed as
+  additional arguments. Returns updated `req`."
+  [req & body]
+  `(update ~req :response/body ~@body))
+
 (defmacro remove-status
   "Removes `:response/status` from `req` using `clojure.core/dissoc`."
   [req]
