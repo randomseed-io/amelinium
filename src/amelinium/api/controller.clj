@@ -141,8 +141,7 @@
         auth?         (delay (nth @auth-state 1 false))
         login-data?   (delay (login-data? req))
         auth-db       (delay (api/auth-db req))
-        session-error (and sess (get sess :error))
-        no-session?   (not (or (and sess (or (get sess :id) (get sess :err/id))) session-error))
+        session-error (common/session-error sess)
         authorized?   (get req :user/authorized?)]
 
     (cond
@@ -159,7 +158,7 @@
 
       ;; There is no session. Short-circuit.
 
-      no-session?
+      (common/no-session? sess session-error)
       (-> req (cleanup-req @auth-state))
 
       ;; Account is manually hard-locked.

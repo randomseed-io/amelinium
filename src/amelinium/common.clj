@@ -1410,6 +1410,47 @@
     (allow-expired smap)
     smap))
 
+(defn session-valid?
+  "Returns `true` if the given session exists and it is a valid session. Returns
+  `false` when the session is invalid. Returns `nil` when there is no session."
+  [smap]
+  (if smap (boolean (get smap :valid?))))
+
+(defn session-invalid?
+  "Returns `true` if the given session does not exists or it is an invalid session."
+  [smap]
+  (if smap (not (get smap :valid?)) true))
+
+(defn session-error?
+  "Returns `true` when there is a session and it has an error. Returns `false` when
+  there is no error. Returns `nil` when there is no session."
+  [smap]
+  (if smap (some? (get smap :error))))
+
+(defn session-error
+  "Returns session error map or `nil` if there was no error or session does not exist."
+  [smap]
+  (if smap (get smap :error)))
+
+(defn no-session?
+  "Returns `true` if the given session:
+   - does not exist, or
+   - exists but lacks both `:id` and `:err/id` and is not marked as erroneous.
+  Optional `session-error` argument can be given to speed up calculations (when it is
+  not `nil` and not `false` then `false` is to be returned, meaning there is a
+  session, even without any ID, but it has errors)."
+  ([smap]
+   (or (nil? smap)
+       (not (or (get smap :id)
+                (get smap :err/id)
+                (get smap :error)))))
+  ([smap session-error]
+   (if session-error
+     false
+     (or (nil? smap)
+         (not (or (get smap :id)
+                  (get smap :err/id)))))))
+
 ;; Context and roles
 
 (defn roles-refresh
