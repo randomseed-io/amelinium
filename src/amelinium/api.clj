@@ -936,11 +936,99 @@
 (defmacro update-body
   "Updates response body in a request map `req` under its key `:response/body` using
   `clojure.core/update`. The body is a result of evaluating expressions passed as
-  additional arguments. Returns updated `req`."
+  additional arguments and it should emit a function. Returns updated `req`."
   [req & body]
   `(update ~req :response/body ~@body))
+
+(defmacro assoc-body
+  "Adds keys with associated values to `:response/body` map of the `req` using built-in
+  function `clojure.core/assoc`. If any key argument is a literal identifier (keyword
+  or symbol), a character, or a literal string, it will be converted to a keyword
+  literal and placed as an `assoc` argument. Otherwise it will be left as is and
+  wrapped into a call to `io.randomseed.utils/some-keyword` to ensure the result is a
+  keyword run-time. Missing last value, if any, will be padded with `nil`."
+  ([req k v]
+   (let [k (if (or (ident? k) (string? k) (char? k))
+             (some-keyword k)
+             (cons `some-keyword (cons k nil)))]
+     `(update ~req :response/body assoc ~k ~v)))
+  ([req k v & more]
+   (let [pairs  (cons k (cons v more))
+         names  (take-nth 2 pairs)
+         values (concat (take-nth 2 (rest pairs)) '(nil))
+         pairs  (map #(cons (if (or (ident?  %1)
+                                    (string? %1)
+                                    (char?   %1))
+                              (some-keyword %1)
+                              (cons `some-keyword (cons %1 nil)))
+                            (cons %2 nil))
+                     names values)
+         pairs  (apply concat pairs)]
+     `(update ~req :response/body assoc ~@pairs))))
+
+(defmacro add-status
+  "Adds response status to a request map `req` under its key `:response/status` using
+  `clojure.core/assoc`. The status is a result of evaluating expressions passed as
+  additional arguments. Returns updated `req`."
+  [req & body]
+  (if (and (coll? body) (> (count body) 1))
+    `(assoc ~req :response/status (do ~@body))
+    `(assoc ~req :response/status ~@body)))
 
 (defmacro remove-status
   "Removes `:response/status` from `req` using `clojure.core/dissoc`."
   [req]
   `(dissoc ~req :response/status))
+
+(defmacro add-header
+  "Adds a header `header` to `:response/headers` map of the `req` using built-in
+  function `clojure.core/assoc`. If a header name argument is a literal
+  identifier (keyword or symbol), a character, a number, or a literal string, it will
+  be converted to a string literal and placed as an `assoc` argument. Otherwise it
+  will be left as is and wrapped into a call to `io.randomseed.utils/some-str` to
+  ensure the result is a string run-time.
+
+
+  All arguments of the body are used to calculate a
+  value of the header."
+  [req header-name & body]
+  (let [header-name (if (or (ident?  header-name)
+                            (string? header-name)
+                            (char?   header-name)
+                            (number? header-name))
+                      (some-str header-name)
+                      (cons `some-str (cons header-name nil)))]
+    (if (and (coll? body) (> (count body) 1))
+      `(update ~req :response/headers assoc ~header-name (do ~@body))
+      `(update ~req :response/headers assoc ~header-name ~@body))))
+
+(defmacro add-headers
+  "Adds headers with associated values to `:response/headers` map of the `req` using
+  built-in function `clojure.core/assoc`. If any header name argument is a literal
+  identifier (keyword or symbol), a character, a number, or a literal string, it will
+  be converted to a string literal and placed as an `assoc` argument. Otherwise it
+  will be left as is and wrapped into a call to `io.randomseed.utils/some-str` to
+  ensure the result is a string run-time. Missing header value, if any, will be
+  padded with `nil`."
+  ([req header-name header-value]
+   (let [header-name (if (or (ident?  header-name)
+                             (string? header-name)
+                             (char?   header-name)
+                             (number? header-name))
+                       (some-str header-name)
+                       (cons `some-str (cons header-name nil)))]
+     `(update ~req :response/headers assoc ~header-name ~header-value)))
+  ([req header-name header-value & more]
+   (let [pairs  (cons header-name (cons header-value more))
+         names  (take-nth 2 pairs)
+         values (concat (take-nth 2 (rest pairs)) '(nil))
+         pairs  (map #(cons (if (or (ident?  %1)
+                                    (string? %1)
+                                    (char?   %1)
+                                    (number? %1))
+                              (some-str %1)
+                              (cons `some-str (cons %1 nil)))
+                            (cons %2 nil))
+                     names values)
+         pairs  (apply concat pairs)]
+     `(update ~req :response/headers assoc ~@pairs))))
