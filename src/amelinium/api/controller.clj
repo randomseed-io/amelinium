@@ -304,7 +304,7 @@
       :reitit.coercion/request-coercion
       (let [tr-sub (common/translator-sub req)
             errors (coercion/explain-errors data tr-sub)]
-        (-> (api/update-body req assoc :parameters/errors errors)
+        (-> (api/assoc-body req :parameters/errors errors)
             (api/render-bad-params)
             (respond)))
 
@@ -323,8 +323,7 @@
   with supported methods listed (separated by commas and space characters)."
   [req]
   (render!
-   (assoc req :response/headers
-          {"Access-Control-Allow-Methods"
-           (->> (-> req (get :reitit.core/match) (get :result))
-                (filter second) keys (map name)
-                (str/join ", ") str/upper-case)})))
+   (api/add-header req :Access-Control-Allow-Methods
+                   (->> (-> req (get :reitit.core/match) (get :result))
+                        (filter second) keys (map name)
+                        (str/join ", ") str/upper-case))))
