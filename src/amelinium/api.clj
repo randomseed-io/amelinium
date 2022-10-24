@@ -676,18 +676,27 @@
   ([req out sub-status sub-key main-key sub-title-key sub-desc-key see-also-key tr-sub]
    (if sub-status
      (let [tr-sub (or tr-sub (i18n/no-default (common/translator-sub req)))]
-       (update out main-key
-               (fn [body]
-                 (if (contains? body sub-key)
-                   (common/add-missing-lang body req [sub-title-key sub-desc-key])
-                   (let [see-also (conj (or (get body see-also-key) []) sub-key)
-                         body     (assoc body sub-key sub-status see-also-key see-also)]
-                     (if (common/untranslatable? sub-status)
-                       (common/add-missing-lang body req [sub-title-key sub-desc-key])
-                       (-> body
-                           (common/add-missing-translation sub-title-key sub-status tr-sub)
-                           (common/add-missing-translation sub-desc-key  sub-status ".full" tr-sub)
-                           (common/add-missing-lang req [sub-title-key sub-desc-key]))))))))
+       (update
+        out main-key
+        (fn [body]
+          (cond
+            ;; body is not a map nor nil, cannot associate
+            (not (or (nil? body) (map? body)))
+            body
+
+            ;; body already contains a sub-key, just add a missing lang
+            (contains? body sub-key)
+            (common/add-missing-lang body req [sub-title-key sub-desc-key])
+
+            :add-keys!
+            (let [see-also (conj (or (get body see-also-key) []) sub-key)
+                  body     (assoc body sub-key sub-status see-also-key see-also)]
+              (if (common/untranslatable? sub-status)
+                (common/add-missing-lang body req [sub-title-key sub-desc-key])
+                (-> body
+                    (common/add-missing-translation sub-title-key sub-status tr-sub)
+                    (common/add-missing-translation sub-desc-key  sub-status ".full" tr-sub)
+                    (common/add-missing-lang req [sub-title-key sub-desc-key]))))))))
      out)))
 
 (defn add-missing-sub-status
