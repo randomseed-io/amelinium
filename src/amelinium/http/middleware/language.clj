@@ -8,14 +8,15 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid force])
 
-  (:require [reitit.ring             :as    ring]
-            [reitit.core             :as       r]
-            [amelinium.logging       :as     log]
-            [amelinium.system        :as  system]
-            [phone-number.core       :as   phone]
-            [io.randomseed.utils.map :as     map]
-            [io.randomseed.utils.var :as     var]
-            [io.randomseed.utils     :refer :all]))
+  (:require [reitit.ring             :as            ring]
+            [reitit.core             :as               r]
+            [reitit.impl             :refer [fast-assoc]]
+            [amelinium.logging       :as             log]
+            [amelinium.system        :as          system]
+            [phone-number.core       :as           phone]
+            [io.randomseed.utils.map :as             map]
+            [io.randomseed.utils.var :as             var]
+            [io.randomseed.utils     :refer         :all]))
 
 (def default-lang-param      :lang)
 (def default-fallback-language :en)
@@ -188,7 +189,7 @@
 
 (def body-picker
   (-> req-picker
-      (assoc :key-path :body-params)))
+      (fast-assoc :key-path :body-params)))
 
 (def body-phone-picker
   {:compile (fn [config]
@@ -208,15 +209,17 @@
 
 (def accept-picker
   (-> req-picker
-      (assoc :key-path :accept, :param :language)))
+      (fast-assoc :key-path :accept)
+      (fast-assoc :param :language)))
 
 (def query-params-picker
   (-> req-picker
-      (assoc :key-path :query-params)))
+      (fast-assoc :key-path :query-params)))
 
 (def query-params-picker-str
   (-> req-picker
-      (assoc :key-path :query-params :stringify-lang-param? true)))
+      (fast-assoc :key-path :query-params)
+      (fast-assoc :stringify-lang-param? true)))
 
 (def form-params-picker-str
   {:compile (fn [config]
@@ -275,9 +278,9 @@
     req
     (let [language-id  (delay (some-keyword-simple language))
           language-str (delay (some-str @language-id))]
-      (assoc req
-             :language/id  language-id
-             :language/str language-str))))
+      (-> req
+          (fast-assoc :language/id  language-id)
+          (fast-assoc :language/str language-str)))))
 
 ;; Language default pickers
 
@@ -390,12 +393,12 @@
                   (fn [req]
                     (let [lang-id  (delay (picker-fn req))
                           lang-str (delay (some-str @lang-id))]
-                      (handler (assoc req
-                                      :language/settings config
-                                      :language/pickers  lang-pickers
-                                      :language/default  default-lang-id
-                                      :language/id       lang-id
-                                      :language/str      lang-str))))))}))
+                      (handler (-> req
+                                   (fast-assoc :language/settings config)
+                                   (fast-assoc :language/pickers  lang-pickers)
+                                   (fast-assoc :language/default  default-lang-id)
+                                   (fast-assoc :language/id       lang-id)
+                                   (fast-assoc :language/str      lang-str)))))))}))
 
 (system/add-init  ::default [k config] (wrap-language k (prep-language config)))
 (system/add-prep  ::default [_ config] (prep-language config))

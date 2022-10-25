@@ -29,7 +29,8 @@
             [phone-number.core             :as                  phone]
             [amelinium.app                 :as                    app]
             [amelinium.system              :as                 system]
-            [amelinium.logging             :as                    log])
+            [amelinium.logging             :as                    log]
+            [reitit.impl                   :refer        [fast-assoc]])
 
   (:import [com.zaxxer.hikari HikariConfig HikariDataSource HikariPoolMXBean]
            [java.sql Connection]
@@ -186,8 +187,8 @@
       (reduce (fn [m uid]
                 (let [id (cwr/lookup cache uid false)]
                   (if (false? id)
-                    (update m false conj uid)
-                    (assoc m uid id))))
+                    (fast-assoc m false (conj (get m false) uid))
+                    (fast-assoc m uid id))))
               {} uids))))
 
 (defn uid-to-id
@@ -203,7 +204,7 @@
         looked-up
         (let [db-ids  (getter db missing)
               present (or (dissoc looked-up false) {})]
-          (reduce #(assoc %1 %2 (cwr/lookup-or-miss cache %2 db-ids))
+          (reduce #(fast-assoc %1 %2 (cwr/lookup-or-miss cache %2 db-ids))
                   present missing))))))
 
 ;; Email mapping
@@ -238,8 +239,8 @@
       (reduce (fn [m email]
                 (let [id (cwr/lookup cache email false)]
                   (if (false? id)
-                    (update m false conj email)
-                    (assoc m email id))))
+                    (fast-assoc m false (conj (get m false) email))
+                    (fast-assoc m email id))))
               {} emails))))
 
 (defn email-to-id
@@ -255,7 +256,7 @@
         looked-up
         (let [db-ids  (getter db missing)
               present (or (dissoc looked-up false) {})]
-          (reduce #(assoc %1 %2 (cwr/lookup-or-miss cache %2 db-ids))
+          (reduce #(fast-assoc %1 %2 (cwr/lookup-or-miss cache %2 db-ids))
                   present missing))))))
 
 ;; Configuration record
