@@ -1769,19 +1769,20 @@
   (if (ident? v) (name v) v))
 
 (defn add-missing-translation
-  "For the given `body` map, a new key, an existing key and a translation function it
-  tries to add a translation under the key `new-k` if it does not exist. The
-  translation key is `k`."
+  "For the given `body` map, a new key `new-k`, a key `k` and a translation function
+  `sub-translation-fn`, tries to add a translation of the key `k` as a value under
+  the given key `new-k`, if it does not exist yet.  `body`. Optional `suffix`
+  argument is used to add suffix to a key name."
   ([body new-k k sub-translation-fn]
    (if (contains? body new-k)
      body
-     (if-some [t (sub-translation-fn k)]
+     (if-some [t (and k (sub-translation-fn k))]
        (assoc body new-k t)
        body)))
   ([body new-k k suffix sub-translation-fn]
    (if (contains? body new-k)
      body
-     (if-some [t (sub-translation-fn (try-namespace k) (str (try-name k) suffix))]
+     (if-some [t (and k (sub-translation-fn (try-namespace k) (str (try-name k) suffix)))]
        (assoc body new-k t)
        body))))
 
