@@ -6,11 +6,13 @@
 
     amelinium.http.middleware.headers
 
-  (:require [clojure.string      :as    str]
-            [reitit.core         :as      r]
-            [io.randomseed.utils :as  utils]
-            [amelinium.logging   :as    log]
-            [amelinium.system    :as system]))
+  (:require [clojure.string      :as             str]
+            [reitit.core         :as               r]
+            [reitit.impl         :refer [fast-assoc]]
+            [potpuri.core        :refer [deep-merge]]
+            [io.randomseed.utils :as           utils]
+            [amelinium.logging   :as             log]
+            [amelinium.system    :as          system]))
 
 (defn- map-entry
   [k v]
@@ -42,27 +44,37 @@
              (prep-hdr-val el)))
 
 (defn- add-missing
-  [m entries-map]
-  (reduce-kv (fn [m k v] (if (contains? m k) m (assoc m k v))) m entries-map))
+  ([m k v]
+   (if (contains? m k) m (fast-assoc m k v)))
+  ([m entries-map]
+   (reduce-kv (fn [m k v] (if (contains? m k) m (fast-assoc m k v))) m entries-map)))
 
 (defn deleter
   [delete-list]
   (if (seq delete-list)
-    (fn [headers]
-      (apply dissoc headers delete-list))))
+    (if (nil? (next delete-list))
+      ;; removing single header
+      (let [delete-header (first delete-list)]
+        (fn [headers] (dissoc headers delete-header)))
+      ;; removing multiple headers
+      (fn [headers] (apply dissoc headers delete-list)))))
 
 (defn adder
   [entries entries-map replace?]
   (if (seq entries)
     (if replace?
-      (fn [headers]
-        (if headers
-          (into headers entries)
-          entries-map))
-      (fn [headers]
-        (if headers
-          (add-missing headers entries-map)
-          entries-map)))))
+      (if (nil? (next entries))
+        ;; replacing single header
+        (let [[h v] (first entries)]
+          (fn [headers] (if headers (fast-assoc headers h v) entries-map)))
+        ;; replacing multiple headers
+        (fn [headers] (if headers (conj headers entries-map) entries-map)))
+      (if (nil? (next entries))
+        ;; adding header if does not exist
+        (let [[h v] (first entries)]
+          (fn [headers] (if headers (add-missing headers h v) entries-map)))
+        ;; adding multiple headers which do not exist
+        (fn [headers] (if headers (add-missing headers entries-map) entries-map))))))
 
 (defn make-transformer
   [& fns]
@@ -70,51 +82,72 @@
 
 (defn prep-config
   [config]
-  (if (fn? (:fn/transformer config))
-    config
-    (let [replace? (boolean (:headers/replace? config))
-          config   (dissoc config :headers/replace?)
-          config   (group-by (comp #{:header/remove} val) (seq config))
-          to-del   (seq (map utils/some-str-simple (keys (get config :header/remove))))
-          to-add   (seq (map prep-hdr-entry (get config nil)))
-          to-map   (into {} to-add)
-          del-fn   (deleter to-del)
-          add-fn   (adder   to-add to-map replace?)]
-      {:fn/transformer   (make-transformer add-fn del-fn)
-       :fn/adder         (or add-fn identity)
-       :fn/deleter       (or del-fn identity)
-       :headers/add      (if to-add (vec to-add))
-       :headers/del      (if to-del (vec to-del))
-       :headers/map      (if (seq to-map) to-map)
-       :headers/replace? replace?})))
+  (if (not-empty config)
+    (if (fn? (:fn/transformer config))
+      config
+      (let [replace? (boolean (:headers/replace? config))
+            config   (dissoc config :headers/replace?)
+            config   (group-by (comp #{:header/remove} val) (seq config))
+            to-del   (seq (doall (map utils/some-str-simple (keys (get config :header/remove)))))
+            to-add   (seq (doall (map prep-hdr-entry (get config nil))))
+            to-map   (into {} to-add)
+            del-fn   (deleter to-del)
+            add-fn   (adder   to-add to-map replace?)]
+        {:fn/transformer   (make-transformer add-fn del-fn)
+         :fn/adder         (or add-fn identity)
+         :fn/deleter       (or del-fn identity)
+         :headers/add      (if to-add (vec to-add))
+         :headers/del      (if to-del (vec to-del))
+         :headers/map      (if (seq to-map) to-map)
+         :headers/replace? replace?}))))
 
 (defn wrap-headers
   "Headers handler wrapper."
-  [handler trf]
-  (fn [req]
-    (if-some [local-trf (get (get (get req ::r/match) :data) :headers)]
-      (update (handler req) :headers (comp local-trf trf))
-      (update (handler req) :headers trf))))
+  [req trf]
+  (fast-assoc req :headers (trf (get req :headers))))
 
 (defn transformer
   "Parses headers configuration and returns a transformer. Helpful when generating
   a non-Reitit handler."
   [config]
-  (:fn/transformer (prep-config config)))
+  (if (not-empty config) (:fn/transformer (prep-config config))))
+
+(defn headers-compile
+  "Prepares a middleware handler to be associated with an HTTP route."
+  [config data opts]
+  (let [local-config   (get data :headers)
+        mergeable?     (or (nil? config)
+                           (nil? local-config)
+                           (and (map? config)
+                                (map? local-config)
+                                (:headers/replace? local-config)
+                                (:headers/replace? config)
+                                (or (not (contains? local-config :headers/merge?))
+                                    (get local-config :headers/merge?))
+                                (or (not (contains? config :headers/merge?))
+                                    (get config :headers/merge?))))
+        merged-prepped (if mergeable? (prep-config (conj (or config {}) local-config)))
+        local-prepped  (if (map? local-config) (prep-config local-config))
+        global-prepped (if (map? config) (prep-config config))
+        trf            (if mergeable? (transformer merged-prepped))
+        local-trf      (if-not trf (if (fn? local-config)  local-config  (transformer local-prepped)))
+        global-trf     (if-not trf (if (fn? config) config (transformer global-prepped)))
+        trf            (or trf (if local-trf
+                                 (if global-trf (comp local-trf global-trf) local-trf)
+                                 (if global-trf global-trf)))]
+    (if trf
+      (fn [handler]
+        (fn [req]
+          (wrap-headers (handler req) trf))))))
 
 (defn init-headers
   "Server headers middleware."
   [k config]
   (log/msg "Initializing HTTP server headers:" k)
-  (let [trf (transformer config)]
-    {:name    k
-     :compile (fn [_ _]
-                (fn [handler]
-                  (let [handler (wrap-headers handler trf)]
-                    (fn [req]
-                      (handler req)))))}))
+  {:name    k
+   :compile (partial headers-compile config)})
 
-(system/add-init  ::default [k config] (init-headers k (prep-config config)))
+(system/add-init  ::default [k config] (init-headers k config))
 (system/add-halt! ::default [_ config] nil)
 
 (system/add-init  ::handler [_ config] (transformer config))
