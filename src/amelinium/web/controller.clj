@@ -11,6 +11,7 @@
 
   (:require [tick.core                          :as               t]
             [reitit.core                        :as               r]
+            [reitit.impl                        :refer [fast-assoc]]
             [ring.util.http-response            :as            resp]
             [clojure.string                     :as             str]
             [amelinium.logging                  :as             log]
@@ -43,16 +44,13 @@
              sid-field (or (get smap :session-id-field) "session-id")]
          (if (= (get smap :db/id) (get gmap :session-id))
            (-> gmap
-               (update-in [:parameters :form] dissoc sid-field)
-               (update :form-params dissoc sid-field)
+               (common/remove-form-params sid-field)
                (dissoc :session-id))))))))
 
 (defn remove-login-data
   "Removes login data from the form params part of a request map."
   [req]
-  (-> req
-      (update :form-params dissoc "password")
-      (update :params dissoc :password)))
+  (common/remove-form-params req :password))
 
 (defn cleanup-req
   [req [_ auth?]]
@@ -69,21 +67,44 @@
    (if-not gmap
      req
      (if (web/session-variable-get-failed? gmap)
-       (assoc req :goto-injected? true :goto-uri false :goto false)
-       (let [req (assoc req :goto-injected? true :goto-uri (get gmap :uri))]
+       (-> req
+           (fast-assoc :goto-injected? true)
+           (fast-assoc :goto-uri      false)
+           (fast-assoc :goto          false))
+       (let [req (-> req
+                     (fast-assoc :goto-injected? true)
+                     (fast-assoc :goto-uri (get gmap :uri)))]
          (if-some [{:keys [form-params query-params parameters]
                     :or   {form-params {} query-params {} parameters {}}}
                    (saved-params req gmap smap)]
-           (-> req
-               (update :parameters   #(delay (deep-merge :into parameters %)))
-               (update :form-params  #(delay (merge form-params  %)))
-               (update :query-params #(delay (merge query-params %)))
-               (update :params       #(delay (merge (super/kw-form-data query-params)
-                                                    (super/kw-form-data form-params) %))))
+           (let [req-parameters   (get req :parameters)
+                 req-form-params  (get req :form-params)
+                 req-query-params (get req :query-params)
+                 req-params       (get req :params)
+                 req              (if (nil? req-parameters) req
+                                      (fast-assoc req :parameters
+                                                  (delay
+                                                    (deep-merge :into parameters
+                                                                req-parameters))))
+                 req              (if (nil? req-form-params) req
+                                      (fast-assoc req :form-params
+                                                  (delay
+                                                    (merge form-params req-form-params))))
+                 req              (if (nil? req-query-params) req
+                                      (fast-assoc req :query-params
+                                                  (delay
+                                                    (merge query-params req-query-params))))
+                 req              (if (nil? req-params) req
+                                      (fast-assoc req :params
+                                                  (delay
+                                                    (merge (super/kw-form-data query-params)
+                                                           (super/kw-form-data form-params)
+                                                           req-params))))]
+             req)
            req))))))
 
 (defn login-data?
-  "Returns true if :form-params map of a request contains login data."
+  "Returns true if `:form-params` map of a request map `req` contains login data."
   [req]
   (if-some [fparams (get req :form-params)]
     (and (contains? fparams "password")
@@ -182,20 +203,24 @@
         sess       (get req sess-key)
         prolonged? (delay (some? (and (get sess :expired?) (get req :goto-uri))))]
     (-> req
-        (assoc sess-key
-               (delay (if @prolonged?
-                        (assoc sess :id (or (get sess :id) (get sess :err/id)) :prolonged? true)
-                        (assoc sess :prolonged? false))))
-        (assoc-in [:app/data :lock-remains]
-                  (delay (super/lock-remaining-mins req
-                                                    (web/auth-db req)
-                                                    (if @prolonged? sess)
-                                                    t/now))))))
+        (fast-assoc sess-key
+                    (delay (if @prolonged?
+                             (-> sess
+                                 (fast-assoc :id (or (get sess :id) (get sess :err/id)))
+                                 (fast-assoc :prolonged? true))
+                             (fast-assoc sess :prolonged? false))))
+        (fast-assoc :app/data
+                    (fast-assoc (get req :app/data web/empty-lazy-map) :lock-remains
+                                (delay (super/lock-remaining-mins req
+                                                                  (web/auth-db req)
+                                                                  (if @prolonged? sess)
+                                                                  t/now)))))))
 
 (defn prep-request!
   "Prepares a request before any web controller is called."
   [req]
-  (let [req         (assoc req :app/data-required [] :app/data web/empty-lazy-map)
+  (let [req         (fast-assoc req :app/data-required [])
+        req         (fast-assoc req :app/data web/empty-lazy-map)
         sess        (common/session req)
         route-data  (http/get-route-data req)
         auth-state  (delay (web/login-auth-state req :login-page? :auth-page?))
@@ -254,14 +279,15 @@
       (let [req            (cleanup-req req @auth-state)
             sess           (common/allow-soft-expired sess)
             session-config (get req :session/config)
-            session-field  (or (get sess :session-id-field) "session-id")]
+            session-field  (or (get sess :session-id-field) "session-id")
+            req-to-save    (common/remove-form-params req session-field)]
         (user/put-session-var session-config
                               sess
                               :goto {:uri          (get req :uri)
                                      :session-id   (get sess :db/id)
-                                     :parameters   (update (get req :parameters) :form dissoc session-field)
-                                     :form-params  (dissoc (get req :form-params) session-field)
-                                     :query-params (get req :query-params)})
+                                     :parameters   (get req-to-save :parameters)
+                                     :form-params  (get req-to-save :form-params)
+                                     :query-params (get req-to-save :query-params)})
         (web/move-to req (or (get route-data :auth/prolongate) :login/prolongate)))
 
       :----pass
@@ -413,7 +439,7 @@
                                     opts smap :form-errors {:dest   dest-uri
                                                             :errors errors}))
                  error-params (if session? "" (coercion/join-errors errors))
-                 joint-params (assoc orig-params "form-errors" error-params)]
+                 joint-params (fast-assoc (or orig-params {}) "form-errors" error-params)]
              (if dest-uri
                (common/temporary-redirect req dest-uri nil joint-params)
                (resp/temporary-redirect
@@ -424,10 +450,12 @@
            (let [translate-sub (common/translator-sub req)]
              (-> req
                  (map/assoc-missing :app/data common/empty-lazy-map)
-                 (update :app/data assoc
-                         :title           (delay (translate-sub :parameters/error))
-                         :form/errors     (delay (coercion/map-errors data))
-                         :coercion/errors (delay (coercion/explain-errors data translate-sub)))
+                 (fast-assoc
+                  :app/data
+                  (-> (get req :app/data web/empty-lazy-map)
+                      (fast-assoc :title           (delay (translate-sub :parameters/error)))
+                      (fast-assoc :form/errors     (delay (coercion/map-errors data)))
+                      (fast-assoc :coercion/errors (delay (coercion/explain-errors data translate-sub)))))
                  web/render-bad-params)))))
 
       :reitit.coercion/response-coercion
