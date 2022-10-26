@@ -1390,11 +1390,11 @@
 (defn allow-expired
   "Temporarily marks expired session as valid."
   [smap]
-  (if (and (get smap :expired?       )
-           (not   (get smap :valid? ))
-           (nil?  (get smap :id     ))
+  (if (and (get smap :expired?)
+           (not   (get smap :valid?))
+           (nil?  (get smap :id))
            (some? (get smap :err/id )))
-    (fast-assoc smap :valid? true :id (get smap :err/id))
+    (-> smap (fast-assoc :valid? true) (fast-assoc :id (get smap :err/id)))
     smap))
 
 (defn allow-soft-expired
@@ -1830,6 +1830,50 @@
    (if params (codec/form-encode params)))
   ([params enc]
    (if params (codec/form-encode params enc))))
+
+(defn remove-form-params
+  "Removes the given parameter or parameters from a request map locations:
+  `[:parameters :form]`, `:form-params` and `:params`. All parameters must be either
+  keywords or strings, they cannot be mixed."
+  [m param & more]
+  (if more
+    (let [params        (cons param more)
+          strings?      (string? param)
+          params-str    (if strings? params (map some-str params))
+          params-kw     (if strings? (map keyword params) params)
+          m-parameters  (get m :parameters)
+          m-form-params (get m :form-params)
+          m-params      (get m :params)
+          m             (if (nil? m-parameters) m
+                            (fast-assoc m :parameters
+                                        (fast-assoc m-parameters :form
+                                                    (if-some [form (get m-parameters :form)]
+                                                      (apply dissoc form params-kw)))))
+          m             (if (nil? m-form-params) m
+                            (fast-assoc m :form-params
+                                        (apply dissoc m-form-params params-str)))
+          m             (if (nil? m-params) m
+                            (fast-assoc m :params
+                                        (apply dissoc m-params params-kw)))]
+      m)
+    (let [strings?      (string? param)
+          param-str     (if strings? param (some-str param))
+          param-kw      (if strings? (keyword param) param)
+          m-parameters  (get m :parameters)
+          m-form-params (get m :form-params)
+          m-params      (get m :params)
+          m             (if (nil? m-parameters) m
+                            (fast-assoc m :parameters
+                                        (fast-assoc m-parameters :form
+                                                    (if-some [form (get m-parameters :form)]
+                                                      (dissoc form param-kw)))))
+          m             (if (nil? m-form-params) m
+                            (fast-assoc m :form-params
+                                        (dissoc m-form-params param-str)))
+          m             (if (nil? m-params) m
+                            (fast-assoc m :params
+                                        (dissoc m-params param-kw)))]
+      m)))
 
 ;; Headers
 
