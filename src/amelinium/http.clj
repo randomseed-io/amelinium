@@ -9,11 +9,12 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [potemkin.namespaces             :as        p]
-            [reitit.core                     :as        r]
-            [reitit.ring                     :as     ring]
-            [io.randomseed.utils             :refer  :all]
-            [io.randomseed.utils.reitit.http :as     http])
+  (:require [potemkin.namespaces             :as               p]
+            [reitit.core                     :as               r]
+            [reitit.ring                     :as            ring]
+            [reitit.impl                     :refer [fast-assoc]]
+            [io.randomseed.utils             :refer         :all]
+            [io.randomseed.utils.reitit.http :as            http])
 
   (:import [reitit.core Match]))
 
@@ -85,4 +86,4 @@
 
 (defn inject-route-data
   [req]
-  (assoc req :route/data (get (get req ::r/match) :data)))
+  (fast-assoc req :route/data (get (get req ::r/match) :data)))

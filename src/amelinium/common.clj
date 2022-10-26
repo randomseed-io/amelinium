@@ -8,33 +8,34 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [clojure.set                          :as          set]
-            [clojure.string                       :as          str]
-            [clojure.core.memoize                 :as          mem]
-            [clojure.java.io                      :as           io]
-            [potemkin.namespaces                  :as            p]
-            [tick.core                            :as            t]
-            [reitit.core                          :as            r]
-            [reitit.coercion                      :as     coercion]
+  (:require [clojure.set                          :as             set]
+            [clojure.string                       :as             str]
+            [clojure.core.memoize                 :as             mem]
+            [clojure.java.io                      :as              io]
+            [potemkin.namespaces                  :as               p]
+            [tick.core                            :as               t]
+            [reitit.core                          :as               r]
+            [reitit.impl                          :refer [fast-assoc]]
+            [reitit.coercion                      :as        coercion]
             [ring.util.response]
-            [ring.util.codec                      :as        codec]
-            [ring.util.http-response              :as         resp]
-            [ring.util.request                    :as          req]
-            [amelinium.http                       :as         http]
-            [amelinium.http.middleware.roles      :as        roles]
-            [amelinium.http.middleware.language   :as     language]
-            [amelinium.http.middleware.session    :as      session]
-            [amelinium.http.middleware.db         :as       mid-db]
-            [amelinium.http.middleware.validators :as   validators]
-            [amelinium.common.oplog.auth          :as   oplog-auth]
-            [amelinium.i18n                       :as         i18n]
-            [amelinium.model.user                 :as         user]
-            [amelinium.logging                    :as          log]
-            [amelinium.db                         :as           db]
-            [io.randomseed.utils.time             :as         time]
-            [io.randomseed.utils.vec              :as          vec]
-            [io.randomseed.utils.map              :as          map]
-            [io.randomseed.utils                  :refer      :all])
+            [ring.util.codec                      :as           codec]
+            [ring.util.http-response              :as            resp]
+            [ring.util.request                    :as             req]
+            [amelinium.http                       :as            http]
+            [amelinium.http.middleware.roles      :as           roles]
+            [amelinium.http.middleware.language   :as        language]
+            [amelinium.http.middleware.session    :as         session]
+            [amelinium.http.middleware.db         :as          mid-db]
+            [amelinium.http.middleware.validators :as      validators]
+            [amelinium.common.oplog.auth          :as      oplog-auth]
+            [amelinium.i18n                       :as            i18n]
+            [amelinium.model.user                 :as            user]
+            [amelinium.logging                    :as             log]
+            [amelinium.db                         :as              db]
+            [io.randomseed.utils.time             :as            time]
+            [io.randomseed.utils.vec              :as             vec]
+            [io.randomseed.utils.map              :as             map]
+            [io.randomseed.utils                  :refer         :all])
 
   (:import [amelinium.auth AuthConfig AuthSettings AccountTypes]
            [reitit.core Match]
@@ -378,7 +379,7 @@
         param  (some-keyword-simple param)]
     (if (ident? id)
       ;; identifier given (route name)
-      (if-some [m (r/match-by-name rtr id (assoc params param pvalue))]
+      (if-some [m (r/match-by-name rtr id (fast-assoc (or params {}) param pvalue))]
         (if require-param?
           (or (req-param-path rtr m param pvalue query-params)
               (if name-path-fallback?
@@ -906,7 +907,7 @@
      (if (resp/response? req)
        req
        (if-some [headers (get req :response/headers)]
-         (update (resp-fn) :headers conj headers)
+         (let [r (or (resp-fn) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
          (resp-fn)))))
   ([resp-fn req a]
    (if (nil? req)
@@ -914,7 +915,7 @@
      (if (resp/response? req)
        req
        (if-some [headers (get req :response/headers)]
-         (update (resp-fn a) :headers conj headers)
+         (let [r (or (resp-fn a) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
          (resp-fn a)))))
   ([resp-fn req a b]
    (if (nil? req)
@@ -922,7 +923,7 @@
      (if (resp/response? req)
        req
        (if-some [headers (get req :response/headers)]
-         (update (resp-fn a b) :headers conj headers)
+         (let [r (or (resp-fn a b) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
          (resp-fn a b)))))
   ([resp-fn req a b c]
    (if (nil? req)
@@ -930,7 +931,7 @@
      (if (resp/response? req)
        req
        (if-some [headers (get req :response/headers)]
-         (update (resp-fn a b c) :headers conj headers)
+         (let [r (or (resp-fn a b c) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
          (resp-fn a b c)))))
   ([resp-fn req a b c & more]
    (if (nil? req)
@@ -938,7 +939,7 @@
      (if (resp/response? req)
        req
        (if-some [headers (get req :response/headers)]
-         (update (apply resp-fn a b c more) :headers conj headers)
+         (let [r (or (apply resp-fn a b c more) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
          (apply resp-fn a b c more))))))
 
 (defn render-force
@@ -951,31 +952,31 @@
    (if (nil? req)
      (resp-fn)
      (if-some [headers (get req :response/headers)]
-       (update (resp-fn) :headers conj headers)
+       (let [r (or (resp-fn) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
        (resp-fn))))
   ([resp-fn req a]
    (if (nil? req)
      (resp-fn a)
      (if-some [headers (get req :response/headers)]
-       (update (resp-fn a) :headers conj headers)
+       (let [r (or (resp-fn a) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
        (resp-fn a))))
   ([resp-fn req a b]
    (if (nil? req)
      (resp-fn a b)
      (if-some [headers (get req :response/headers)]
-       (update (resp-fn a b) :headers conj headers)
+       (let [r (or (resp-fn a b) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
        (resp-fn a b))))
   ([resp-fn req a b c]
    (if (nil? req)
      (resp-fn a b c)
      (if-some [headers (get req :response/headers)]
-       (update (resp-fn a b c) :headers conj headers)
+       (let [r (or (resp-fn a b c) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
        (resp-fn a b c))))
   ([resp-fn req a b c & more]
    (if (nil? req)
      (apply resp-fn a b c more)
      (if-some [headers (get req :response/headers)]
-       (update (apply resp-fn a b c more) :headers conj headers)
+       (let [r (or (apply resp-fn a b c more) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
        (apply resp-fn a b c more)))))
 
 ;; Redirects
@@ -1371,16 +1372,16 @@
   with the `:session/config` key of `req`. If all of that fails, `:session` is used
   as a key."
   ([req smap]
-   (assoc req (or (get smap :session-key)
-                  (get (get req :session/config) :session-key)
-                  :session)
-          smap))
+   (fast-assoc req (or (get smap :session-key)
+                       (get (get req :session/config) :session-key)
+                       :session)
+               smap))
   ([req smap cfg]
-   (assoc req (or (get cfg  :session-key)
-                  (get smap :session-key)
-                  (get (get req :session/config) :session-key)
-                  :session)
-          smap)))
+   (fast-assoc req (or (get cfg  :session-key)
+                       (get smap :session-key)
+                       (get (get req :session/config) :session-key)
+                       :session)
+               smap)))
 
 (defn session-variable-get-failed?
   [v]
@@ -1393,7 +1394,7 @@
            (not   (get smap :valid? ))
            (nil?  (get smap :id     ))
            (some? (get smap :err/id )))
-    (assoc smap :valid? true :id (get smap :err/id))
+    (fast-assoc smap :valid? true :id (get smap :err/id))
     smap))
 
 (defn allow-soft-expired
@@ -1571,13 +1572,14 @@
      :as   opts}]
    (let [global-marker        (or global-marker (str " (" global-label ")"))
          global-present-label (or global-present-label (str present-label global-marker))
-         opts                 (assoc opts :include-global? include-global? :include-self? include-self?)
+         opts                 (fast-assoc opts :include-global? include-global?)
+         opts                 (fast-assoc opts :include-self?   include-self?)
          [l & d]              (roles-matrix req opts)
          gctx-line            (first d)
          have-gctx?           (and include-global? (= global-context (first gctx-line)))
          labels               (vec (interleave (range) (cons context-label (map str l))))
          roles-labeler        {true present-label, false missing-label, :! global-present-label}
-         gctx-labeler         (if have-gctx? (assoc roles-labeler :! present-label))
+         gctx-labeler         (if have-gctx? (fast-assoc roles-labeler :! present-label))
          ctx-labeler          (contexts-labeler req (map first d))
          data                 (->> (if have-gctx? (next d) d)
                                    (map (partial calc-roles
@@ -1734,18 +1736,23 @@
     body
     (if (some #(contains? body %) translation-keys)
       (if-some [l (lang-id req)]
-        (assoc body :lang l)
+        (fast-assoc body :lang l)
         body)
       body)))
 
 ;; I18n
 
 (defn translator
+  "Generates a translation function using populated values from `:i18n/translator` or
+  `:i18n/translator-nd` (variant which returns `nil` for missing keys, used when
+  `i18n/*handle-missing-keys*` is set to a falsy value). Falls back to
+  `i18n/translator` if predefined functions are not found or if a language was
+  specified as an optional `lang` argument."
   ([req]
    (or (get req (if i18n/*handle-missing-keys* :i18n/translator :i18n/translator-nd))
        (i18n/translator req)))
   ([req lang]
-   (if lang
+   (if (and lang (not= lang (i18n/lang req)))
      (i18n/translator req lang)
      (or (get req (if i18n/*handle-missing-keys* :i18n/translator :i18n/translator-nd))
          (i18n/translator req)))))
@@ -1755,7 +1762,7 @@
    (or (get req (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd))
        (i18n/translator-sub req)))
   ([req lang]
-   (if lang
+   (if (and lang (not= lang (i18n/lang req)))
      (i18n/translator-sub req lang)
      (or (get req (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd))
          (i18n/translator-sub req)))))
@@ -1771,19 +1778,19 @@
 (defn add-missing-translation
   "For the given `body` map, a new key `new-k`, a key `k` and a translation function
   `sub-translation-fn`, tries to add a translation of the key `k` as a value under
-  the given key `new-k`, if it does not exist yet.  `body`. Optional `suffix`
+  the given key `new-k`, if it does not exist yet in `body`. Optional `suffix`
   argument is used to add suffix to a key name."
   ([body new-k k sub-translation-fn]
    (if (contains? body new-k)
      body
      (if-some [t (and k (sub-translation-fn k))]
-       (assoc body new-k t)
+       (fast-assoc (or body {}) new-k t)
        body)))
   ([body new-k k suffix sub-translation-fn]
    (if (contains? body new-k)
      body
      (if-some [t (and k (sub-translation-fn (try-namespace k) (str (try-name k) suffix)))]
-       (assoc body new-k t)
+       (fast-assoc (or body {}) new-k t)
        body))))
 
 (defn untranslatable?
