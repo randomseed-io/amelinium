@@ -8,18 +8,19 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid compile])
 
-  (:require [clojure.string          :as       str]
-            [amelinium.system        :as    system]
-            [amelinium.logging       :as       log]
-            [amelinium.i18n          :as      i18n]
-            [amelinium.schemas       :as   schemas]
-            [amelinium.common        :as    common]
-            [reitit.coercion         :as  coercion]
-            [reitit.ring.coercion    :as       rrc]
-            [malli.core              :as         m]
-            [malli.registry          :as mregistry]
-            [io.randomseed.utils.var :as       var]
-            [io.randomseed.utils.map :as       map]
+  (:require [clojure.string          :as             str]
+            [amelinium.system        :as          system]
+            [amelinium.logging       :as             log]
+            [amelinium.i18n          :as            i18n]
+            [amelinium.schemas       :as         schemas]
+            [amelinium.common        :as          common]
+            [reitit.coercion         :as        coercion]
+            [reitit.ring.coercion    :as             rrc]
+            [reitit.impl             :refer [fast-assoc]]
+            [malli.core              :as               m]
+            [malli.registry          :as       mregistry]
+            [io.randomseed.utils.var :as             var]
+            [io.randomseed.utils.map :as             map]
             [io.randomseed.utils     :refer   :all]))
 
 ;; Common functions
@@ -67,41 +68,41 @@
          output      {:parameter/name param-name :parameter-type/name type-name}]
      (i18n/no-default
       (-> output
-          (assoc :error/summary
-                 (or (if param-id?   (translate-sub :parameter-error param-id
-                                                    param-name
-                                                    param-id
-                                                    param-type))
-                     (if param-name? (translate-sub :error/parameter-name nil
-                                                    param-name
-                                                    param-id
-                                                    param-type))
-                     (if param-type? (translate-sub :type-error param-type
-                                                    param-name
-                                                    param-id
-                                                    param-type))
-                     (if type-name?  (translate-sub :error/type-name nil
-                                                    type-name
-                                                    param-id
-                                                    param-type))
-                     (if param-id?   (translate-sub :error/parameter nil
-                                                    param-id
-                                                    param-type))
-                     (if param-type? (translate-sub :error/parameter-of-type
-                                                    nil param-type))))
-          (assoc :error/description
-                 (or (if mixed-id?   (translate-sub :parameter-should mixed-id
-                                                    param-name
-                                                    param-id
-                                                    param-type))
-                     (if param-id?   (translate-sub :parameter-should param-id
-                                                    param-name
-                                                    param-id
-                                                    param-type))
-                     (if param-type? (translate-sub :type-should param-type
-                                                    param-name
-                                                    param-id
-                                                    param-type)))))))))
+          (fast-assoc :error/summary
+                      (or (if param-id?   (translate-sub :parameter-error param-id
+                                                         param-name
+                                                         param-id
+                                                         param-type))
+                          (if param-name? (translate-sub :error/parameter-name nil
+                                                         param-name
+                                                         param-id
+                                                         param-type))
+                          (if param-type? (translate-sub :type-error param-type
+                                                         param-name
+                                                         param-id
+                                                         param-type))
+                          (if type-name?  (translate-sub :error/type-name nil
+                                                         type-name
+                                                         param-id
+                                                         param-type))
+                          (if param-id?   (translate-sub :error/parameter nil
+                                                         param-id
+                                                         param-type))
+                          (if param-type? (translate-sub :error/parameter-of-type
+                                                         nil param-type))))
+          (fast-assoc :error/description
+                      (or (if mixed-id?   (translate-sub :parameter-should mixed-id
+                                                         param-name
+                                                         param-id
+                                                         param-type))
+                          (if param-id?   (translate-sub :parameter-should param-id
+                                                         param-name
+                                                         param-id
+                                                         param-type))
+                          (if param-type? (translate-sub :type-should param-type
+                                                         param-name
+                                                         param-id
+                                                         param-type)))))))))
 
 (defn recode-errors
   "Uses exception data to recode coercion errors in a form of a map. To be used mainly
@@ -157,7 +158,7 @@
   to pass form errors to another page which should expose them to a visitor."
   [data]
   (if-some [r (list-errors data)]
-    (reduce (partial apply assoc) {} (map butlast r))))
+    (reduce (partial apply common/fast-assoc-multi) {} (map butlast r))))
 
 (defn join-errors
   "Used to produce a string containing parameter names and their types (as defined in
@@ -263,14 +264,14 @@
     (sequential? errors) (->> (seq errors)
                               (map #(take 2 %))
                               (filter identity)
-                              (reduce (partial apply assoc) {})
+                              (reduce (partial apply common/fast-assoc-multi) {})
                               not-empty)))
 
 (defn inject-errors
   "Takes coercion errors, parses them and injects into a `req` under a key named
   `:form/errors`."
   [req errors]
-  (assoc req :form/errors (delay (parse-errors errors))))
+  (fast-assoc req :form/errors (delay (parse-errors errors))))
 
 ;; Default exception handler
 
