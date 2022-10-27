@@ -41,6 +41,62 @@
            [reitit.core Match]
            [lazy_map.core LazyMapEntry LazyMap]))
 
+;; Utility functions
+
+(defn fast-assoc-multi
+  "Fast version of `assoc` with most of the checks disabled."
+  ([m k v]
+   (fast-assoc m k v))
+  ([m k v a b]
+   (-> (fast-assoc m k v)
+       (fast-assoc a b)))
+  ([m k v a b c d]
+   (-> (fast-assoc m k v)
+       (fast-assoc a b)
+       (fast-assoc c d)))
+  ([m k v a b c d e f]
+   (-> (fast-assoc m k v)
+       (fast-assoc a b)
+       (fast-assoc c d)
+       (fast-assoc e f)))
+  ([m k v a b c d e f g h]
+   (-> (fast-assoc m k v)
+       (fast-assoc a b)
+       (fast-assoc c d)
+       (fast-assoc e f)
+       (fast-assoc g h)))
+  ([m k v a b c d e f g h i j]
+   (-> (fast-assoc m k v)
+       (fast-assoc a b)
+       (fast-assoc c d)
+       (fast-assoc e f)
+       (fast-assoc g h)
+       (fast-assoc i j)))
+  ([m k v a b c d e f g h i j x y]
+   (-> (fast-assoc m k v)
+       (fast-assoc a b)
+       (fast-assoc c d)
+       (fast-assoc e f)
+       (fast-assoc g h)
+       (fast-assoc i j)
+       (fast-assoc x y)))
+  ([m k v a b c d e f g h i j x y q w]
+   (-> (fast-assoc m k v)
+       (fast-assoc a b)
+       (fast-assoc c d)
+       (fast-assoc e f)
+       (fast-assoc g h)
+       (fast-assoc i j)
+       (fast-assoc x y)
+       (fast-assoc q w)))
+  ([m k v a b c d e f g h i j x y q w & pairs]
+   (let [m (fast-assoc-multi m k v a b c d e f g h i j x y)]
+     (loop [m m, k q, v w, pairs pairs]
+       (let [r (fast-assoc m k v)]
+         (if pairs
+           (recur r (first pairs) (second pairs) (nnext pairs))
+           r))))))
+
 ;; Data sources
 
 (defn auth-config

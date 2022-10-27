@@ -953,14 +953,6 @@
        (add-missing-sub-status req (session-status smap) :session-status :response/body translate-sub)
        (body-add-session-id req smap)))))
 
-(defn fast-assoc-multi
-  "Fast version of `assoc` with most of the checks disabled."
-  [m k v & pairs]
-  (let [r (fast-assoc m k v)]
-    (if pairs
-      (recur r (first pairs) (second pairs) (nnext pairs))
-      r)))
-
 (defmacro response
   "Creates a response block. If the given `req` is already a response then it is simply
   returned. Otherwise the expressions from `body` are evaluated."
@@ -1020,10 +1012,10 @@
          pairs      (apply concat pairs)
          names      (take-nth 2 pairs)
          dups?      (not= (count names) (count (distinct names)))
-         assoc-impl (if (> (count pairs) 1) `fast-assoc-multi `fast-assoc)]
+         assoc-impl (if (> (count pairs) 1) `common/fast-assoc-multi `fast-assoc)]
      (if dups?
        `(let [req# ~req]
-          (fast-assoc req# :response/body (fast-assoc-multi (get req# :response/body) ~@pairs)))
+          (fast-assoc req# :response/body (common/fast-assoc-multi (get req# :response/body) ~@pairs)))
        `(let [req# ~req
               bod# (get req# :response/body)]
           (fast-assoc req# :response/body
@@ -1103,10 +1095,10 @@
          pairs      (apply concat pairs)
          names      (take-nth 2 pairs)
          dups?      (not= (count names) (count (distinct names)))
-         assoc-impl (if (> (count pairs) 1) `fast-assoc-multi `fast-assoc)]
+         assoc-impl (if (> (count pairs) 1) `common/fast-assoc-multi `fast-assoc)]
      (if dups?
        `(let [req# ~req]
-          (fast-assoc req# :response/headers (fast-assoc-multi (get req# :response/headers) ~@pairs)))
+          (fast-assoc req# :response/headers (common/fast-assoc-multi (get req# :response/headers) ~@pairs)))
        `(let [req# ~req
               hdr# (get req# :response/headers)]
           (fast-assoc req# :response/headers
