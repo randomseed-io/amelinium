@@ -13,6 +13,7 @@
             [amelinium.http.middleware.session     :as         session]
             [amelinium.logging                     :as             log]
             [amelinium.system                      :as          system]
+            [amelinium.common                      :as          common]
             [phone-number.core                     :as           phone]
             [io.randomseed.utils.validators        :as               v]
             [io.randomseed.utils.validators.common :as              vc]
@@ -20,6 +21,7 @@
             [io.randomseed.utils.vec               :as             vec]
             [io.randomseed.utils.map               :as             map]
             [io.randomseed.utils                   :refer         :all]
+            [reitit.impl                           :refer [fast-assoc]]
             [potpuri.core                          :refer [deep-merge]]))
 
 ;; Default validation strategy.
@@ -386,7 +388,7 @@
                   (fn [handler]
                     (fn [req]
                       (handler
-                       (assoc req result-key true))))
+                       (fast-assoc req result-key true))))
                   (if explain?
                     (let [explain-fn (case required-mode
                                        :all v/explain-all-required
@@ -398,16 +400,16 @@
                         (fn [req]
                           (handler
                            (if (get req :validators/disabled?)
-                             (assoc req config-key config result-key true)
+                             (common/fast-assoc-multi req config-key config result-key true)
                              (let [reasons (v/explain (get req :form-params)
                                                       validators-all
                                                       default-pass?
                                                       required
                                                       explain-fn)]
-                               (assoc req
-                                      config-key config
-                                      result-key (nil? (first reasons))
-                                      explain-key reasons)))))))
+                               (common/fast-assoc-multi req
+                                                        config-key config
+                                                        result-key (nil? (first reasons))
+                                                        explain-key reasons)))))))
                     (let [check-fn (case required-mode
                                      :all v/has-all-required?
                                      :one v/has-required?
@@ -423,7 +425,7 @@
                                                         default-pass?
                                                         required
                                                         check-fn))]
-                             (assoc req config-key config result-key result))))))))))})
+                             (common/fast-assoc-multi req config-key config result-key result))))))))))})
 
 (system/add-prep  ::default [_ config] (prep-validators config))
 (system/add-init  ::default [k config] (wrap-validators k (if (:required/cat config)
