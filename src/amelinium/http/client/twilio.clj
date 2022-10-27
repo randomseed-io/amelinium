@@ -12,6 +12,7 @@
             [clojure.string               :as             str]
             [tick.core                    :as               t]
             [hato.client                  :as              hc]
+            [reitit.impl                  :refer [fast-assoc]]
             [amelinium.db                 :as              db]
             [amelinium.logging            :as             log]
             [amelinium.system             :as          system]
@@ -53,7 +54,7 @@
                                             template-group
                                             lang
                                             fallback-template)]
-       (assoc params :template_id template-id)
+       (fast-assoc params :template_id template-id)
        params)
      params)))
 
@@ -210,11 +211,11 @@
         opts          {:url            url
                        :accept         accept
                        :request-method req-method}
-        opts          (if (is-json? accept) (assoc opts :as :json) opts)
-        opts          (if auth-tok          (assoc opts :oauth-token auth-tok) opts)
-        opts          (if content-type      (assoc opts :content-type content-type) opts)
+        opts          (if (is-json? accept) (fast-assoc opts :as :json) opts)
+        opts          (if auth-tok          (fast-assoc opts :oauth-token auth-tok) opts)
+        opts          (if content-type      (fast-assoc opts :content-type content-type) opts)
         opts          (into opts existing-opts)]
-    (assoc config :request-opts opts)))
+    (fast-assoc config :request-opts opts)))
 
 ;; Initialization
 
@@ -246,60 +247,66 @@
 
 (defn- stringify-params
   [p]
-  (map/map-keys some-str p))
+  (if p (map/map-keys some-str p)))
 
 (defn init-twilio
   [k config]
   (if-not (:enabled? config)
     (constantly nil)
     (let [client   (hc/build-http-client (:client-opts config))
-          req-opts (assoc (:request-opts config) :http-client client)]
+          req-opts (fast-assoc (or (:request-opts config) {}) :http-client client)]
       (log/msg "Registering Twilio client:" k)
       (if-some [default-params (:parameters config)]
         (fn twilio-request
-          ([opts params  & [respond raise]]
-           (let [opts   (into req-opts opts)
-                 json?  (sending-json? opts)
-                 params (or params {})
-                 params (if json? params (stringify-params params))
-                 opts   (update opts :form-params
-                                #(if %
-                                   (deep-merge :into default-params (or (if json? % (stringify-params %)) params) {})
-                                   (deep-merge :into default-params (or params {}))))]
-             (if (= :config params)
-               config
-               (hc/request opts respond raise))))
+          ([opts params & [respond raise]]
+           (if (= :config params)
+             config
+             (let [opts       (into req-opts opts)
+                   json?      (sending-json? opts)
+                   params     (if json? params (stringify-params params))
+                   fparams    (get opts :form-params)
+                   fparams    (if json? fparams (stringify-params fparams))
+                   all-params (if params
+                                (if fparams
+                                  (deep-merge :into default-params fparams params)
+                                  (deep-merge :into default-params params))
+                                (if fparams
+                                  (deep-merge :into default-params fparams)
+                                  default-params))]
+               (-> (fast-assoc opts :form-params all-params)
+                   (hc/request respond raise)))))
           ([params]
-           (let [params (or params {})
-                 params (if (sending-json? req-opts) params (stringify-params params))
-                 opts   (assoc req-opts :form-params (deep-merge :into default-params (or params {})))]
-             (if (= :config params)
-               config
-               (hc/request opts))))
+           (if (= :config params)
+             config
+             (let [params     (if (sending-json? req-opts) params (stringify-params params))
+                   all-params (if params (deep-merge :into default-params params) default-params)]
+               (-> (fast-assoc req-opts :form-params all-params)
+                   (hc/request)))))
           ([]
-           (let [opts (assoc req-opts :form-params default-params)]
-             (hc/request opts))))
+           (-> (fast-assoc req-opts :form-params default-params)
+               (hc/request))))
         (fn twilio-request
           ([opts params & [respond raise]]
-           (let [opts   (into req-opts opts)
-                 json?  (sending-json? opts)
-                 params (or params {})
-                 params (if json? params (stringify-params params))
-                 opts   (update opts :form-params
-                                #(if % (deep-merge :into
-                                                   (if json? % (stringify-params %))
-                                                   (or params {}))
-                                     params))]
-             (if (= :config params)
-               config
-               (hc/request opts respond raise))))
+           (if (= :config params)
+             config
+             (let [opts       (conj req-opts opts)
+                   json?      (sending-json? opts)
+                   params     (if json? params (stringify-params params))
+                   fparams    (get opts :form-params)
+                   fparams    (if json? fparams (stringify-params fparams))
+                   all-params (if params
+                                (if fparams
+                                  (deep-merge :into fparams params)
+                                  params)
+                                fparams)]
+               (-> (fast-assoc opts :form-params (or all-params {}))
+                   (hc/request respond raise)))))
           ([params]
-           (let [params (or params {})
-                 params (if (sending-json? req-opts) params (stringify-params params))
-                 opts   (assoc req-opts :form-params params)]
-             (if (= :config params)
-               config
-               (hc/request opts))))
+           (if (= :config params)
+             config
+             (let [params (if (sending-json? req-opts) params (stringify-params params))]
+               (-> (fast-assoc req-opts :form-params (or params {}))
+                   (hc/request)))))
           ([]
            (hc/request req-opts)))))))
 
