@@ -13,6 +13,7 @@
             [smangler.api            :as         sa]
             [amelinium.logging       :as        log]
             [amelinium.system        :as     system]
+            [amelinium.common        :as     common]
             [io.randomseed.utils.var :as        var]
             [io.randomseed.utils.map :as        map]
             [io.randomseed.utils.ip  :as         ip]
@@ -122,10 +123,10 @@
                           (get-ips-from-req-data-lru (get req :remote-addr)
                                                      proxy-setting
                                                      proxy-for-fn)))]
-     (assoc req
-            :remote-ip        (delay (nth @addrs 0 nil))
-            :remote-ip/str    (delay (nth @addrs 1 nil))
-            :remote-ip/proxy? (delay (nth @addrs 3 nil))))))
+     (common/fast-assoc-multi req
+                              :remote-ip        (delay (nth @addrs 0 nil))
+                              :remote-ip/str    (delay (nth @addrs 1 nil))
+                              :remote-ip/proxy? (delay (nth @addrs 3 nil))))))
 
 ;; Configuration initializers
 
