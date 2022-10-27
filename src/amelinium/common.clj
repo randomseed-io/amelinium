@@ -26,7 +26,6 @@
             [amelinium.http.middleware.language   :as        language]
             [amelinium.http.middleware.session    :as         session]
             [amelinium.http.middleware.db         :as          mid-db]
-            [amelinium.http.middleware.validators :as      validators]
             [amelinium.common.oplog.auth          :as      oplog-auth]
             [amelinium.i18n                       :as            i18n]
             [amelinium.model.user                 :as            user]
