@@ -11,16 +11,17 @@
 
   (:import  [java.security SecureRandom])
 
-  (:require [clojure.spec.alpha      :as        s]
-            [crypto.equality         :as   crypto]
-            [jsonista.core           :as     json]
-            [amelinium.system        :as   system]
-            [amelinium.logging       :as      log]
-            [io.randomseed.utils.var :as      var]
-            [io.randomseed.utils.map :as      map]
-            [io.randomseed.utils     :as        u]
-            [io.randomseed.utils     :refer  :all]
-            [amelinium.auth.specs    :refer  :all]))
+  (:require [clojure.spec.alpha      :as               s]
+            [crypto.equality         :as          crypto]
+            [jsonista.core           :as            json]
+            [reitit.impl             :refer [fast-assoc]]
+            [amelinium.system        :as          system]
+            [amelinium.logging       :as             log]
+            [io.randomseed.utils.var :as             var]
+            [io.randomseed.utils.map :as             map]
+            [io.randomseed.utils     :as               u]
+            [io.randomseed.utils     :refer         :all]
+            [amelinium.auth.specs    :refer         :all]))
 
 (defonce ^:private lock 'lock)
 
@@ -152,20 +153,21 @@
            ^java.lang.Number salt-length
            ^java.lang.String salt-prefix
            ^java.lang.String salt-suffix
-           ^java.lang.String salt-charset] :as opts} ; options for this handler (taken from configuration)
+           ^java.lang.String salt-charset]
+    :as   opts}                                      ; options for this handler (taken from configuration)
    settings]                                         ; authentication settings
   (locking lock
     (let [handler-id handler                         ; symbolic handler identifier (from options)
           handler    (assoc (var/deref handler-id)   ; actual handler (a map of two functions)
                             :id handler-id)          ; armored by its symbolic identifier (to find it later)
-          encrypt-fn (:encrypt-fn handler)           ; encryption function (from handler)
-          check-fn   (:check-fn   handler)           ; checking function (from handler)
-          opts       (-> handler :defaults           ; encryption parameters (configuration options merged with handler defaults)
-                         (merge opts)
+          encrypt-fn (get handler :encrypt-fn)       ; encryption function (from handler)
+          check-fn   (get handler :check-fn)         ; checking function (from handler)
+          opts       (-> handler (get :defaults)     ; encryption parameters (configuration options merged with handler defaults)
+                         (or {}) (conj opts)
                          (update :salt-charset vec)  ; change string charset to vector (for random access)
                          map/remove-empty-values)
           pub-opts   (dissoc opts                    ; public options (enclosed in an encryption function)
-                             :name :encrypt-fn       ;   with removed keys which are only needed by this wrapper
+                             :name :encrypt-fn       ; with removed keys which are only needed by this wrapper
                              :check-fn :salt-charset
                              :salt-length :salt-prefix :salt-suffix)]
 
@@ -200,11 +202,12 @@
                              (encrypt-fn
                               plain
                               (cond-> pub-opts
-                                (number? salt-length) (assoc :salt (generate-salt
-                                                                    salt-length
-                                                                    (:salt-charset opts)
-                                                                    salt-prefix
-                                                                    salt-suffix)))
+                                (number? salt-length)
+                                (fast-assoc :salt (generate-salt
+                                                   salt-length
+                                                   (:salt-charset opts)
+                                                   salt-prefix
+                                                   salt-suffix)))
                               settings)))))))
 
 ;;
@@ -232,7 +235,7 @@
             results (if (ifn? encfn)        ; if there is an encryption function
                       (-> lastpass          ; for the previously generated password
                           (encfn settings)  ; run an encryption function on it
-                          (assoc            ; to get the encrypted password and a bunch of parameters
+                          (fast-assoc       ; to get the encrypted password and a bunch of parameters
                            :handler-id      ; armor the results (a map) with the handler-id
                            (get-in opts     ; containing names of encryption and decryption functions
                                    [:handler :id]))) ; for checking purposes
@@ -272,15 +275,15 @@
        ;; and calling encryption function to recreate hashing process
 
        (loop [lastpass plain, todo user-suite]
-         (let [opts    (first todo)
+         (let [opts    (or (first todo) {})
                handler (-> opts :handler-id var/deref)
-               opts    (-> opts                      ; preparing options for encryption function
-                           (dissoc :handler-id)      ; encryption function doesn't have to know that
-                           (assoc  :checking true))] ; informative flag for the encryption function
+               opts    (-> opts                          ; preparing options for encryption function
+                           (dissoc :handler-id)          ; encryption function doesn't have to know that
+                           (fast-assoc :checking true))] ; informative flag for the encryption function
            (if-some [nextf (next todo)]
-             (let [encrypt-fn (:encrypt-fn handler)]
-               (recur (:password (if (ifn? encrypt-fn) (encrypt-fn lastpass opts settings) lastpass)) nextf))
-             (if-some [checker-fn (:check-fn handler)]
+             (let [encrypt-fn (get handler :encrypt-fn)]
+               (recur (get (if (ifn? encrypt-fn) (encrypt-fn lastpass opts settings) lastpass) :password) nextf))
+             (if-some [checker-fn (get handler :check-fn)]
                (if (ifn? checker-fn) (checker-fn lastpass opts settings))))))))))
 
 ;;
@@ -307,7 +310,7 @@
   (if-not (map? m) m
           (reduce-kv (fn [acc k f]
                        (if (contains? m k)
-                         (assoc acc k (f (get m k)))
+                         (fast-assoc acc k (f (get m k)))
                          acc))
                      m json-translation)))
 
@@ -340,7 +343,7 @@
         hid (map/lazy-get crypto-entry :handler-id
                           (map/lazy-get h :id (get-in crypto-entry [:handler :id])))
         dfl (select-keys  crypto-entry (:shared h))]
-    (assoc dfl :handler-id hid)))
+    (fast-assoc (or dfl {}) :handler-id hid)))
 
 (defn shared-suite
   [suite]
