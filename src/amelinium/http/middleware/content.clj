@@ -18,14 +18,13 @@
 (defn wrap-accept
   "Content types handling middleware."
   [k config]
-  (let []
-    (log/msg "Installing content types handler")
-    {:name    k
-     :compile (fn [_ _]
-                (fn [handler]
-                  (let [handler (accept/wrap-accept handler config)]
-                    (fn [req]
-                      (handler req)))))}))
+  (log/msg "Installing content types handler")
+  {:name    k
+   :compile (fn [_ _]
+              (fn [handler]
+                (let [handler (accept/wrap-accept handler config)]
+                  (fn [req]
+                    (handler req)))))})
 
 (defn prep-language
   [config]
