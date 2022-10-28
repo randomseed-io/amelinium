@@ -1829,49 +1829,93 @@
   ([params enc]
    (if params (codec/form-encode params enc))))
 
+(defn remove-params
+  "Removes the given parameter or parameters from a request map locations:
+  - from a map associated with `parameters-sub-key` key
+    within a map associated with `:parameters` key in `m`,
+  - from a map associated with `params-key` key in `m`,
+  - from a map associated with `:params` key in `m` (if `combined?` is truthy).
+  All parameters must be either keywords or strings, they cannot be mixed.
+  Parameter type `params-key` and `parameters-sub-key` should be keywords.
+  If `params-key` or `parameters-sub-key` is `nil` then the removal within a specific
+  location(s) will be skipped."
+  ([m params-key parameters-sub-key combined? param]
+   (let [strings?     (string? param)
+         param-str    (if strings? param (some-str param))
+         param-kw     (if strings? (keyword param) param)
+         m-parameters (if parameters-sub-key (get m :parameters))
+         m-req-params (if params-key (get m params-key))
+         m-params     (if combined? (get m :params))
+         m            (if (nil? m-parameters) m
+                          (if-some [p (get m-parameters parameters-sub-key)]
+                            (qassoc m :parameters
+                                    (qassoc m-parameters parameters-sub-key
+                                            (dissoc p param-kw)))
+                            m))
+         m            (if (nil? m-req-params) m
+                          (qassoc m params-key
+                                  (dissoc m-req-params param-str)))
+         m            (if (nil? m-params) m
+                          (qassoc m :params
+                                  (dissoc m-params param-kw)))]
+     m))
+  ([m params-key parameters-sub-key combined? param & more]
+   (let [params       (cons param more)
+         strings?     (string? param)
+         params-str   (if strings? params (map some-str params))
+         params-kw    (if strings? (map keyword params) params)
+         m-parameters (if parameters-sub-key (get m :parameters))
+         m-req-params (if params-key (get m params-key))
+         m-params     (if combined? (get m :params))
+         m            (if (nil? m-parameters) m
+                          (if-some [p (get m-parameters parameters-sub-key)]
+                            (qassoc m :parameters
+                                    (qassoc m-parameters parameters-sub-key
+                                            (apply dissoc p params-kw)))
+                            m))
+         m            (if (nil? m-req-params) m
+                          (qassoc m params-key
+                                  (apply dissoc m-req-params params-str)))
+         m            (if (nil? m-params) m
+                          (qassoc m :params
+                                  (apply dissoc m-params params-kw)))]
+     m)))
+
+(defn remove-path-params
+  "Removes the given parameter or parameters from a request map locations:
+  `[:parameters :path]`, `:path-params` and `:params`. All parameters must be
+  either keywords or strings, they cannot be mixed."
+  ([m param]
+   (remove-params m :path-params :path true param))
+  ([m param & more]
+   (apply remove-params m :path-params :path true param more)))
+
+(defn remove-query-params
+  "Removes the given parameter or parameters from a request map locations:
+  `[:parameters :query]`, `:query-params` and `:params`. All parameters must be
+  either keywords or strings, they cannot be mixed."
+  ([m param]
+   (remove-params m :query-params :query true param))
+  ([m param & more]
+   (apply remove-params m :query-params :query true param more)))
+
 (defn remove-form-params
   "Removes the given parameter or parameters from a request map locations:
   `[:parameters :form]`, `:form-params` and `:params`. All parameters must be either
   keywords or strings, they cannot be mixed."
-  [m param & more]
-  (if more
-    (let [params        (cons param more)
-          strings?      (string? param)
-          params-str    (if strings? params (map some-str params))
-          params-kw     (if strings? (map keyword params) params)
-          m-parameters  (get m :parameters)
-          m-form-params (get m :form-params)
-          m-params      (get m :params)
-          m             (if (nil? m-parameters) m
-                            (fast-assoc m :parameters
-                                        (fast-assoc m-parameters :form
-                                                    (if-some [form (get m-parameters :form)]
-                                                      (apply dissoc form params-kw)))))
-          m             (if (nil? m-form-params) m
-                            (fast-assoc m :form-params
-                                        (apply dissoc m-form-params params-str)))
-          m             (if (nil? m-params) m
-                            (fast-assoc m :params
-                                        (apply dissoc m-params params-kw)))]
-      m)
-    (let [strings?      (string? param)
-          param-str     (if strings? param (some-str param))
-          param-kw      (if strings? (keyword param) param)
-          m-parameters  (get m :parameters)
-          m-form-params (get m :form-params)
-          m-params      (get m :params)
-          m             (if (nil? m-parameters) m
-                            (fast-assoc m :parameters
-                                        (fast-assoc m-parameters :form
-                                                    (if-some [form (get m-parameters :form)]
-                                                      (dissoc form param-kw)))))
-          m             (if (nil? m-form-params) m
-                            (fast-assoc m :form-params
-                                        (dissoc m-form-params param-str)))
-          m             (if (nil? m-params) m
-                            (fast-assoc m :params
-                                        (dissoc m-params param-kw)))]
-      m)))
+  ([m param]
+   (remove-params m :form-params :form true param))
+  ([m param & more]
+   (apply remove-params m :form-params :form true param more)))
+
+(defn remove-body-params
+  "Removes the given parameter or parameters from a request map locations:
+  `[:parameters :body]`, `:body-params` and `:params`. All parameters must be either
+  keywords or strings, they cannot be mixed."
+  ([m param]
+   (remove-params m :body-params :body true param))
+  ([m param & more]
+   (apply remove-params m :body-params :body true param more)))
 
 ;; Headers
 

@@ -35,9 +35,8 @@
   "Removes login data from the form params and body part of a request map."
   [req]
   (-> req
-      (map/update-existing :form-params dissoc "password")
-      (map/update-existing :params      dissoc :password)
-      (update              :body-params dissoc :password)))
+      (common/remove-form-params :password)
+      (common/remove-params :body-params :body false :password)))
 
 (defn cleanup-req
   [req auth-state]
