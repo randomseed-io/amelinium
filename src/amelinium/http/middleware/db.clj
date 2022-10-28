@@ -6,9 +6,10 @@
 
     amelinium.http.middleware.db
 
-  (:require [amelinium.db      :as     db]
-            [amelinium.logging :as    log]
-            [amelinium.system  :as system]))
+  (:require [io.randomseed.utils.map :refer [qassoc]]
+            [amelinium.db            :as          db]
+            [amelinium.logging       :as         log]
+            [amelinium.system        :as      system]))
 
 (defn wrap-db
   "Database wrapping middleware."
@@ -20,7 +21,7 @@
      :compile (fn [_ _]
                 (fn [handler]
                   (fn [req]
-                    (handler (assoc req k ds-obj)))))}))
+                    (handler (qassoc req k ds-obj)))))}))
 
 (system/add-init  ::db [k config] (wrap-db k (:name config) (:db config)))
 (system/add-halt! ::db [_ config] nil)
