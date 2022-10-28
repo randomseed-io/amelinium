@@ -39,6 +39,10 @@
       (common/remove-params :body-params :body false :password)))
 
 (defn cleanup-req
+  "Takes a request map `req` and an authentication state, 2-element vector
+  `auth-state`. Removes login information from form and body data if its second
+  element does not have a truthy value (meaning that we are NOT on an authentication
+  page which is allowed to process passwords)."
   [req auth-state]
   (if (nth auth-state 1 false) req (remove-login-data req)))
 
