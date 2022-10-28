@@ -9,12 +9,10 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [amelinium.auth.pwd      :as       pwd]
-            [io.randomseed.utils     :refer   :all]
-            [io.randomseed.utils.map :as       map]))
-
-(def ^:const default-options       {})
-(def ^:const required-keys         [])
+  (:require [amelinium.auth.pwd      :as         pwd]
+            [io.randomseed.utils.map :as         map]
+            [io.randomseed.utils.map :refer [qassoc]]
+            [io.randomseed.utils     :refer     :all]))
 
 (defn encrypt
   ([plain]
@@ -22,8 +20,9 @@
   ([plain options]
    (encrypt plain options {}))
   ([plain options settings]
-   (let [options (if (or (nil? options) (map? options)) options {})]
-     (assoc options :password nil))))
+   (if (map? options)
+     (qassoc options :password nil)
+     {:password nil})))
 
 (def check (partial pwd/standard-check (constantly nil)))
 

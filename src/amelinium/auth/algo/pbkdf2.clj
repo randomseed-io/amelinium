@@ -11,9 +11,10 @@
 
   (:import com.lambdaworks.crypto.PBKDF)
 
-  (:require [amelinium.auth.pwd      :as     pwd]
-            [io.randomseed.utils     :refer :all]
-            [io.randomseed.utils.map :as     map]))
+  (:require [amelinium.auth.pwd      :as         pwd]
+            [io.randomseed.utils.map :as         map]
+            [io.randomseed.utils.map :refer [qassoc]]
+            [io.randomseed.utils     :refer     :all]))
 
 (def ^:const default-options
   {:iterations 100000
@@ -24,24 +25,29 @@
 
 (defn encrypt
   "Encrypts a password string using the PBKDF2 algorithm."
+  {:arglists '([plain]
+               [plain options]
+               [plain salt]
+               [plain options settings]
+               [plain salt settings])}
   ([plain]
    (encrypt plain {} {}))
   ([plain options]
    (encrypt plain options {}))
   ([plain options settings]
    (let [options (if (or (nil? options) (map? options)) options {:salt options})
-         options (merge default-options
-                        (map/remove-empty-values (select-keys settings required-keys))
-                        (map/remove-empty-values (select-keys options required-keys)))
+         options (conj default-options
+                       (map/remove-empty-values (select-keys settings required-keys))
+                       (map/remove-empty-values (select-keys options required-keys)))
          options (map/update-existing options :algorithm normalize-name)
          salt    (to-bytes (map/lazy-get options :salt (pwd/salt-bytes 8)))
          result  (PBKDF/pbkdf2
-                  (:algorithm options)
+                  (get options :algorithm)
                   (text-to-bytes plain)
                   salt
-                  (int (:iterations options))
+                  (int (get options :iterations))
                   (int 160))]
-     (merge options {:salt salt :password result}))))
+     (qassoc options :salt salt :password result))))
 
 (def check (partial pwd/standard-check encrypt))
 

@@ -9,10 +9,11 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [clojure.string          :as       str]
-            [amelinium.auth.pwd      :as       pwd]
-            [io.randomseed.utils     :refer   :all]
-            [io.randomseed.utils.map :as       map]))
+  (:require [clojure.string          :as         str]
+            [amelinium.auth.pwd      :as         pwd]
+            [io.randomseed.utils.map :as         map]
+            [io.randomseed.utils.map :refer [qassoc]]
+            [io.randomseed.utils     :refer     :all]))
 
 (def ^:const default-options       {})
 (def ^:const required-keys         [:prefix :suffix])
@@ -36,17 +37,19 @@
    (encrypt plain options {}))
   ([plain options settings]
    (let [options  (if (or (nil? options) (map? options)) options {})
-         no-check (not (:checking options false))
-         salt-set (:salt-charset options default-charset)
-         options (cond-> options
-                   true     (select-keys required-keys)
-                   no-check (map/update-existing :prefix parse-random salt-set)
-                   no-check (map/update-existing :suffix parse-random salt-set)
-                   true     (map/update-to-bytes :prefix :suffix)
-                   true     map/remove-empty-values)
-         options (merge default-options options)
-         result  (bytes-concat (:prefix options bzero) (text-to-bytes plain) (:suffix options bzero))]
-     (assoc options :password result))))
+         no-check (not (get options :checking false))
+         salt-set (get options :salt-charset default-charset)
+         options  (cond-> options
+                    true     (select-keys required-keys)
+                    no-check (map/update-existing :prefix parse-random salt-set)
+                    no-check (map/update-existing :suffix parse-random salt-set)
+                    true     (map/update-to-bytes :prefix :suffix)
+                    true     map/remove-empty-values)
+         options  (conj default-options options)
+         result   (bytes-concat (get options :prefix bzero)
+                                (text-to-bytes plain)
+                                (get options :suffix bzero))]
+     (qassoc options :password result))))
 
 (def check (partial pwd/standard-check encrypt))
 

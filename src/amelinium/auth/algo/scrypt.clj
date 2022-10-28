@@ -11,9 +11,10 @@
 
   (:import com.lambdaworks.crypto.SCrypt)
 
-  (:require [amelinium.auth.pwd       :as      pwd]
-            [io.randomseed.utils      :refer  :all]
-            [io.randomseed.utils.map  :as      map]))
+  (:require [amelinium.auth.pwd       :as        pwd]
+            [io.randomseed.utils.map :as         map]
+            [io.randomseed.utils.map :refer [qassoc]]
+            [io.randomseed.utils     :refer     :all]))
 
 (def ^:const default-options
   {:cpu-cost 32768
@@ -25,24 +26,29 @@
 
 (defn encrypt
   "Encrypt a password string using the scrypt algorithm."
+  {:arglists '([plain]
+               [plain options]
+               [plain salt]
+               [plain options settings]
+               [plain salt settings])}
   ([plain]
    (encrypt plain {} {}))
   ([plain options]
    (encrypt plain options {}))
   ([plain options settings]
    (let [options (if (or (nil? options) (map? options)) options {:salt options})
-         options (merge default-options
-                        (map/remove-empty-values (select-keys settings required-keys))
-                        (map/remove-empty-values (select-keys options required-keys)))
+         options (conj default-options
+                       (map/remove-empty-values (select-keys settings required-keys))
+                       (map/remove-empty-values (select-keys options  required-keys)))
          salt    (to-bytes (or (get options :salt) (pwd/salt-bytes 16)))
          result  (SCrypt/scrypt
                   (text-to-bytes plain)
                   salt
-                  (int (:cpu-cost options))
-                  (int (:mem-cost options))
-                  (int (:parallel options))
+                  (int (get options :cpu-cost))
+                  (int (get options :mem-cost))
+                  (int (get options :parallel))
                   (int 32))]
-     (merge options {:salt salt :password result}))))
+     (qassoc options :salt salt :password result))))
 
 (def check (partial pwd/standard-check encrypt))
 

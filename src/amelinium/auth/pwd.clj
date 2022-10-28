@@ -14,12 +14,12 @@
   (:require [clojure.spec.alpha      :as               s]
             [crypto.equality         :as          crypto]
             [jsonista.core           :as            json]
-            [reitit.impl             :refer [fast-assoc]]
             [amelinium.system        :as          system]
             [amelinium.logging       :as             log]
             [io.randomseed.utils.var :as             var]
-            [io.randomseed.utils.map :as             map]
             [io.randomseed.utils     :as               u]
+            [io.randomseed.utils.map :as             map]
+            [io.randomseed.utils.map :refer     [qassoc]]
             [io.randomseed.utils     :refer         :all]
             [amelinium.auth.specs    :refer         :all]))
 
@@ -99,16 +99,19 @@
   ([encrypt-fn plain encrypted salt settings]
    (standard-check encrypt-fn plain {:password encrypted :salt salt} settings))
   ([encrypt-fn plain opts encrypted salt settings]
-   (standard-check encrypt-fn plain (merge opts {:password encrypted :salt salt}) settings))
+   (standard-check encrypt-fn
+                   plain
+                   (qassoc opts :password encrypted :salt salt)
+                   settings))
   ([encrypt-fn plain opts-or-enc settings]
    (s/assert :amelinium.auth/encrypt-fn encrypt-fn)
    (s/assert (s/nilable :amelinium.auth.settings/generic) settings)
    (s/assert (s/nilable (s/or :pwd-in-map (s/keys :req-un [:amelinium.auth.plain/password])
                               :pwd-plain  :amelinium.auth.plain/password)) opts-or-enc)
    (let [options   (if (or (nil? opts-or-enc) (map? opts-or-enc)) opts-or-enc {:password opts-or-enc})
-         passwd    (:password options)
+         passwd    (get options :password)
          encrypted (if passwd (to-bytes passwd))
-         provided  (:password (encrypt-fn plain options settings))]
+         provided  (get (encrypt-fn plain options settings) :password)]
      (if (and encrypted provided)
        (crypto/eq? encrypted provided)
        (crypto/eq? (to-bytes "@|-.-.-.-.-|@") (to-bytes "_ _ ! ! ! _ _"))))))
@@ -121,7 +124,7 @@
                              :password-entry  :amelinium.auth/password)) password-or-cipher)
   (if (some? password-or-cipher)
     (if-some [h (map/lazy-get password-or-cipher
-                              :handler (var/deref (:handler-id password-or-cipher)))]
+                              :handler (var/deref (get password-or-cipher :handler-id)))]
       (if (and (map? h) (seq h)) h))))
 
 (defn merge-suites
@@ -141,7 +144,7 @@
                         :password-entry
                         (s/or :shared    :amelinium.auth.password/shared
                               :intrinsic :amelinium.auth.password/intrinsic))))) suites)
-     (not-empty (apply map merge suites)))))
+     (not-empty (apply map conj suites)))))
 
 ;;
 ;; Encryption handler processor
@@ -162,7 +165,7 @@
                             :id handler-id)          ; armored by its symbolic identifier (to find it later)
           encrypt-fn (get handler :encrypt-fn)       ; encryption function (from handler)
           check-fn   (get handler :check-fn)         ; checking function (from handler)
-          opts       (-> handler (get :defaults)     ; encryption parameters (configuration options merged with handler defaults)
+          opts       (-> (get handler :defaults)     ; encryption parameters (configuration options merged with handler defaults)
                          (or {}) (conj opts)
                          (update :salt-charset vec)  ; change string charset to vector (for random access)
                          map/remove-empty-values)
@@ -203,11 +206,11 @@
                               plain
                               (cond-> pub-opts
                                 (number? salt-length)
-                                (fast-assoc :salt (generate-salt
-                                                   salt-length
-                                                   (:salt-charset opts)
-                                                   salt-prefix
-                                                   salt-suffix)))
+                                (qassoc :salt (generate-salt
+                                               salt-length
+                                               (get opts :salt-charset)
+                                               salt-prefix
+                                               salt-suffix)))
                               settings)))))))
 
 ;;
@@ -221,7 +224,7 @@
   (s/assert :amelinium.auth.plain/password plain)
   (let [settings   local-settings
         _          (s/assert (s/nilable :amelinium.auth.pwd/settings) settings)
-        used-suite (:suite settings)]
+        used-suite (get settings :suite)]
     ;; extract suite from settings or use global as fallback
     ;; loop through all encryption steps in the provided suite
     ;; extracting encryption functions and using them
@@ -231,20 +234,20 @@
     ;; except the last one (which will be needed during checking)
     (loop [lastpass plain, todo used-suite, stack []]
       (let [opts    (first todo)
-            encfn   (:encrypt-fn opts)
+            encfn   (get opts :encrypt-fn)
             results (if (ifn? encfn)        ; if there is an encryption function
                       (-> lastpass          ; for the previously generated password
                           (encfn settings)  ; run an encryption function on it
-                          (fast-assoc       ; to get the encrypted password and a bunch of parameters
+                          (qassoc           ; to get the encrypted password and a bunch of parameters
                            :handler-id      ; armor the results (a map) with the handler-id
                            (get-in opts     ; containing names of encryption and decryption functions
                                    [:handler :id]))) ; for checking purposes
                       {:password lastpass})
-            newpass (:password results)]
+            newpass (get results :password)]
         ;; if there are more items in our chain
         (if-some [nextf (next todo)]
           (recur newpass nextf (conj stack (dissoc results :password))) ; stack the current one and repeat the process
-          (conj stack results))))))                                    ; otherwise stack the last results with a final encrypted password
+          (conj stack results))))))                                     ; otherwise stack the last results with a final encrypted password
 
 (defn check
   "Checks if the given plain text password is correct by comparing it with the result
@@ -262,7 +265,7 @@
 
      ;; wait some time
      (if-not combo?
-       ((:wait-fn settings) user-suite))
+       (if-some [waitfn (get settings :wait-fn)] (waitfn user-suite)))
 
      (if combo? ; if the suite is a Suite then extract :shared and :intrinsic
        (check plain
@@ -277,9 +280,9 @@
        (loop [lastpass plain, todo user-suite]
          (let [opts    (or (first todo) {})
                handler (-> opts :handler-id var/deref)
-               opts    (-> opts                          ; preparing options for encryption function
-                           (dissoc :handler-id)          ; encryption function doesn't have to know that
-                           (fast-assoc :checking true))] ; informative flag for the encryption function
+               opts    (-> opts                      ; preparing options for encryption function
+                           (dissoc :handler-id)      ; encryption function doesn't have to know that
+                           (qassoc :checking true))] ; informative flag for the encryption function
            (if-some [nextf (next todo)]
              (let [encrypt-fn (get handler :encrypt-fn)]
                (recur (get (if (ifn? encrypt-fn) (encrypt-fn lastpass opts settings) lastpass) :password) nextf))
@@ -310,7 +313,7 @@
   (if-not (map? m) m
           (reduce-kv (fn [acc k f]
                        (if (contains? m k)
-                         (fast-assoc acc k (f (get m k)))
+                         (qassoc acc k (f (get m k)))
                          acc))
                      m json-translation)))
 
@@ -342,8 +345,8 @@
   (let [h   (find-handler crypto-entry)
         hid (map/lazy-get crypto-entry :handler-id
                           (map/lazy-get h :id (get-in crypto-entry [:handler :id])))
-        dfl (select-keys  crypto-entry (:shared h))]
-    (fast-assoc (or dfl {}) :handler-id hid)))
+        dfl (select-keys  crypto-entry (get h :shared))]
+    (qassoc dfl :handler-id hid)))
 
 (defn shared-suite
   [suite]
