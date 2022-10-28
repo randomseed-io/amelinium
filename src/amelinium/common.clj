@@ -15,7 +15,6 @@
             [potemkin.namespaces                  :as               p]
             [tick.core                            :as               t]
             [reitit.core                          :as               r]
-            [reitit.impl                          :refer [fast-assoc]]
             [reitit.coercion                      :as        coercion]
             [ring.util.response]
             [ring.util.codec                      :as           codec]
@@ -34,67 +33,12 @@
             [io.randomseed.utils.time             :as            time]
             [io.randomseed.utils.vec              :as             vec]
             [io.randomseed.utils.map              :as             map]
+            [io.randomseed.utils.map              :refer     [qassoc]]
             [io.randomseed.utils                  :refer         :all])
 
   (:import [amelinium.auth AuthConfig AuthSettings AccountTypes]
            [reitit.core Match]
            [lazy_map.core LazyMapEntry LazyMap]))
-
-;; Utility functions
-
-(defn fast-assoc-multi
-  "Fast version of `assoc` with most of the checks disabled."
-  ([m k v]
-   (fast-assoc m k v))
-  ([m k v a b]
-   (-> (fast-assoc m k v)
-       (fast-assoc a b)))
-  ([m k v a b c d]
-   (-> (fast-assoc m k v)
-       (fast-assoc a b)
-       (fast-assoc c d)))
-  ([m k v a b c d e f]
-   (-> (fast-assoc m k v)
-       (fast-assoc a b)
-       (fast-assoc c d)
-       (fast-assoc e f)))
-  ([m k v a b c d e f g h]
-   (-> (fast-assoc m k v)
-       (fast-assoc a b)
-       (fast-assoc c d)
-       (fast-assoc e f)
-       (fast-assoc g h)))
-  ([m k v a b c d e f g h i j]
-   (-> (fast-assoc m k v)
-       (fast-assoc a b)
-       (fast-assoc c d)
-       (fast-assoc e f)
-       (fast-assoc g h)
-       (fast-assoc i j)))
-  ([m k v a b c d e f g h i j x y]
-   (-> (fast-assoc m k v)
-       (fast-assoc a b)
-       (fast-assoc c d)
-       (fast-assoc e f)
-       (fast-assoc g h)
-       (fast-assoc i j)
-       (fast-assoc x y)))
-  ([m k v a b c d e f g h i j x y q w]
-   (-> (fast-assoc m k v)
-       (fast-assoc a b)
-       (fast-assoc c d)
-       (fast-assoc e f)
-       (fast-assoc g h)
-       (fast-assoc i j)
-       (fast-assoc x y)
-       (fast-assoc q w)))
-  ([m k v a b c d e f g h i j x y q w & pairs]
-   (let [m (fast-assoc-multi m k v a b c d e f g h i j x y)]
-     (loop [m m, k q, v w, pairs pairs]
-       (let [r (fast-assoc m k v)]
-         (if pairs
-           (recur r (first pairs) (second pairs) (nnext pairs))
-           r))))))
 
 ;; Data sources
 
@@ -434,7 +378,7 @@
         param  (some-keyword-simple param)]
     (if (ident? id)
       ;; identifier given (route name)
-      (if-some [m (r/match-by-name rtr id (fast-assoc (or params {}) param pvalue))]
+      (if-some [m (r/match-by-name rtr id (qassoc params param pvalue))]
         (if require-param?
           (or (req-param-path rtr m param pvalue query-params)
               (if name-path-fallback?
@@ -962,7 +906,7 @@
      (if (resp/response? req)
        req
        (if-some [headers (get req :response/headers)]
-         (let [r (or (resp-fn) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
+         (let [r (resp-fn)] (qassoc r :headers (conj (get r :headers) headers)))
          (resp-fn)))))
   ([resp-fn req a]
    (if (nil? req)
@@ -970,7 +914,7 @@
      (if (resp/response? req)
        req
        (if-some [headers (get req :response/headers)]
-         (let [r (or (resp-fn a) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
+         (let [r (resp-fn a)] (qassoc r :headers (conj (get r :headers) headers)))
          (resp-fn a)))))
   ([resp-fn req a b]
    (if (nil? req)
@@ -978,7 +922,7 @@
      (if (resp/response? req)
        req
        (if-some [headers (get req :response/headers)]
-         (let [r (or (resp-fn a b) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
+         (let [r (resp-fn a b)] (qassoc r :headers (conj (get r :headers) headers)))
          (resp-fn a b)))))
   ([resp-fn req a b c]
    (if (nil? req)
@@ -986,7 +930,7 @@
      (if (resp/response? req)
        req
        (if-some [headers (get req :response/headers)]
-         (let [r (or (resp-fn a b c) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
+         (let [r (resp-fn a b c)] (qassoc r :headers (conj (get r :headers) headers)))
          (resp-fn a b c)))))
   ([resp-fn req a b c & more]
    (if (nil? req)
@@ -994,7 +938,7 @@
      (if (resp/response? req)
        req
        (if-some [headers (get req :response/headers)]
-         (let [r (or (apply resp-fn a b c more) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
+         (let [r (apply resp-fn a b c more)] (qassoc r :headers (conj (get r :headers) headers)))
          (apply resp-fn a b c more))))))
 
 (defn render-force
@@ -1007,31 +951,31 @@
    (if (nil? req)
      (resp-fn)
      (if-some [headers (get req :response/headers)]
-       (let [r (or (resp-fn) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
+       (let [r (resp-fn)] (qassoc r :headers (conj (get r :headers) headers)))
        (resp-fn))))
   ([resp-fn req a]
    (if (nil? req)
      (resp-fn a)
      (if-some [headers (get req :response/headers)]
-       (let [r (or (resp-fn a) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
+       (let [r (resp-fn a)] (qassoc r :headers (conj (get r :headers) headers)))
        (resp-fn a))))
   ([resp-fn req a b]
    (if (nil? req)
      (resp-fn a b)
      (if-some [headers (get req :response/headers)]
-       (let [r (or (resp-fn a b) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
+       (let [r (resp-fn a b)] (qassoc r :headers (conj (get r :headers) headers)))
        (resp-fn a b))))
   ([resp-fn req a b c]
    (if (nil? req)
      (resp-fn a b c)
      (if-some [headers (get req :response/headers)]
-       (let [r (or (resp-fn a b c) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
+       (let [r (resp-fn a b c)] (qassoc r :headers (conj (get r :headers) headers)))
        (resp-fn a b c))))
   ([resp-fn req a b c & more]
    (if (nil? req)
      (apply resp-fn a b c more)
      (if-some [headers (get req :response/headers)]
-       (let [r (or (apply resp-fn a b c more) {})] (fast-assoc r :headers (conj (get r :headers) headers)))
+       (let [r (apply resp-fn a b c more)] (qassoc r :headers (conj (get r :headers) headers)))
        (apply resp-fn a b c more)))))
 
 ;; Redirects
@@ -1427,16 +1371,16 @@
   with the `:session/config` key of `req`. If all of that fails, `:session` is used
   as a key."
   ([req smap]
-   (fast-assoc req (or (get smap :session-key)
-                       (get (get req :session/config) :session-key)
-                       :session)
-               smap))
+   (qassoc req (or (get smap :session-key)
+                   (get (get req :session/config) :session-key)
+                   :session)
+           smap))
   ([req smap cfg]
-   (fast-assoc req (or (get cfg  :session-key)
-                       (get smap :session-key)
-                       (get (get req :session/config) :session-key)
-                       :session)
-               smap)))
+   (qassoc req (or (get cfg  :session-key)
+                   (get smap :session-key)
+                   (get (get req :session/config) :session-key)
+                   :session)
+           smap)))
 
 (defn session-variable-get-failed?
   [v]
@@ -1449,7 +1393,7 @@
            (not   (get smap :valid?))
            (nil?  (get smap :id))
            (some? (get smap :err/id )))
-    (-> smap (fast-assoc :valid? true) (fast-assoc :id (get smap :err/id)))
+    (qassoc smap :valid? true :id (get smap :err/id))
     smap))
 
 (defn allow-soft-expired
@@ -1627,14 +1571,13 @@
      :as   opts}]
    (let [global-marker        (or global-marker (str " (" global-label ")"))
          global-present-label (or global-present-label (str present-label global-marker))
-         opts                 (fast-assoc opts :include-global? include-global?)
-         opts                 (fast-assoc opts :include-self?   include-self?)
+         opts                 (qassoc opts :include-global? include-global? :include-self? include-self?)
          [l & d]              (roles-matrix req opts)
          gctx-line            (first d)
          have-gctx?           (and include-global? (= global-context (first gctx-line)))
          labels               (vec (interleave (range) (cons context-label (map str l))))
          roles-labeler        {true present-label, false missing-label, :! global-present-label}
-         gctx-labeler         (if have-gctx? (fast-assoc roles-labeler :! present-label))
+         gctx-labeler         (if have-gctx? (qassoc roles-labeler :! present-label))
          ctx-labeler          (contexts-labeler req (map first d))
          data                 (->> (if have-gctx? (next d) d)
                                    (map (partial calc-roles
@@ -1791,7 +1734,7 @@
     body
     (if (some #(contains? body %) translation-keys)
       (if-some [l (lang-id req)]
-        (fast-assoc body :lang l)
+        (qassoc body :lang l)
         body)
       body)))
 
@@ -1839,13 +1782,13 @@
    (if (contains? body new-k)
      body
      (if-some [t (and k (sub-translation-fn k))]
-       (fast-assoc (or body {}) new-k t)
+       (qassoc body new-k t)
        body)))
   ([body new-k k suffix sub-translation-fn]
    (if (contains? body new-k)
      body
      (if-some [t (and k (sub-translation-fn (try-namespace k) (str (try-name k) suffix)))]
-       (fast-assoc (or body {}) new-k t)
+       (qassoc body new-k t)
        body))))
 
 (defn untranslatable?

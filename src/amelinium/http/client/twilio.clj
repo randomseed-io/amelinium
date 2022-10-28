@@ -12,7 +12,6 @@
             [clojure.string               :as             str]
             [tick.core                    :as               t]
             [hato.client                  :as              hc]
-            [reitit.impl                  :refer [fast-assoc]]
             [amelinium.db                 :as              db]
             [amelinium.logging            :as             log]
             [amelinium.system             :as          system]
@@ -20,6 +19,7 @@
             [io.randomseed.utils.time     :as            time]
             [io.randomseed.utils.var      :as             var]
             [io.randomseed.utils.map      :as             map]
+            [io.randomseed.utils.map      :refer     [qassoc]]
             [potpuri.core                 :refer [deep-merge]]))
 
 (defonce sms    (constantly nil))
@@ -54,7 +54,7 @@
                                             template-group
                                             lang
                                             fallback-template)]
-       (fast-assoc params :template_id template-id)
+       (qassoc params :template_id template-id)
        params)
      params)))
 
@@ -211,11 +211,11 @@
         opts          {:url            url
                        :accept         accept
                        :request-method req-method}
-        opts          (if (is-json? accept) (fast-assoc opts :as :json) opts)
-        opts          (if auth-tok          (fast-assoc opts :oauth-token auth-tok) opts)
-        opts          (if content-type      (fast-assoc opts :content-type content-type) opts)
+        opts          (if (is-json? accept) (qassoc opts :as :json) opts)
+        opts          (if auth-tok          (qassoc opts :oauth-token auth-tok) opts)
+        opts          (if content-type      (qassoc opts :content-type content-type) opts)
         opts          (into opts existing-opts)]
-    (fast-assoc config :request-opts opts)))
+    (qassoc config :request-opts opts)))
 
 ;; Initialization
 
@@ -254,7 +254,7 @@
   (if-not (:enabled? config)
     (constantly nil)
     (let [client   (hc/build-http-client (:client-opts config))
-          req-opts (fast-assoc (or (:request-opts config) {}) :http-client client)]
+          req-opts (qassoc (:request-opts config) :http-client client)]
       (log/msg "Registering Twilio client:" k)
       (if-some [default-params (:parameters config)]
         (fn twilio-request
@@ -273,17 +273,17 @@
                                 (if fparams
                                   (deep-merge :into default-params fparams)
                                   default-params))]
-               (-> (fast-assoc opts :form-params all-params)
+               (-> (qassoc opts :form-params all-params)
                    (hc/request respond raise)))))
           ([params]
            (if (= :config params)
              config
              (let [params     (if (sending-json? req-opts) params (stringify-params params))
                    all-params (if params (deep-merge :into default-params params) default-params)]
-               (-> (fast-assoc req-opts :form-params all-params)
+               (-> (qassoc req-opts :form-params all-params)
                    (hc/request)))))
           ([]
-           (-> (fast-assoc req-opts :form-params default-params)
+           (-> (qassoc req-opts :form-params default-params)
                (hc/request))))
         (fn twilio-request
           ([opts params & [respond raise]]
@@ -299,13 +299,13 @@
                                   (deep-merge :into fparams params)
                                   params)
                                 fparams)]
-               (-> (fast-assoc opts :form-params (or all-params {}))
+               (-> (qassoc opts :form-params (or all-params {}))
                    (hc/request respond raise)))))
           ([params]
            (if (= :config params)
              config
              (let [params (if (sending-json? req-opts) params (stringify-params params))]
-               (-> (fast-assoc req-opts :form-params (or params {}))
+               (-> (qassoc req-opts :form-params (or params {}))
                    (hc/request)))))
           ([]
            (hc/request req-opts)))))))

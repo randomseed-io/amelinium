@@ -12,8 +12,8 @@
   (:require [potemkin.namespaces             :as               p]
             [reitit.core                     :as               r]
             [reitit.ring                     :as            ring]
-            [reitit.impl                     :refer [fast-assoc]]
             [io.randomseed.utils             :refer         :all]
+            [io.randomseed.utils.map         :refer     [qassoc]]
             [io.randomseed.utils.reitit.http :as            http])
 
   (:import [reitit.core Match]))
@@ -86,4 +86,4 @@
 
 (defn inject-route-data
   [req]
-  (fast-assoc req :route/data (get (get req ::r/match) :data)))
+  (qassoc req :route/data (get (get req ::r/match) :data)))

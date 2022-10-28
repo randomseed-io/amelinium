@@ -18,7 +18,7 @@
             [amelinium.errors                     :as          errors]
             [amelinium.i18n                       :as            i18n]
             [amelinium.http.middleware.validators :as      validators]
-            [reitit.impl                          :refer [fast-assoc]]
+            [io.randomseed.utils.map              :refer     [qassoc]]
             [io.randomseed.utils                  :refer         :all])
 
   (:import [reitit.core Match]
@@ -128,11 +128,11 @@
          (common/add-missing-lang body req [:status/title :status/description])
          (if (common/untranslatable? status)
            (-> body
-               (fast-assoc :status status)
+               (qassoc :status status)
                (common/add-missing-lang req [:status/title :status/description]))
            (let [tr-sub (i18n/no-default (common/translator-sub req))]
              (-> body
-                 (fast-assoc :status status)
+                 (qassoc :status status)
                  (common/add-missing-translation :status/title status tr-sub)
                  (common/add-missing-translation :status/description status ".full" tr-sub)
                  (common/add-missing-lang req [:status/title :status/description])))))
@@ -170,18 +170,14 @@
      req
      (let [resp (resp-fn (render req))]
        (if-some [headers (get req :response/headers)]
-         (if (pos? (count resp))
-           (fast-assoc resp :headers headers)
-           {:headers headers})
+         (qassoc resp :headers headers)
          resp))))
   ([resp-fn status req]
    (if (response? req)
      req
      (let [resp (resp-fn (render req status))]
        (if-some [headers (get req :response/headers)]
-         (if (pos? (count resp))
-           (fast-assoc resp :headers headers)
-           {:headers headers})
+         (qassoc resp :headers headers)
          resp)))))
 
 (defn render-response-force
@@ -203,17 +199,13 @@
   ([resp-fn req]
    (let [resp (resp-fn (render req))]
      (if-some [headers (get req :response/headers)]
-       (if (pos? (count resp))
-         (fast-assoc resp :headers headers)
-         {:headers headers})
-       (resp-fn resp))))
+       (qassoc resp :headers headers)
+       resp)))
   ([resp-fn status req]
    (let [resp (resp-fn (render req status))]
      (if-some [headers (get req :response/headers)]
-       (if (pos? (count resp))
-         (fast-assoc resp :headers headers)
-         {:headers headers})
-       (resp-fn resp)))))
+       (qassoc resp :headers headers)
+       resp))))
 
 ;; OK response
 
@@ -588,22 +580,22 @@
    (common/render resp/created))
   ([req]
    (if-some [resp (common/created req (get req :response/location))]
-     (fast-assoc resp :body (render req :ok/created))))
+     (qassoc resp :body (render req :ok/created))))
   ([req name-or-path]
    (if-some [resp (common/created req name-or-path)]
-     (fast-assoc resp :body (render req :ok/created))))
+     (qassoc resp :body (render req :ok/created))))
   ([req name-or-path lang]
    (if-some [resp (common/created req name-or-path lang)]
-     (fast-assoc resp :body (render req :ok/created))))
+     (qassoc resp :body (render req :ok/created))))
   ([req name-or-path lang params]
    (if-some [resp (common/created req name-or-path lang params)]
-     (fast-assoc resp :body (render req :ok/created))))
+     (qassoc resp :body (render req :ok/created))))
   ([req name-or-path lang params query-params]
    (if-some [resp (common/created req name-or-path lang params query-params)]
-     (fast-assoc resp :body (render req :ok/created))))
+     (qassoc resp :body (render req :ok/created))))
   ([req name-or-path lang params query-params & more]
    (if-some [resp (apply common/created req name-or-path lang params query-params more)]
-     (fast-assoc resp :body (render req :ok/created)))))
+     (qassoc resp :body (render req :ok/created)))))
 
 (defn render-localized-created
   "Renders 201 response with a localized redirect and possible body taken from a
@@ -613,22 +605,22 @@
    (render-response resp/created))
   ([req]
    (if-some [resp (common/localized-created req (get req :response/location))]
-     (fast-assoc resp :body (render req :ok/created))))
+     (qassoc resp :body (render req :ok/created))))
   ([req name-or-path]
    (if-some [resp (common/localized-created req name-or-path)]
-     (fast-assoc resp :body (render req :ok/created))))
+     (qassoc resp :body (render req :ok/created))))
   ([req name-or-path lang]
    (if-some [resp (common/localized-created req name-or-path lang)]
-     (fast-assoc resp :body (render req :ok/created))))
+     (qassoc resp :body (render req :ok/created))))
   ([req name-or-path lang params]
    (if-some [resp (common/localized-created req name-or-path lang params)]
-     (fast-assoc resp :body (render req :ok/created))))
+     (qassoc resp :body (render req :ok/created))))
   ([req name-or-path lang params query-params]
    (if-some [resp (common/localized-created req name-or-path lang params query-params)]
-     (fast-assoc resp :body (render req :ok/created))))
+     (qassoc resp :body (render req :ok/created))))
   ([req name-or-path lang params query-params & more]
    (if-some [resp (apply common/localized-created req name-or-path lang params query-params more)]
-     (fast-assoc resp :body (render req :ok/created)))))
+     (qassoc resp :body (render req :ok/created)))))
 
 ;; Responses without a body
 
@@ -684,19 +676,14 @@
                                        sub-title-key sub-desc-key see-also-key nil))
   ([req out sub-status sub-key main-key sub-title-key sub-desc-key see-also-key tr-sub]
    (if sub-status
-     (let [no?  (nil? out)
-           outm (if no? {} out)
-           body (if no? {} (get out main-key))
-           body (if (nil? body) {} body)]
-       (if (or no? (map? body))
-         (fast-assoc
-          outm main-key
+     (let [body (get out main-key)]
+       (if (or (nil? body) (map? body))
+         (qassoc
+          out main-key
           (if (contains? body sub-key)
             (common/add-missing-lang body req [sub-title-key sub-desc-key])
             (let [see-also (conj (or (get body see-also-key) []) sub-key)
-                  body     (-> body
-                               (fast-assoc sub-key sub-status)
-                               (fast-assoc see-also-key see-also))]
+                  body     (qassoc body sub-key sub-status see-also-key see-also)]
               (if (common/untranslatable? sub-status)
                 (common/add-missing-lang body req [sub-title-key sub-desc-key])
                 (let [tr-sub (or tr-sub (i18n/no-default (common/translator-sub req)))]
@@ -870,29 +857,23 @@
 
 (defn body-add-lang
   ([req]
-   (fast-assoc req :response/body
-               (let [body (get req :response/body)
-                     k    (common/lang-param req)
-                     v    (common/lang-id req)]
-                 (if (pos? (count body))
-                   (fast-assoc body k v)
-                   {k v}))))
+   (qassoc req :response/body
+           (let [body (get req :response/body)
+                 k    (common/lang-param req)
+                 v    (common/lang-id req)]
+             (qassoc body k v))))
   ([req lang]
-   (fast-assoc req :response/body
-               (let [body (get req :response/body)
-                     k    (common/lang-param req)
-                     v    (or lang (common/lang-id req))]
-                 (if (pos? (count body))
-                   (fast-assoc body k v)
-                   {k v}))))
+   (qassoc req :response/body
+           (let [body (get req :response/body)
+                 k    (common/lang-param req)
+                 v    (or lang (common/lang-id req))]
+             (qassoc body k v))))
   ([req lang field]
-   (fast-assoc req :response/body
-               (let [body (get req :response/body)
-                     k    (or field (common/lang-param req))
-                     v    (or lang  (common/lang-id req))]
-                 (if (pos? (count body))
-                   (fast-assoc body k v)
-                   {k v})))))
+   (qassoc req :response/body
+           (let [body (get req :response/body)
+                 k    (or field (common/lang-param req))
+                 v    (or lang  (common/lang-id req))]
+             (qassoc body k v)))))
 
 (defn body-add-session-id
   ([req]
@@ -900,26 +881,22 @@
      (body-add-session-id req smap)
      req))
   ([req smap]
-   (fast-assoc req :response/body
-               (let [body (get req :response/body)
-                     k    (or (get smap :session-id-field)
-                              (get (get req :session/config) :session-id-field)
-                              :session-id)
-                     v    (get smap :id)]
-                 (if (pos? (count body))
-                   (fast-assoc body k v)
-                   {k v}))))
+   (qassoc req :response/body
+           (let [body (get req :response/body)
+                 k    (or (get smap :session-id-field)
+                          (get (get req :session/config) :session-id-field)
+                          :session-id)
+                 v    (get smap :id)]
+             (qassoc body k v))))
   ([req smap field]
-   (fast-assoc req :response/body
-               (let [body (get req :response/body)
-                     k    (or field
-                              (get smap :session-id-field)
-                              (get (get req :session/config) :session-id-field)
-                              :session-id)
-                     v    (get smap :id)]
-                 (if (pos? (count body))
-                   (fast-assoc body k v)
-                   {k v})))))
+   (qassoc req :response/body
+           (let [body (get req :response/body)
+                 k    (or field
+                          (get smap :session-id-field)
+                          (get (get req :session/config) :session-id-field)
+                          :session-id)
+                 v    (get smap :id)]
+             (qassoc body k v)))))
 
 (defn session-status
   "Returns session status for the given session map `smap`."
@@ -968,8 +945,8 @@
   a map."
   [req & body]
   (if (and (seq? body) (> (count body) 1))
-    `(fast-assoc ~req :response/body (do ~@body))
-    `(fast-assoc ~req :response/body ~@body)))
+    `(qassoc ~req :response/body (do ~@body))
+    `(qassoc ~req :response/body ~@body)))
 
 (defmacro update-body
   "Updates response body in a request map `req` under its key `:response/body` using
@@ -992,36 +969,31 @@
    (let [k (if (or (ident? k) (string? k) (char? k))
              (some-keyword k)
              (cons `some-keyword (cons k nil)))]
-     `(let [req# ~req
-            bod# (get req# :response/body)]
-        (fast-assoc req# :response/body
-                    (if (pos? (count bod#))
-                      (fast-assoc bod# ~k ~v)
-                      {~k ~v})))))
+     `(let [req# ~req]
+        (qassoc req# :response/body (qassoc (get req# :response/body) ~k ~v)))))
   ([req k v & more]
-   (let [pairs      (cons k (cons v more))
-         names      (take-nth 2 pairs)
-         values     (concat (take-nth 2 (rest pairs)) '(nil))
-         pairs      (map #(cons (if (or (ident?  %1)
-                                        (string? %1)
-                                        (char?   %1))
-                                  (some-keyword %1)
-                                  (cons `some-keyword (cons %1 nil)))
-                                (cons %2 nil))
-                         names values)
-         pairs      (apply concat pairs)
-         names      (take-nth 2 pairs)
-         dups?      (not= (count names) (count (distinct names)))
-         assoc-impl (if (> (count pairs) 1) `common/fast-assoc-multi `fast-assoc)]
+   (let [pairs  (cons k (cons v more))
+         names  (take-nth 2 pairs)
+         values (concat (take-nth 2 (rest pairs)) '(nil))
+         pairs  (map #(cons (if (or (ident?  %1)
+                                    (string? %1)
+                                    (char?   %1))
+                              (some-keyword %1)
+                              (cons `some-keyword (cons %1 nil)))
+                            (cons %2 nil))
+                     names values)
+         pairs  (apply concat pairs)
+         names  (take-nth 2 pairs)
+         dups?  (not= (count names) (count (distinct names)))]
      (if dups?
        `(let [req# ~req]
-          (fast-assoc req# :response/body (common/fast-assoc-multi (get req# :response/body) ~@pairs)))
+          (qassoc req# :response/body (qassoc (get req# :response/body) ~@pairs)))
        `(let [req# ~req
               bod# (get req# :response/body)]
-          (fast-assoc req# :response/body
-                      (if (pos? (count bod#))
-                        (~assoc-impl bod# ~@pairs)
-                        {~@pairs ~@[]})))))))
+          (qassoc req# :response/body
+                  (if (pos? (count bod#))
+                    (qassoc bod# ~@pairs)
+                    {~@pairs ~@[]})))))))
 
 (defmacro add-status
   "Adds response status to a request map `req` under its key `:response/status` using
@@ -1029,8 +1001,8 @@
   additional arguments. Returns updated `req`. Assumes that `req` is always a map."
   [req & body]
   (if (and (seq? body) (> (count body) 1))
-    `(fast-assoc ~req :response/status (do ~@body))
-    `(fast-assoc ~req :response/status ~@body)))
+    `(qassoc ~req :response/status (do ~@body))
+    `(qassoc ~req :response/status ~@body)))
 
 (defmacro remove-status
   "Removes `:response/status` from `req` using `clojure.core/dissoc`."
@@ -1054,10 +1026,10 @@
                       (cons `some-str (cons header-name nil)))]
     `(let [req# ~req
            hdr# (get req# :response/headers)]
-       (fast-assoc req# :response/headers
-                   (if (pos? (count hdr#))
-                     (fast-assoc hdr# ~header-name (do ~@body))
-                     {~header-name (do ~@body)})))))
+       (qassoc req# :response/headers
+               (if (pos? (count hdr#))
+                 (qassoc hdr# ~header-name (do ~@body))
+                 {~header-name (do ~@body)})))))
 
 (defmacro add-headers
   "Adds headers with associated values to `:response/headers` map of the `req` using
@@ -1076,32 +1048,31 @@
                        (cons `some-str (cons header-name nil)))]
      `(let [req# ~req
             hdr# (get req# :response/headers)]
-        (fast-assoc req# :response/headers
-                    (if (pos? (count hdr#))
-                      (fast-assoc hdr# ~header-name ~header-value)
-                      {~header-name ~header-value})))))
+        (qassoc req# :response/headers
+                (if (pos? (count hdr#))
+                  (qassoc hdr# ~header-name ~header-value)
+                  {~header-name ~header-value})))))
   ([req header-name header-value & more]
-   (let [pairs      (cons header-name (cons header-value more))
-         names      (take-nth 2 pairs)
-         values     (concat (take-nth 2 (rest pairs)) '(nil))
-         pairs      (map #(cons (if (or (ident?  %1)
-                                        (string? %1)
-                                        (char?   %1)
-                                        (number? %1))
-                                  (some-str %1)
-                                  (cons `some-str (cons %1 nil)))
-                                (cons %2 nil))
-                         names values)
-         pairs      (apply concat pairs)
-         names      (take-nth 2 pairs)
-         dups?      (not= (count names) (count (distinct names)))
-         assoc-impl (if (> (count pairs) 1) `common/fast-assoc-multi `fast-assoc)]
+   (let [pairs  (cons header-name (cons header-value more))
+         names  (take-nth 2 pairs)
+         values (concat (take-nth 2 (rest pairs)) '(nil))
+         pairs  (map #(cons (if (or (ident?  %1)
+                                    (string? %1)
+                                    (char?   %1)
+                                    (number? %1))
+                              (some-str %1)
+                              (cons `some-str (cons %1 nil)))
+                            (cons %2 nil))
+                     names values)
+         pairs  (apply concat pairs)
+         names  (take-nth 2 pairs)
+         dups?  (not= (count names) (count (distinct names)))]
      (if dups?
        `(let [req# ~req]
-          (fast-assoc req# :response/headers (common/fast-assoc-multi (get req# :response/headers) ~@pairs)))
+          (qassoc req# :response/headers (qassoc (get req# :response/headers) ~@pairs)))
        `(let [req# ~req
               hdr# (get req# :response/headers)]
-          (fast-assoc req# :response/headers
-                      (if (pos? (count hdr#))
-                        (~assoc-impl hdr# ~@pairs)
-                        {~@pairs ~@[]})))))))
+          (qassoc req# :response/headers
+                  (if (pos? (count hdr#))
+                    (qassoc hdr# ~@pairs)
+                    {~@pairs ~@[]})))))))

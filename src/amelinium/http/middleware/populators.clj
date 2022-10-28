@@ -10,9 +10,9 @@
 
   (:require [amelinium.system        :as          system]
             [amelinium.logging       :as             log]
-            [reitit.impl             :refer [fast-assoc]]
             [io.randomseed.utils.var :as             var]
             [io.randomseed.utils.map :as             map]
+            [io.randomseed.utils.map :refer     [qassoc]]
             [io.randomseed.utils     :refer         :all]))
 
 (defn- derefn
@@ -86,7 +86,7 @@
   accept two arguments (a request/context map and a key) and return a value to be
   associated."
   [req populators]
-  (reduce (fn [req [k f]] (fast-assoc req k (f req))) req populators))
+  (reduce (fn [req [k f]] (qassoc req k (f req))) req populators))
 
 (defn wrap-populators
   "Populators wrapping middleware."

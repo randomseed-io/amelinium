@@ -20,8 +20,9 @@
             [clj-uuid                 :as          uuid]
             [amelinium.db             :as            db]
             [io.randomseed.utils.time :as          time]
-            [io.randomseed.utils.map  :as           map]
             [io.randomseed.utils.ip   :as            ip]
+            [io.randomseed.utils.map  :as           map]
+            [io.randomseed.utils.map  :refer   [qassoc]]
             [io.randomseed.utils      :refer       :all]))
 
 (def ten-minutes
@@ -132,7 +133,7 @@
              (-> r
                  (map/assoc-if user-id?  :user/id  user-id)
                  (map/assoc-if user-uid? :user/uid user-uid)
-                 (assoc :exists? user-id? :confirmed? (pos-int? (get r :confirmed)))
+                 (qassoc :exists? user-id? :confirmed? (pos-int? (get r :confirmed)))
                  (dissoc :confirmed)
                  (map/update-existing :account-type some-keyword)
                  (map/update-existing :reason some-keyword)))))))))
@@ -282,9 +283,8 @@
                (sql/find-by-keys
                 db :confirmations
                 {:id id :code code}
-                (assoc db/opts-simple-map :columns [:token :confirmed])))]
-    (-> r
-        (assoc  :confirmed? (pos-int? (get r :confirmed)))
+                (qassoc db/opts-simple-map :columns [:token :confirmed])))]
+    (-> (qassoc r :confirmed? (pos-int? (get r :confirmed)))
         (dissoc :confirmed))))
 
 (def confirm-token-query
@@ -382,9 +382,10 @@
       (let [reason (or (some-str reason) "creation")]
         (if-some [r (jdbc/execute-one! db [decrease-attempts-query id reason] db/opts-simple-map)]
           (-> r
-              (assoc :exists?    (pos-int? (get r :user-id)))
-              (assoc :confirmed? (pos-int? (get r :confirmed))) (dissoc :confirmed)
-              (map/update-existing :user-uid     (comp parse-uuid str))
+              (qassoc :exists?    (pos-int? (get r :user-id))
+                      :confirmed? (pos-int? (get r :confirmed)))
+              (dissoc :confirmed)
+              (map/update-existing :user-uid (comp parse-uuid str))
               (map/update-existing :account-type some-keyword))
           (let [errs (report-errors db id nil reason false)
                 errs (specific-id errs id :verify/bad-id :verify/bad-email :verify/bad-phone)]

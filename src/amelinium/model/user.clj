@@ -26,8 +26,9 @@
             [amelinium.http.middleware.roles   :as         roles]
             [amelinium.model.confirmation      :as  confirmation]
             [io.randomseed.utils.time          :as          time]
-            [io.randomseed.utils.map           :as           map]
             [io.randomseed.utils.ip            :as            ip]
+            [io.randomseed.utils.map           :as           map]
+            [io.randomseed.utils.map           :refer   [qassoc]]
             [io.randomseed.utils               :refer       :all])
 
   (:import [javax.sql          DataSource]
@@ -517,7 +518,7 @@
   (let [token (some-str token)]
     (if token
       (if-some [r (jdbc/execute-one! db [create-with-token-query token] db/opts-simple-map)]
-        (assoc r :created? true :uid (db/as-uuid (get r :uid)))
+        (qassoc r :created? true :uid (db/as-uuid (get r :uid)))
         (let [errs (confirmation/report-errors db token "creation" true)]
           {:created? false
            :errors   errs})))))
@@ -539,7 +540,7 @@
         email (some-str email)]
     (if (and code email)
       (if-some [r (jdbc/execute-one! db [create-with-code-query code email] db/opts-simple-map)]
-        (assoc r :created? true :uid (db/as-uuid (get r :uid)))
+        (qassoc r :created? true :uid (db/as-uuid (get r :uid)))
         (let [errs (confirmation/report-errors db email code "creation" true)]
           {:created? false
            :errors   errs})))))

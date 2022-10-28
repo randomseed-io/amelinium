@@ -9,19 +9,20 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [potemkin.namespaces                :as             p]
-            [tick.core                          :as             t]
-            [clojure.string                     :as           str]
-            [amelinium.logging                  :as           log]
-            [amelinium.common                   :as        common]
-            [amelinium.common.controller        :as         super]
-            [io.randomseed.utils.map            :as           map]
-            [io.randomseed.utils                :refer       :all]
-            [amelinium.i18n                     :as          i18n]
-            [amelinium.api                      :as           api]
-            [amelinium.http                     :as          http]
-            [amelinium.http.middleware.language :as      language]
-            [amelinium.http.middleware.coercion :as      coercion]))
+  (:require [potemkin.namespaces                :as              p]
+            [tick.core                          :as              t]
+            [clojure.string                     :as            str]
+            [amelinium.logging                  :as            log]
+            [amelinium.common                   :as         common]
+            [amelinium.common.controller        :as          super]
+            [io.randomseed.utils.map            :as            map]
+            [io.randomseed.utils.map            :refer    [qassoc]]
+            [io.randomseed.utils                :refer        :all]
+            [amelinium.i18n                     :as           i18n]
+            [amelinium.api                      :as            api]
+            [amelinium.http                     :as           http]
+            [amelinium.http.middleware.language :as       language]
+            [amelinium.http.middleware.coercion :as       coercion]))
 
 (p/import-vars [amelinium.common.controller
                 check-password lock-remaining-mins
@@ -122,12 +123,13 @@
         sess       (get req sess-key)
         prolonged? (some? (and (get sess :expired?) (get req :goto-uri)))
         remaining  (lock-remaining-mins req auth-db (if prolonged? sess) t/now)
-        body       (assoc (get req :response/body {}) :lock-remains remaining)]
-    (assoc req
-           :response/body body
-           sess-key (delay (if @prolonged?
-                             (assoc sess :id (or (get sess :id) (get sess :err/id)) :prolonged? true)
-                             (assoc sess :prolonged? false))))))
+        body       (qassoc (get req :response/body) :lock-remains remaining)]
+    (qassoc req
+            :response/body body
+            sess-key       (delay
+                             (if @prolonged?
+                               (qassoc sess :id (or (get sess :id) (get sess :err/id)) :prolonged? true)
+                               (qassoc sess :prolonged? false))))))
 
 ;; Request preparation handler
 

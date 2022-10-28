@@ -8,16 +8,16 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [clojure.string          :as        str]
-            [clojure.core.memoize    :as        mem]
-            [smangler.api            :as         sa]
-            [amelinium.logging       :as        log]
-            [amelinium.system        :as     system]
-            [amelinium.common        :as     common]
-            [io.randomseed.utils.var :as        var]
-            [io.randomseed.utils.map :as        map]
-            [io.randomseed.utils.ip  :as         ip]
-            [io.randomseed.utils     :refer    :all])
+  (:require [clojure.string          :as         str]
+            [clojure.core.memoize    :as         mem]
+            [smangler.api            :as          sa]
+            [amelinium.logging       :as         log]
+            [amelinium.system        :as      system]
+            [io.randomseed.utils.var :as         var]
+            [io.randomseed.utils.ip  :as          ip]
+            [io.randomseed.utils.map :as         map]
+            [io.randomseed.utils.map :refer [qassoc]]
+            [io.randomseed.utils     :refer     :all])
 
   (:import  [java.net InetAddress Inet4Address Inet6Address]
             [inet.ipaddr IPAddress IPAddressString IPAddressNetwork]
@@ -123,10 +123,10 @@
                           (get-ips-from-req-data-lru (get req :remote-addr)
                                                      proxy-setting
                                                      proxy-for-fn)))]
-     (common/fast-assoc-multi req
-                              :remote-ip        (delay (nth @addrs 0 nil))
-                              :remote-ip/str    (delay (nth @addrs 1 nil))
-                              :remote-ip/proxy? (delay (nth @addrs 3 nil))))))
+     (qassoc req
+             :remote-ip        (delay (nth @addrs 0 nil))
+             :remote-ip/str    (delay (nth @addrs 1 nil))
+             :remote-ip/proxy? (delay (nth @addrs 3 nil))))))
 
 ;; Configuration initializers
 

@@ -13,7 +13,6 @@
             [potemkin.namespaces                  :as               p]
             [tick.core                            :as               t]
             [reitit.core                          :as               r]
-            [reitit.impl                          :refer [fast-assoc]]
             [ring.util.response]
             [ring.util.http-response              :as            resp]
             [ring.util.request                    :as             req]
@@ -27,6 +26,7 @@
             [amelinium.http.middleware.validators :as      validators]
             [amelinium.logging                    :as             log]
             [io.randomseed.utils.map              :as             map]
+            [io.randomseed.utils.map              :refer     [qassoc]]
             [io.randomseed.utils                  :refer         :all]
             [hiccup.core                          :refer         :all]
             [hiccup.table                         :as           table])
@@ -148,7 +148,7 @@
   (let [req (map/to-lazy req)]
     (reduce (fn [ret k]
               (if-let [entry (and (not (contains? ret k)) (find req k))]
-                (fast-assoc ret k (.val_ ^LazyMapEntry entry))
+                (qassoc ret k (.val_ ^LazyMapEntry entry))
                 ret))
             (map/to-lazy (or data empty-lazy-map))
             (seq keyz))))
@@ -157,7 +157,7 @@
   "Disables processing of the `:app/data` key for the given request `req` by
   associating it with the `false` value."
   [req]
-  (fast-assoc req :app/data false))
+  (qassoc req :app/data false))
 
 (defn prep-app-data
   "Prepares data for the rendering functions by copying the given values associated
@@ -275,7 +275,7 @@
   ([req status lang status-key title-key description-key]
    (if status
      (->> (update-status (get req :app/data) req status lang status-key title-key description-key)
-          (fast-assoc req :app/data))
+          (qassoc req :app/data))
      req))
   ([data req status lang status-key title-key description-key]
    (if status
@@ -378,7 +378,7 @@
                                      :lang dlng)
              data (update-status data req status dlng)
              html (selmer/render-file view data)
-             rndr (fast-assoc data :body [:safe html])
+             rndr (qassoc data :body [:safe html])
              resp (selmer/render-file layt rndr)]
          resp)))))
 
@@ -442,7 +442,7 @@
      req
      (let [r (-> (render req status data view layout lang sess) (resp-fn))]
        (if-some [headers (get req :response/headers)]
-         (fast-assoc (or r {}) :headers (conj (get r :headers) headers))
+         (qassoc r :headers (conj (get r :headers) headers))
          r)))))
 
 (defn render-response-force
@@ -498,7 +498,7 @@
   ([resp-fn status req data view layout lang sess]
    (let [r (-> (render req status data view layout lang sess) (resp-fn))]
      (if-some [headers (get req :response/headers)]
-       (fast-assoc (or r {}) :headers (conj (get r :headers) headers))
+       (qassoc r :headers (conj (get r :headers) headers))
        r))))
 
 ;; Rendering functions generation
@@ -633,31 +633,31 @@
    (common/render resp/created))
   ([req]
    (if-some [resp (common/created req (get req :response/location))]
-     (fast-assoc resp :body (render req :ok/created nil nil nil nil nil))))
+     (qassoc resp :body (render req :ok/created nil nil nil nil nil))))
   ([req data]
    (if-some [resp (common/created req (get req :response/location))]
-     (fast-assoc resp :body (render req :ok/created data nil nil nil nil))))
+     (qassoc resp :body (render req :ok/created data nil nil nil nil))))
   ([req data view]
    (if-some [resp (common/created req (get req :response/location))]
-     (fast-assoc resp :body (render req :ok/created data view nil nil nil))))
+     (qassoc resp :body (render req :ok/created data view nil nil nil))))
   ([req data view layout]
    (if-some [resp (common/created req (get req :response/location))]
-     (fast-assoc resp :body (render req :ok/created data view layout nil nil))))
+     (qassoc resp :body (render req :ok/created data view layout nil nil))))
   ([req data view layout lang]
    (if-some [resp (common/created req (get req :response/location) lang)]
-     (fast-assoc resp :body (render req :ok/created data view layout lang nil))))
+     (qassoc resp :body (render req :ok/created data view layout lang nil))))
   ([req data view layout lang smap]
    (if-some [resp (common/created req (get req :response/location) lang)]
-     (fast-assoc resp :body (render req :ok/created data view layout lang smap))))
+     (qassoc resp :body (render req :ok/created data view layout lang smap))))
   ([req data view layout lang smap name-or-path]
    (if-some [resp (common/created req name-or-path lang)]
-     (fast-assoc resp :body (render req :ok/created data view layout lang smap))))
+     (qassoc resp :body (render req :ok/created data view layout lang smap))))
   ([req data view layout lang smap name-or-path params]
    (if-some [resp (common/created req name-or-path lang params)]
-     (fast-assoc resp :body (render req :ok/created data view layout lang smap))))
+     (qassoc resp :body (render req :ok/created data view layout lang smap))))
   ([req data view layout lang smap name-or-path params query-params]
    (if-some [resp (common/created req name-or-path lang params query-params)]
-     (fast-assoc resp :body (render req :ok/created data view layout lang smap)))))
+     (qassoc resp :body (render req :ok/created data view layout lang smap)))))
 
 (defn localized-render-created
   "Renders 201 response with a redirect (possibly localized if a destination path is
@@ -669,31 +669,31 @@
    (common/render resp/created))
   ([req]
    (if-some [resp (common/localized-created req (get req :response/location))]
-     (fast-assoc resp :body (render req :ok/created nil nil nil nil nil))))
+     (qassoc resp :body (render req :ok/created nil nil nil nil nil))))
   ([req data]
    (if-some [resp (common/localized-created req (get req :response/location))]
-     (fast-assoc resp :body (render req :ok/created data nil nil nil nil))))
+     (qassoc resp :body (render req :ok/created data nil nil nil nil))))
   ([req data view]
    (if-some [resp (common/localized-created req (get req :response/location))]
-     (fast-assoc resp :body (render req :ok/created data view nil nil nil))))
+     (qassoc resp :body (render req :ok/created data view nil nil nil))))
   ([req data view layout]
    (if-some [resp (common/localized-created req (get req :response/location))]
-     (fast-assoc resp :body (render req :ok/created data view layout nil nil))))
+     (qassoc resp :body (render req :ok/created data view layout nil nil))))
   ([req data view layout lang]
    (if-some [resp (common/localized-created req (get req :response/location) lang)]
-     (fast-assoc resp :body (render req :ok/created data view layout lang nil))))
+     (qassoc resp :body (render req :ok/created data view layout lang nil))))
   ([req data view layout lang smap]
    (if-some [resp (common/localized-created req (get req :response/location) lang)]
-     (fast-assoc resp :body (render req :ok/created data view layout lang smap))))
+     (qassoc resp :body (render req :ok/created data view layout lang smap))))
   ([req data view layout lang smap name-or-path]
    (if-some [resp (common/localized-created req name-or-path lang)]
-     (fast-assoc resp :body (render req :ok/created data view layout lang smap))))
+     (qassoc resp :body (render req :ok/created data view layout lang smap))))
   ([req data view layout lang smap name-or-path params]
    (if-some [resp (common/localized-created req name-or-path lang params)]
-     (fast-assoc resp :body (render req :ok/created data view layout lang smap))))
+     (qassoc resp :body (render req :ok/created data view layout lang smap))))
   ([req data view layout lang smap name-or-path params query-params]
    (if-some [resp (common/localized-created req name-or-path lang params query-params)]
-     (fast-assoc resp :body (render req :ok/created data view layout lang smap)))))
+     (qassoc resp :body (render req :ok/created data view layout lang smap)))))
 
 ;; Responses without bodies
 

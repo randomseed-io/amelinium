@@ -25,12 +25,12 @@
             [io.randomseed.utils.fs        :as                     fs]
             [io.randomseed.utils.var       :as                    var]
             [io.randomseed.utils.map       :as                    map]
+            [io.randomseed.utils.map       :refer            [qassoc]]
             [phone-number.util             :as                 phutil]
             [phone-number.core             :as                  phone]
             [amelinium.app                 :as                    app]
             [amelinium.system              :as                 system]
-            [amelinium.logging             :as                    log]
-            [reitit.impl                   :refer        [fast-assoc]])
+            [amelinium.logging             :as                    log])
 
   (:import [com.zaxxer.hikari HikariConfig HikariDataSource HikariPoolMXBean]
            [java.sql Connection]
@@ -187,8 +187,8 @@
       (reduce (fn [m uid]
                 (let [id (cwr/lookup cache uid false)]
                   (if (false? id)
-                    (fast-assoc m false (conj (get m false) uid))
-                    (fast-assoc m uid id))))
+                    (qassoc m false (conj (get m false) uid))
+                    (qassoc m uid id))))
               {} uids))))
 
 (defn uid-to-id
@@ -204,7 +204,7 @@
         looked-up
         (let [db-ids  (getter db missing)
               present (or (dissoc looked-up false) {})]
-          (reduce #(fast-assoc %1 %2 (cwr/lookup-or-miss cache %2 db-ids))
+          (reduce #(qassoc %1 %2 (cwr/lookup-or-miss cache %2 db-ids))
                   present missing))))))
 
 ;; Email mapping
@@ -239,8 +239,8 @@
       (reduce (fn [m email]
                 (let [id (cwr/lookup cache email false)]
                   (if (false? id)
-                    (fast-assoc m false (conj (get m false) email))
-                    (fast-assoc m email id))))
+                    (qassoc m false (conj (get m false) email))
+                    (qassoc m email id))))
               {} emails))))
 
 (defn email-to-id
@@ -255,8 +255,8 @@
       (if-not missing
         looked-up
         (let [db-ids  (getter db missing)
-              present (or (dissoc looked-up false) {})]
-          (reduce #(fast-assoc %1 %2 (cwr/lookup-or-miss cache %2 db-ids))
+              present (dissoc looked-up false)]
+          (reduce #(qassoc %1 %2 (cwr/lookup-or-miss cache %2 db-ids))
                   present missing))))))
 
 ;; Configuration record

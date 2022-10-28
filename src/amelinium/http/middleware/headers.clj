@@ -6,13 +6,13 @@
 
     amelinium.http.middleware.headers
 
-  (:require [clojure.string      :as             str]
-            [reitit.core         :as               r]
-            [reitit.impl         :refer [fast-assoc]]
-            [potpuri.core        :refer [deep-merge]]
-            [io.randomseed.utils :as           utils]
-            [amelinium.logging   :as             log]
-            [amelinium.system    :as          system]))
+  (:require [clojure.string          :as             str]
+            [reitit.core             :as               r]
+            [potpuri.core            :refer [deep-merge]]
+            [io.randomseed.utils     :as           utils]
+            [io.randomseed.utils.map :refer     [qassoc]]
+            [amelinium.logging       :as             log]
+            [amelinium.system        :as          system]))
 
 (defn- map-entry
   [k v]
@@ -45,9 +45,9 @@
 
 (defn- add-missing
   ([m k v]
-   (if (contains? m k) m (fast-assoc m k v)))
+   (if (contains? m k) m (qassoc m k v)))
   ([m entries-map]
-   (reduce-kv (fn [m k v] (if (contains? m k) m (fast-assoc m k v))) m entries-map)))
+   (reduce-kv (fn [m k v] (if (contains? m k) m (qassoc m k v))) m entries-map)))
 
 (defn deleter
   [delete-list]
@@ -66,7 +66,7 @@
       (if (nil? (next entries))
         ;; replacing single header
         (let [[h v] (first entries)]
-          (fn [headers] (if headers (fast-assoc headers h v) entries-map)))
+          (fn [headers] (if headers (qassoc headers h v) entries-map)))
         ;; replacing multiple headers
         (fn [headers] (if headers (conj headers entries-map) entries-map)))
       (if (nil? (next entries))
@@ -104,7 +104,7 @@
 (defn wrap-headers
   "Headers handler wrapper."
   [req trf]
-  (fast-assoc req :headers (trf (get req :headers))))
+  (qassoc req :headers (trf (get req :headers))))
 
 (defn transformer
   "Parses headers configuration and returns a transformer. Helpful when generating
