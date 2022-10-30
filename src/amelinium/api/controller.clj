@@ -322,7 +322,7 @@
   "Default handler for the OPTIONS method. Adds `Access-Control-Allow-Methods` header
   with supported methods listed (separated by commas and space characters)."
   [req]
-  (render!
+  (api/render-ok
    (api/add-header req :Access-Control-Allow-Methods
                    (->> (-> req (get :reitit.core/match) (get :result))
                         (filter second) keys (map name)
