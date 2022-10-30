@@ -1531,7 +1531,7 @@
          roles-m        (dissoc all-roles-m gctx)
          groles         (get all-roles-m gctx #{})
          dyn-roles      (set/select groles dynamic-roles)
-         reg-roles      (vals (update all-roles-m gctx #(apply disj % dyn-roles)))
+         reg-roles      (vals (map/qupdate all-roles-m gctx #(apply disj % dyn-roles)))
          reg-roles      (dedupe (sort-by sorter (apply concat reg-roles)))
          dyn-roles      (if (or inc-s? (not self-role)) dyn-roles (disj dyn-roles self-role))
          all-roles      (concat reg-roles (sort-by sorter dyn-roles))

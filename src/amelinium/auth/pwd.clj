@@ -19,7 +19,8 @@
             [io.randomseed.utils.var :as             var]
             [io.randomseed.utils     :as               u]
             [io.randomseed.utils.map :as             map]
-            [io.randomseed.utils.map :refer     [qassoc]]
+            [io.randomseed.utils.map :refer    [qassoc
+                                                qupdate]]
             [io.randomseed.utils     :refer         :all]
             [amelinium.auth.specs    :refer         :all]))
 
@@ -167,7 +168,7 @@
           check-fn   (get handler :check-fn)         ; checking function (from handler)
           opts       (-> (get handler :defaults)     ; encryption parameters (configuration options merged with handler defaults)
                          (or {}) (conj opts)
-                         (update :salt-charset vec)  ; change string charset to vector (for random access)
+                         (qupdate :salt-charset vec) ; change string charset to vector (for random access)
                          map/remove-empty-values)
           pub-opts   (dissoc opts                    ; public options (enclosed in an encryption function)
                              :name :encrypt-fn       ; with removed keys which are only needed by this wrapper

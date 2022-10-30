@@ -950,11 +950,11 @@
 
 (defmacro update-body
   "Updates response body in a request map `req` under its key `:response/body` using
-  `clojure.core/update`. The body is a result of update operation and `args` are
-  passed as its additional arguments where the first one should be a
+  `io.randomseed.utils.map/qupdate`. The body is a result of update operation and
+  `args` are passed as its additional arguments where the first one should be a
   function. Returns updated `req`."
   [req & args]
-  `(update ~req :response/body ~@args))
+  `(map/qupdate ~req :response/body ~@args))
 
 (defmacro assoc-body
   "Adds keys with associated values to `:response/body` map of the `req` using built-in
