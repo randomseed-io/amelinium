@@ -151,11 +151,6 @@
 
     (cond
 
-      ;; Request is invalid.
-
-      (not (get req :validators/params-valid?))
-      (api/render-error req :parameters/error)
-
       ;; Authorization failed.
 
       (not (or session-error authorized?))
