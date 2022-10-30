@@ -949,12 +949,13 @@
     `(qassoc ~req :response/body ~@body)))
 
 (defmacro update-body
-  "Updates response body in a request map `req` under its key `:response/body` using
-  `io.randomseed.utils.map/qupdate`. The body is a result of update operation and
-  `args` are passed as its additional arguments where the first one should be a
-  function. Returns updated `req`."
-  [req & args]
-  `(map/qupdate ~req :response/body ~@args))
+  "Updates response body in a request map `req` under its key `:response/body` with a
+  result of calling the function `f` on the previous value of the body and optional
+  arguments passed. Uses `io.randomseed.utils.map/qupdate`. The body is a result of
+  update operation and `args` are passed as its additional arguments where the first
+  one should be a function. Returns updated `req`."
+  [req f & args]
+  `(map/qupdate ~req :response/body ~f ~@args))
 
 (defmacro assoc-body
   "Adds keys with associated values to `:response/body` map of the `req` using built-in
