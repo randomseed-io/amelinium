@@ -89,10 +89,10 @@
   and parameters map. If `:password` parameter is present it will make JSON password
   suite."
   [auth-settings params]
-  (let [email         (some-str (or (get params :login) (get params :email)))
-        phone         (get params :phone)
-        password      (some-str (get params :password))
-        account-type  (get params :account-type)
+  (let [email         (some-str (or (get params :user/email) (get params :login) (get params :email)))
+        phone         (or (get params :user/phone) (get params :phone))
+        password      (some-str (or (get params :user/password) (get params :password)))
+        account-type  (or (get params :user/account-type) (get params :account-type))
         account-type  (if (keyword? account-type) account-type (some-keyword account-type))
         account-type  (or account-type (.default-type ^AuthSettings auth-settings))
         auth-config   (or (get (.types ^AuthSettings auth-settings) account-type)
@@ -105,9 +105,9 @@
         pwd-shared-id (if (and db pwd-shared) (create-or-get-shared-suite-id db pwd-shared))]
     (->UserData email phone (name account-type) auth-config db
                 pwd-intrinsic pwd-shared pwd-shared-id
-                (some-str (get params :first-name))
-                (some-str (get params :middle-name))
-                (some-str (get params :last-name))
+                (some-str (or (get params :user/first-name)  (get params :first-name)))
+                (some-str (or (get params :user/middle-name) (get params :middle-name)))
+                (some-str (or (get params :user/last-name)   (get params :last-name)))
                 (or (.expires      ^AuthConfirmation auth-cfrm) auth/confirmation-expires-default)
                 (or (.max-attempts ^AuthConfirmation auth-cfrm) 3))))
 
