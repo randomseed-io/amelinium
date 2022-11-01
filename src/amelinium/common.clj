@@ -1947,9 +1947,9 @@
                [params ns]
                [params keys]
                [params key-map]
-               [params ns new-ns]
-               [params keys new-ns])}
-  ([params keys-or-ns new-ns]
+               [params new-ns ns]
+               [params new-ns keys])}
+  ([params new-ns keys-or-ns]
    (if (coll? keys-or-ns)
      (let [new-ns (some-str new-ns)]
        (reduce (fn [^clojure.lang.Associative m k]
