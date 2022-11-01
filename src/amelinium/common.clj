@@ -1917,7 +1917,7 @@
   ([m param & more]
    (apply remove-params m :body-params :body true param more)))
 
-(defn parameters-pick
+(defn pick-params
   "Removes namespaces from keys in `params` or renames keys according to the given
   `key-map`.
 
