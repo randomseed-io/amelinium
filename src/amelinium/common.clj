@@ -1923,7 +1923,9 @@
 
   The `keys` argument should be a sequence of keys to be found in `params`. Only the
   entries identified by these keys will be preserved, with keys stripped from their
-  namespaces.
+  namespaces. When `new-ns` is present then the keys in generated map will have their
+  namespace set to this value (which should be a string or any object convertible to
+  a string).
 
   The `key-map` argument should be a map of keys to be found in `params` mapped to
   their new names. Only the entries from `params` identified by the keys from
@@ -1931,14 +1933,40 @@
 
   The `ns` argument should be a string or an object which can be converted to a
   string.  It will be used to select the entries from `params` by the given namespace
-  and to remove this namespace when producing the result.
+  and to remove this namespace when producing the result. When `new-ns` is present
+  then the keys in generated map will have their namespace set to this value (which
+  should be a string or any object convertible to a string).
 
   When only `params` argument is given, it will simply rename all keys from
-  namespaced to simple keywords."
+  namespaced to simple keywords.
+
+  When `params` argument is given, then `ns` is set to `nil`, and `new-ns` is set, it
+  will strip all keys from their namespaces replacing it with the given namespace in
+  a resulting map."
   {:arglists '([params]
                [params ns]
                [params keys]
-               [params key-map])}
+               [params key-map]
+               [params ns new-ns]
+               [params keys new-ns])}
+  ([params keys-or-ns new-ns]
+   (if (coll? keys-or-ns)
+     (let [new-ns (some-str new-ns)]
+       (reduce (fn [^clojure.lang.Associative m k]
+                 (if (contains? params k)
+                   (qassoc m (keyword new-ns (name k)) (get params k))
+                   m))
+               {} keys-or-ns))
+     (if (nil? keys-or-ns)
+       (map/map-keys (comp (partial keyword (some-str new-ns)) name) params)
+       (let [ns     (some-str keys-or-ns)
+             new-ns (some-str new-ns)]
+         (reduce (fn [^clojure.lang.Associative m ^clojure.lang.MapEntry e]
+                   (let [k (.key ^clojure.lang.MapEntry e)]
+                     (if (= ns (namespace k))
+                       (qassoc m (keyword new-ns (name k)) (.val ^clojure.lang.MapEntry e))
+                       m)))
+                 {} params)))))
   ([params keys-or-ns]
    (if (coll? keys-or-ns)
      (if (map? keys-or-ns)
