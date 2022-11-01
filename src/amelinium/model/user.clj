@@ -115,8 +115,8 @@
   "Creates simple user data record (only db, phone and email) by getting values from
   the given authentication settings and parameters map."
   [auth-settings params]
-  (let [email (some-str (or (get params :login) (get params :email)))
-        phone (get params :phone)
+  (let [email (some-str (or (get params :user/email) (get params :login) (get params :email)))
+        phone (or (get params :user/phone) (get params :phone))
         db    (.db ^AuthSettings auth-settings)]
     (->UserData email phone nil nil db nil nil nil nil nil nil nil nil)))
 
