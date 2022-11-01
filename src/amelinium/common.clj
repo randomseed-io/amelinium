@@ -1917,6 +1917,52 @@
   ([m param & more]
    (apply remove-params m :body-params :body true param more)))
 
+(defn parameters-pick
+  "Removes namespaces from keys in `params` or renames keys according to the given
+  `key-map`.
+
+  The `keys` argument should be a sequence of keys to be found in `params`. Only the
+  entries identified by these keys will be preserved, with keys stripped from their
+  namespaces.
+
+  The `key-map` argument should be a map of keys to be found in `params` mapped to
+  their new names. Only the entries from `params` identified by the keys from
+  `key-map` will be preserved and renamed to corresponding values.
+
+  The `ns` argument should be a string or an object which can be converted to a
+  string.  It will be used to select the entries from `params` by the given namespace
+  and to remove this namespace when producing the result.
+
+  When only `params` argument is given, it will simply rename all keys from
+  namespaced to simple keywords."
+  {:arglists '([params]
+               [params ns]
+               [params keys]
+               [params key-map])}
+  ([params keys-or-ns]
+   (if (coll? keys-or-ns)
+     (if (map? keys-or-ns)
+       (reduce (fn [^clojure.lang.Associative m ^clojure.lang.MapEntry e]
+                 (let [k (.key ^clojure.lang.MapEntry e)]
+                   (if (contains? params k)
+                     (qassoc m (.val ^clojure.lang.MapEntry e) (get params k))
+                     m)))
+               {} keys-or-ns)
+       (reduce (fn [^clojure.lang.Associative m k]
+                 (if (contains? params k)
+                   (qassoc m (keyword (name k)) (get params k))
+                   m))
+               {} keys-or-ns))
+     (let [ns (some-str keys-or-ns)]
+       (reduce (fn [^clojure.lang.Associative m ^clojure.lang.MapEntry e]
+                 (let [k (.key ^clojure.lang.MapEntry e)]
+                   (if (= ns (namespace k))
+                     (qassoc m (keyword (name k)) (.val ^clojure.lang.MapEntry e))
+                     m)))
+               {} params))))
+  ([params]
+   (map/map-keys (comp keyword name) params)))
+
 ;; Headers
 
 (defn mobile-agent?
