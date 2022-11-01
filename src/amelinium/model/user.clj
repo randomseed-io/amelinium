@@ -336,6 +336,21 @@
 
 ;; Getting user properties by...
 
+(defn prop-by-id
+  "Returns the given property of the given user ID (cached)."
+  [db prop user-id]
+  (if (some? user-id) (prop db prop user-id)))
+
+(defn prop-by-session
+  "Returns the given property of the given session (cached)."
+  [db prop smap]
+  (if-some [user-id (get smap :user/id)] (prop db prop user-id)))
+
+(defn prop-by-session-or-id
+  "Returns the given property of the given session or user ID (cached)."
+  [db prop smap user-id]
+  (if db (or (prop-by-session db prop smap) (prop-by-id db prop user-id))))
+
 (defn props-by-id
   "Returns properties of the given user ID (cached)."
   [db user-id]
@@ -438,6 +453,11 @@
   "Returns user IDs for the given user UIDs (cached)."
   [db uids]
   (db/uids-to-ids db ids-cache get-user-ids-by-uids uids))
+
+(defn prop-by-uid
+  "Returns the given user property for the given user UID (cached)."
+  [db prop uid]
+  (prop db prop (uid-to-id db uid)))
 
 (defn props-by-uid
   "Returns user properties for the given user UID (cached)."
