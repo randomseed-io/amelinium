@@ -932,11 +932,11 @@
 
 (defmacro response
   "Creates a response block. If the given `req` is already a response then it is simply
-  returned. Otherwise the expressions from `body` are evaluated."
-  [req & body]
-  (if (and (seq? body) (> (count body) 1))
-    `(let [req# ~req] (if (response? req#) req# (do ~@body)))
-    `(let [req# ~req] (if (response? req#) req# ~@body))))
+  returned. Otherwise the expressions from `code` are evaluated."
+  [req & code]
+  (if (and (seq? code) (> (count code) 1))
+    `(let [req# ~req] (if (response? req#) req# (do ~@code)))
+    `(let [req# ~req] (if (response? req#) req# ~@code))))
 
 (defmacro add-body
   "Adds response body to a request map `req` under its key `:response/body` using
