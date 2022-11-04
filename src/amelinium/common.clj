@@ -1721,6 +1721,10 @@
   [req]
   (get req :language/str))
 
+(defn lang-query-string
+  [req]
+  (query-string-encode {"lang" (lang-str req)}))
+
 (defn lang-config
   [req]
   (get req :language/settings))
