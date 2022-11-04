@@ -29,13 +29,9 @@
 ;; Constants
 
 (def ^:const config-tag (re-pattern ":([a-zA-Z][a-zA-Z0-9_\\-]+)"))
-(def ^:const json-types #{:json :application/json "application/json" "json"})
+(def ^:const json-types #{:json :application/json "application/json" "json" "JSON"})
 
 ;; Helpers
-
-(defn sendsms
-  [to body]
-  (sms {:Body (str body) :To (str to)}))
 
 (defn- get-template-id
   [config template-group lang fallback-template]
@@ -57,6 +53,8 @@
        (qassoc params :template_id template-id)
        params)
      params)))
+
+;; E-mail sending
 
 (defn sendmail-l10n-template
   ([lang to template-group]
@@ -132,6 +130,12 @@
   ([to tpl-gr]                 (sendmail-l10n-template nil to tpl-gr))
   ([to tpl-gr fb-tpl-or-tdata] (sendmail-l10n-template nil to tpl-gr fb-tpl-or-tdata))
   ([to tpl-gr fb-tpl tdata]    (sendmail-l10n-template nil to tpl-gr fb-tpl tdata)))
+
+;; SMS sending
+
+(defn sendsms
+  [to body]
+  (sms {:Body (str body) :To (str to)}))
 
 ;; Initialization helpers
 
@@ -217,8 +221,6 @@
         opts          (into opts existing-opts)]
     (qassoc config :request-opts opts)))
 
-;; Initialization
-
 (defn prep-twilio
   [{:keys [enabled? prepared?]
     :or   {enabled? true prepared? false}
@@ -248,6 +250,8 @@
 (defn- stringify-params
   [p]
   (if p (map/map-keys some-str p)))
+
+;; Initialization
 
 (defn init-twilio
   [k config]
