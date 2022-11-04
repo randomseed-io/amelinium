@@ -1711,120 +1711,6 @@
      (random-uuid)
      "")))
 
-;; Language helpers
-
-(defn lang-url
-  [req path-or-name lang localized? params query-params lang-settings]
-  (let [router        (or (get req ::r/router) (get req :router))
-        lang          (or lang (get req :language/str) (some-str (get req :language)) (some-str (get req :lang)))
-        lang-settings (or (valuable lang-settings) (get req :language/settings) (get req :language-param) (get req :param) :lang)
-        path-or-name  (or path-or-name (current-page req))
-        path-or-name  (if (and path-or-name (str/starts-with? path-or-name ":")) (keyword (subs path-or-name 1)) path-or-name)
-        path-fn       (if localized? localized-path path)
-        out-path      (path-fn path-or-name lang params query-params router lang-settings)
-        out-path      (or out-path (if-not (ident? path-or-name) (some-str path-or-name)))]
-    out-path))
-
-(defn lang-param
-  [req]
-  (or (get (get req :language/settings) :param) :lang))
-
-(defn lang-id
-  [req]
-  (or (get req :language/id)
-      (get req :language/default)))
-
-(defn lang-id-or-nil
-  [req]
-  (get req :language/id))
-
-(defn lang-str
-  [req]
-  (or (get req :language/str)
-      (str (get req :language/default))))
-
-(defn lang-str-or-nil
-  [req]
-  (get req :language/str))
-
-(defn lang-query-string
-  [req]
-  (query-string-encode {"lang" (lang-str req)}))
-
-(defn lang-config
-  [req]
-  (get req :language/settings))
-
-(defn add-missing-lang
-  "For the given `body` map it adds a language under the `:lang` key if it does not
-  exists yet. The language is obtained from the request map `req` by reading a value
-  associated with the `:language/id` key."
-  [body req translation-keys]
-  (if (contains? body :lang)
-    body
-    (if (some #(contains? body %) translation-keys)
-      (if-some [l (lang-id req)]
-        (qassoc body :lang l)
-        body)
-      body)))
-
-;; I18n
-
-(defn translator
-  "Generates a translation function using populated values from `:i18n/translator` or
-  `:i18n/translator-nd` (variant which returns `nil` for missing keys, used when
-  `i18n/*handle-missing-keys*` is set to a falsy value). Falls back to
-  `i18n/translator` if predefined functions are not found or if a language was
-  specified as an optional `lang` argument."
-  ([req]
-   (or (get req (if i18n/*handle-missing-keys* :i18n/translator :i18n/translator-nd))
-       (i18n/translator req)))
-  ([req lang]
-   (if (and lang (not= lang (i18n/lang req)))
-     (i18n/translator req lang)
-     (or (get req (if i18n/*handle-missing-keys* :i18n/translator :i18n/translator-nd))
-         (i18n/translator req)))))
-
-(defn translator-sub
-  ([req]
-   (or (get req (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd))
-       (i18n/translator-sub req)))
-  ([req lang]
-   (if (and lang (not= lang (i18n/lang req)))
-     (i18n/translator-sub req lang)
-     (or (get req (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd))
-         (i18n/translator-sub req)))))
-
-(defn try-namespace
-  [v]
-  (if (ident? v) (namespace v) v))
-
-(defn try-name
-  [v]
-  (if (ident? v) (name v) v))
-
-(defn add-missing-translation
-  "For the given `body` map, a new key `new-k`, a key `k` and a translation function
-  `sub-translation-fn`, tries to add a translation of the key `k` as a value under
-  the given key `new-k`, if it does not exist yet in `body`. Optional `suffix`
-  argument is used to add suffix to a key name."
-  ([body new-k k sub-translation-fn]
-   (if (contains? body new-k)
-     body
-     (if-some [t (and k (sub-translation-fn k))]
-       (qassoc body new-k t)
-       body)))
-  ([body new-k k suffix sub-translation-fn]
-   (if (contains? body new-k)
-     body
-     (if-some [t (and k (sub-translation-fn (try-namespace k) (str (try-name k) suffix)))]
-       (qassoc body new-k t)
-       body))))
-
-(defn untranslatable?
-  "Returns true if the given argument cannot be used as a translation key."
-  [v]
-  (not (or (ident? v) (string? v))))
 
 ;; Parameters
 
@@ -2020,6 +1906,121 @@
                {} params))))
   ([params]
    (map/map-keys (comp keyword name) params)))
+
+;; Language helpers
+
+(defn lang-url
+  [req path-or-name lang localized? params query-params lang-settings]
+  (let [router        (or (get req ::r/router) (get req :router))
+        lang          (or lang (get req :language/str) (some-str (get req :language)) (some-str (get req :lang)))
+        lang-settings (or (valuable lang-settings) (get req :language/settings) (get req :language-param) (get req :param) :lang)
+        path-or-name  (or path-or-name (current-page req))
+        path-or-name  (if (and path-or-name (str/starts-with? path-or-name ":")) (keyword (subs path-or-name 1)) path-or-name)
+        path-fn       (if localized? localized-path path)
+        out-path      (path-fn path-or-name lang params query-params router lang-settings)
+        out-path      (or out-path (if-not (ident? path-or-name) (some-str path-or-name)))]
+    out-path))
+
+(defn lang-param
+  [req]
+  (or (get (get req :language/settings) :param) :lang))
+
+(defn lang-id
+  [req]
+  (or (get req :language/id)
+      (get req :language/default)))
+
+(defn lang-id-or-nil
+  [req]
+  (get req :language/id))
+
+(defn lang-str
+  [req]
+  (or (get req :language/str)
+      (str (get req :language/default))))
+
+(defn lang-str-or-nil
+  [req]
+  (get req :language/str))
+
+(defn lang-query-string
+  [req]
+  (query-string-encode {"lang" (lang-str req)}))
+
+(defn lang-config
+  [req]
+  (get req :language/settings))
+
+(defn add-missing-lang
+  "For the given `body` map it adds a language under the `:lang` key if it does not
+  exists yet. The language is obtained from the request map `req` by reading a value
+  associated with the `:language/id` key."
+  [body req translation-keys]
+  (if (contains? body :lang)
+    body
+    (if (some #(contains? body %) translation-keys)
+      (if-some [l (lang-id req)]
+        (qassoc body :lang l)
+        body)
+      body)))
+
+;; I18n
+
+(defn translator
+  "Generates a translation function using populated values from `:i18n/translator` or
+  `:i18n/translator-nd` (variant which returns `nil` for missing keys, used when
+  `i18n/*handle-missing-keys*` is set to a falsy value). Falls back to
+  `i18n/translator` if predefined functions are not found or if a language was
+  specified as an optional `lang` argument."
+  ([req]
+   (or (get req (if i18n/*handle-missing-keys* :i18n/translator :i18n/translator-nd))
+       (i18n/translator req)))
+  ([req lang]
+   (if (and lang (not= lang (i18n/lang req)))
+     (i18n/translator req lang)
+     (or (get req (if i18n/*handle-missing-keys* :i18n/translator :i18n/translator-nd))
+         (i18n/translator req)))))
+
+(defn translator-sub
+  ([req]
+   (or (get req (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd))
+       (i18n/translator-sub req)))
+  ([req lang]
+   (if (and lang (not= lang (i18n/lang req)))
+     (i18n/translator-sub req lang)
+     (or (get req (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd))
+         (i18n/translator-sub req)))))
+
+(defn try-namespace
+  [v]
+  (if (ident? v) (namespace v) v))
+
+(defn try-name
+  [v]
+  (if (ident? v) (name v) v))
+
+(defn add-missing-translation
+  "For the given `body` map, a new key `new-k`, a key `k` and a translation function
+  `sub-translation-fn`, tries to add a translation of the key `k` as a value under
+  the given key `new-k`, if it does not exist yet in `body`. Optional `suffix`
+  argument is used to add suffix to a key name."
+  ([body new-k k sub-translation-fn]
+   (if (contains? body new-k)
+     body
+     (if-some [t (and k (sub-translation-fn k))]
+       (qassoc body new-k t)
+       body)))
+  ([body new-k k suffix sub-translation-fn]
+   (if (contains? body new-k)
+     body
+     (if-some [t (and k (sub-translation-fn (try-namespace k) (str (try-name k) suffix)))]
+       (qassoc body new-k t)
+       body))))
+
+(defn untranslatable?
+  "Returns true if the given argument cannot be used as a translation key."
+  [v]
+  (not (or (ident? v) (string? v))))
 
 ;; Headers
 
