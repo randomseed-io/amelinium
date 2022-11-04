@@ -44,18 +44,22 @@
 
 (defn auth-config
   "Gets authentication configuration (`AuthConfig`) for the given account type or a
-  global authentication settings (`AuthSettings`) if the account type was not
-  given. If a value the `auth-type` argument is explicitly set to `nil` or `false`,
-  an authentication configuration (`AuthConfig`) for a default type will be
-  returned."
+  default authentication settings (`AuthSettings`) if the account type was not
+  given. Returns `nil` when `auth-type` was given but there is no match in settings
+  for it."
   ([req-or-match auth-type]
-   (if-some [auth-settings (http/get-route-data req-or-match :auth/config)]
+   (if-some [auth-settings (http/get-route-data req-or-match :auth/settings)]
      (if auth-type
        (get (.types ^AuthSettings auth-settings)
-            (if (keyword? auth-type) auth-type (keyword auth-type)))
-       (.default ^AuthSettings auth-settings))))
+            (if (keyword? auth-type) auth-type (keyword auth-type))))))
   ([req-or-match]
-   (http/get-route-data req-or-match :auth/config)))
+   (if-some [auth-settings (http/get-route-data req-or-match :auth/settings)]
+     (.default ^AuthSettings auth-settings))))
+
+(defn auth-settings
+  "Gets authentication global settings (`AuthSettings`) for the `req`."
+  ([req-or-match]
+   (http/get-route-data req-or-match :auth/settings)))
 
 (defn auth-db
   "Returns an authentication database connection object for the given authentication
