@@ -51,8 +51,8 @@
   "Injects authorization configurations directly into a request map. Uses global
   authentication configuration from a current route data."
   [req _ _]
-  (get (or (get (get req :route/data) :auth/config)
-           (get req :auth/config))
+  (get (or (get (get req :route/data) :auth/settings)
+           (get req :auth/settings))
        :types))
 
 (defn oplog-logger

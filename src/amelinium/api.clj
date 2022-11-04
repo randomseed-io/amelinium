@@ -27,7 +27,7 @@
 ;; Database
 
 (p/import-vars [amelinium.common
-                auth-config auth-db])
+                auth-settings auth-config auth-db])
 
 ;; Operations logging
 

@@ -62,7 +62,7 @@
 ;; Database
 
 (p/import-vars [amelinium.common
-                auth-config auth-db])
+                auth-config auth-settings auth-db])
 
 ;; Routing data and settings helpers
 
