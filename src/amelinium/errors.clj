@@ -45,9 +45,9 @@
   (satisfies? ErrorsConfigurable v))
 
 (defn most-significant
-  "Returns a most significant error from the given `errors` using the given
+  "Returns the most significant error from the given `errors` using the given
   `config` (which may be of type `ErrorsConfig`, a request map, or a `Match`
-  object). If `errors` is not a sequence but a keyword, it is returned as-is.
+  object). If `errors` is not a sequence but an identifier, it is returned as-is.
   Returns `nil` when `config-src` is `nil` or `errors` is `nil`."
   [config-src errors]
   (if errors
