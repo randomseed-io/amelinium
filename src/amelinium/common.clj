@@ -62,12 +62,15 @@
    (http/get-route-data req-or-match :auth/settings)))
 
 (defn auth-db
-  "Returns an authentication database connection object for the given authentication
-  type or, if the type is not given, for a common authentication database (top-level,
-  not assigned to any particular authentication type)."
+  "Returns an authentication database connection object for the given account type or,
+  if the type is not given, for a common authentication database (top-level, not
+  assigned to any particular authentication type)."
   ([req-or-match]
-   (if-some [auth-settings (auth-config req-or-match)]
-     (.db ^AuthSettings auth-settings))))
+   (if-some [as (auth-settings req-or-match)]
+     (.db ^AuthSettings as)))
+  ([req-or-match auth-type]
+   (if-some [ac (auth-config req-or-match auth-type)]
+     (.db ^AuthConfig ac))))
 
 ;; Operations logging
 
