@@ -64,7 +64,9 @@
     (str "IF(attempts > 0, attempts - 1, attempts)")
     (str "attempts")))
 
-(defn gen-confirmation-query
+(defn gen-full-confirmation-query
+  "Generates a confirmation query for an e-mail or a phone used during registration of
+  a new user."
   [id-column dec-att?]
   (str-squeeze-spc
    "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,user_uid,"
@@ -92,27 +94,66 @@
    "RETURNING user_id,user_uid,account_type,attempts,code,token,created,confirmed,expires"))
 
 (def ^:const new-email-confirmation-query
-  (gen-confirmation-query :email true))
+  (gen-full-confirmation-query :email true))
 
 (def ^:const new-phone-confirmation-query
-  (gen-confirmation-query :phone true))
+  (gen-full-confirmation-query :phone true))
 
 (def ^:const new-email-confirmation-query-without-attempt
-  (gen-confirmation-query :email false))
+  (gen-full-confirmation-query :email false))
 
 (def ^:const new-phone-confirmation-query-without-attempt
+  (gen-full-confirmation-query :phone false))
+
+(defn gen-confirmation-query
+  "Generates a confirmation query for an e-mail or a phone updated by an existing
+  user."
+  [id-column dec-att?]
+  (str-squeeze-spc
+   "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,attempts,requester_id,user_id,user_uid)"
+   (str "SELECT ?,?,?,?,?,0,?,?"
+        "(SELECT users.id  FROM users WHERE users." (or (some-str id-column) "email") " = ?),"
+        "(SELECT users.uid FROM users WHERE users." (or (some-str id-column) "email") " = ?),"
+        " FROM users"
+        " WHERE users.id = ? AND users." (or (some-str id-column) "email") " <> ?")
+   "ON DUPLICATE KEY UPDATE"
+   "user_id      = IF(NOW()>expires, VALUE(user_id),      user_id),"
+   "user_uid     = IF(NOW()>expires, VALUE(user_uid),     user_uid),"
+   "requester_id = IF(NOW()>expires, VALUE(requester),    requester),"
+   "attempts     = IF(NOW()>expires, VALUE(attempts),"    (str (calc-attempts-query dec-att?) "),")
+   "code         = IF(NOW()>expires, VALUE(code),         code),"
+   "token        = IF(NOW()>expires, VALUE(token),        token),"
+   "created      = IF(NOW()>expires, NOW(),               created),"
+   "confirmed    = IF(NOW()>expires, VALUE(confirmed),    confirmed),"
+   "req_id       = IF(NOW()>expires, NULL,                req_id),"
+   "expires      = IF(NOW()>expires, VALUE(expires),      expires)"
+   "RETURNING requester_id,user_id,user_uid,attempts,code,token,created,confirmed,expires"))
+
+(def ^:const email-confirmation-query
+  (gen-confirmation-query :email true))
+
+(def ^:const phone-confirmation-query
+  (gen-confirmation-query :phone true))
+
+(def ^:const email-confirmation-query-without-attempt
+  (gen-confirmation-query :email false))
+
+(def ^:const phone-confirmation-query-without-attempt
   (gen-confirmation-query :phone false))
 
-(defn- gen-confirmation-core
+(defn- gen-full-confirmation-core
   "Creates a confirmation code for the given identity (an e-mail address or a
-  phone). When the confirmation was already generated and it hasn't expired, it is
-  returned with an existing code and token. When the given identity (`id`) is already
-  assigned to a registered user the returned map will contain 4 keys: `:exists?` set
-  to `true`, `:user/id` set to ID of existing user, `:id` set to the given
-  identity (as a string) and `:reason` set to the given reason (as a keyword or `nil`
-  if not given)."
+  phone).
+
+  When the confirmation was already generated and it hasn't expired, it is returned
+  with an existing code and token.
+
+  When the given identity (`id`) is already assigned to a registered user the
+  returned map will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of
+  existing user, `:id` set to the given identity (as a string) and `:reason` set to
+  the given reason (as a keyword or `nil` if not given)."
   ([db query id exp udata]
-   (gen-confirmation-core db query id exp udata (get udata :reason)))
+   (gen-full-confirmation-core db query id exp udata (get udata :reason)))
   ([db query id exp udata reason]
    (if db
      (if-some [id (some-str id)]
@@ -126,67 +167,177 @@
                                           :password :password-suite-id])
              qargs  (list* query id code token reason exp id id udata)]
          (if-some [r (jdbc/execute-one! db qargs db/opts-simple-map)]
-           (let [user-id   (get r :user-id)
-                 user-id?  (pos-int? user-id)
-                 user-uid  (parse-uuid (str (get r :user-uid)))
-                 user-uid? (uuid? user-uid)]
+           (let [user-id       (get r :user-id)
+                 user-uid      (parse-uuid (str (get r :user-uid)))
+                 requester-id  (get r :requester-id)
+                 user-id?      (pos-int? user-id)
+                 user-uid?     (uuid? user-uid)
+                 requester-id? (pos-int? requester-id)]
              (-> r
-                 (map/assoc-if user-id?  :user/id  user-id)
-                 (map/assoc-if user-uid? :user/uid user-uid)
+                 (map/assoc-if user-id?      :user/id      user-id)
+                 (map/assoc-if user-uid?     :user/uid     user-uid)
+                 (map/assoc-if requester-id? :requester/id requester-id)
                  (qassoc :exists? user-id? :confirmed? (pos-int? (get r :confirmed)))
-                 (dissoc :confirmed)
+                 (dissoc :confirmed :user-id :user-uuid :requester-id)
                  (map/update-existing :account-type some-keyword)
+                 (map/update-existing :reason some-keyword)))))))))
+
+(defn- gen-confirmation-core
+  "Creates a confirmation code for the given identity (an e-mail address or a
+  phone).
+
+  When the confirmation was already generated and it hasn't expired, it is returned
+  with an existing code and token.
+
+  When the given identity (`id`) is already assigned to a registered user the
+  returned map will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of
+  existing user, `:id` set to the given identity (as a string) and `:reason` set to
+  the given reason (as a keyword or `nil` if not given).
+
+  The query will return no result when the given identity (`id`) is already assigned
+  to the requesting user (identified by `user-id`)."
+  ([db query id user-id exp attempts]
+   (gen-confirmation-core db query id exp "change"))
+  ([db query id user-id exp attempts reason]
+   (if db
+     (if-some [id (some-str id)]
+       (let [code   (if exp (gen-code))
+             token  (if exp (gen-token))
+             reason (or (some-str reason) "change")
+             exp    (or exp ten-minutes)
+             exp    (if (t/duration? exp) (t/hence exp) exp)
+             qargs  (query id code token reason exp attempts user-id id id user-id id)]
+         (if-some [r (jdbc/execute-one! db qargs db/opts-simple-map)]
+           (let [user-id       (get r :user-id)
+                 user-uid      (parse-uuid (str (get r :user-uid)))
+                 requester-id  (get r :requester-id)
+                 user-id?      (pos-int? user-id)
+                 user-uid?     (uuid? user-uid)
+                 requester-id? (pos-int? requester-id)]
+             (-> r
+                 (map/assoc-if requester-id? :requester/id requester-id)
+                 (map/assoc-if user-id?      :user/id      user-id)
+                 (map/assoc-if user-uid?     :user/uid     user-uid)
+                 (qassoc :exists? user-id? :confirmed? (pos-int? (get r :confirmed)))
+                 (dissoc :confirmed :user-id :user-uuid :requester-id)
                  (map/update-existing :reason some-keyword)))))))))
 
 (defn create-for-registration-without-attempt
   "Creates a confirmation code for a new user identified by the given e-mail
-  address. When the confirmation was already generated and it hasn't expired, it is
-  returned with an existing code and token. When the given e-mail is already assigned
-  to a registered user the returned map will contain 4 keys: `:exists?` set to
-  `true`, `:user/id` set to ID of existing user, `:id` set to the given e-mail (as a
-  string) and `:reason` set to the given reason (as a keyword or `nil` if not
-  given)."
+  address.
+
+  When the confirmation was already generated and it hasn't expired, it is returned
+  with an existing code and token.
+
+  When the given e-mail is already assigned to a registered user the returned map
+  will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of existing
+  user, `:id` set to the given e-mail (as a string) and `:reason` set to the given
+  reason (as a keyword or `nil` if not given)."
   ([udata]
    (create-for-registration-without-attempt (get udata :db) udata))
   ([db udata]
-   (gen-confirmation-core db
-                          new-email-confirmation-query-without-attempt
-                          (get udata :email)
-                          (get udata :expires-in)
-                          udata
-                          (or (get udata :reason) "creation")))
+   (gen-full-confirmation-core db
+                               new-email-confirmation-query-without-attempt
+                               (get udata :email)
+                               (get udata :expires-in)
+                               udata
+                               (or (get udata :reason) "creation")))
   ([db udata reason]
-   (gen-confirmation-core db
-                          new-email-confirmation-query-without-attempt
-                          (get udata :email)
-                          (get udata :expires-in)
-                          udata
-                          reason)))
+   (gen-full-confirmation-core db
+                               new-email-confirmation-query-without-attempt
+                               (get udata :email)
+                               (get udata :expires-in)
+                               udata
+                               reason)))
 
 (defn create-for-registration
   "Creates a confirmation code for a new user identified by the given e-mail
-  address. When the confirmation was already generated and it hasn't expired, it is
-  returned with an existing code and token. When the given e-mail is already assigned
-  to a registered user the returned map will contain 4 keys: `:exists?` set to
-  `true`, `:user/id` set to ID of existing user, `:id` set to the given e-mail (as a
-  string) and `:reason` set to the given reason (as a keyword or `nil` if not
-  given). Attempts counter is increased each time this function is called."
+  address.
+
+  When the confirmation was already generated and it hasn't expired, it is returned
+  with an existing code and token.
+
+  When the given e-mail is already assigned to a registered user the returned map
+  will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of existing
+  user, `:id` set to the given e-mail (as a string) and `:reason` set to the given
+  reason (as a keyword or `nil` if not given). Attempts counter is increased each
+  time this function is called."
   ([udata]
    (create-for-registration (get udata :db) udata))
   ([db udata]
-   (gen-confirmation-core db
-                          new-email-confirmation-query
-                          (get udata :email)
-                          (get udata :expires-in)
-                          udata
-                          (or (get udata :reason) "creation")))
+   (gen-full-confirmation-core db
+                               new-email-confirmation-query
+                               (get udata :email)
+                               (get udata :expires-in)
+                               udata
+                               (or (get udata :reason) "creation")))
   ([db udata reason]
+   (gen-full-confirmation-core db
+                               new-email-confirmation-query
+                               (get udata :email)
+                               (get udata :expires-in)
+                               udata
+                               reason)))
+
+(defn create-for-change-without-attempt
+  "Creates a confirmation code for an existing user identified by the given user
+  ID (`user-id`). The identity to be confirmed (`id`) can be an e-mail address or a
+  phone number (if the `id-type` is set to `:phone`).
+
+  When the confirmation was already generated and it hasn't expired, it is returned
+  with an existing code and token.
+
+  When the given e-mail is already assigned to some other registered user the
+  returned map will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of
+  existing user, `:id` set to the given e-mail (as a string) and `:reason` set to the
+  given reason (as a keyword or `nil` if not given). Attempts counter is increased
+  each time this function is called."
+  ([db id user-id exp attempts]
    (gen-confirmation-core db
-                          new-email-confirmation-query
-                          (get udata :email)
-                          (get udata :expires-in)
-                          udata
-                          reason)))
+                          email-confirmation-query-without-attempt
+                          id user-id exp attempts "change"))
+  ([db id user-id exp attempts id-type]
+   (gen-confirmation-core db
+                          (if (= id-type :phone)
+                            phone-confirmation-query-without-attempt
+                            email-confirmation-query-without-attempt)
+                          id user-id exp attempts "change"))
+  ([db id user-id exp attempts id-type reason]
+   (gen-confirmation-core db
+                          (if (= id-type :phone)
+                            phone-confirmation-query-without-attempt
+                            email-confirmation-query-without-attempt)
+                          id user-id exp attempts reason)))
+
+(defn create-for-change
+  "Creates a confirmation code for an existing user identified by the given user
+  ID (`user-id`). The identity to be confirmed (`id`) can be an e-mail address or a
+  phone number (if the `id-type` is set to `:phone`).
+
+  When the confirmation was already generated and it hasn't expired, it is returned
+  with an existing code and token.
+
+  When the given e-mail is already assigned to some other registered user the
+  returned map will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of
+  existing user, `:id` set to the given e-mail (as a string) and `:reason` set to the
+  given reason (as a keyword or `nil` if not given). Attempts counter is increased
+  each time this function is called."
+  ([db id user-id exp attempts]
+   (gen-confirmation-core db
+                          email-confirmation-query
+                          id user-id exp attempts "change"))
+  ([db id user-id exp attempts id-type]
+   (gen-confirmation-core db
+                          (if (= :phone (name id-type))
+                            phone-confirmation-query
+                            email-confirmation-query)
+                          id user-id exp attempts "change"))
+  ([db id user-id exp attempts id-type reason]
+   (gen-confirmation-core db
+                          (if (= :phone (name id-type))
+                            phone-confirmation-query
+                            email-confirmation-query)
+                          id user-id exp attempts reason)))
 
 ;; Confirming identity with a token or code
 
