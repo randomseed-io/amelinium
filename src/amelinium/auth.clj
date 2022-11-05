@@ -54,10 +54,10 @@
                              ^AuthLocking          locking
                              ^AuthPasswords        passwords])
 
-(defrecord AuthSettings     [^DataSource           db
-                             ^clojure.lang.Keyword default-type
-                             ^AuthConfig           default
-                             ^AccountTypes         types])
+(defrecord AuthSettings     [^DataSource                  db
+                             ^clojure.lang.Keyword        default-type
+                             ^AuthConfig                  default
+                             ^clojure.lang.IPersistentMap types])
 
 ;; Password authentication
 
