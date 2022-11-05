@@ -24,11 +24,6 @@
   (:import [reitit.core Match]
            [lazy_map.core LazyMapEntry LazyMap]))
 
-;; Database
-
-(p/import-vars [amelinium.common
-                auth-settings auth-config auth-db])
-
 ;; Operations logging
 
 (p/import-vars [amelinium.common

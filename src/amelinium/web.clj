@@ -59,11 +59,6 @@
                                       param-keys
                                       page-keys)))
 
-;; Database
-
-(p/import-vars [amelinium.common
-                auth-config auth-settings auth-db])
-
 ;; Routing data and settings helpers
 
 (p/import-vars [amelinium.common
