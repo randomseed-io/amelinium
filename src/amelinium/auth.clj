@@ -65,19 +65,27 @@
   (^{:tag AuthSettings}
    -settings
    [settings-src]
-   "Returns `AuthSettings` value on a basis of configuration source provided.")
+   "Returns a global authentication settings of type `AuthSettings` a basis of
+  configuration source provided.")
 
   (^{:tag AuthConfig}
    -config
    [settings-src] [settings-src account-type]
-   "Returns `AuthConfig` value on a basis of configuration source `settings-src` and
-  `account-type` provided."))
+   "Returns an authentication configuration of type `AuthConfig` on a basis of
+  configuration source `settings-src` and `account-type` provided.")
+
+  (^{:tag DataSource}
+   -db
+   [settings-src] [settings-src account-type]
+   "Returns a database connection object on a basis of configuration source
+  `settings-src` and optional `account-type` provided."))
 
 ;; Access to settings and configuration
 
 (extend-protocol Authenticable
 
   AuthSettings
+
   (-settings
     ^AuthSettings [settings-src]
     settings-src)
@@ -88,23 +96,56 @@
      (if account-type
        (get (.types ^AuthSettings settings-src)
             (if (keyword? account-type) account-type (keyword account-type))))))
+  (-db
+    (^DataSource [settings-src]
+     (.db ^AuthSettings settings-src))
+    (^DataSource [settings-src account-type]
+     (if account-type
+       (let [at (if (keyword? account-type) account-type (keyword account-type))]
+         (if-some [^AuthConfig ac (get (.types ^AuthSettings settings-src) at)]
+           (.db ^AuthConfig ac))))))
 
   AuthConfig
+
   (-config
     (^AuthConfig [config-source] config-source))
+  (-db
+    (^DataSource [settings-src]
+     (.db ^AuthConfig settings-src)))
+
+  DataSource
+
+  (-db
+    (^DataSource [settings-src]
+     settings-src))
 
   nil
+
   (-settings [settings-src] nil)
   (-config
+    ([settings-src] nil)
+    ([settings-src account-type] nil))
+  (-db
     ([settings-src] nil)
     ([settings-src account-type] nil)))
 
 (defn settings
+  "Returns authentication settings for the given authentication settings source
+  `src`."
   ^AuthSettings [src] (-settings src))
 
 (defn config
+  "Returns an authentication configuration for the given account type `account-type`
+  using authentication settings source `src`. If the second argument is not given it
+  will use a default account type."
   (^AuthConfig [src] (-config src))
   (^AuthConfig [src account-type] (-config src account-type)))
+
+(defn db
+  "Returns an authentication database connection object using the given authentication
+  settings source `src` and optional account type `account-type`."
+  (^DataSource [src] (-db src))
+  (^DataSource [src account-type] (-db src account-type)))
 
 (defn config-by-type
   "Returns authentication configuration for the given account type using an
@@ -118,15 +159,6 @@
   `var-name`."
   [var-name account-type]
   (config-by-type (var/deref var-name) account-type))
-
-(defn db
-  "Returns an authentication database connection object."
-  ([settings-src]
-   (if-some [^AuthSettings as (settings settings-src)]
-     (.db ^AuthSettings as)))
-  ([settings-src account-type]
-   (if-some [^AuthConfig ac (config settings-src account-type)]
-     (.db ^AuthConfig ac))))
 
 ;; Password authentication
 

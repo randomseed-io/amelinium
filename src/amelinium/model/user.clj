@@ -623,6 +623,7 @@
 (extend-protocol Authorizable
 
   AuthConfig
+
   (get-user-auth-data
     ([^AuthConfig src email ^AuthQueries queries]
      (if email
@@ -646,6 +647,7 @@
        (get-user-auth-data src email queries))))
 
   AuthSettings
+
   (get-user-auth-data
     ([^AuthSettings src email ^AuthQueries queries]
      (if email
@@ -660,6 +662,7 @@
        (get-user-auth-data src email queries))))
 
   DataSource
+
   (get-user-auth-data
     ([^DataSource src email ^AuthQueries queries]
      (if email
