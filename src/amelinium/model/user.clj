@@ -71,7 +71,7 @@
                         ^String post
                         ^String single])
 
-;; Authorizable protocol is to support class-based, single method dispatch, when
+;; Authorizable protocol is to support class-based, single method dispatch when
 ;; dealing with authorization and authentication data. The auth-source can be a data
 ;; source, an AuthConfig record or a global AuthSettings record.
 

@@ -199,14 +199,14 @@
 
 (defn index-by-type
   "Prepares static authentication preference map by mapping a copy of each
-  authentication configuration to any account type identifier found within it. So,
-  `[{:account-types {:ids [:a :b]}}]` becomes:
+  authentication configuration (of type `AuthConfig`) to any account type identifier
+  found within it. So, `[{:account-types {:ids [:a :b]}}]` becomes:
   `{:a {:account-types {:ids [:a :b]}}, :b {:account-types {:ids [:a :b]}}`.
 
   Additionally, it sets `:db` from global settings and updates `:account-types` field
-  to have current account type set as default (including SQL query). Original account
-  types is preserved under `:parent-account-types`. Each authentication configuration
-  will be initialized if it isn't already."
+  to have current account type set as its default (including SQL query). Original
+  account types data is preserved under `:parent-account-types`. Each authentication
+  configuration will be initialized if it isn't already."
   [coll db]
   (->> coll
        (filter map?)
