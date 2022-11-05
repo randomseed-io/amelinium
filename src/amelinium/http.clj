@@ -12,11 +12,13 @@
   (:require [potemkin.namespaces             :as               p]
             [reitit.core                     :as               r]
             [reitit.ring                     :as            ring]
+            [amelinium.auth                  :as            auth]
             [io.randomseed.utils             :refer         :all]
             [io.randomseed.utils.map         :refer     [qassoc]]
             [io.randomseed.utils.reitit.http :as            http])
 
-  (:import [reitit.core Match]))
+  (:import [reitit.core Match]
+           [amelinium.auth Authenticable AuthConfig AuthSettings AccountTypes]))
 
 (p/import-vars [io.randomseed.utils.reitit.http
                 router? router match match?
@@ -87,3 +89,50 @@
 (defn inject-route-data
   [req]
   (qassoc req :route/data (get (get req ::r/match) :data)))
+
+(extend-protocol auth/Authenticable
+
+  Match
+
+  (-settings
+    ^AuthSettings [m]
+    (get (.data ^Match m) :auth/setup))
+  (-config
+    (^AuthConfig [m]
+     (if-some [as (get (.data ^Match m) :auth/setup)]
+       (.default ^AuthSettings as)))
+    (^AuthConfig [m account-type]
+     (if account-type
+       (if-some [as (get (.data ^Match m) :auth/setup)]
+         (get (.types ^AuthSettings as)
+              (if (keyword? account-type) account-type (keyword account-type)))))))
+
+  clojure.lang.IPersistentMap
+
+  (-settings
+    ^AuthSettings [req]
+    (get-route-data req :auth/setup))
+  (-config
+    (^AuthConfig [req]
+     (if-some [as (get-route-data req :auth/setup)]
+       (.default ^AuthSettings as)))
+    (^AuthConfig [req account-type]
+     (if account-type
+       (if-some [as (get-route-data req :auth/setup)]
+         (get (.types ^AuthSettings as)
+              (if (keyword? account-type) account-type (keyword account-type)))))))
+
+  clojure.lang.Associative
+
+  (-settings
+    ^AuthSettings [req]
+    (get-route-data req :auth/setup))
+  (-config
+    (^AuthConfig [req]
+     (if-some [as (get-route-data req :auth/setup)]
+       (.default ^AuthSettings as)))
+    (^AuthConfig [req account-type]
+     (if account-type
+       (if-some [as (get-route-data req :auth/setup)]
+         (get (.types ^AuthSettings as)
+              (if (keyword? account-type) account-type (keyword account-type))))))))
