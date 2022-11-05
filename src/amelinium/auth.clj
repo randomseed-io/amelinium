@@ -98,6 +98,36 @@
   (-config
     ([settings-src] nil)
     ([settings-src account-type] nil)))
+
+(defn settings
+  ^AuthSettings [src] (-settings src))
+
+(defn config
+  (^AuthConfig [src] (-config src))
+  (^AuthConfig [src account-type] (-config src account-type)))
+
+(defn config-by-type
+  "Returns authentication configuration for the given account type using an
+  authentication configuration map."
+  [settings-src account-type]
+  (config settings-src account-type))
+
+(defn config-by-type-with-var
+  "Returns authentication configuration for the given `account-type` using an
+  authentication settings map stored in a Var of the given (fully-qualified) name
+  `var-name`."
+  [var-name account-type]
+  (config-by-type (var/deref var-name) account-type))
+
+(defn db
+  "Returns an authentication database connection object."
+  ([settings-src]
+   (if-some [^AuthSettings as (settings settings-src)]
+     (.db ^AuthSettings as)))
+  ([settings-src account-type]
+   (if-some [^AuthConfig ac (config settings-src account-type)]
+     (.db ^AuthConfig ac))))
+
 ;; Password authentication
 
 (defn check-password
@@ -221,20 +251,6 @@
                 ", lock wait: "    (time/seconds  (:locking/lock-wait    config)) " s"
                 ", lock expires: " (time/seconds  (:locking/fail-expires config)) " s)"))
   (make-auth k config))
-
-(defn config-by-type
-  "Returns authentication configuration for the given account type using an
-  authentication configuration map."
-  [auth-settings account-type]
-  (if-some [types-map (.types ^AuthSettings auth-settings)]
-    (get types-map (some-keyword-simple account-type))))
-
-(defn config-by-type-with-var
-  "Returns authentication configuration for the given account type using an
-  authentication settings map stored in a Var of the given (fully-qualified)
-  name."
-  [var-name account-type]
-  (config-by-type (var/deref var-name) account-type))
 
 (defn index-by-type
   "Prepares static authentication preference map by mapping a copy of each
