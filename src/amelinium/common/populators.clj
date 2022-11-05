@@ -20,6 +20,7 @@
             [lazy-map.core                      :as   lazy-map]
             [tick.core                          :as          t]
             [amelinium.logging                  :as        log]
+            [amelinium.auth                     :as       auth]
             [amelinium.model.user               :as       user]
             [io.randomseed.utils.time           :as       time]
             [io.randomseed.utils.var            :as        var]
@@ -64,7 +65,7 @@
   "Injects user's preferred language into a request map."
   [req _ _]
   (delay
-    (if-some [db (common/auth-db req)]
+    (if-some [db (auth/db req)]
       (if-some [smap (common/session req)]
         (if-some [user-id (get smap :user/id)]
           (let [supported (get (get req :language/settings) :supported)]

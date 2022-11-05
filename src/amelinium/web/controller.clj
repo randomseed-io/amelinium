@@ -19,6 +19,7 @@
             [amelinium.common.controller        :as           super]
             [amelinium.i18n                     :as            i18n]
             [amelinium.web                      :as             web]
+            [amelinium.auth                     :as            auth]
             [amelinium.http                     :as            http]
             [amelinium.http.middleware.session  :as         session]
             [amelinium.http.middleware.language :as        language]
@@ -210,7 +211,7 @@
         (qassoc :app/data
                 (qassoc (get req :app/data web/empty-lazy-map) :lock-remains
                         (delay (super/lock-remaining-mins req
-                                                          (web/auth-db req)
+                                                          (auth/db req)
                                                           (if @prolonged? sess)
                                                           t/now)))))))
 
@@ -222,7 +223,7 @@
         route-data  (http/get-route-data req)
         auth-state  (delay (web/login-auth-state req :login-page? :auth-page?))
         login-data? (delay (login-data? req))
-        auth-db     (delay (web/auth-db req))]
+        auth-db     (delay (auth/db req))]
 
     (cond
 

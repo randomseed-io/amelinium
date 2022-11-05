@@ -20,6 +20,7 @@
             [ring.util.codec                      :as           codec]
             [ring.util.http-response              :as            resp]
             [ring.util.request                    :as             req]
+            [amelinium.auth                       :as            auth]
             [amelinium.http                       :as            http]
             [amelinium.http.middleware.roles      :as           roles]
             [amelinium.http.middleware.language   :as        language]
@@ -36,41 +37,8 @@
             [io.randomseed.utils.map              :refer     [qassoc]]
             [io.randomseed.utils                  :refer         :all])
 
-  (:import [amelinium.auth AuthConfig AuthSettings AccountTypes]
-           [reitit.core Match]
+  (:import [reitit.core Match]
            [lazy_map.core LazyMapEntry LazyMap]))
-
-;; Data sources
-
-(defn auth-config
-  "Gets authentication configuration (`AuthConfig`) for the given account type or a
-  default authentication settings (`AuthSettings`) if the account type was not
-  given. Returns `nil` when `auth-type` was given but there is no match in settings
-  for it."
-  ([req-or-match auth-type]
-   (if-some [auth-settings (http/get-route-data req-or-match :auth/settings)]
-     (if auth-type
-       (get (.types ^AuthSettings auth-settings)
-            (if (keyword? auth-type) auth-type (keyword auth-type))))))
-  ([req-or-match]
-   (if-some [auth-settings (http/get-route-data req-or-match :auth/settings)]
-     (.default ^AuthSettings auth-settings))))
-
-(defn auth-settings
-  "Gets authentication global settings (`AuthSettings`) for the `req`."
-  ([req-or-match]
-   (http/get-route-data req-or-match :auth/settings)))
-
-(defn auth-db
-  "Returns an authentication database connection object for the given account type or,
-  if the type is not given, for a common authentication database (top-level, not
-  assigned to any particular authentication type)."
-  ([req-or-match]
-   (if-some [as (auth-settings req-or-match)]
-     (.db ^AuthSettings as)))
-  ([req-or-match auth-type]
-   (if-some [ac (auth-config req-or-match auth-type)]
-     (.db ^AuthConfig ac))))
 
 (defn auth-config-by-user-id
   "Gets authentication configuration (`AuthConfig`) for the given user. Uses cached

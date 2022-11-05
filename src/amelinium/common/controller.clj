@@ -66,7 +66,7 @@
   "Returns true if an account associated with the session is hard-locked.
   Uses cached property."
   ([req session]
-   (if-some [db (common/auth-db req)]
+   (if-some [db (auth/db req)]
      (account-locked? req session db)))
   ([req session db]
    (some? (some->> session :user/id (user/prop-get-locked db)))))
@@ -80,8 +80,8 @@
   ([req auth-db smap time-fn id-form-field]
    (if auth-db
      (if-some [user (or (user/props-by-session auth-db smap)
-                          (user/props-by-email auth-db (get (get req :form-params) id-form-field)))]
-       (if-some [auth-config (common/auth-config req (get user :account-type))]
+                        (user/props-by-email auth-db (get (get req :form-params) id-form-field)))]
+       (if-some [auth-config (auth/config req (get user :account-type))]
          (if-some [mins (time/minutes (common/soft-lock-remains user auth-config (time-fn)))]
            (if (zero? mins) 1 mins)))))))
 
@@ -127,23 +127,24 @@
   ([req user-email password sess route-data]
    (auth-user-with-password! req user-email password sess route-data false))
   ([req user-email password sess route-data auth-only-mode]
-   (let [ipaddr       (get req :remote-ip)
-         ipplain      (get req :remote-ip/str)
-         auth-db      (common/auth-db req)
-         user         (user/get-login-data auth-db user-email)
-         user-id      (get user :id)
-         pwd-suites   (select-keys user [:intrinsic :shared])
-         auth-config  (common/auth-config req (get user :account-type))
-         auth-db      (get auth-config :db)
-         for-user     (log/for-user user-id user-email ipplain)
-         for-mail     (log/for-user nil user-email ipplain)
-         opname       (if auth-only-mode :auth :login)
-         oplog-fn     (common/oplog-logger-populated req route-data)
-         oplog        (fn [ok? l m a] (oplog-fn :ok? ok? :user-id user-id :opname opname
-                                                :level l :msg (str m " " a)))
-         hard-locked? (fn [] (common/hard-locked? user))
-         soft-locked? (fn [] (common/soft-locked? user auth-config (t/now)))
-         invalid-pwd? (fn [] (not (check-password user password auth-config)))]
+   (let [ipaddr        (get req :remote-ip)
+         ipplain       (get req :remote-ip/str)
+         auth-settings (or (get route-data :auth/setup) (auth/settings req))
+         auth-db       (auth/db auth-settings)
+         user          (user/get-login-data auth-db user-email)
+         user-id       (get user :id)
+         ac-type       (get user :account-type)
+         pwd-suites    (select-keys user [:intrinsic :shared])
+         auth-config   (delay (auth/config auth-settings ac-type))
+         for-user      (log/for-user user-id user-email ipplain)
+         for-mail      (log/for-user nil user-email ipplain)
+         opname        (if auth-only-mode :auth :login)
+         oplog-fn      (common/oplog-logger-populated req route-data)
+         oplog         (fn [ok? l m a] (oplog-fn :ok? ok? :user-id user-id :opname opname
+                                                 :level l :msg (str m " " a)))
+         hard-locked?  (fn [] (common/hard-locked? user))
+         soft-locked?  (fn [] (common/soft-locked? user @auth-config (t/now)))
+         invalid-pwd?  (fn [] (not (check-password user password @auth-config)))]
 
      (cond
 
@@ -160,7 +161,7 @@
        (invalid-pwd?) (do (log/wrn "Incorrect password or user not found" for-user)
                           (when user-id
                             (oplog false :warn "Bad password" for-mail)
-                            (user/update-login-failed auth-config user-id ipaddr))
+                            (user/update-login-failed @auth-config user-id ipaddr))
                           (assoc req :user/authorized? false :user/authenticated? false
                                  :auth/ok? false :response/status :auth/bad-password))
 

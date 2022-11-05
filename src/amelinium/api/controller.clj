@@ -20,6 +20,7 @@
             [io.randomseed.utils                :refer        :all]
             [amelinium.i18n                     :as           i18n]
             [amelinium.api                      :as            api]
+            [amelinium.auth                     :as           auth]
             [amelinium.http                     :as           http]
             [amelinium.http.middleware.language :as       language]
             [amelinium.http.middleware.coercion :as       coercion]))
@@ -120,7 +121,7 @@
 (defn info!
   "Returns login information."
   [req]
-  (let [auth-db    (api/auth-db req)
+  (let [auth-db    (auth/db req)
         sess-opts  (get req :session/config)
         sess-key   (or (get sess-opts :session-key) :session)
         sess       (get req sess-key)
@@ -145,7 +146,7 @@
         auth-state    (delay (common/login-auth-state req :login-page? :auth-page?))
         auth?         (delay (nth @auth-state 1 false))
         login-data?   (delay (login-data? req))
-        auth-db       (delay (api/auth-db req))
+        auth-db       (delay (auth/db req))
         session-error (common/session-error sess)
         authorized?   (get req :user/authorized?)]
 
