@@ -68,7 +68,7 @@
   ([user-spec plain-password]
    (set-password nil user-spec plain-password))
   ([auth-settings user-spec plain-password]
-   (if-some [auth-settings (or auth-settings (::auth/settings app/state) auth/settings)]
+   (if-some [auth-settings (or auth-settings (::auth/setup app/state) auth/setup)]
      (if-some [db (:db auth-settings)]
        (if-some [user-id (user/find-id db user-spec)]
          (if-some [user (user/props db user-id)]
@@ -98,7 +98,7 @@
   ([f user-spec]
    (prop-do-account nil f user-spec))
   ([auth-settings f user-spec & args]
-   (if-some [auth-settings (or auth-settings (::auth/settings app/state) auth/settings)]
+   (if-some [auth-settings (or auth-settings (::auth/setup app/state) auth/setup)]
      (if-some [db (:db auth-settings)]
        (if-some [user-id (user/find-id db user-spec)]
          (if-some [user (user/props db user-id)]

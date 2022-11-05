@@ -21,7 +21,7 @@
   (:import [javax.sql DataSource]
            [java.time Duration]))
 
-(defonce config nil)
+(defonce setup nil)
 
 (def confirmation-expires-default (t/new-duration 10 :minutes))
 
@@ -236,8 +236,8 @@
 (system/add-init  ::auth [k config] (init-auth k config))
 (system/add-halt! ::auth [_ config] nil)
 
-(system/add-init  ::settings [k config] (var/make k (init-config config)))
-(system/add-halt! ::settings [k config] (var/make k nil))
+(system/add-init  ::setup [k config] (var/make k (init-config config)))
+(system/add-halt! ::setup [k config] (var/make k nil))
 
 (derive ::strong ::auth)
 (derive ::simple ::auth)
