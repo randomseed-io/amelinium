@@ -72,6 +72,32 @@
    [settings-src] [settings-src account-type]
    "Returns `AuthConfig` value on a basis of configuration source `settings-src` and
   `account-type` provided."))
+
+;; Access to settings and configuration
+
+(extend-protocol Authenticable
+
+  AuthSettings
+  (-settings
+    ^AuthSettings [settings-src]
+    settings-src)
+  (-config
+    (^AuthConfig [settings-src]
+     (.default ^AuthSettings settings-src))
+    (^AuthConfig [settings-src account-type]
+     (if account-type
+       (get (.types ^AuthSettings settings-src)
+            (if (keyword? account-type) account-type (keyword account-type))))))
+
+  AuthConfig
+  (-config
+    (^AuthConfig [config-source] config-source))
+
+  nil
+  (-settings [settings-src] nil)
+  (-config
+    ([settings-src] nil)
+    ([settings-src account-type] nil)))
 ;; Password authentication
 
 (defn check-password
