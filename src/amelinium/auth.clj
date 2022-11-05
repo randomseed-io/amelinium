@@ -59,6 +59,19 @@
                              ^AuthConfig                  default
                              ^clojure.lang.IPersistentMap types])
 
+(defprotocol Authenticable
+  "This protocol is used to access authentication settings and configuration."
+
+  (^{:tag AuthSettings}
+   -settings
+   [settings-src]
+   "Returns `AuthSettings` value on a basis of configuration source provided.")
+
+  (^{:tag AuthConfig}
+   -config
+   [settings-src] [settings-src account-type]
+   "Returns `AuthConfig` value on a basis of configuration source `settings-src` and
+  `account-type` provided."))
 ;; Password authentication
 
 (defn check-password
