@@ -40,25 +40,6 @@
   (:import [reitit.core Match]
            [lazy_map.core LazyMapEntry LazyMap]))
 
-(defn auth-config-by-user-id
-  "Gets authentication configuration (`AuthConfig`) for the given user. Uses cached
-  user props provided by `amelinium.model.user/props-by-id`."
-  [req-or-match user-id]
-  (if-some [as (auth-settings req-or-match)]
-    (if-some [ac-type (user/prop-by-id (.db ^AuthSettings as) :account-type user-id)]
-      (get (.types ^AuthSettings as)
-           (if (keyword? ac-type) ac-type (keyword ac-type))))))
-
-(defn auth-config-by-session
-  "Gets authentication configuration (`AuthConfig`) for the given user identified by a
-  session object. Uses cached user props provided by
-  `amelinium.model.user/props-by-session`."
-  [req-or-match smap]
-  (if-some [as (auth-settings req-or-match)]
-    (if-some [ac-type (user/prop-by-session (.db ^AuthSettings as) :account-type smap)]
-      (get (.types ^AuthSettings as)
-           (if (keyword? ac-type) ac-type (keyword ac-type))))))
-
 ;; Operations logging
 
 (defn oplog-config

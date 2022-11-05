@@ -819,6 +819,25 @@
                             (or max-attempts 3)
                             user-id]))))
 
+;; Authentication
+
+(defn auth-by-user-id
+  "Gets authentication configuration (`AuthConfig`) for the given user. Uses cached
+  user props provided by `amelinium.model.user/props-by-id`."
+  [settings-src user-id]
+  (if-some [as (auth/settings settings-src)]
+    (if-some [ac-type (prop-by-id (.db ^AuthSettings as) :account-type user-id)]
+      (get (.types ^AuthSettings as) ac-type))))
+
+(defn auth-by-session
+  "Gets authentication configuration (`AuthConfig`) for the given user identified by a
+  session object. Uses cached user props provided by
+  `amelinium.model.user/props-by-session`."
+  [settings-src smap]
+  (if-some [as (auth/settings settings-src)]
+    (if-some [ac-type (prop-by-session (.db ^AuthSettings as) :account-type smap)]
+      (get (.types ^AuthSettings as) ac-type))))
+
 ;; Other
 
 (defn prop-get-locked
