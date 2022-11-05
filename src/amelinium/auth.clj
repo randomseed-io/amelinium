@@ -11,6 +11,7 @@
   (:require [amelinium.db             :as        db]
             [amelinium.logging        :as       log]
             [amelinium.auth.pwd       :as       pwd]
+            [amelinium.http           :as      http]
             [amelinium.system         :as    system]
             [io.randomseed.utils      :refer   :all]
             [io.randomseed.utils.time :as      time]
@@ -19,7 +20,8 @@
             [tick.core                :as         t])
 
   (:import [javax.sql DataSource]
-           [java.time Duration]))
+           [java.time Duration]
+           [reitit.core Match]))
 
 (defonce setup nil)
 
@@ -81,53 +83,6 @@
   `settings-src` and optional `account-type` provided."))
 
 ;; Access to settings and configuration
-
-(extend-protocol Authenticable
-
-  AuthSettings
-
-  (-settings
-    ^AuthSettings [settings-src]
-    settings-src)
-  (-config
-    (^AuthConfig [settings-src]
-     (.default ^AuthSettings settings-src))
-    (^AuthConfig [settings-src account-type]
-     (if account-type
-       (get (.types ^AuthSettings settings-src)
-            (if (keyword? account-type) account-type (keyword account-type))))))
-  (-db
-    (^DataSource [settings-src]
-     (.db ^AuthSettings settings-src))
-    (^DataSource [settings-src account-type]
-     (if account-type
-       (let [at (if (keyword? account-type) account-type (keyword account-type))]
-         (if-some [^AuthConfig ac (get (.types ^AuthSettings settings-src) at)]
-           (.db ^AuthConfig ac))))))
-
-  AuthConfig
-
-  (-config
-    (^AuthConfig [config-source] config-source))
-  (-db
-    (^DataSource [settings-src]
-     (.db ^AuthConfig settings-src)))
-
-  DataSource
-
-  (-db
-    (^DataSource [settings-src]
-     settings-src))
-
-  nil
-
-  (-settings [settings-src] nil)
-  (-config
-    ([settings-src] nil)
-    ([settings-src account-type] nil))
-  (-db
-    ([settings-src] nil)
-    ([settings-src account-type] nil)))
 
 (defn settings
   "Returns authentication settings for the given authentication settings source
@@ -205,6 +160,130 @@
   (if (and password auth-config)
     (if-some [encryptor (.encrypt-json ^AuthPasswords (.passwords ^AuthConfig auth-config))]
       (encryptor password))))
+
+;; Authenticable implementation
+
+(extend-protocol Authenticable
+
+  AuthSettings
+
+  (-settings
+    ^AuthSettings [settings-src]
+    settings-src)
+  (-config
+    (^AuthConfig [settings-src]
+     (.default ^AuthSettings settings-src))
+    (^AuthConfig [settings-src account-type]
+     (if account-type
+       (get (.types ^AuthSettings settings-src)
+            (if (keyword? account-type) account-type (keyword account-type))))))
+  (-db
+    (^DataSource [settings-src]
+     (.db ^AuthSettings settings-src))
+    (^DataSource [settings-src account-type]
+     (if account-type
+       (let [at (if (keyword? account-type) account-type (keyword account-type))]
+         (if-some [^AuthConfig ac (get (.types ^AuthSettings settings-src) at)]
+           (.db ^AuthConfig ac))))))
+
+  AuthConfig
+
+  (-config
+    (^AuthConfig [config-source] config-source))
+  (-db
+    (^DataSource [settings-src]
+     (.db ^AuthConfig settings-src)))
+
+  DataSource
+
+  (-db
+    (^DataSource [settings-src]
+     settings-src))
+
+  Match
+
+  (-settings
+    ^AuthSettings [m]
+    (get (.data ^Match m) :auth/setup))
+  (-config
+    (^AuthConfig [m]
+     (if-some [^AuthSettings as (get (.data ^Match m) :auth/setup)]
+       (.default ^AuthSettings as)))
+    (^AuthConfig [m account-type]
+     (if account-type
+       (if-some [^AuthSettings as (get (.data ^Match m) :auth/setup)]
+         (get (.types ^AuthSettings as)
+              (if (keyword? account-type) account-type (keyword account-type)))))))
+  (-db
+    (^DataSource [m]
+     (if-some [as (get (.data ^Match m) :auth/setup)]
+       (.db ^AuthSettings as)))
+    (^DataSource [m account-type]
+     (if account-type
+       (if-some [^AuthSettings as (get (.data ^Match m) :auth/setup)]
+         (let [at (if (keyword? account-type) account-type (keyword account-type))]
+           (if-some [^AuthConfig ac (get (.types ^AuthSettings as) at)]
+             (.db ^AuthConfig ac)))))))
+
+  clojure.lang.IPersistentMap
+
+  (-settings
+    ^AuthSettings [req]
+    (http/get-route-data req :auth/setup))
+  (-config
+    (^AuthConfig [req]
+     (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
+       (.default ^AuthSettings as)))
+    (^AuthConfig [req account-type]
+     (if account-type
+       (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
+         (get (.types ^AuthSettings as)
+              (if (keyword? account-type) account-type (keyword account-type)))))))
+  (-db
+    (^DataSource [req]
+     (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
+       (.db ^AuthSettings as)))
+    (^DataSource [req account-type]
+     (if account-type
+       (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
+         (let [at (if (keyword? account-type) account-type (keyword account-type))]
+           (if-some [^AuthConfig ac (get (.types ^AuthSettings as) at)]
+             (.db ^AuthConfig ac)))))))
+
+  clojure.lang.Associative
+
+  (-settings
+    ^AuthSettings [req]
+    (http/get-route-data req :auth/setup))
+  (-config
+    (^AuthConfig [req]
+     (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
+       (.default ^AuthSettings as)))
+    (^AuthConfig [req account-type]
+     (if account-type
+       (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
+         (get (.types ^AuthSettings as)
+              (if (keyword? account-type) account-type (keyword account-type)))))))
+  (-db
+    (^DataSource [req]
+     (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
+       (.db ^AuthSettings as)))
+    (^DataSource [req account-type]
+     (if account-type
+       (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
+         (let [at (if (keyword? account-type) account-type (keyword account-type))]
+           (if-some [^AuthConfig ac (get (.types ^AuthSettings as) at)]
+             (.db ^AuthConfig ac)))))))
+
+  nil
+
+  (-settings [settings-src] nil)
+  (-config
+    ([settings-src] nil)
+    ([settings-src account-type] nil))
+  (-db
+    ([settings-src] nil)
+    ([settings-src account-type] nil)))
 
 ;; Settings initialization
 

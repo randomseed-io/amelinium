@@ -12,14 +12,11 @@
   (:require [potemkin.namespaces             :as               p]
             [reitit.core                     :as               r]
             [reitit.ring                     :as            ring]
-            [amelinium.auth                  :as            auth]
             [io.randomseed.utils             :refer         :all]
             [io.randomseed.utils.map         :refer     [qassoc]]
             [io.randomseed.utils.reitit.http :as            http])
 
-  (:import [reitit.core Match]
-           [javax.sql DataSource]
-           [amelinium.auth Authenticable AuthConfig AuthSettings AccountTypes]))
+  (:import [reitit.core Match]))
 
 (p/import-vars [io.randomseed.utils.reitit.http
                 router? router match match?
@@ -90,80 +87,3 @@
 (defn inject-route-data
   [req]
   (qassoc req :route/data (get (get req ::r/match) :data)))
-
-(extend-protocol auth/Authenticable
-
-  Match
-
-  (-settings
-    ^AuthSettings [m]
-    (get (.data ^Match m) :auth/setup))
-  (-config
-    (^AuthConfig [m]
-     (if-some [^AuthSettings as (get (.data ^Match m) :auth/setup)]
-       (.default ^AuthSettings as)))
-    (^AuthConfig [m account-type]
-     (if account-type
-       (if-some [^AuthSettings as (get (.data ^Match m) :auth/setup)]
-         (get (.types ^AuthSettings as)
-              (if (keyword? account-type) account-type (keyword account-type)))))))
-  (-db
-    (^DataSource [m]
-     (if-some [as (get (.data ^Match m) :auth/setup)]
-       (.db ^AuthSettings as)))
-    (^DataSource [m account-type]
-     (if account-type
-       (if-some [^AuthSettings as (get (.data ^Match m) :auth/setup)]
-         (let [at (if (keyword? account-type) account-type (keyword account-type))]
-           (if-some [^AuthConfig ac (get (.types ^AuthSettings as) at)]
-             (.db ^AuthConfig ac)))))))
-
-  clojure.lang.IPersistentMap
-
-  (-settings
-    ^AuthSettings [req]
-    (get-route-data req :auth/setup))
-  (-config
-    (^AuthConfig [req]
-     (if-some [^AuthSettings as (get-route-data req :auth/setup)]
-       (.default ^AuthSettings as)))
-    (^AuthConfig [req account-type]
-     (if account-type
-       (if-some [^AuthSettings as (get-route-data req :auth/setup)]
-         (get (.types ^AuthSettings as)
-              (if (keyword? account-type) account-type (keyword account-type)))))))
-  (-db
-    (^DataSource [req]
-     (if-some [^AuthSettings as (get-route-data req :auth/setup)]
-       (.db ^AuthSettings as)))
-    (^DataSource [req account-type]
-     (if account-type
-       (if-some [^AuthSettings as (get-route-data req :auth/setup)]
-         (let [at (if (keyword? account-type) account-type (keyword account-type))]
-           (if-some [^AuthConfig ac (get (.types ^AuthSettings as) at)]
-             (.db ^AuthConfig ac)))))))
-
-  clojure.lang.Associative
-
-  (-settings
-    ^AuthSettings [req]
-    (get-route-data req :auth/setup))
-  (-config
-    (^AuthConfig [req]
-     (if-some [^AuthSettings as (get-route-data req :auth/setup)]
-       (.default ^AuthSettings as)))
-    (^AuthConfig [req account-type]
-     (if account-type
-       (if-some [^AuthSettings as (get-route-data req :auth/setup)]
-         (get (.types ^AuthSettings as)
-              (if (keyword? account-type) account-type (keyword account-type)))))))
-  (-db
-    (^DataSource [req]
-     (if-some [^AuthSettings as (get-route-data req :auth/setup)]
-       (.db ^AuthSettings as)))
-    (^DataSource [req account-type]
-     (if account-type
-       (if-some [^AuthSettings as (get-route-data req :auth/setup)]
-         (let [at (if (keyword? account-type) account-type (keyword account-type))]
-           (if-some [^AuthConfig ac (get (.types ^AuthSettings as) at)]
-             (.db ^AuthConfig ac))))))))
