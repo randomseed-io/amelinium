@@ -310,12 +310,12 @@
 (defn render
   "HTML web page renderer. Takes a request, a data map to be used in templates, a name
   of the view file (defaults to `:app/view` from the `req`), a name of the template
-  file (defaults to `:app/layout` from the `req`), a language string (guessed if not
-  given, unless explicitly set to `false`) and a session map (used only when the
-  language cannot be established otherwise and taken from the request if not
-  given). Uses values associated with the `:layout/dir` and `:view/dir` keys of the
-  `req` to obtain optional subdirectories to be looked up when searching for views
-  and layouts.
+  file (defaults to `:app/layout` from the `req`) and a language string (guessed if not
+  given, unless explicitly set to `false`).
+
+  Uses values associated with the `:layout/dir` and `:view/dir` keys of the `req` to
+  obtain optional subdirectories to be looked up when searching for views and
+  layouts.
 
   It will add `:status`, `:status/title` and `:status/description` entries
   to `:app/data` map (unless it already contains one), using configuration maps
@@ -345,20 +345,18 @@
   - value of `:app/error-view` (in a route data or a request map),
   - \"error\"."
   ([]
-   (render nil :ok/found nil nil nil nil nil))
+   (render nil :ok/found nil nil nil nil))
   ([req]
-   (render req :ok/found nil nil nil nil nil))
+   (render req :ok/found nil nil nil nil))
   ([req status]
-   (render req status nil nil nil nil nil))
+   (render req status nil nil nil nil))
   ([req status data]
-   (render req status data nil nil nil nil))
+   (render req status data nil nil nil))
   ([req status data view]
-   (render req status data view nil nil nil))
+   (render req status data view nil nil))
   ([req status data view layout]
-   (render req status data view layout nil nil))
+   (render req status data view layout nil))
   ([req status data view layout lang]
-   (render req status data view layout lang nil))
-  ([req status data view layout lang sess]
    (let [lang        (if lang (some-str lang))
          lang        (if (false? lang) nil (pick-language-str req))
          [layt view] (error-lv req status layout view)
@@ -417,25 +415,23 @@
   - value of `:app/error-view` (in a route data or a request map),
   - \"error\"."
   ([]
-   (render-response resp/ok :ok/found nil nil nil nil nil nil))
+   (render-response resp/ok :ok/found nil nil nil nil nil))
   ([resp-fn]
-   (render-response resp-fn nil nil nil nil nil nil nil))
+   (render-response resp-fn nil nil nil nil nil nil))
   ([resp-fn req]
-   (render-response resp-fn nil req nil nil nil nil nil))
+   (render-response resp-fn nil req nil nil nil nil))
   ([resp-fn status req]
-   (render-response resp-fn status req nil nil nil nil nil))
+   (render-response resp-fn status req nil nil nil nil))
   ([resp-fn status req data]
-   (render-response resp-fn status req data nil nil nil nil))
+   (render-response resp-fn status req data nil nil nil))
   ([resp-fn status req data view]
-   (render-response resp-fn status req data view nil nil nil))
+   (render-response resp-fn status req data view nil nil))
   ([resp-fn status req data view layout]
-   (render-response resp-fn status req data view layout nil nil))
+   (render-response resp-fn status req data view layout nil))
   ([resp-fn status req data view layout lang]
-   (render-response resp-fn status req data view layout lang nil))
-  ([resp-fn status req data view layout lang sess]
    (if (resp/response? req)
      req
-     (let [r (-> (render req status data view layout lang sess) (resp-fn))]
+     (let [r (-> (render req status data view layout lang) (resp-fn))]
        (if-some [headers (get req :response/headers)]
          (qassoc r :headers (conj (get r :headers) headers))
          r)))))
@@ -475,23 +471,21 @@
   - value of `:app/error-view` (in a route data or a request map),
   - \"error\"."
   ([]
-   (render-response-force resp/ok :ok/found nil nil nil nil nil nil))
+   (render-response-force resp/ok :ok/found nil nil nil nil nil))
   ([resp-fn]
-   (render-response-force resp-fn nil nil nil nil nil nil nil))
+   (render-response-force resp-fn nil nil nil nil nil nil))
   ([resp-fn req]
-   (render-response-force resp-fn nil req nil nil nil nil nil))
+   (render-response-force resp-fn nil req nil nil nil nil))
   ([resp-fn status req]
-   (render-response-force resp-fn status req nil nil nil nil nil))
+   (render-response-force resp-fn status req nil nil nil nil))
   ([resp-fn status req data]
-   (render-response-force resp-fn status req data nil nil nil nil))
+   (render-response-force resp-fn status req data nil nil nil))
   ([resp-fn status req data view]
-   (render-response-force resp-fn status req data view nil nil nil))
+   (render-response-force resp-fn status req data view nil nil))
   ([resp-fn status req data view layout]
-   (render-response-force resp-fn status req data view layout nil nil))
+   (render-response-force resp-fn status req data view layout nil))
   ([resp-fn status req data view layout lang]
-   (render-response-force resp-fn status req data view layout lang nil))
-  ([resp-fn status req data view layout lang sess]
-   (let [r (-> (render req status data view layout lang sess) (resp-fn))]
+   (let [r (-> (render req status data view layout lang) (resp-fn))]
      (if-some [headers (get req :response/headers)]
        (qassoc r :headers (conj (get r :headers) headers))
        r))))
@@ -532,19 +526,17 @@
           c# (if c# (keyword c#))]
       (defn ~name ~doc
         ([]
-         (render-response f# c# nil nil nil nil nil nil))
+         (render-response f# c# nil nil nil nil nil))
         (~'[req]
-         (render-response f# c# ~'req nil nil nil nil nil))
+         (render-response f# c# ~'req nil nil nil nil))
         (~'[req data]
-         (render-response f# c# ~'req ~'data nil nil nil nil))
+         (render-response f# c# ~'req ~'data nil nil nil))
         (~'[req data view]
-         (render-response f# c# ~'req ~'data ~'view nil nil nil))
+         (render-response f# c# ~'req ~'data ~'view nil nil))
         (~'[req data view layout]
-         (render-response f# c# ~'req ~'data ~'view ~'layout nil nil))
+         (render-response f# c# ~'req ~'data ~'view ~'layout nil))
         (~'[req data view layout lang]
-         (render-response f# c# ~'req ~'data ~'view ~'layout ~'lang nil))
-        (~'[req data view layout lang session-map]
-         (render-response f# c# ~'req ~'data ~'view ~'layout ~'lang ~'session-map))))))
+         (render-response f# c# ~'req ~'data ~'view ~'layout ~'lang))))))
 
 ;; OK response
 
@@ -756,10 +748,8 @@
                [req app-statuses default data view layout]
                [req app-status default data view layout lang]
                [req app-statuses default data view layout lang]
-               [req app-status default data view layout lang session-map]
-               [req app-statuses default data view layout lang session-map]
-               [req app-status default data view layout lang session-map & more]
-               [req app-statuses default data view layout lang session-map & more])}
+               [req app-status default data view layout lang & more]
+               [req app-statuses default data view layout lang & more])}
   ([]
    (render-internal-server-error))
   ([req]
@@ -794,16 +784,11 @@
          app-status (errors/most-significant err-config app-status)
          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
      (errors/render err-config app-status (or default render-internal-server-error) req data view layout lang)))
-  ([req app-status default data view layout lang session-map]
+  ([req app-status default data view layout lang & more]
    (let [err-config (errors/config req)
          app-status (errors/most-significant err-config app-status)
          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
-     (errors/render err-config app-status (or default render-internal-server-error) req data view layout lang session-map)))
-  ([req app-status default data view layout lang session-map & more]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
-     (apply errors/render err-config app-status (or default render-internal-server-error) req data view layout lang session-map more))))
+     (apply errors/render err-config app-status (or default render-internal-server-error) req data view layout lang more))))
 
 (defn render-status
   "Renders status response."
@@ -821,10 +806,8 @@
                [req app-statuses default data view layout]
                [req app-status default data view layout lang]
                [req app-statuses default data view layout lang]
-               [req app-status default data view layout lang session-map]
-               [req app-statuses default data view layout lang session-map]
-               [req app-status default data view layout lang session-map & more]
-               [req app-statuses default data view layout lang session-map & more])}
+               [req app-status default data view layout lang & more]
+               [req app-statuses default data view layout lang & more])}
   ([]
    (render-ok))
   ([req]
@@ -859,16 +842,11 @@
          app-status (errors/most-significant err-config app-status)
          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
      (errors/render err-config app-status (or default render-ok) req data view layout lang)))
-  ([req app-status default data view layout lang session-map]
+  ([req app-status default data view layout lang & more]
    (let [err-config (errors/config req)
          app-status (errors/most-significant err-config app-status)
          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
-     (errors/render err-config app-status (or default render-ok) req data view layout lang session-map)))
-  ([req app-status default data view layout lang session-map & more]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
-     (apply errors/render err-config app-status (or default render-ok) req data view layout lang session-map more))))
+     (apply errors/render err-config app-status (or default render-ok) req data view layout lang more))))
 
 ;; Linking helpers
 
