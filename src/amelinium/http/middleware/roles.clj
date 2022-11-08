@@ -8,24 +8,27 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [clojure.set               :as        set]
-            [clojure.string            :as        str]
-            [tick.core                 :as          t]
-            [buddy.core.hash           :as       hash]
-            [buddy.core.codecs         :as     codecs]
-            [taoensso.nippy            :as      nippy]
-            [next.jdbc.sql             :as        sql]
-            [next.jdbc                 :as       jdbc]
-            [reitit.ring               :as       ring]
-            [ring.util.http-response   :as       resp]
-            [amelinium.db              :as         db]
-            [amelinium.logging         :as        log]
-            [amelinium.system          :as     system]
-            [io.randomseed.utils       :refer    :all]
-            [io.randomseed.utils.time  :as       time]
-            [io.randomseed.utils.var   :as        var]
-            [io.randomseed.utils.map   :as        map]
-            [io.randomseed.utils.ip    :as         ip]))
+  (:require [clojure.set                       :as        set]
+            [clojure.string                    :as        str]
+            [tick.core                         :as          t]
+            [buddy.core.hash                   :as       hash]
+            [buddy.core.codecs                 :as     codecs]
+            [taoensso.nippy                    :as      nippy]
+            [next.jdbc.sql                     :as        sql]
+            [next.jdbc                         :as       jdbc]
+            [reitit.ring                       :as       ring]
+            [ring.util.http-response           :as       resp]
+            [amelinium.db                      :as         db]
+            [amelinium.logging                 :as        log]
+            [amelinium.system                  :as     system]
+            [amelinium.http.middleware.session :as    session]
+            [io.randomseed.utils               :refer    :all]
+            [io.randomseed.utils.time          :as       time]
+            [io.randomseed.utils.var           :as        var]
+            [io.randomseed.utils.map           :as        map]
+            [io.randomseed.utils.ip            :as         ip])
+
+  (:import [amelinium.http.middleware.session Session]))
 
 (defn known?
   [config role]
@@ -56,10 +59,11 @@
   "Returns true if user is authenticated, false otherwise."
   [session]
   (boolean
-   (if (map? session)
-     (and (get session :valid?)
-          (some? (get session :id))
-          (some? (get session :user/id))))))
+   (if (session/session? session)
+     (let [^Session session session]
+       (and (.valid?         ^Session session)
+            (some? (.id      ^Session session))
+            (some? (.user-id ^Session session)))))))
 
 (defn user-authorized?
   "Checks if user is authorized in the specified context. Takes a request map and a set
@@ -210,21 +214,21 @@
 (defn get-roles-from-session
   "Uses session map (`session`) to obtain current user's ID and then calls `handler-fn`
   with user ID to obtain user's roles."
-  ([config session]
+  ([config ^Session session]
    (get-roles-from-session config session (get config :processor)
                            (get config :global-context)
                            (get config :anonymous-role)
                            (get config :known-user-role)))
-  ([config session handler-fn]
+  ([config ^Session session handler-fn]
    (get-roles-from-session config session handler-fn
                            (get config :global-context)
                            (get config :anonymous-role)
                            (get config :known-user-role)))
-  ([config session handler-fn
+  ([config ^Session session handler-fn
     global-context anonymous-role known-user-role]
-   (let [user-id (valuable (get session :user/id))
+   (let [user-id (valuable (session/user-id session))
          roles   (get-roles-for-user-id config user-id handler-fn global-context anonymous-role)]
-     (if (or (get session :valid?) (not user-id))
+     (if (or (not user-id) (session/valid? ^Session session) )
        roles
        (if known-user-role {global-context #{known-user-role}})))))
 
@@ -320,27 +324,27 @@
     anonymous-role known-user-role self-role
     global-context authorize-default? session-key
     roles-forbidden roles-any roles-all]
-   (let [session        (get req session-key)
-         authenticated? (delay (user-authenticated? session))
-         roles          (delay (let [sr (if (and self-role @authenticated?) (srfn req))]
-                                 (cond-> (get-roles-from-session config session
-                                                                 processor
-                                                                 global-context
-                                                                 anonymous-role
-                                                                 known-user-role)
-                                   sr (update global-context (fnil #(conj % sr) #{})))))
-         context        (delay (rcfn req))
-         in-context     (delay (filter-in-context @context @roles config))
-         authorized?    (delay (user-authorized? req @in-context authorize-default?
-                                                 roles-forbidden roles-any roles-all))
-         unauth-redir   (get config :unauthorized-redirect)
-         req            (-> req
-                            (map/assoc-missing :roles/config config)
-                            (assoc :roles               roles
-                                   :roles/context       context
-                                   :roles/in-context    in-context
-                                   :user/authorized?    authorized?
-                                   :user/authenticated? authenticated?))]
+   (let [^Session session (session/of req session-key)
+         authenticated?   (delay (user-authenticated? session))
+         roles            (delay (let [sr (if (and self-role @authenticated?) (srfn req))]
+                                   (cond-> (get-roles-from-session config session
+                                                                   processor
+                                                                   global-context
+                                                                   anonymous-role
+                                                                   known-user-role)
+                                     sr (update global-context (fnil #(conj % sr) #{})))))
+         context          (delay (rcfn req))
+         in-context       (delay (filter-in-context @context @roles config))
+         authorized?      (delay (user-authorized? req @in-context authorize-default?
+                                                   roles-forbidden roles-any roles-all))
+         unauth-redir     (get config :unauthorized-redirect)
+         req              (-> req
+                              (map/assoc-missing :roles/config config)
+                              (assoc :roles               roles
+                                     :roles/context       context
+                                     :roles/in-context    in-context
+                                     :user/authorized?    authorized?
+                                     :user/authenticated? authenticated?))]
      (if (and unauth-redir (not @authorized?))
        (resp/see-other unauth-redir)
        req))))

@@ -41,9 +41,9 @@
   ([req gmap smap]
    (if (and gmap (= (get req :uri) (get gmap :uri)))
      (if-some [gmap (valuable (select-keys gmap [:form-params :query-params :parameters :session-id]))]
-       (let [smap      (or smap (common/session req))
-             sid-field (or (get smap :session-id-field) "session-id")]
-         (if (= (get smap :db/id) (get gmap :session-id))
+       (let [smap      (or (session/of smap) (session/of req))
+             sid-field (or (session/id-field smap) "session-id")]
+         (if (= (session/db-id smap) (get gmap :session-id))
            (-> gmap
                (common/remove-form-params sid-field)
                (dissoc :session-id))))))))
@@ -67,7 +67,7 @@
   ([req gmap smap]
    (if-not gmap
      req
-     (if (web/session-variable-get-failed? gmap)
+     (if (common/session-variable-get-failed? gmap)
        (qassoc req
                :goto-injected? true
                :goto-uri      false
@@ -114,14 +114,14 @@
 
 (defn get-goto+
   "Gets go-to map from a session variable even if the session expired."
-  [smap sess-opts]
-  (user/get-session-var sess-opts (common/allow-soft-expired smap) :goto))
+  [smap]
+  (user/get-session-var (session/allow-soft-expired smap) :goto))
 
 (defn get-goto-for-valid+
   "Gets go-to map from session variable if the session is valid (and not expired)."
-  [smap sess-opts]
-  (if (and smap (get smap :valid?))
-    (get-goto+ smap sess-opts)))
+  [smap]
+  (if (and smap (session/valid? smap))
+    (get-goto+ smap)))
 
 (defn populate-goto+
   "Gets a go-to data from a session variable if it does not yet exist in the `req`
@@ -129,12 +129,10 @@
   a map) is the same as the URI of a currently visited page. Uses `inject-goto` to
   inject the data."
   ([req smap]
-   (populate-goto+ req smap (get req :session/config)))
-  ([req smap sess-opts]
    (if (or (get req :goto-injected?) (not smap)
-           (not (get (common/allow-soft-expired smap) :id)))
+           (not (session/id (session/allow-soft-expired smap))))
      req
-     (inject-goto req (get-goto+ smap sess-opts) smap))))
+     (inject-goto req (get-goto+ smap) smap))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
@@ -180,9 +178,9 @@
   (let [form-params    (get req :form-params)
         user-email     (some-str (get form-params "login"))
         password       (if user-email (some-str (get form-params "password")))
-        sess           (common/session req)
+        sess           (session/of req)
         lang           (web/pick-language-str req :user)
-        valid-session? (get sess :valid?)
+        valid-session? (session/valid? sess)
         ring-match     (get req ::r/match)
         route-data     (http/get-route-data ring-match)]
     (cond
@@ -197,15 +195,14 @@
 (defn login!
   "Prepares response data to display a login page."
   [req]
-  (let [sess-opts  (get req :session/config)
-        sess-key   (or (get sess-opts :session-key) :session)
-        sess       (get req sess-key)
-        prolonged? (delay (some? (and (get sess :expired?) (get req :goto-uri))))]
+  (let [sess       (session/of req)
+        sess-key   (or (session/session-key sess) :session)
+        prolonged? (delay (some? (and (session/expired? sess) (get req :goto-uri))))]
     (-> req
         (qassoc sess-key
                 (delay (if @prolonged?
                          (qassoc sess
-                                 :id (or (get sess :id) (get sess :err/id))
+                                 :id (or (session/id sess) (session/err-id sess))
                                  :prolonged? true)
                          (qassoc sess :prolonged? false))))
         (qassoc :app/data
@@ -219,7 +216,7 @@
   "Prepares a request before any web controller is called."
   [req]
   (let [req         (qassoc req :app/data-required [] :app/data web/empty-lazy-map)
-        sess        (common/session req)
+        sess        (session/of req)
         route-data  (http/get-route-data req)
         auth-state  (delay (web/login-auth-state req :login-page? :auth-page?))
         login-data? (delay (login-data? req))
@@ -234,7 +231,7 @@
 
       ;; There is no session. Short-circuit.
 
-      (not (and sess (or (get sess :id) (get sess :err/id))))
+      (not (and sess (or (session/id sess) (session/err-id sess))))
       (-> req (cleanup-req @auth-state))
 
       ;; Account is manually hard-locked.
@@ -274,15 +271,13 @@
       ;; We have to preserve form data and original, destination URI in a session variable.
 
       (super/prolongation? sess @auth-state @login-data?)
-      (let [req            (cleanup-req req @auth-state)
-            sess           (common/allow-soft-expired sess)
-            session-config (get req :session/config)
-            session-field  (or (get sess :session-id-field) "session-id")
-            req-to-save    (common/remove-form-params req session-field)]
-        (user/put-session-var session-config
-                              sess
+      (let [req           (cleanup-req req @auth-state)
+            sess          (session/allow-soft-expired sess)
+            session-field (or (session/id-field sess) "session-id")
+            req-to-save   (common/remove-form-params req session-field)]
+        (user/put-session-var sess
                               :goto {:uri          (get req :uri)
-                                     :session-id   (get sess :db/id)
+                                     :session-id   (session/db-id sess)
                                      :parameters   (get req-to-save :parameters)
                                      :form-params  (get req-to-save :form-params)
                                      :query-params (get req-to-save :query-params)})
@@ -290,9 +285,9 @@
 
       :----pass
 
-      (let [valid-session? (get sess :valid?)
+      (let [valid-session? (session/valid? sess)
             req            (-> req
-                               (populate-goto+ sess (get req :session/config))
+                               (populate-goto+ sess)
                                (cleanup-req @auth-state))
             [_ auth?]      @auth-state
             goto?          (get req :goto-injected?)
@@ -305,9 +300,9 @@
         ;; Checking for a valid session is the responsibility of each controller.
 
         (and (not valid-session?) (not (and auth? @login-data?))
-             (if (get sess :expired?)
-               (let [user-id  (:user/id      sess)
-                     email    (:user/email   sess)
+             (if (session/expired? sess)
+               (let [user-id  (session/user-id sess)
+                     email    (session/user-email sess)
                      ip-addr  (:remote-ip/str req)
                      for-user (log/for-user user-id email ip-addr)
                      for-mail (log/for-user nil email ip-addr)]
@@ -428,14 +423,13 @@
            (let [errors       (coercion/map-errors data)
                  orig-uri     (if orig-uri (some-str orig-uri))
                  orig-params  (if orig-uri orig-params)
-                 [opts smap]  (common/config+session req)
+                 smap         (session/of req)
                  destination  (or orig-page orig-uri)
                  dest-uri     (if (keyword? destination) (common/page req destination) destination)
                  dest-uri     (some-str dest-uri)
-                 session?     (and smap (get smap :valid?)
-                                   (session/put-var!
-                                    opts smap :form-errors {:dest   dest-uri
-                                                            :errors errors}))
+                 session?     (and smap (session/valid? smap)
+                                   (session/put-var! smap :form-errors {:dest   dest-uri
+                                                                        :errors errors}))
                  error-params (if session? "" (coercion/join-errors errors))
                  joint-params (qassoc orig-params "form-errors" error-params)]
              (if dest-uri

@@ -14,6 +14,7 @@
             [selmer.parser                        :as     selmer]
             [amelinium.i18n                       :as       i18n]
             [amelinium.common                     :as     common]
+            [amelinium.http.middleware.session    :as    session]
             [amelinium.http.middleware.language   :as   language]
             [amelinium.http.middleware.validators :as validators]
             [amelinium.http.middleware.coercion   :as   coercion]
@@ -158,9 +159,9 @@
     (selmer/add-tag!
      :link
      (fn [args ctx content]
-       (let [smap            (common/session ctx)
-             sid             (get smap :id)
-             sfld            (get smap :session-id-field)
+       (let [smap            (session/of ctx)
+             sid             (session/id smap)
+             sfld            (session/id-field smap)
              path-or-name    (first args)
              args            (rest args)
              args            (if (map? (first args)) (cons nil args) args)
@@ -181,9 +182,9 @@
      :slink
      (fn [args ctx content]
        (let [url  (selmer/render (first args) ctx {:tag-open \[ :tag-close \]})
-             smap (common/session ctx)
-             sid  (get smap :id)
-             sfld (get smap :session-id-field)]
+             smap (session/of ctx)
+             sid  (session/id smap)
+             sfld (session/id-field smap)]
          (if (and sid sfld)
            (str "<form name=\"sessionLink\" class=\"formlink\" action=\"" url "\" method=\"post\">"
                 (anti-spam-code validators)
@@ -196,10 +197,10 @@
     (selmer/add-tag!
      :session-data
      (fn [args ctx]
-       (let [smap (common/session ctx)
-             sfld (get smap :session-id-field)]
+       (let [smap (session/of ctx)
+             sfld (session/id-field smap)]
          (str (anti-spam-code validators)
-              "<input type=\"hidden\" name=\"" sfld "\" value=\"" (get smap :id) "\" />"))))
+              "<input type=\"hidden\" name=\"" sfld "\" value=\"" (session/id smap) "\" />"))))
 
     (selmer/add-tag!
      :explain-form-error

@@ -22,7 +22,6 @@
             [amelinium.errors                     :as          errors]
             [amelinium.http                       :as            http]
             [amelinium.http.middleware.language   :as        language]
-            [amelinium.http.middleware.session    :as         session]
             [amelinium.http.middleware.validators :as      validators]
             [amelinium.logging                    :as             log]
             [io.randomseed.utils.map              :as             map]
@@ -96,12 +95,6 @@
                 lock-wait-default lock-wait
                 hard-lock-time hard-locked?
                 soft-lock-time soft-lock-passed soft-locked? soft-lock-remains])
-
-;; Sessions
-
-(p/import-vars [amelinium.common
-                session-field session-variable-get-failed?
-                allow-expired allow-soft-expired allow-hard-expired])
 
 ;; Context and roles
 

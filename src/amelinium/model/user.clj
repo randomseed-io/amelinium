@@ -142,46 +142,38 @@
 
 ;; Sessions
 
-(defn create-session
-  "Creates a session for user of the given ID and IP address."
-  ([req opts-or-config-key user-id user-email ip-address]
-   (session/create req opts-or-config-key user-id user-email ip-address))
-  ([opts user-id user-email ip-address]
-   ((get opts :fn/create) user-id user-email ip-address))
-  ([opts user ip-address]
-   ((get opts :fn/create) (get user :id) (get user :email) ip-address)))
-
 (defn prolong-session
-  ([opts smap ip-address]
-   ((get opts :fn/prolong) smap ip-address))
-  ([req opts-or-config-key smap ip-address]
-   (session/prolong req opts-or-config-key smap ip-address)))
+  ([smap ip-address]
+   (if-some [opts (get (session/config smap) :fn/prolong)]
+     (session/prolong smap ip-address)))
+  ([req session-key smap ip-address]
+   (session/prolong req session-key smap ip-address)))
 
 (defn get-session-var
-  [opts smap var-name & more]
+  [smap var-name & more]
   (if more
-    (apply session/get-var opts smap var-name more)
-    (session/get-var opts smap var-name)))
+    (apply session/get-var smap var-name more)
+    (session/get-var smap var-name)))
 
 (defn fetch-session-var
-  [opts smap var-name & more]
+  [smap var-name & more]
   (if more
-    (apply session/fetch-var! opts smap var-name more)
-    (session/fetch-var! opts smap var-name)))
+    (apply session/fetch-var! smap var-name more)
+    (session/fetch-var! smap var-name)))
 
 (defn put-session-var
-  [opts smap var-name v & more]
+  [smap var-name v & more]
   (if more
-    (apply session/put-var! opts smap var-name v more)
-    (session/put-var! opts smap var-name v)))
+    (apply session/put-var! smap var-name v more)
+    (session/put-var! smap var-name v)))
 
 (def set-session-var put-session-var)
 
 (defn del-session-var
-  [opts smap var-name & more]
+  [smap var-name & more]
   (if more
-    (apply session/del-var! opts smap var-name more)
-    (session/del-var! opts smap var-name)))
+    (apply session/del-var! smap var-name more)
+    (session/del-var! smap var-name)))
 
 ;; Roles
 
@@ -189,7 +181,7 @@
   ([smap-or-user-id opts context]
    (roles/filter-in-context context (prop-get-roles smap-or-user-id opts) opts))
   ([smap-or-user-id opts]
-   (if (map? smap-or-user-id)
+   (if (session/session? smap-or-user-id)
      (roles/get-roles-from-session opts smap-or-user-id)
      (roles/get-roles-for-user-id  opts smap-or-user-id))))
 
@@ -344,7 +336,7 @@
 (defn prop-by-session
   "Returns the given property of the given session (cached)."
   [db prop smap]
-  (if-some [user-id (get smap :user/id)] (prop db prop user-id)))
+  (if-some [user-id (session/user-id smap)] (prop db prop user-id)))
 
 (defn prop-by-session-or-id
   "Returns the given property of the given session or user ID (cached)."
@@ -359,7 +351,7 @@
 (defn props-by-session
   "Returns properties of the given user session (cached)."
   [db smap]
-  (if-some [user-id (get smap :user/id)] (props db user-id)))
+  (if-some [user-id (session/user-id smap)] (props db user-id)))
 
 (defn props-by-session-or-id
   "Returns properties of the given user session or ID (cached)."

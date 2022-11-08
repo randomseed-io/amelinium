@@ -66,8 +66,8 @@
   [req _ _]
   (delay
     (if-some [db (auth/db req)]
-      (if-some [smap (common/session req)]
-        (if-some [user-id (get smap :user/id)]
+      (if-some [smap (session/of req)]
+        (if-some [user-id (session/user-id smap)]
           (let [supported (get (get req :language/settings) :supported)]
             (contains? supported (user/setting db user-id :language))))))))
 
@@ -101,9 +101,9 @@
   (delay
     (if-some [qp (get req :query-params)]
       (if-some [query-params-errors (get qp "form-errors")]
-        (let [[opts smap]     (common/config+session req)
-              session?        (and opts smap (get smap :valid?))
-              sess-var        (if session? (session/fetch-var! opts smap :form-errors))
+        (let [smap            (session/of req)
+              session?        (and smap (session/valid? smap))
+              sess-var        (if session? (session/fetch-var! smap :form-errors))
               expected-uri    (if sess-var (get sess-var :dest))
               uri-ok?         (or (not expected-uri) (= expected-uri (get req :uri)))
               sess-var-errors (if uri-ok? (not-empty (get sess-var :errors)))]
