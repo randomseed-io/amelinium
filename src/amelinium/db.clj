@@ -28,6 +28,7 @@
             [io.randomseed.utils.map       :refer            [qassoc]]
             [phone-number.util             :as                 phutil]
             [phone-number.core             :as                  phone]
+            [taoensso.nippy                :as                  nippy]
             [amelinium.app                 :as                    app]
             [amelinium.system              :as                 system]
             [amelinium.logging             :as                    log])
@@ -39,6 +40,9 @@
            [java.io Closeable]))
 
 (set! *warn-on-reflection* true)
+
+(alter-var-root #'nippy/*thaw-serializable-allowlist*
+                conj "com.google.i18n.phonenumbers.Phonenumber$PhoneNumber")
 
 (defonce auth      nil)
 (defonce migrators nil)
