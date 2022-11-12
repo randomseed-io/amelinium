@@ -1085,28 +1085,20 @@
 (defn prolong
   "Re-validates session by updating its timestamp and re-running validation."
   {:arglists '([req]
-               [req config]
                [req session-key]
-               [req config smap ip-address]
-               [req session-key smap ip-address]
+               [smap ip-address]
                [opts handler-fn update-active-fn invalidator-fn smap ip-address])}
-  ([req]
-   (prolong req :session))
-  ([req opts-or-session-key]
-   (if (keyword? opts-or-session-key)
-     (if-some [^Session smap (-session req opts-or-session-key)]
+  ([req-or-smap]
+   (if (session? req-or-smap)
+     (prolong req-or-smap )
+     (prolong req-or-smap :session)))
+  ([req-or-smap session-key-or-ip]
+   (if (session? req-or-smap)
+     (if-some [prolonger (get (.config ^Session req-or-smap) :fn/prolong)]
+       (prolonger req-or-smap session-key-or-ip))
+     (if-some [^Session smap (-session req-or-smap session-key-or-ip)]
        (if-some [prolonger (get (.config ^Session smap) :fn/prolong)]
-         (prolonger smap (get req :ip-address))))
-     (if-some [prolonger (get opts-or-session-key :fn/prolong)]
-       (if-some [^Session smap (-session req (get opts-or-session-key :session-key))]
-         (prolonger smap (get req :ip-address))))))
-  ([opts smap ip-address]
-   (if-some [prolonger (get opts :fn/prolong)]
-     (prolonger smap ip-address)))
-  ([req opts-or-session-key smap ip-address]
-   (let [opts (config-options req opts-or-session-key)]
-     (if-some [prolonger (get opts :fn/prolong)]
-       (prolonger smap ip-address))))
+         (prolonger smap (get req-or-smap :ip-address))))))
   ([opts handler-fn update-active-fn invalidator-fn smap ip-address]
    (if-some [^Session smap (-session smap)]
      (if-some [sid (or (.err-id ^Session smap) (.id ^Session smap))]
