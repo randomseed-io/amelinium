@@ -112,8 +112,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions
 
-(defn get-goto+
-  "Gets go-to map from a session variable even if the session expired."
+(defn get-goto
+  "Gets go-to map from a session variable even if the session is not valid."
   [smap]
   (user/get-session-var (session/allow-soft-expired smap) :goto))
 
@@ -156,21 +156,22 @@
   "Logs user in when user e-mail and password are given, or checks if the session is
   valid to serve a current page.
 
-  Takes a request map and obtains database connection, client IP address and
-  authentication configuration from it. Also gets a user e-mail and a password from a
+  Takes a request map and obtains a database connection, a client IP address and an
+  authentication configuration from it. Also gets user's e-mail and a password from a
   map associated with the `:form-params` key of the `req`. Calls
-  `auth-user-with-password!` to get a result or a redirect if authentication was not
-  successful.
+  `auth-user-with-password!` to get the result or perform a redirect if the
+  authentication was not successful.
 
-  If there is no e-mail or password given (the value is `nil`, `false` or an empty
-  string) then authentication is not performed but instead validity of a session is
-  tested. If the session is invalid redirect to a login page is performed. The
-  destination URL is obtained via the route name taken from the `:auth/login` key of
-  a route data, or from `:login` route identifier as default. If the destination path
-  is parameterized with a language the redirect will set this path parameter to a
-  value obtained by calling the `web/pick-language-str` using language detection
-  chain identified by the `:user` key. The same language will be
-  passed to `auth-user-with-password!`.
+  If there is no e-mail nor password given (the value is `nil`, `false` or an empty
+  string) then the authentication is not performed but instead the validity of a
+  session is tested. If the session is invalid a redirect to the login page is
+  performed; the destination URL is obtained by looking up the route data key
+  `:auth/login` and taking a route name associated with it, or by visiting an URL
+  associated with the `:login` route name (as default, when the previous lookup was
+  not successful). If the destination path is parameterized with a language, the
+  redirect will set this path parameter to a value obtained by calling the
+  `web/pick-language-str`, using language detection chain identified by the `:user`
+  key. The same language will be passed to the `auth-user-with-password!` call.
 
   If the session is valid then the given request map is returned with the
   `:authenticated!` key set to `true`."
