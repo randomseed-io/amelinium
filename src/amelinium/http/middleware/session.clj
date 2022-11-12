@@ -667,7 +667,7 @@
            expired?      (or (= :session/expired cause)
                              (and (= :session/bad-ip cause)
                                   (get (.config ^Session smap) :wrong-ip-expires)))
-           hard-expired? (and expired? (hard-expired? smap))
+           hard-expired? (and expired? (calc-hard-expired? smap))
            err-id        (or (.id ^Session smap) (.err-id ^Session smap))
            err-map       (.error ^Session smap)]
        (if (get err-map :severity)
