@@ -193,23 +193,21 @@
       :invalid-session! (web/move-to req (or (get route-data :auth/login) :auth/login) lang))))
 
 (defn login!
-  "Prepares response data to display a login page."
+  "Prepares response data to be displayed a login page."
   [req]
   (let [sess       (session/of req)
         sess-key   (or (session/session-key sess) :session)
-        prolonged? (delay (some? (and (session/expired? sess) (get req :goto-uri))))]
+        prolonged? (some? (and (session/expired? sess) (get req :goto-uri)))]
     (-> req
         (qassoc sess-key
-                (delay (if @prolonged?
-                         (qassoc sess
-                                 :id (or (session/id sess) (session/err-id sess))
-                                 :prolonged? true)
+                (delay (if prolonged?
+                         (-> sess session/allow-soft-expired (qassoc :prolonged? true))
                          (qassoc sess :prolonged? false))))
         (qassoc :app/data
                 (qassoc (get req :app/data web/empty-lazy-map) :lock-remains
                         (delay (super/lock-remaining-mins req
                                                           (auth/db req)
-                                                          (if @prolonged? sess)
+                                                          (if prolonged? sess)
                                                           t/now)))))))
 
 (defn prep-request!
