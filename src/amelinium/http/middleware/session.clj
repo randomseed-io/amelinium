@@ -1058,7 +1058,7 @@
                         opts)
               :id-path (get opts :id-path))
        (let [remote-ip     (get req :remote-ip)
-             ^Session smap (handler-fn sid remote-ip)]
+             ^Session smap (map/qassoc (handler-fn sid remote-ip) :config opts)]
          (if-not (valid? smap)
            smap
            (let [^Session smap (refresh-fn smap remote-ip)]
@@ -1120,7 +1120,7 @@
            (invalidator-fn sid ip-address)
            (if (correct? (get stat :cause))
              (do (update-active-fn sid-db ip-address (t/instant new-time))
-                 (map/qassoc (handler-fn sid ip-address) :prolonged? true))
+                 (map/qassoc (handler-fn sid ip-address) :config opts :prolonged? true))
              (do (log/wrn "Session re-validation error" (log/for-user (:user-id smap) (:user-email smap) ipplain))
                  (mkbad smap :error stat)))))))))
 
