@@ -737,7 +737,7 @@
      (let [^Session smap smap-or-opts
            opts          (.config ^Session smap)
            db-sid        (db-sid-smap ^Session smap)
-           deleter       (get (.config ^Session smap) :fn/xvar-del)
+           deleter       (get (.config ^Session smap) :fn/var-del)
            var-name      var-name-or-sid]
        (if-not db-sid
          (log/err "Cannot delete session variable" var-name "because session ID is not valid"
