@@ -140,40 +140,6 @@
   (if-some [uid (db/some-uuid-str)]
     (sql/get-by-id db :users uid :uid db/opts-simple-map)))
 
-;; Sessions
-
-(defn prolong-session
-  ([smap ip-address]
-   (session/prolong smap ip-address))
-  ([req session-key smap ip-address]
-   (session/prolong req session-key smap ip-address)))
-
-(defn get-session-var
-  [smap var-name & more]
-  (if more
-    (apply session/get-var smap var-name more)
-    (session/get-var smap var-name)))
-
-(defn fetch-session-var
-  [smap var-name & more]
-  (if more
-    (apply session/fetch-var! smap var-name more)
-    (session/fetch-var! smap var-name)))
-
-(defn put-session-var
-  [smap var-name v & more]
-  (if more
-    (apply session/put-var! smap var-name v more)
-    (session/put-var! smap var-name v)))
-
-(def set-session-var put-session-var)
-
-(defn del-session-var
-  [smap var-name & more]
-  (if more
-    (apply session/del-var! smap var-name more)
-    (session/del-var! smap var-name)))
-
 ;; Roles
 
 (defn prop-get-roles
