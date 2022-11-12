@@ -779,7 +779,7 @@
                [opts user-id])}
   ([smap]
    (if-some [^Session smap (-session smap)]
-     (let [deleter (get (.config ^Session smap) :fn/var-del-user)
+     (let [deleter (get (.config ^Session smap) :fn/vars-del-user)
            user-id (.user-id ^Session smap)]
        (if-not user-id
          (log/err "Cannot delete session variables because user ID is not valid"
@@ -788,7 +788,7 @@
   ([smap-or-opts user-id]
    (let [smap    (if (session? smap-or-opts) smap-or-opts)
          opts    (if smap (.config ^Session smap) smap-or-opts)
-         deleter (get opts :fn/var-del-user)]
+         deleter (get opts :fn/vars-del-user)]
      (if-not user-id
        (log/err "Cannot delete session variables because user ID is not set"
                 (log/for-user (user-id smap) (user-email smap)))
@@ -1121,7 +1121,7 @@
                [smap user-id user-email ip-address]
                [req opts user-id user-email ip-address]
                [req session-key user-id user-email ip-address]
-               [opts setter-fn invalidator-fn var-del-fn var-del-user-fn
+               [opts setter-fn invalidator-fn var-del-fn vars-del-user-fn
                 single-session? secured? session-id-field session-key
                 user-id user-email ip-address])}
   ([opts-or-req user-id user-email ip-address]
@@ -1135,7 +1135,7 @@
    (let [opts (config-options req opts-or-session-key)]
      (if-some [creator (get opts :fn/create)]
        (creator user-id user-email ip-address))))
-  ([opts setter-fn invalidator-fn var-del-fn var-del-user-fn single-session? secured?
+  ([opts setter-fn invalidator-fn var-del-fn vars-del-user-fn single-session? secured?
     session-id-field session-key user-id user-email ip-address]
    (let [user-id    (valuable user-id)
          user-email (some-str user-email)]
@@ -1162,7 +1162,7 @@
              (invalidator-fn (or (.id ^Session sess) (.err-id ^Session sess)) ip)
              (if (pos-int? updated-count)
                (do (if single-session?
-                     (var-del-user-fn user-id)
+                     (vars-del-user-fn user-id)
                      (var-del-fn sess))
                    (mkgood sess))
                (do (log/err "Problem saving session" (log/for-user user-id user-email ipplain))
@@ -1289,7 +1289,7 @@
                                   :fn/var-del var-del-fn
                                   :fn/vars-del-user var-del-user-fn-w)
         create-fn          #(create config
-                                    setter-fn-w invalidator-fn var-del-fn var-del-user-fn-w
+                                    setter-fn-w invalidator-fn var-del-fn vars-del-user-fn-w
                                     single-session? secured? session-id-field session-key
                                     %1 %2 %3)
         config             (assoc config :fn/create create-fn)]
