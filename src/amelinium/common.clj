@@ -159,13 +159,13 @@
   ([req ring-match] (boolean (http/get-route-data ring-match req :auth-page?))))
 
 (defn login-auth-state
-  "Helper which returns 2-element sequence telling if the current (or given as a match)
+  "Helper which returns 2-element vector telling if the current (or given as a match)
   page is a login page (1st element) and/or an auth page (2nd element)."
   ([req]
    (let [rd     (http/get-route-data req)
          login? (boolean (get rd :login-page?))
          auth?  (boolean (get rd :auth-page?))]
-     (cons login? (cons auth? nil))))
+     [login? auth?]))
   ([req ring-match]
    (let [rd     (http/get-route-data req)
          login? (boolean (get rd :login-page?))
@@ -175,12 +175,12 @@
    (let [rd     (http/get-route-data req)
          login? (boolean (get rd (or login-page-data :login-page?)))
          auth?  (boolean (get rd (or auth-page-data  :auth-page?)))]
-     (cons login? (cons auth? nil))))
+     [login? auth?]))
   ([req ring-match login-page-data auth-page-data]
    (let [rd     (http/get-route-data req)
          login? (boolean (get rd (or login-page-data :login-page?)))
          auth?  (boolean (get rd (or auth-page-data  :auth-page?)))]
-     (cons login? (cons auth? nil)))))
+     [login? auth?])))
 
 ;; Path parsing
 
