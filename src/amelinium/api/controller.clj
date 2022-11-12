@@ -22,6 +22,7 @@
             [amelinium.api                      :as            api]
             [amelinium.auth                     :as           auth]
             [amelinium.http                     :as           http]
+            [amelinium.http.middleware.session  :as        session]
             [amelinium.http.middleware.language :as       language]
             [amelinium.http.middleware.coercion :as       coercion]))
 
@@ -56,7 +57,9 @@
 
 (defn auth-user-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
-  conditions and may render a response."
+  conditions and may render a response. Initial session `sess` will serve as a
+  configuration source to create a new session and inject it into a request map `req`
+  under configured session key."
   ([req user-email password sess route-data lang]
    (auth-user-with-password! req user-email password sess route-data lang false))
   ([req user-email password sess route-data lang auth-only-mode]
@@ -67,7 +70,7 @@
              tr-sub (i18n/no-default (common/translator-sub req lang))]
          (-> req
              (language/force lang)
-             (api/body-add-session-status sess tr-sub)))))))
+             (api/body-add-session-status (session/session-key sess) tr-sub)))))))
 
 ;; Controllers
 
@@ -93,12 +96,12 @@
   (let [body-params (get req :body-params)
         user-email  (some-str (get body-params :login))
         password    (if user-email (some-str (get body-params :password)))
-        sess        (common/session req)
+        sess        (session/of req :utoken)
         route-data  (http/get-route-data req)]
     (cond
-      password           (auth-user-with-password! req user-email password sess route-data nil false)
-      (get sess :valid?) req
-      :invalid!          (api/move-to req (get route-data :auth/info :auth/info)))))
+      password              (auth-user-with-password! req user-email password sess route-data nil false)
+      (session/valid? sess) req
+      :invalid!             (api/move-to req (get route-data :auth/info :auth/info)))))
 
 (defn authenticate-only!
   "Logs user in when user e-mail and password are given.
@@ -115,24 +118,23 @@
         user-email  (some-str (get body-params :login))
         password    (if user-email (some-str (get body-params :password)))
         route-data  (http/get-route-data req)
-        sess        (common/session req)]
+        sess        (session/of req :utoken)]
     (auth-user-with-password! req user-email password sess route-data nil true)))
 
 (defn info!
   "Returns login information."
   [req]
   (let [auth-db    (auth/db req)
-        sess-opts  (get req :session/config)
-        sess-key   (or (get sess-opts :session-key) :session)
-        sess       (get req sess-key)
-        prolonged? (some? (and (get sess :expired?) (get req :goto-uri)))
+        sess       (session/of req :utoken)
+        sess-key   (session/session-key sess)
+        prolonged? (some? (and (session/expired? sess) (get req :goto-uri)))
         remaining  (lock-remaining-mins req auth-db (if prolonged? sess) t/now)
         body       (qassoc (get req :response/body) :lock-remains remaining)]
     (qassoc req
             :response/body body
             sess-key       (delay
                              (if @prolonged?
-                               (qassoc sess :id (or (get sess :id) (get sess :err/id)) :prolonged? true)
+                               (qassoc sess :id (or (session/id sess) (session/err-id sess)) :prolonged? true)
                                (qassoc sess :prolonged? false))))))
 
 ;; Request preparation handler
@@ -142,12 +144,12 @@
   valid (if validators are configured). If there is a session present, checks for its
   validity and tests if an account is locked."
   [req]
-  (let [sess          (common/session req)
+  (let [sess          (session/of req :utoken)
         auth-state    (delay (common/login-auth-state req :login-page? :auth-page?))
         auth?         (delay (nth @auth-state 1 false))
         login-data?   (delay (login-data? req))
         auth-db       (delay (auth/db req))
-        session-error (common/session-error sess)
+        session-error (session/error sess)
         authorized?   (get req :user/authorized?)]
 
     (cond
@@ -165,9 +167,9 @@
       ;; Account is manually hard-locked.
 
       (account-locked? req sess @auth-db)
-      (let [user-id   (:user/id      sess)
-            email     (:user/email   sess)
-            ip-addr   (:remote-ip/str req)
+      (let [user-id   (session/id         sess)
+            email     (session/user-email sess)
+            ip-addr   (get req :remote-ip/str)
             for-user  (log/for-user user-id email ip-addr)
             for-mail  (log/for-user nil email ip-addr)
             translate (common/translator req)]
@@ -181,11 +183,11 @@
 
       ;; Session is not valid.
 
-      (and (not (get sess :valid?)) (not (and @auth? @login-data?)))
+      (and (not (session/valid? sess)) (not (and @auth? @login-data?)))
       (let [req           (cleanup-req req @auth-state)
-            expired?      (get sess :expired?)
-            user-id       (get sess :user/id)
-            email         (get sess :user/email)
+            expired?      (session/expired?   sess)
+            user-id       (session/user-id    sess)
+            email         (session/user-email sess)
             reason        (get session-error :reason)
             cause         (get session-error :cause)
             ip-addr       (:remote-ip/str req)
@@ -199,14 +201,14 @@
           ;; Session expired.
           (do (log/msg "Session expired" for-user)
               (api/oplog req
-                         :user-id (:user/id sess)
+                         :user-id user-id
                          :op      :session
                          :ok?     false
                          :msg     (str "Expired " for-mail)))
           ;; Session invalid in another way.
           (when (some? cause)
             (api/oplog req
-                       :user-id (:user/id sess)
+                       :user-id user-id
                        :op      :session
                        :ok?     false
                        :level   (:severity session-error)

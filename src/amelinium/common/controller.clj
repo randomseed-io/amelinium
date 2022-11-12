@@ -89,32 +89,42 @@
 ;; Actions
 
 (defn prolongation?
-  "Returns true if session is expired (but not hard expired) and a user is not logged
-  in and there is no login data present and we are not authenticating user. In other
-  words: this returns true when we are good with redirecting user to a session
-  prolongation page."
+  "Returns `true` if the given session `sess` is expired (but not hard expired),
+  current user is not logged in, there is no login data present, and we are not
+  authenticating any user. In other words: returns `true` when we are good with
+  redirecting a user to a session prolongation page (a form of login page)."
   [sess [login? auth?] login-data?]
-  (or (and (get sess :expired?) (not (get sess :hard-expired?))
-           (not login?)
-           (or (not auth?) (not login-data?)))
+  (or (and (not login?)
+           (or (not auth?) (not login-data?))
+           (session/soft-expired? sess))
       false))
 
 (defn prolongation-auth?
-  "Returns true if user is being authenticated to prolongate the soft-expired session."
+  "Returns `true` if user visited the prolongation page after submitting credentials to
+  the authentication page is being authenticated to prolongate the soft-expired
+  session."
   [sess login? auth? login-data?]
-  (or (and login-data? auth? (not login?) (:expired? sess)) false))
+  (or (and login-data?
+           auth?
+           (not login?)
+           (session/expired? sess))
+      false))
 
 (defn regular-auth?
-  "Returns true if user is being authenticated."
+  "Returns `true` if user is being authenticated."
   [sess login? auth? login-data?]
-  (or (and auth? login-data? (not login?) (not sess)) false))
+  (or (and auth?
+           login-data?
+           (not login?)
+           (not sess))
+      false))
 
 (defn hard-expiry?
-  "Returns true if the session is hard-expired and we are not on the hard-expired login
-  page. Uses the given, previously collected session data, does not connect to a
-  database."
+  "Returns `true` if the session is hard-expired and we are not on the hard-expired
+  login page. Uses the given, previously collected session data. Does not connect to
+  a database."
   [req sess route-data]
-  (or (and (get sess :hard-expired?)
+  (or (and (session/hard-expired? sess)
            (not (common/on-page? req (get route-data :auth/session-expired :login/session-expired))))
       false))
 
@@ -127,7 +137,9 @@
   ([req user-email password sess route-data]
    (auth-user-with-password! req user-email password sess route-data false))
   ([req user-email password sess route-data auth-only-mode]
-   (let [ipaddr        (get req :remote-ip)
+   (let [sess          (or sess (session/of req))
+         route-data    (or route-data (http/get-route-data req))
+         ipaddr        (get req :remote-ip)
          ipplain       (get req :remote-ip/str)
          auth-settings (or (get route-data :auth/setup) (auth/settings req))
          auth-db       (auth/db auth-settings)
@@ -173,15 +185,14 @@
        :authenticate! (do (log/msg "Login successful" for-user)
                           (oplog true :info "Login OK" for-mail)
                           (user/update-login-ok auth-db user-id ipaddr)
-                          (let [goto-uri  (if (get sess :expired?) (get req :goto-uri))
-                                sess-opts (get req :session/config)
-                                sess      (if goto-uri
-                                            (user/prolong-session sess-opts sess ipaddr)
-                                            (user/create-session  sess-opts user-id user-email ipaddr))]
+                          (let [goto-uri (if (session/expired? sess) (get req :goto-uri))
+                                sess     (if goto-uri
+                                           (session/prolong sess ipaddr)
+                                           (session/create  sess user-id user-email ipaddr))]
 
-                            (if-not (get sess :valid?)
+                            (if-not (session/valid? sess)
 
-                              (let [e (get sess :error)
+                              (let [e (session/error sess)
                                     r (:reason   e)
                                     s (:severity e)]
                                 (when r
@@ -193,8 +204,8 @@
                               (if goto-uri
                                 (resp/temporary-redirect goto-uri)
                                 (-> req
-                                    (assoc :auth/ok? true :response/status :auth/ok)
-                                    (common/session-inject sess sess-opts)
+                                    (qassoc :auth/ok? true :response/status :auth/ok)
+                                    (session/inject sess)
                                     (common/roles-refresh))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -211,15 +222,15 @@
 
   If there is no e-mail or password given (the value is `nil`, `false` or an empty
   string) then authentication is not performed but instead validity of a session is
-  tested. If the session is invalid redirect to a login page is performed. The
-  destination URL is obtained via the route name taken from the `:auth/info` key of
-  a route data, or from `:login` route identifier as default. If the session is valid
-  then the given request map is returned as is."
+  tested. If the session is invalid, the redirect to a login page is performed. The
+  destination URL is obtained via a route name taken from the `:auth/info` key of a
+  route data, or from `:login` route identifier (as default). If the session is valid
+  then the given request map is returned as-is."
   [req user-email user-password]
   (let [user-email     (some-str user-email)
         user-password  (if user-email (some-str user-password))
-        sess           (common/session req)
-        valid-session? (get sess :valid?)
+        sess           (session/of req)
+        valid-session? (session/valid? sess)
         route-data     (http/get-route-data req)]
 
     (if user-password

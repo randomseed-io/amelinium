@@ -144,8 +144,7 @@
 
 (defn prolong-session
   ([smap ip-address]
-   (if-some [opts (get (session/config smap) :fn/prolong)]
-     (session/prolong smap ip-address)))
+   (session/prolong smap ip-address))
   ([req session-key smap ip-address]
    (session/prolong req session-key smap ip-address)))
 

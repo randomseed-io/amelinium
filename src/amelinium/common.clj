@@ -37,8 +37,9 @@
             [io.randomseed.utils.map              :refer     [qassoc]]
             [io.randomseed.utils                  :refer         :all])
 
-  (:import [reitit.core Match]
-           [lazy_map.core LazyMapEntry LazyMap]))
+  (:import [amelinium.http.middleware.session Session]
+           [lazy_map.core LazyMapEntry LazyMap]
+           [reitit.core Match]))
 
 ;; Operations logging
 
@@ -1314,98 +1315,73 @@
 ;; Sessions
 
 (p/import-vars [amelinium.http.middleware.session
-                session-field])
+                session-field allow-expired allow-soft-expired allow-hard-expired])
 
 (defn session
   "Gets a session map from the given request map."
   ([req]
-   (get req (or (get (get req :session/config) :session-key) :session)))
-  ([req config-key]
-   (get req (or (get (get req config-key) :session-key) :session))))
+   (session/of req))
+  ([req session-key]
+   (session/of req session-key)))
 
 (defn session-config
   "Gets a session config map from the given request map."
   ([req]
-   (get req :session/config))
-  ([req config-key]
-   (get req config-key)))
+   (session/config req))
+  ([req session-key]
+   (session/config req session-key)))
 
 (defn config+session
   "Gets a session map and a session config map from the given request map. Returns a
   two-element vector."
   ([req]
-   (config+session req :session/config))
-  ([req config-key]
-   (if-some [cfg (get req config-key)]
-     [cfg (get req (or (get cfg :session-key) :session))]
+   (config+session req :session))
+  ([req session-key]
+   (if-some [^Session s (session/of req session-key)]
+     [(.config ^Session s) s]
      [nil nil])))
 
 (defn session-inject
-  "Adds session data to a request map. Session key is obtained from `cfg` (if given),
-  then from the given session map `smap`, and then from a configuration associated
-  with the `:session/config` key of `req`. If all of that fails, `:session` is used
-  as a key."
+  "Adds session data to a request map. Session key is obtained from the `config` field
+  of `smap` or (if given) from a `session-key` argument."
   ([req smap]
-   (qassoc req (or (get smap :session-key)
-                   (get (get req :session/config) :session-key)
-                   :session)
-           smap))
-  ([req smap cfg]
-   (qassoc req (or (get cfg  :session-key)
-                   (get smap :session-key)
-                   (get (get req :session/config) :session-key)
-                   :session)
-           smap)))
+   (session/inject req smap))
+  ([req smap session-key]
+   (session/inject req smap session-key)))
 
 (defn session-variable-get-failed?
   [v]
   (session/get-variable-failed? v))
 
-(defn allow-expired
-  "Temporarily marks expired session as valid."
-  [smap]
-  (if (and (get smap :expired?)
-           (not   (get smap :valid?))
-           (nil?  (get smap :id))
-           (some? (get smap :err/id )))
-    (qassoc smap :valid? true :id (get smap :err/id))
-    smap))
-
-(defn allow-soft-expired
-  "Temporarily mark soft-expired session as valid."
-  [smap]
-  (if (get smap :hard-expired?)
-    smap
-    (allow-expired smap)))
-
-(defn allow-hard-expired
-  "Temporarily mark hard-expired session as valid."
-  [smap]
-  (if (get smap :hard-expired?)
-    (allow-expired smap)
-    smap))
-
 (defn session-valid?
   "Returns `true` if the given session exists and it is a valid session. Returns
   `false` when the session is invalid. Returns `nil` when there is no session."
-  [smap]
-  (if smap (boolean (get smap :valid?))))
+  ([src session-key]
+   (session/valid? src session-key))
+  ([src]
+   (session/valid? src)))
 
 (defn session-invalid?
   "Returns `true` if the given session does not exists or it is an invalid session."
-  [smap]
-  (if smap (not (get smap :valid?)) true))
+  ([src session-key]
+   (not (session/valid? src session-key)))
+  ([src]
+   (not (session/valid? src))))
 
 (defn session-error?
   "Returns `true` when there is a session and it has an error. Returns `false` when
   there is no error. Returns `nil` when there is no session."
-  [smap]
-  (if smap (some? (get smap :error))))
+  ([src session-key]
+   (session/error? src session-key))
+  ([src]
+   (session/error? src)))
 
 (defn session-error
   "Returns session error map or `nil` if there was no error or session does not exist."
-  [smap]
-  (if smap (get smap :error)))
+  ([src session-key]
+   (session/error src session-key))
+  ([src]
+   (session/error src)))
 
 (defn no-session?
   "Returns `true` if the given session:
@@ -1416,15 +1392,18 @@
   session, even without any ID, but it has errors)."
   ([smap]
    (or (nil? smap)
-       (not (or (get smap :id)
-                (get smap :err/id)
-                (get smap :error)))))
+       (let [^Session smap (session/of smap)]
+         (not (or (.id     ^Session smap)
+                  (.err-id ^Session smap)
+                  (.error  ^Session smap))))))
   ([smap session-error]
    (if session-error
      false
      (or (nil? smap)
-         (not (or (get smap :id)
-                  (get smap :err/id)))))))
+         (let [^Session smap (session/of smap)]
+           (not (or (.id     ^Session smap)
+                    (.err-id ^Session smap)
+                    (.error  ^Session smap))))))))
 
 ;; Context and roles
 

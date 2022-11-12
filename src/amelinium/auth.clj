@@ -67,7 +67,7 @@
   (^{:tag AuthSettings}
    -settings
    [settings-src]
-   "Returns a global authentication settings of type `AuthSettings` a basis of
+   "Returns a global authentication settings of type `AuthSettings` on a basis of
   configuration source provided.")
 
   (^{:tag AuthConfig}

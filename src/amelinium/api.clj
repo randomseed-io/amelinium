@@ -18,6 +18,7 @@
             [amelinium.errors                     :as          errors]
             [amelinium.i18n                       :as            i18n]
             [amelinium.http.middleware.validators :as      validators]
+            [amelinium.http.middleware.session    :as         session]
             [io.randomseed.utils.map              :refer     [qassoc]]
             [io.randomseed.utils                  :refer         :all])
 
@@ -871,34 +872,36 @@
              (qassoc body k v)))))
 
 (defn body-add-session-id
+  {:arglists '([req]
+               [req smap]
+               [req session-key]
+               [req smap field]
+               [req session-key field])}
   ([req]
-   (if-some [smap (common/session req)]
+   (if-some [smap (session/of req)]
      (body-add-session-id req smap)
      req))
   ([req smap]
    (qassoc req :response/body
-           (let [body (get req :response/body)
-                 k    (or (get smap :session-id-field)
-                          (get (get req :session/config) :session-id-field)
-                          :session-id)
-                 v    (get smap :id)]
+           (let [smap (if (keyword? smap) (session/of req smap) (session/of smap))
+                 body (get req :response/body)
+                 k    (or (session/id-field smap) :session-id)
+                 v    (session/id smap)]
              (qassoc body k v))))
   ([req smap field]
    (qassoc req :response/body
-           (let [body (get req :response/body)
-                 k    (or field
-                          (get smap :session-id-field)
-                          (get (get req :session/config) :session-id-field)
-                          :session-id)
-                 v    (get smap :id)]
+           (let [smap (if (keyword? smap) (session/of req smap) (session/of smap))
+                 body (get req :response/body)
+                 k    (or field (session/id-field smap) :session-id)
+                 v    (session/id smap)]
              (qassoc body k v)))))
 
 (defn session-status
   "Returns session status for the given session map `smap`."
   [smap]
-  (if-not (map? smap)
+  (if-not (session/session? smap)
     :session/missing
-    (or (some-keyword (get (get smap :error) :cause)) :session/unknown-error)))
+    (or (some-keyword (get (session/error smap) :cause)) :session/unknown-error)))
 
 (defn body-add-session-status
   "Gets the value of `:response/status` key of the given `req` and if it is set to
@@ -906,22 +909,27 @@
   body with a value set to a result of calling `session-status` on a current
   session. If there is no session error detected, it simply calls `body-add-session`
   to add session ID to the response body."
+  {:arglists '([req]
+               [req smap]
+               [req session-key]
+               [req smap translate-sub]
+               [req session-key translate-sub])}
   ([req]
    (body-add-session-status req nil))
   ([req smap]
    (let [rstatus (get req :response/status)
-         smap?   (and smap (or (get smap :id) (get smap :err/id)) true)
-         smap    (if smap? smap (common/session req))]
+         smap    (if (keyword? smap) (session/of req smap) (session/of smap))]
      (if (or (= rstatus :auth/session-error)
-             (= rstatus :error/session))
+             (= rstatus :error/session)
+             (session/error? smap))
        (add-missing-sub-status req (session-status smap) :session-status :response/body)
        (body-add-session-id req smap))))
   ([req smap translate-sub]
    (let [rstatus (get req :response/status)
-         smap?   (and smap (or (get smap :id) (get smap :err/id)) true)
-         smap    (if smap? smap (common/session req))]
+         smap    (if (keyword? smap) (session/of req smap) (session/of smap))]
      (if (or (= rstatus :auth/session-error)
-             (= rstatus :error/session))
+             (= rstatus :error/session)
+             (session/error? smap))
        (add-missing-sub-status req (session-status smap) :session-status :response/body translate-sub)
        (body-add-session-id req smap)))))
 
