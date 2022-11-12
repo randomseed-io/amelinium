@@ -1266,7 +1266,7 @@
         var-get-core-fn    (db/make-setting-getter  variables-table :session-id)
         var-set-core-fn    (db/make-setting-setter  variables-table :session-id)
         var-del-core-fn    (db/make-setting-deleter variables-table :session-id)
-        var-del-user-fn    (setup-fn config :fn/vars-del-user delete-user-vars)
+        vars-del-user-fn   (setup-fn config :fn/vars-del-user delete-user-vars)
         var-get-fn         (fn
                              ([session-id setting-id]
                               (var-get-core-fn db session-id setting-id))
@@ -1284,12 +1284,12 @@
                               (var-del-core-fn db session-id setting-id))
                              ([session-id setting-id & setting-ids]
                               (apply var-del-core-fn db session-id setting-id setting-ids)))
-        var-del-user-fn-w  #(var-del-user-fn config db sessions-table variables-table %)
+        vars-del-user-fn-w #(vars-del-user-fn config db sessions-table variables-table %)
         config             (assoc config
                                   :fn/var-get var-get-fn
                                   :fn/var-set var-set-fn
                                   :fn/var-del var-del-fn
-                                  :fn/vars-del-user var-del-user-fn-w)
+                                  :fn/vars-del-user vars-del-user-fn-w)
         create-fn          #(create config
                                     setter-fn-w invalidator-fn var-del-fn vars-del-user-fn-w
                                     single-session? secured? session-id-field session-key
