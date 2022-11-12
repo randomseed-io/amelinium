@@ -1242,10 +1242,6 @@
         checker-fn         (setup-fn config :fn/checker check-encrypted)
         checker-fn-w       (db/memoizer checker-fn checker-config)
         config             (assoc config :fn/checker checker-fn-w)
-        pre-handler        #(handler config getter-fn-w checker-fn-w session-id-field session-key %1 %2)
-        mem-handler        (db/memoizer pre-handler config)
-        invalidator-fn     (setup-invalidator pre-handler mem-handler)
-        config             (assoc config :fn/invalidator invalidator-fn :fn/handler mem-handler)
         last-active-fn     (setup-fn config :fn/last-active get-last-active)
         update-active-fn   (setup-fn config :fn/update-active update-last-active)
         last-active-fn-w   #(last-active-fn config db sessions-table %1 %2)
@@ -1256,13 +1252,6 @@
                              ([sid-db remote-ip t]
                               (update-active-fn config db sessions-table sid-db remote-ip t)))
         config             (assoc config :fn/update-active update-active-fn-w)
-        refresh-fn         #(refresh-times config last-active-fn-w invalidator-fn cache-expires %1 %2)
-        config             (assoc config :fn/refresh refresh-fn)
-        setter-fn          (setup-fn config :fn/setter set-session)
-        setter-fn-w        #(setter-fn config db sessions-table %)
-        config             (assoc config :fn/setter setter-fn-w)
-        prolong-fn         #(prolong config mem-handler update-active-fn-w invalidator-fn %1 %2)
-        config             (assoc config :fn/prolong prolong-fn)
         var-get-core-fn    (db/make-setting-getter  variables-table :session-id)
         var-set-core-fn    (db/make-setting-setter  variables-table :session-id)
         var-del-core-fn    (db/make-setting-deleter variables-table :session-id)
@@ -1290,6 +1279,17 @@
                                   :fn/var-set var-set-fn
                                   :fn/var-del var-del-fn
                                   :fn/vars-del-user vars-del-user-fn-w)
+        setter-fn          (setup-fn config :fn/setter set-session)
+        setter-fn-w        #(setter-fn config db sessions-table %)
+        config             (assoc config :fn/setter setter-fn-w)
+        pre-handler        #(handler config getter-fn-w checker-fn-w session-id-field session-key %1 %2)
+        mem-handler        (db/memoizer pre-handler config)
+        invalidator-fn     (setup-invalidator pre-handler mem-handler)
+        config             (assoc config :fn/invalidator invalidator-fn :fn/handler mem-handler)
+        refresh-fn         #(refresh-times config last-active-fn-w invalidator-fn cache-expires %1 %2)
+        config             (assoc config :fn/refresh refresh-fn)
+        prolong-fn         #(prolong config mem-handler update-active-fn-w invalidator-fn %1 %2)
+        config             (assoc config :fn/prolong prolong-fn)
         create-fn          #(create config
                                     setter-fn-w invalidator-fn var-del-fn vars-del-user-fn-w
                                     single-session? secured? session-id-field session-key
