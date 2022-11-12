@@ -236,8 +236,8 @@
       ;; Account is manually hard-locked.
 
       (super/account-locked? req sess @auth-db)
-      (let [user-id  (:user/id      sess)
-            email    (:user/email   sess)
+      (let [user-id  (session/user-id    sess)
+            email    (session/user-email sess)
             ip-addr  (:remote-ip/str req)
             for-user (log/for-user user-id email ip-addr)
             for-mail (log/for-user nil email ip-addr)]
@@ -252,8 +252,8 @@
       ;; Session expired and the time for prolongation has passed.
 
       (super/hard-expiry? req sess route-data)
-      (let [user-id  (:user/id      sess)
-            email    (:user/email   sess)
+      (let [user-id  (session/user-id    sess)
+            email    (session/user-email sess)
             ip-addr  (:remote-ip/str req)
             for-user (log/for-user user-id email ip-addr)
             for-mail (log/for-user nil email ip-addr)]
@@ -274,12 +274,12 @@
             sess          (session/allow-soft-expired sess)
             session-field (or (session/id-field sess) "session-id")
             req-to-save   (common/remove-form-params req session-field)]
-        (user/put-session-var sess
-                              :goto {:uri          (get req :uri)
-                                     :session-id   (session/db-id sess)
-                                     :parameters   (get req-to-save :parameters)
-                                     :form-params  (get req-to-save :form-params)
-                                     :query-params (get req-to-save :query-params)})
+        (session/put-var! sess
+                          :goto {:uri          (get req :uri)
+                                 :session-id   (session/db-id sess)
+                                 :parameters   (get req-to-save :parameters)
+                                 :form-params  (get req-to-save :form-params)
+                                 :query-params (get req-to-save :query-params)})
         (web/move-to req (or (get route-data :auth/prolongate) :login/prolongate)))
 
       :----pass
@@ -298,35 +298,34 @@
         ;; Notice the fact and go with displaying content.
         ;; Checking for a valid session is the responsibility of each controller.
 
-        (and (not valid-session?) (not (and auth? @login-data?))
-             (if (session/expired? sess)
-               (let [user-id  (session/user-id sess)
-                     email    (session/user-email sess)
-                     ip-addr  (:remote-ip/str req)
-                     for-user (log/for-user user-id email ip-addr)
-                     for-mail (log/for-user nil email ip-addr)]
-                 (log/msg "Session expired" for-user)
-                 (common/oplog req
-                               :user-id (:user/id sess)
-                               :op      :session
-                               :ok?     false
-                               :msg     (str "Expired " for-mail)))
-               (when-some [sess-err (:error sess)]
-                 (common/oplog req
-                               :user-id (:user/id sess)
-                               :op      :session
-                               :ok?     false
-                               :level   (:severity sess-err)
-                               :msg     (:reason   sess-err "Unknown error"))
-                 (log/log (:severity sess-err :warn) (:reason sess-err "Unknown error")))))
+        (if (and (not valid-session?) (not (and auth? @login-data?)))
+          (if (session/expired? sess)
+            (let [user-id  (session/user-id sess)
+                  email    (session/user-email sess)
+                  ip-addr  (:remote-ip/str req)
+                  for-user (log/for-user user-id email ip-addr)
+                  for-mail (log/for-user nil email ip-addr)]
+              (log/msg "Session expired" for-user)
+              (common/oplog req
+                            :user-id user-id
+                            :op      :session
+                            :ok?     false
+                            :msg     (str "Expired " for-mail)))
+            (when-some [sess-err (session/error sess)]
+              (common/oplog req
+                            :user-id (session/user-id sess)
+                            :op      :session
+                            :ok?     false
+                            :level   (:severity sess-err)
+                            :msg     (:reason   sess-err "Unknown error"))
+              (log/log (:severity sess-err :warn) (:reason sess-err "Unknown error")))))
 
         ;; Remove goto session variable as we already injected it into a response.
         ;; Remove goto session variable if it seems broken.
         ;; Condition: not applicable in prolonging mode.
 
-        (and valid-session?
-             (or goto-failed? goto-unwanted?)
-             (user/del-session-var (get req :session/config) sess :goto))
+        (if (and valid-session? (or goto-failed? goto-unwanted?))
+          (session/del-var! sess :goto))
 
         ;; Remove login data from the request if we are not authenticating a user.
         ;; Take care about broken go-to (move to a login page in such case).
