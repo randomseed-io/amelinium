@@ -406,25 +406,35 @@
 
 (defn expired?
   ([src]
-   (if-some [^Session s (-session src)] (.expired? ^Session src)))
+   (if-some [^Session s (-session src)]
+     (.expired? ^Session s)
+     false))
   ([src session-key]
-   (if-some [^Session s (-session src session-key)] (.expired? ^Session src))))
+   (if-some [^Session s (-session src session-key)]
+     (.expired? ^Session s)
+     false)))
 
 (defn hard-expired?
   ([src]
-   (if-some [^Session s (-session src)] (.hard-expired? ^Session src)))
+   (if-some [^Session s (-session src)]
+     (.hard-expired? ^Session s)
+     false))
   ([src session-key]
-   (if-some [^Session s (-session src session-key)] (.hard-expired? ^Session src))))
+   (if-some [^Session s (-session src session-key)]
+     (.hard-expired? ^Session s)
+     false)))
 
 (defn soft-expired?
   ([src]
    (if-some [^Session s (-session src)]
-     (and (.expired?      ^Session src)
-          (.hard-expired? ^Session src))))
+     (and (.expired? ^Session s)
+          (not (.hard-expired? ^Session s)))
+     false))
   ([src session-key]
    (if-some [^Session s (-session src session-key)]
-     (and (.expired?      ^Session src)
-          (.hard-expired? ^Session src)))))
+     (and (.expired? ^Session s)
+          (not (.hard-expired? ^Session s)))
+     false)))
 
 (defn sid-valid?
   ^Boolean [sid]
