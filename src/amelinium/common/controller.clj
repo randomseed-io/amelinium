@@ -9,31 +9,33 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [potemkin.namespaces                :as          p]
-            [reitit.ring                        :as       ring]
-            [reitit.coercion                    :as   coercion]
-            [ring.middleware.keyword-params     :as    ring-kw]
-            [ring.util.http-response            :as       resp]
-            [ring.util.request                  :as        req]
-            [ring.util.codec                    :as      codec]
-            [reitit.core                        :as          r]
-            [reitit.ring                        :as       ring]
-            [selmer.filters                     :as    filters]
-            [selmer.parser                      :as       tmpl]
-            [lazy-map.core                      :as   lazy-map]
-            [tick.core                          :as          t]
-            [amelinium.i18n                     :as       i18n]
-            [amelinium.i18n                     :refer    [tr]]
-            [amelinium.logging                  :as        log]
-            [amelinium.model.user               :as       user]
-            [amelinium.common                   :as     common]
-            [io.randomseed.utils.time           :as       time]
-            [io.randomseed.utils.var            :as        var]
-            [io.randomseed.utils.map            :as        map]
-            [io.randomseed.utils                :refer    :all]
-            [amelinium.auth                     :as       auth]
-            [amelinium.http                     :as       http]
-            [amelinium.http.middleware.language :as   language]))
+  (:require [potemkin.namespaces                :as           p]
+            [reitit.ring                        :as        ring]
+            [reitit.coercion                    :as    coercion]
+            [ring.middleware.keyword-params     :as     ring-kw]
+            [ring.util.http-response            :as        resp]
+            [ring.util.request                  :as         req]
+            [ring.util.codec                    :as       codec]
+            [reitit.core                        :as           r]
+            [reitit.ring                        :as        ring]
+            [selmer.filters                     :as     filters]
+            [selmer.parser                      :as        tmpl]
+            [lazy-map.core                      :as    lazy-map]
+            [tick.core                          :as           t]
+            [amelinium.i18n                     :as        i18n]
+            [amelinium.i18n                     :refer     [tr]]
+            [amelinium.logging                  :as         log]
+            [amelinium.model.user               :as        user]
+            [amelinium.common                   :as      common]
+            [io.randomseed.utils.time           :as        time]
+            [io.randomseed.utils.var            :as         var]
+            [io.randomseed.utils.map            :as         map]
+            [io.randomseed.utils.map            :refer [qassoc]]
+            [io.randomseed.utils                :refer     :all]
+            [amelinium.auth                     :as        auth]
+            [amelinium.http                     :as        http]
+            [amelinium.http.middleware.language :as    language]
+            [amelinium.http.middleware.session  :as     session]))
 
 (def ^:const keywordize-params? false)
 
@@ -162,25 +164,25 @@
 
        (hard-locked?) (do (log/wrn "Account locked permanently" for-user)
                           (oplog false :info "Permanent lock" for-mail)
-                          (assoc req :user/authorized? false :user/authenticated? false
-                                 :auth/ok? false :response/status :auth/locked))
+                          (qassoc req :user/authorized? false :user/authenticated? false
+                                  :auth/ok? false :response/status :auth/locked))
 
        (soft-locked?) (do (log/msg "Account locked temporarily" for-user)
                           (oplog false :info "Temporary lock" for-mail)
-                          (assoc req :user/authenticated? false :user/authorized? false
-                                 :auth/ok? false :response/status :auth/soft-locked))
+                          (qassoc req :user/authenticated? false :user/authorized? false
+                                  :auth/ok? false :response/status :auth/soft-locked))
 
        (invalid-pwd?) (do (log/wrn "Incorrect password or user not found" for-user)
                           (when user-id
                             (oplog false :warn "Bad password" for-mail)
                             (user/update-login-failed @auth-config user-id ipaddr))
-                          (assoc req :user/authorized? false :user/authenticated? false
-                                 :auth/ok? false :response/status :auth/bad-password))
+                          (qassoc req :user/authorized? false :user/authenticated? false
+                                  :auth/ok? false :response/status :auth/bad-password))
 
        auth-only-mode (do (log/msg "Authentication successful" for-user)
                           (oplog true :info "Authentication OK" for-mail)
                           (user/update-login-ok auth-db user-id ipaddr)
-                          (assoc req :auth/ok? true :response/status :auth/ok))
+                          (qassoc req :auth/ok? true :response/status :auth/ok))
 
        :authenticate! (do (log/msg "Login successful" for-user)
                           (oplog true :info "Login OK" for-mail)
@@ -198,8 +200,8 @@
                                 (when r
                                   (log/log (or s :warn) r)
                                   (oplog-fn :level s :user-id user-id :op :session :ok? false :msg r))
-                                (assoc req :user/authenticated? false :user/authorized? false
-                                       :auth/ok? false :response/status :auth/session-error))
+                                (qassoc req :user/authenticated? false :user/authorized? false
+                                        :auth/ok? false :response/status :auth/session-error))
 
                               (if goto-uri
                                 (resp/temporary-redirect goto-uri)
