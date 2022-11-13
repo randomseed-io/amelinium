@@ -1701,7 +1701,7 @@
                                   (dissoc m-req-params param-str)))
          m            (if (nil? m-params) m
                           (qassoc m :params
-                                  (dissoc m-params param-kw)))]
+                                  (dissoc m-params param-kw param-str)))]
      m))
   ([m params-key parameters-sub-key combined? param & more]
    (let [params       (cons param more)
@@ -1722,7 +1722,7 @@
                                   (apply dissoc m-req-params params-str)))
          m            (if (nil? m-params) m
                           (qassoc m :params
-                                  (apply dissoc m-params params-kw)))]
+                                  (apply dissoc m-params (concat params-kw params-str))))]
      m)))
 
 (defn remove-path-params
