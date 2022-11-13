@@ -87,9 +87,6 @@
          (if-some [mins (time/minutes (common/soft-lock-remains user auth-config (time-fn)))]
            (if (zero? mins) 1 mins)))))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Actions
-
 (defn prolongation?
   "Returns `true` if the given session `sess` is expired (but not hard expired),
   current user is not logged in, there is no login data present, and we are not
@@ -129,6 +126,22 @@
   (or (and (session/hard-expired? sess)
            (not (common/on-page? req (get route-data :auth/session-expired :login/session-expired))))
       false))
+
+(defn get-goto-uri
+  "Obtains go-to URI from `req` if `am/goto` form parameter is present and session is
+  soft-expired. Used to get the destination URI from a session variable when user is
+  authenticated to be redirected into a page where session expiration has been
+  encountered a moment ago."
+  [req sess]
+  (if (and (session/soft-expired? sess)
+           (contains? (get req :form-params) "am/goto"))
+    (if-some [g (session/get-var sess :goto)]
+      (if (session/get-variable-failed? g)
+        false
+        (:uri g)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Actions
 
 (defn auth-user-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
