@@ -444,7 +444,7 @@
          (if (and (or (valuable? orig-page) (valuable? orig-uri) referer)
                   (not handling-previous?))
            ;; redirect to a form-submission page allowing user to correct errors
-           ;; transfer form errors using query params or form params (if session is present)
+           ;; transfer form errors using query params or form params (if a session is present)
            (let [errors       (coercion/map-errors data)
                  orig-uri     (if orig-uri (some-str orig-uri))
                  orig-params  (if orig-uri orig-params)

@@ -102,7 +102,7 @@
     (if-some [qp (get req :query-params)]
       (if-some [query-params-errors (get qp "form-errors")]
         (let [smap            (session/of req)
-              session?        (and smap (session/valid? smap))
+              session?        (session/valid? smap)
               sess-var        (if session? (session/fetch-var! smap :form-errors))
               expected-uri    (if sess-var (get sess-var :dest))
               uri-ok?         (or (not expected-uri) (= expected-uri (get req :uri)))
