@@ -447,7 +447,7 @@
            (let [errors       (coercion/map-errors data)
                  orig-uri     (if orig-uri (some-str orig-uri))
                  orig-params  (if orig-uri orig-params)
-                 smap         (session/of req)
+                 smap         (session/usable-of req)
                  destination  (or orig-page orig-uri)
                  dest-uri     (if (keyword? destination) (common/page req destination) destination)
                  dest-uri     (some-str dest-uri)
