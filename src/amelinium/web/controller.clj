@@ -216,6 +216,27 @@
                                   (qassoc sess :prolonged? false)) req)]
     (qassoc req :app/data (qassoc app-data :lock-remains rem-mins))))
 
+(defn prolong!
+  "Prepares response data to be displayed a prolongation page."
+  [req]
+  (let [sess (session/usable-of req)]
+    (cond
+
+      (and sess (session/soft-expired? sess) (some? (get-goto sess)))
+      (let [app-data (get req :app/data web/empty-lazy-map)
+            sess-key (or (session/session-key sess) :session)
+            rem-mins (delay (super/lock-remaining-mins req (auth/db req) sess t/now))]
+        (qassoc req
+                sess-key  (qassoc (session/allow-soft-expired sess) :prolonged? true)
+                :app/data (qassoc app-data :lock-remains rem-mins)))
+
+      (and sess (session/hard-expired? sess))
+      (web/move-to req (or (http/get-route-data req :auth/session-expired)
+                           :login/session-expired))
+
+      :bad-prolongation
+      (web/move-to req (or (http/get-route-data req :auth/session-error)
+                           :login/session-error)))))
 
 (defn prep-request!
   "Prepares a request before any web controller is called."
