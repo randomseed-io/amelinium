@@ -33,9 +33,9 @@
 ;; Authentication
 
 (defn saved-params
-  "Gets go-to data from for a valid (and not expired) session. Returns form data as a
-  map. The resulting map has session-id entry removed (if found). We assume that all
-  parameters were validated earlier."
+  "Gets go-to data for a valid (and not expired) session. Returns form data as a
+  map. The resulting map has `:session-id` entry removed (if found). We assume that
+  all parameters were validated earlier."
   ([req gmap]
    (saved-params req gmap nil))
   ([req gmap smap]
@@ -43,7 +43,7 @@
      (if-some [gmap (valuable (select-keys gmap [:form-params :query-params :parameters :session-id]))]
        (let [smap      (or (session/of smap) (session/of req))
              sid-field (or (session/id-field smap) "session-id")]
-         (if (= (session/db-id smap) (get gmap :session-id))
+         (if (and (= (session/db-id smap) (get gmap :session-id false)))
            (-> gmap
                (common/remove-form-params sid-field)
                (dissoc :session-id))))))))
