@@ -75,14 +75,14 @@
 
 (defn lock-remaining-mins
   "Returns the time of the remaining minutes of a soft account lock when the visited
-  page ID is `:login/account-soft-locked`. Otherwise it returns nil. Uses cached user
-  properties."
+  page ID is `:login/account-soft-locked`. Otherwise it returns `nil`. Uses cached
+  user properties."
   ([req auth-db smap time-fn]
-   (lock-remaining-mins req auth-db smap time-fn "login"))
+   (lock-remaining-mins req auth-db smap time-fn :login))
   ([req auth-db smap time-fn id-form-field]
    (if auth-db
      (if-some [user (or (user/props-by-session auth-db smap)
-                        (user/props-by-email auth-db (get (get req :form-params) id-form-field)))]
+                        (user/props-by-email auth-db (get (get (get req :parameters) :form) id-form-field)))]
        (if-some [auth-config (auth/config req (get user :account-type))]
          (if-some [mins (time/minutes (common/soft-lock-remains user auth-config (time-fn)))]
            (if (zero? mins) 1 mins)))))))
