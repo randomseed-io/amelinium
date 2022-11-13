@@ -208,7 +208,7 @@
 (defn login!
   "Prepares response data to be displayed a login page."
   [req]
-  (let [sess     (session/usable-of req)
+  (let [sess     (session/not-empty-of req)
         app-data (get req :app/data web/empty-lazy-map)
         rem-mins (delay (super/lock-remaining-mins req (auth/db req) sess t/now))
         req      (if sess (qassoc req
@@ -219,7 +219,7 @@
 (defn prolong!
   "Prepares response data to be displayed a prolongation page."
   [req]
-  (let [sess (session/usable-of req)]
+  (let [sess (session/not-empty-of req)]
     (cond
 
       (and sess (session/soft-expired? sess) (some? (get-goto sess)))
@@ -242,7 +242,7 @@
   "Prepares a request before any web controller is called."
   [req]
   (let [req         (qassoc req :app/data-required [] :app/data web/empty-lazy-map)
-        sess        (session/usable-of req)
+        sess        (session/not-empty-of req)
         route-data  (http/get-route-data req)
         auth-state  (delay (common/login-auth-state req :login-page? :auth-page?))
         login-data? (delay (login-data? req))
@@ -447,7 +447,7 @@
            (let [errors       (coercion/map-errors data)
                  orig-uri     (if orig-uri (some-str orig-uri))
                  orig-params  (if orig-uri orig-params)
-                 smap         (session/usable-of req)
+                 smap         (session/not-empty-of req)
                  destination  (or orig-page orig-uri)
                  dest-uri     (if (keyword? destination) (common/page req destination) destination)
                  dest-uri     (some-str dest-uri)

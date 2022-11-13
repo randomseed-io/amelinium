@@ -68,7 +68,7 @@
   structure (defaults to `:session`).")
 
   (^{:tag Boolean}
-   -usable?
+   -not-empty?
    [src] [src session-key]
    "Returns `true` is `src` contains a session or is a session, and the session has
   usable identifier set (`:id` or `:err-id` field is set) or has the `:error` field
@@ -87,7 +87,7 @@
 
   (-session (^Session [src] src) (^Session [src _] src))
   (-inject  ([dst smap] smap) ([dst smap _] smap))
-  (-usable?
+  (-not-empty?
     (^Boolean [src]
      (or (some? (.id     ^Session src))
          (some? (.err-id ^Session src))
@@ -103,7 +103,7 @@
     (^Session [req]             (if-some [s (get req :session)] s))
     (^Session [req session-key] (if-some [s (get req (or session-key :session))] s)))
 
-  (-usable?
+  (-not-empty?
     (^Boolean [req]
      (if-some [^Session s (-session req :session)]
        (or (some? (.id     ^Session s))
@@ -133,7 +133,7 @@
     (^Session [req]             (if-some [s (get req :session)] s))
     (^Session [req session-key] (if-some [s (get req (or session-key :session))] s)))
 
-  (-usable?
+  (-not-empty?
     (^Boolean [req]
      (if-some [^Session s (-session req :session)]
        (or (some? (.id     ^Session s))
@@ -163,7 +163,7 @@
     ([src] nil)
     ([src session-key] nil))
 
-  (-usable?
+  (-not-empty?
     ([src] false)
     ([src session-key] false))
 
@@ -178,13 +178,13 @@
   (^Session [src] (-session src))
   (^Session [src session-key] (-session src session-key)))
 
-(defn usable?
+(defn not-empty?
   "Returns `true` is `src` contains a session or is a session, and the session has
   usable identifier set (`:id` or `:err-id` field is set) or has the `:error` field
   set. Optional `session-key` can be given to express a key in associative
   structure (defaults to `:session`)."
-  (^Boolean [src] (-usable? src))
-  (^Boolean [src session-key] (-usable? src session-key)))
+  (^Boolean [src] (-not-empty? src))
+  (^Boolean [src session-key] (-not-empty? src session-key)))
 
 (defn inject
   "Returns an object updated with session record of type `Session` under an optional
@@ -193,7 +193,7 @@
   ([dst smap] (-inject dst smap))
   ([dst smap session-key] (-inject dst smap session-key)))
 
-(defn usable-of
+(defn not-empty-of
   "Returns `true` is `src` contains a session or is a session, and the session has
   usable identifier set (`:id` or `:err-id` field is set) or has the `:error` field
   set. Optional `session-key` can be given to express a key in associative
@@ -201,10 +201,10 @@
   not have `:id`, `:err-id` not `:error` set)."
   (^Session [src]
    (let [^Session s (-session src)]
-     (if (-usable? s) s)))
+     (if (-not-empty? s) s)))
   (^Session [src session-key]
    (let [^Session s (-session src session-key)]
-     (if (-usable? s) s))))
+     (if (-not-empty? s) s))))
 
 (defn config
   ([src] (if-some [^Session s (-session src)] (.config ^Session s)))
