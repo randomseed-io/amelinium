@@ -206,7 +206,7 @@
       :invalid-session! (web/move-to req (or (get route-data :auth/login) :auth/login) lang))))
 
 (defn login!
-  "Prepares response data to be displayed a login page."
+  "Prepares response data to be displayed on a login page."
   [req]
   (let [sess     (session/not-empty-of req)
         app-data (get req :app/data web/empty-lazy-map)
@@ -217,7 +217,7 @@
     (qassoc req :app/data (qassoc app-data :lock-remains rem-mins))))
 
 (defn prolong!
-  "Prepares response data to be displayed a prolongation page."
+  "Prepares response data to be displayed on a prolongation page."
   [req]
   (let [sess (session/not-empty-of req)]
     (cond
@@ -316,7 +316,7 @@
       (let [valid-session? (session/valid? sess)
             auth?          (nth @auth-state 1 false)
             req            (if auth? req (populate-goto req sess))
-            goto-uri       (if auth? (get req :goto-uri))
+            goto-uri       (if auth? nil (get req :goto-uri))
             req            (cleanup-req req @auth-state)]
 
         ;; Session is invalid (or just expired without prolongation).
@@ -356,7 +356,8 @@
                 (web/move-to req (or (get route-data :auth/session-error) :login/session-error)))
             ;; Remove utilized go-to.
             (if valid-session?
-              (session/del-var! sess :goto)
+              (do (session/del-var! sess :goto)
+                  req)
               req))
           req)))))
 
