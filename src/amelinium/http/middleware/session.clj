@@ -243,8 +243,8 @@
   ([src session-key] (if-some [^Session s (-session src session-key)] (.ip ^Session src))))
 
 (defn session-key
-  ([src] (if-some [^Session s (-session src)] (.session-key ^Session src)))
-  ([src session-key] (if-some [^Session s (-session src session-key)] (.session-key ^Session src))))
+  ([src] (if-some [^Session s (-session src)] (or (.session-key ^Session src) :session)))
+  ([src session-key] (if-some [^Session s (-session src session-key)] (or (.session-key ^Session src) :session))))
 
 (defn id-field
   ([src] (if-some [^Session s (-session src)] (.id-field ^Session src)))
