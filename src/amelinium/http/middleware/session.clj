@@ -193,6 +193,19 @@
   ([dst smap] (-inject dst smap))
   ([dst smap session-key] (-inject dst smap session-key)))
 
+(defn usable-of
+  "Returns `true` is `src` contains a session or is a session, and the session has
+  usable identifier set (`:id` or `:err-id` field is set) or has the `:error` field
+  set. Optional `session-key` can be given to express a key in associative
+  structure (defaults to `:session`). Returns `nil` if session is not usable (does
+  not have `:id`, `:err-id` not `:error` set)."
+  (^Session [src]
+   (let [^Session s (-session src)]
+     (if (-usable? s) s)))
+  (^Session [src session-key]
+   (let [^Session s (-session src session-key)]
+     (if (-usable? s) s))))
+
 (defn config
   ([src] (if-some [^Session s (-session src)] (.config ^Session s)))
   ([src session-key] (if-some [^Session s (-session src session-key)] (.config ^Session s))))
