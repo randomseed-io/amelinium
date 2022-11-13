@@ -25,7 +25,8 @@
             [amelinium.http.middleware.language :as        language]
             [amelinium.http.middleware.coercion :as        coercion]
             [io.randomseed.utils.map            :as             map]
-            [io.randomseed.utils.map            :refer     [qassoc]]
+            [io.randomseed.utils.map            :refer     [qassoc
+                                                            qupdate]]
             [io.randomseed.utils                :refer         :all]
             [potpuri.core                       :refer [deep-merge]]))
 
@@ -86,11 +87,13 @@
                                       (qassoc req :parameters
                                               (delay
                                                 (deep-merge :into parameters
-                                                            req-parameters))))
+                                                            (qupdate req-parameters :form
+                                                                     #(if (some? %) (dissoc % :am/goto) %))))))
                  req              (if (nil? req-form-params) req
                                       (qassoc req :form-params
                                               (delay
-                                                (conj (or form-params {}) req-form-params))))
+                                                (conj (or form-params {})
+                                                      (dissoc req-form-params "am/goto")))))
                  req              (if (nil? req-query-params) req
                                       (qassoc req :query-params
                                               (delay
@@ -98,9 +101,8 @@
                  req              (if (nil? req-params) req
                                       (qassoc req :params
                                               (delay
-                                                (conj (or (super/kw-form-data query-params) {})
-                                                      (super/kw-form-data form-params)
-                                                      req-params))))]
+                                                (conj (or req-params {})
+                                                      (dissoc req-params "am/goto" :am/goto)))))]
              req)
            req))))))
 
