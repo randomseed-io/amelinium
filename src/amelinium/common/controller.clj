@@ -200,11 +200,11 @@
        :authenticate! (do (log/msg "Login successful" for-user)
                           (oplog true :info "Login OK" for-mail)
                           (user/update-login-ok auth-db user-id ipaddr)
-                          (let [goto-uri (if (session/expired? sess) (get req :goto-uri))
-                                sess     (if goto-uri
+                          (let [goto-uri (get-goto-uri req sess)
+                                goto?    (some? goto-uri)
+                                sess     (if goto?
                                            (session/prolong sess ipaddr)
                                            (session/create  sess user-id user-email ipaddr))]
-
                             (if-not (session/valid? sess)
 
                               (let [e (session/error sess)
@@ -216,7 +216,7 @@
                                 (qassoc req :user/authenticated? false :user/authorized? false
                                         :auth/ok? false :response/status :auth/session-error))
 
-                              (if goto-uri
+                              (if goto?
                                 (resp/temporary-redirect goto-uri)
                                 (-> req
                                     (qassoc :auth/ok? true :response/status :auth/ok)
