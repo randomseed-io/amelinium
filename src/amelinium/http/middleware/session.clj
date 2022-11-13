@@ -172,6 +172,9 @@
     ([src smap session-key] nil)))
 
 (defn of
+  "Returns a session record of type `Session` on a basis of configuration source
+  provided and an optional `session-key` if session must be looked in an associative
+  structure (defaults to `:session`)."
   (^Session [src] (-session src))
   (^Session [src session-key] (-session src session-key)))
 
@@ -184,6 +187,9 @@
   (^Boolean [src session-key] (-usable? src session-key)))
 
 (defn inject
+  "Returns an object updated with session record of type `Session` under an optional
+  `session-key` if session is to be put into an associative structure (defaults to
+  `:session`)."
   ([dst smap] (-inject dst smap))
   ([dst smap session-key] (-inject dst smap session-key)))
 
