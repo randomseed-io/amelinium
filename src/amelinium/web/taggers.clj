@@ -103,7 +103,7 @@
   ([ctx]
    (translator-sub ctx nil))
   ([ctx translations-fn]
-   (or (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd)
+   (or (get ctx (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd))
        (let [tf   (or translations-fn i18n/translations)
              lang (get-lang-id ctx)]
          (fn
