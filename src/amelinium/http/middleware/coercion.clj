@@ -60,10 +60,10 @@
          param-id?   (some? param-id)
          mixed-id    (if (and param-type? param-id?) (str param-id "." param-type))
          mixed-id?   (some? mixed-id)
-         param-name  (i18n/no-default (translate-sub :parameter param-id param-type))
+         param-name  (i18n/no-default (translate-sub :parameter param-id))
          param-name? (some? param-name)
          param-name  (if param-name? param-name (some-str param-id))
-         type-name   (if param-type? (i18n/no-default (translate-sub :parameter-type param-type param-id)))
+         type-name   (if param-type? (i18n/no-default (translate-sub :parameter-type param-type)))
          type-name?  (some? type-name)
          output      {:parameter/name param-name :parameter-type/name type-name}]
      (i18n/no-default
