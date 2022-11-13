@@ -119,7 +119,7 @@
 (defn get-goto
   "Gets go-to map from a session variable even if the session is not valid."
   [smap]
-  (user/get-session-var (session/allow-soft-expired smap) :goto))
+  (session/get-var smap :goto))
 
 (defn get-goto-for-valid+
   "Gets go-to map from session variable if the session is valid (and not expired)."
