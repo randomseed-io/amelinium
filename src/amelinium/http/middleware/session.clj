@@ -68,10 +68,12 @@
   structure (defaults to `:session`).")
 
   (^{:tag Boolean}
-   -present?
+   -usable?
    [src] [src session-key]
-   "Returns `true` is `src` contains a session or is a session. Optional `session-key`
-  can be given to express a key in associative structure (defaults to `:session`.")
+   "Returns `true` is `src` contains a session or is a session, and the session has
+  usable identifier set (`:id` or `:err-id` field is set) or has the `:error` field
+  set. Optional `session-key` can be given to express a key in associative
+  structure (defaults to `:session`).")
 
   (-inject
     [dst smap] [dst smap session-key]
@@ -83,9 +85,17 @@
 
   Session
 
-  (-session  (^Session [src] src)  (^Session [src _] src))
-  (-present? (^Boolean [src] true) (^Boolean [src _] true))
-  (-inject   ([dst smap] smap)     ([dst smap _] smap))
+  (-session (^Session [src] src) (^Session [src _] src))
+  (-inject  ([dst smap] smap) ([dst smap _] smap))
+  (-usable?
+    (^Boolean [src]
+     (or (some? (.id     ^Session src))
+         (some? (.err-id ^Session src))
+         (some? (.error  ^Session src))))
+    (^Boolean [src _]
+     (or (some? (.id     ^Session src))
+         (some? (.err-id ^Session src))
+         (some? (.error  ^Session src)))))
 
   clojure.lang.IPersistentMap
 
@@ -93,9 +103,19 @@
     (^Session [req]             (if-some [s (get req :session)] s))
     (^Session [req session-key] (if-some [s (get req (or session-key :session))] s)))
 
-  (-present?
-    (^Boolean [req]             (contains? req :session))
-    (^Boolean [req session-key] (contains? req (or session-key :session))))
+  (-usable?
+    (^Boolean [req]
+     (if-some [^Session s (-session req :session)]
+       (or (some? (.id     ^Session s))
+           (some? (.err-id ^Session s))
+           (some? (.error  ^Session s)))
+       false))
+    (^Boolean [req session-key]
+     (if-some [^Session s (-session req session-key)]
+       (or (some? (.id     ^Session s))
+           (some? (.err-id ^Session s))
+           (some? (.error  ^Session s)))
+       false)))
 
   (-inject
     (^Session [dst smap]
@@ -113,9 +133,19 @@
     (^Session [req]             (if-some [s (get req :session)] s))
     (^Session [req session-key] (if-some [s (get req (or session-key :session))] s)))
 
-  (-present?
-    (^Boolean [req]             (contains? req :session))
-    (^Boolean [req session-key] (contains? req (or session-key :session))))
+  (-usable?
+    (^Boolean [req]
+     (if-some [^Session s (-session req :session)]
+       (or (some? (.id     ^Session s))
+           (some? (.err-id ^Session s))
+           (some? (.error  ^Session s)))
+       false))
+    (^Boolean [req session-key]
+     (if-some [^Session s (-session req session-key)]
+       (or (some? (.id     ^Session s))
+           (some? (.err-id ^Session s))
+           (some? (.error  ^Session s)))
+       false)))
 
   (-inject
     (^Session [dst smap]
@@ -133,7 +163,7 @@
     ([src] nil)
     ([src session-key] nil))
 
-  (-present?
+  (-usable?
     ([src] false)
     ([src session-key] false))
 
@@ -145,9 +175,13 @@
   (^Session [src] (-session src))
   (^Session [src session-key] (-session src session-key)))
 
-(defn present?
-  (^Boolean [src] (-present? src))
-  (^Boolean [src session-key] (-present? src session-key)))
+(defn usable?
+  "Returns `true` is `src` contains a session or is a session, and the session has
+  usable identifier set (`:id` or `:err-id` field is set) or has the `:error` field
+  set. Optional `session-key` can be given to express a key in associative
+  structure (defaults to `:session`)."
+  (^Boolean [src] (-usable? src))
+  (^Boolean [src session-key] (-usable? src session-key)))
 
 (defn inject
   ([dst smap] (-inject dst smap))
