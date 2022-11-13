@@ -244,13 +244,16 @@
          (if (or f s) [f s v]))))))
 
 (defn parse-errors
-  "Transforms a string previously exposed with `join-errors`, a list created
-  with `list-errors` or a map resulted from calling `map-errors` into a map
-  containing parameter names as keys and parameter types as values. Used to parse
-  input from a query string or saved session variable when visiting a page with
-  a previously visited form which to be corrected (after redirecting to it).
-  The `explain-form-error` template tag can make use of such map to decide whether
-  an input field had invalid data."
+  "Transforms a string previously exposed with `join-errors`, a list created with
+  `list-errors` or a map resulted from calling `map-errors`, into a map containing
+  parameter names as keys and parameter types as values.
+
+  Used to parse input from a query string or saved session variable when visiting a
+  page with a previously visited form which is to be corrected (after redirecting to
+  it).
+
+  The `explain-form-error` template tag can make use of such map to decide whether an
+  input field had invalid data."
   [errors]
   (cond
     (map?        errors) errors
@@ -259,12 +262,14 @@
                                 (map split-error)
                                 (map #(take 2 %))
                                 (filter identity)
-                                (into {})
+                                (mapcat seq)
+                                (apply qassoc {})
                                 not-empty))
     (sequential? errors) (->> (seq errors)
                               (map #(take 2 %))
                               (filter identity)
-                              (reduce (partial apply qassoc) {})
+                              (mapcat seq)
+                              (apply qassoc {})
                               not-empty)))
 
 (defn inject-errors
