@@ -27,35 +27,80 @@
             [io.randomseed.utils.ip       :as         ip]
             [io.randomseed.utils.db.types :as      types])
 
-  (:import [java.time Instant]
+  (:import [java.time Instant Duration]
+           [javax.sql DataSource]
            [inet.ipaddr IPAddress]))
 
 (def ^:const sid-match (re-pattern "|^[a-f0-9]{30,128}(-[a-f0-9]{30,128})?$"))
 
 (def one-second (t/new-duration 1 :seconds))
 
-(defrecord Session [^String    id
-                    ^String    err-id
-                    ^String    db-id
-                    ^String    db-token
-                    ^Long      user-id
-                    ^String    user-email
-                    ^Instant   created
-                    ^Instant   active
-                    ^IPAddress ip
-                    ^Boolean   valid?
-                    ^Boolean   expired?
-                    ^Boolean   hard-expired?
-                    ^Boolean   secure?
-                    ^Boolean   security-passed?
-                    ^String    session-key
-                    ^String    id-field
-                    ^clojure.lang.IPersistentMap error
-                    ^clojure.lang.IPersistentMap config])
+(defprotocol SessionControl
+  "This protocol promises access to session configuration data and basic actions which
+  are configuration-dependent. The operations should keep access to settings and/or
+  dynamically generated functions using lexical closures. Therefore, this protocol
+  should later be reified, after settings are parsed, and the anonymous object with
+  implementations should be stored in all created `Session` records, in their
+  `:control` fields."
+
+  (-config     [c]                           "Gets a session configuration settings.")
+  (-identify   [c req] [c]                   "Extracts session ID.")
+  (-handle     [c sid ip]     [c sid]    [c] "Obtains a session from a database and creates its object.")
+  (-invalidate [c sid ip]     [c sid]    [c] "Invalidates internal cache.")
+  (-from-db    [c db-sid ip]  [c db-sid] [c] "Gets the session data from a database.")
+  (-token-ok?  [c plain enc]                 "Checks if the security token is valid.")
+  (-get-var    [c db-sid k]   [c k]          "Gets session variable from a persistent storage.")
+  (-get-vars   [c db-sid ks]  [c ks]         "Gets session variables from a persistent storage.")
+  (-put-var    [c db-sid k v] [c k v]        "Puts session variable into a persistent storage.")
+  (-put-vars   [c db-sid kvs] [c kvs]        "Puts session variables into a persistent storage.")
+  (-del-var    [c db-sid k]   [c k]          "Deletes session variable from a persistent storage.")
+  (-del-vars   [c db-sid ks]  [c ks]         "Deletes session variables from a persistent storage.")
+  (-del-svars  [c db-sid]     [c]            "Deletes all session variables from a persistent storage.")
+  (-del-uvars  [c uid]        [c]            "Deletes all user's session variables from a persistent storage."))
+
+(defrecord SessionConfig
+    [^DataSource                    db
+     ^String                        sessions-table
+     ^String                        variables-table
+     ^clojure.lang.Keyword          session-key
+     ^clojure.lang.PersistentVector id-path
+     ^Object                        id-field
+     ^Duration                      expires
+     ^Duration                      hard-expires
+     ^Duration                      cache-ttl
+     ^Long                          cache-size
+     ^Duration                      token-cache-ttl
+     ^Duration                      token-cache-size
+     ^Boolean                       single-session?
+     ^Boolean                       secured?])
+
+(defrecord Session
+    [^String                        id
+     ^String                        err-id
+     ^String                        db-id
+     ^String                        db-token
+     ^Long                          user-id
+     ^String                        user-email
+     ^Instant                       created
+     ^Instant                       active
+     ^IPAddress                     ip
+     ^Boolean                       valid?
+     ^Boolean                       expired?
+     ^Boolean                       hard-expired?
+     ^Boolean                       secure?
+     ^Boolean                       security-passed?
+     ^String                        session-key
+     ^Object                        id-field
+     ^clojure.lang.IPersistentMap   error
+     ^SessionControl                control])
 
 (defn session?
   ^Boolean [v]
   (instance? Session v))
+
+(defn config?
+  ^Boolean [v]
+  (instance? SessionConfig v))
 
 (defprotocol Sessionable
   "This protocol is used to access session data."
@@ -79,14 +124,22 @@
     [dst smap] [dst smap session-key]
     "Returns an object updated with session record of type `Session` under an optional
   `session-key` if session is to be put into an associative structure (defaults to
-  `:session`)."))
+  `:session`).")
+
+  (^{:tag SessionControl}
+   -control
+   [src] [src session-key]
+   "Returns a session control object (satisfying the `SessionControl` protocol) used to
+  reach session configuration and internal operations."))
 
 (extend-protocol Sessionable
 
   Session
 
   (-session (^Session [src] src) (^Session [src _] src))
+
   (-inject  ([dst smap] smap) ([dst smap _] smap))
+
   (-not-empty?
     (^Boolean [src]
      (or (some? (.id     ^Session src))
@@ -97,35 +150,14 @@
          (some? (.err-id ^Session src))
          (some? (.error  ^Session src)))))
 
-  clojure.lang.IPersistentMap
+  (-control
+    (^SessionControl [src]   (.control ^Session src))
+    (^SessionControl [src _] (.control ^Session src)))
 
-  (-session
-    (^Session [req]             (if-some [s (get req :session)] s))
-    (^Session [req session-key] (if-some [s (get req (or session-key :session))] s)))
+  SessionControl
 
-  (-not-empty?
-    (^Boolean [req]
-     (if-some [^Session s (-session req :session)]
-       (or (some? (.id     ^Session s))
-           (some? (.err-id ^Session s))
-           (some? (.error  ^Session s)))
-       false))
-    (^Boolean [req session-key]
-     (if-some [^Session s (-session req session-key)]
-       (or (some? (.id     ^Session s))
-           (some? (.err-id ^Session s))
-           (some? (.error  ^Session s)))
-       false)))
-
-  (-inject
-    (^Session [dst smap]
-     (if-some [^Session smap (-session smap)]
-       (map/qassoc dst (or (get (.config ^Session smap) :session-key) :session) smap)
-       dst))
-    (^Session [dst smap session-key]
-     (if-some [^Session smap (-session smap)]
-       (map/qassoc dst (or session-key (get (.config ^Session smap) :session-key) :session) smap)
-       dst)))
+  (-control (^SessionControl [src] src) (^SessionControl [src _] src))
+  (^Boolean -not-empty? [src] (config? (-config src)))
 
   clojure.lang.Associative
 
@@ -150,12 +182,31 @@
   (-inject
     (^Session [dst smap]
      (if-some [^Session smap (-session smap)]
-       (map/qassoc dst (or (get (.config ^Session smap) :session-key) :session) smap)
+       (map/qassoc dst (or  (.session-key ^Session smap)
+                            (if-some [^SessionControl ctrl (.control ^Session smap)]
+                              (if-some [^SessionConfig cfg (-config ^SessionControl ctrl)]
+                                (get cfg :session-key)))
+                            :session)
+                   smap)
        dst))
     (^Session [dst smap session-key]
      (if-some [^Session smap (-session smap)]
-       (map/qassoc dst (or session-key (get (.config ^Session smap) :session-key) :session) smap)
+       (map/qassoc dst (or session-key
+                           (.session-key ^Session smap)
+                           (if-some [^SessionControl ctrl (.control ^Session smap)]
+                             (if-some [^SessionConfig cfg (-config ^SessionControl ctrl)]
+                               (get cfg :session-key)))
+                           :session)
+                   smap)
        dst)))
+
+  (-control
+    (^SessionControl [req]
+     (if-some [^Session s (get req :session)]
+       (.control ^Session src)))
+    (^SessionControl [req session-key]
+     (if-some [^Session s (get req session-key)]
+       (.control ^Session src))))
 
   nil
 
@@ -169,7 +220,84 @@
 
   (-inject
     ([src smap] nil)
-    ([src smap session-key] nil)))
+    ([src smap session-key] nil))
+
+  (-control
+    ([src] nil)
+    ([src session-key] nil)))
+
+(extend-protocol SessionControl
+
+  SessionConfig
+
+  (^SessionConfig -config [s] s)
+
+  Session
+
+  (^SessionConfig -config [s]     (-config     (.control ^Session s)))
+  (^Boolean -token-ok?    [s p e] (-token-ok?  (.control ^Session s) p e))
+  (^Object  -get-var      [s k]   (-get-var    (.control ^Session s) (db-sid-smap s) k))
+  (^Object  -get-vars     [s ks]  (-get-vars   (.control ^Session s) (db-sid-smap s) ks))
+  (^Object  -put-var      [s k v] (-put-var    (.control ^Session s) (db-sid-smap s) k v))
+  (^Object  -put-vars     [s kvs] (-put-vars   (.control ^Session s) (db-sid-smap s) kvs))
+  (^Object  -del-var      [s k]   (-del-var    (.control ^Session s) (db-sid-smap s) k))
+  (^Object  -del-vars     [s ks]  (-del-vars   (.control ^Session s) (db-sid-smap s) ks))
+  (^Object  -del-svars    [s]     (-del-svars  (.control ^Session s) (db-sid-smap s)))
+  (^Object  -del-uvars    [s]     (-del-uvars  (.control ^Session s) (.user-id ^Session s)))
+
+  (-identify
+    (^String [s]     (or (.id ^Session s) (.err-id ^Session s)))
+    (^String [s req] (or (.id ^Session s) (.err-id ^Session s)
+                         (-identify (.control ^Session s) req))))
+
+  (-from-db
+    (^Session [s]           (-from-db (.control ^Session s) (db-sid-smap s) (.ip ^Session s)))
+    (^Session [s db-sid]    (-from-db (.control ^Session s) db-sid (.ip ^Session s)))
+    (^Session [s db-sid ip] (-from-db (.control ^Session s) db-sid ip)))
+
+  (-handle
+    (^Session [s]        (-handle (.control ^Session s) (-identify ^Session s) (.ip ^Session s)))
+    (^Session [s sid]    (-handle (.control ^Session s) sid (.ip ^Session s)))
+    (^Session [s sid ip] (-handle (.control ^Session s) sid ip)))
+
+  (-invalidate
+    ([s]        (-invalidate (.control ^Session s) (-identify ^Session s) (.ip ^Session s)))
+    ([s sid]    (-invalidate (.control ^Session s) sid (.ip ^Session s)))
+    ([s sid ip] (-invalidate (.control ^Session s) sid ip)))
+
+  clojure.lang.Associative
+
+  (-config
+    (^SessionConfig [src]             (-config (-session src)))
+    (^SessionConfig [src session-key] (-config (-session src session-key))))
+
+  (-identify
+    (^String [req]
+     (or (-identify (-session req))
+         (get-in req [:params :session-id])
+         (get-in req [:params "session-id"])))
+
+    (^String [req session-key-or-req-path]
+     (if (coll? session-key-or-req-path)
+       (get-in req session-key-or-req-path)
+       (-identify (-session req session-key-or-req-path)))))
+
+  nil
+
+  (-token-ok?   [s e p] false)
+  (-config     ([s]            nil) ([s s-k] nil))
+  (-identify   ([s]            nil) ([s req] nil))
+  (-handle     ([s db-sid ip]  nil) ([s db-sid] nil) ([s] nil))
+  (-invalidate ([s db-sid ip]  nil) ([s db-sid] nil) ([s] nil))
+  (-from-db    ([s db-sid ip]  nil) ([s db-sid] nil) ([s] nil))
+  (-get-var    ([s db-sid k]   nil) ([s k]   nil))
+  (-get-vars   ([s db-sid ks]  nil) ([s ks]  nil))
+  (-put-var    ([s db-sid k v] nil) ([s k v] nil))
+  (-put-vars   ([s db-sid kvs] nil) ([s kvs] nil))
+  (-del-var    ([s db-sid k]   nil) ([s k]   nil))
+  (-del-vars   ([s db-sid ks]  nil) ([s ks]  nil))
+  (-del-svars  ([s db-sid]     nil) ([s]     nil))
+  (-del-uvars  ([s uid]        nil) ([s]     nil)))
 
 (defn of
   "Returns a session record of type `Session` on a basis of configuration source
@@ -183,7 +311,7 @@
   usable identifier set (`:id` or `:err-id` field is set) or has the `:error` field
   set. Optional `session-key` can be given to express a key in associative
   structure (defaults to `:session`)."
-  (^Boolean [src] (-not-empty? src))
+   (^Boolean [src] (-not-empty? src))
   (^Boolean [src session-key] (-not-empty? src session-key)))
 
 (defn inject
@@ -206,9 +334,17 @@
    (let [^Session s (-session src session-key)]
      (if (-not-empty? s) s))))
 
+(defn control?
+  ^Boolean [v]
+  (satsfies? SessionControl v))
+
+(defn control
+  (^SessionControl [src] (-control src))
+  (^SessionControl [src session-key] (-control src)))
+
 (defn config
-  ([src] (if-some [^Session s (-session src)] (.config ^Session s)))
-  ([src session-key] (if-some [^Session s (-session src session-key)] (.config ^Session s))))
+  (^SessionConfig [src] (-config src))
+  (^SessionConfig [src session-key] (-config src session-key)))
 
 (defn id
   ([src] (if-some [^Session s (-session src)] (.id ^Session src)))
@@ -217,6 +353,10 @@
 (defn err-id
   ([src] (if-some [^Session s (-session src)] (.err-id ^Session src)))
   ([src session-key] (if-some [^Session s (-session src session-key)] (.err-id ^Session src))))
+
+(defn any-id
+  ([src] (if-some [^Session s (-session src)] (or (.id ^Session src) (.err-id ^Session src))))
+  ([src session-key] (if-some [^Session s (-session src session-key)] (or  (.id ^Session src) (.err-id ^Session src)))))
 
 (defn db-token
   ([src] (if-some [^Session s (-session src)] (.db-token ^Session src)))
@@ -280,13 +420,13 @@
            (bytes->b64u (bytes (get enc :password)))))))
 
 (defn check-encrypted
-  ([plain-token encrypted-token-b64-str]
-   (if (and plain-token encrypted-token-b64-str)
-     (if-some [salt-pass (str/split encrypted-token-b64-str salt-splitter 2)]
-       (crypto/eq? (b64u->bytes (nth salt-pass 1 nil))
-                   (get (scrypt/encrypt plain-token
-                                        (b64u->bytes (nth salt-pass 0 nil))
-                                        scrypt-options) :password))))))
+  [plain-token encrypted-token-b64-str]
+  (if (and plain-token encrypted-token-b64-str)
+    (if-some [salt-pass (str/split encrypted-token-b64-str salt-splitter 2)]
+      (crypto/eq? (b64u->bytes (nth salt-pass 1 nil))
+                  (get (scrypt/encrypt plain-token
+                                       (b64u->bytes (nth salt-pass 0 nil))
+                                       scrypt-options) :password)))))
 
 (defn split-secure-sid
   [session-id]
@@ -334,38 +474,40 @@
 ;; Session validation
 
 (defn secure?
-  "Checks if a session is secure. If `:secured?` option is not enabled in configuration,
-  it always returns `true`. If `:secure?` flag is set to a truthy value, it returns
-  it."
+  "Checks if a session is secure according to configured security level. If `:secured?`
+  option is not enabled in configuration, it returns `true`. If `:secure?` flag is
+  set to a truthy value, it returns it.  If there is no session, it returns `false`."
   (^Boolean [src]
    (if-some [^Session s (-session src)]
-     (or (not (get (.config ^Session s) :secured?))
-         (.secure? ^Session s))
+     (or (.secure? ^Session s)
+         (not (if-some [^SessionConfig c (config ^Session s)] (.secured? ^SessionConfig c))))
      false))
   (^Boolean [src session-key]
    (if-some [^Session s (-session src session-key)]
-     (or (not (get (.config ^Session s) :secured?))
-         (.secure? ^Session s))
+     (or (.secure? ^Session s)
+         (not (if-some [^SessionConfig c (config ^Session s)] (.secured? ^SessionConfig c))))
      false)))
 
 (defn insecure?
   "Checks if session is not secure where it should be. If `:secured?` option is not
-  enabled in configuration, it always returns `false`. If `:secure?` flag is set to a
-  falsy value, it returns `false`."
+  enabled in configuration, it returns `false`. If `:secure?` flag is set to a falsy
+  value, it returns `false`. If there is no session, it returns `true`."
   (^Boolean [src]
    (if-some [^Session s (-session src)]
      (and (not (.secure? ^Session s))
-          (get (.config ^Session s) :secured?))
+          (if-some [^SessionConfig c (config ^Session s)] (.secured? ^SessionConfig c) false))
      true))
   (^Boolean [src session-key]
    (if-some [^Session s (-session src session-key)]
      (and (not (.secure? ^Session s))
-          (get (.config ^Session s) :secured?))
+          (if-some [^SessionConfig c (config ^Session s)] (.secured? ^SessionConfig c) false))
      true)))
 
 (defn security-passed?
-  "Checks if the additional security token was validated correctly unless the session
-  is not secured (in such case returns `true`)."
+  "Checks if the additional security token was validated correctly or there was not a
+  need to validate it because the session is not secure (in such case returns
+  `true`). Does not test if session should be secured; to check it, use `secure?` or
+  `insecure?`."
   (^Boolean [src]
    (if-some [^Session s (-session src)]
      (or (not (.secure? ^Session s))
@@ -379,7 +521,8 @@
 
 (defn security-failed?
   "Checks if the additional security token was validated incorrectly unless the session
-  is not secured (in such case it returns `false`)."
+  is not secure (in such case it returns `false`). Does not test if session should be
+  secured; to check it, use `secure?` or `insecure?`."
   (^Boolean [src]
    (if-some [^Session s (-session src)]
      (and (.secure? ^Session s)
@@ -436,18 +579,20 @@
    (calc-expired? (-session src session-key)))
   (^Boolean [src]
    (if-some [^Session smap (-session src)]
-     (if-some [exp (get (.config ^Session smap) :expires)]
-       (and (pos-int? (time/seconds exp))
-            (time-exceeded? (.active ^Session smap) (t/now) exp))))))
+     (if-some [^SessionConfig cfg (config ^Session smap)]
+       (if-some [exp (.expires ^SessionConfig cfg)]
+         (and (pos-int? (time/seconds exp))
+              (time-exceeded? (.active ^Session smap) (t/now) exp)))))))
 
 (defn calc-hard-expired?
   (^Boolean [src session-key]
    (calc-hard-expired? (-session src session-key)))
   (^Boolean [src]
    (if-some [^Session smap (-session src)]
-     (if-some [hexp (get (.config ^Session smap) :hard-expires)]
-       (and (pos-int? (time/seconds hexp))
-            (time-exceeded? (.active ^Session smap) (t/now) hexp))))))
+     (if-some [^SessionConfig cfg (config ^Session smap)]
+       (if-some [hexp (.hard-expires ^SessionConfig cfg)]
+         (and (pos-int? (time/seconds hexp))
+              (time-exceeded? (.active ^Session smap) (t/now) hexp)))))))
 
 (defn calc-soft-expired?
   (^Boolean [src session-key]
@@ -560,7 +705,7 @@
         (security-failed? smap)     {:cause    :session/bad-security-token
                                      :reason   (str "Bad session security token " @for-user)
                                      :severity :warn}
-        :ip-address-check           (ip-state smap user-id user-email ip-address )))))
+        :ip-address-check           (ip-state smap user-id user-email ip-address)))))
 
 (defn correct?
   "Returns `true` if a session exists and its state is correct. Never throws an
@@ -643,7 +788,7 @@
   [path]
   (let [[a b c d & more] path]
     (case (count path)
-      0 #(get % :session-id)
+      0 #(if-some [p (get % :params)] (or (get p :session-id) (get p "session-id")))
       1 #(get % a)
       2 #(get (get % a) b)
       3 #(get (get (get % a) b) c)
@@ -656,7 +801,7 @@
   "Standard session getter. Uses `db` to connect to a database and gets data identified
   by `sid` from a table `table`. Returns a map."
   [opts db table sid-db remote-ip]
-  (sql/get-by-id db table sid-db db/opts-simple-map))
+  (sql/get-by-id opts db table sid-db db/opts-simple-map))
 
 (defn get-last-active
   [opts db table sid-db remote-ip]
@@ -689,6 +834,14 @@
                                   (str "AND " variables-table ".session_id = " sessions-table ".id)"))
                          user-id]))
 
+(defn delete-session-vars
+  [opts db sessions-table variables-table db-id]
+  (jdbc/execute-one! db [(str-spc "DELETE FROM" variables-table
+                                  "WHERE EXISTS (SELECT 1 FROM" sessions-table
+                                  (str "WHERE " sessions-table ".id = ?")
+                                  (str "AND " variables-table ".session_id = " sessions-table ".id)"))
+                         db-id]))
+
 ;; Marking
 
 (defn mkgood
@@ -719,7 +872,8 @@
      (let [cause         (get (.error ^Session smap) :cause)
            expired?      (or (= :session/expired cause)
                              (and (= :session/bad-ip cause)
-                                  (get (.config ^Session smap) :wrong-ip-expires)))
+                                  (if-some [^SessionConfig cfg (config ^Session smap)]
+                                    (.wrong-ip-expires ^SessionConfig cfg))))
            hard-expired? (and expired? (calc-hard-expired? smap))
            err-id        (or (.id ^Session smap) (.err-id ^Session smap))
            err-map       (.error ^Session smap)]
@@ -774,143 +928,169 @@
 (defn- config-options
   [req opts-or-session-key]
   (if (keyword? opts-or-session-key)
-    (if-some [^Session s (-session req (or opts-or-session-key :session))] (.config ^Session s))
+    (if-some [^Session s (-session req (or opts-or-session-key :session))]
+      (config ^Session s))
     opts-or-session-key))
 
 ;; Session variables
 
 (defn del-var!
-  "Deletes a session variable `var-name` assigned to a session of the given ID (`sid`)
-  or a session map (`smap`). Optional variable `names` can be given to perform a
-  batch operation for multiple variables."
-  {:arglists '([smap var-name & names]
-               [opts sid var-name & names])}
-  ([smap-or-opts var-name-or-sid & names]
-   (if (session? smap-or-opts)
-     (let [^Session smap smap-or-opts
-           opts          (.config ^Session smap)
-           db-sid        (db-sid-smap ^Session smap)
-           deleter       (get (.config ^Session smap) :fn/var-del)
-           var-name      var-name-or-sid]
+  "Deletes a session variable `var-name`."
+  ([src var-name]
+   (del-var! src :session var-name))
+  ([src session-key var-name]
+   (if var-name
+     (let [^Session smap (-session src)
+           db-sid        (db-sid-smap ^Session smap)]
        (if-not db-sid
          (log/err "Cannot delete session variable" var-name "because session ID is not valid"
                   (log/for-user (user-id smap) (user-email smap)))
-         (if names (apply deleter db-sid var-name names) (deleter db-sid var-name))))
-     (let [db-sid   (db-sid-str var-name-or-sid)
-           deleter  (get smap-or-opts :fn/var-del)
-           var-name (first names)
-           names    (next names)]
-       (if-not db-sid
-         (log/err "Cannot delete session variable" var-name "because session ID is not valid")
-         (if names (apply deleter db-sid var-name names) (deleter db-sid var-name)))))))
+         (-del-var (.control ^Session smap) db-sid var-name))))))
 
 (defn del-vars!
-  "Deletes all session variables which belong to a session of the given ID (`sid`) or a
-  session map (`smap`)."
-  {:arglists '([smap]
-               [opts sid]
-               [opts smap])}
-  ([smap]
-   (if-some [^Session smap (-session smap)]
-     (let [deleter (get (.config ^Session smap) :fn/var-del)
-           db-sid  (db-sid-smap ^Session smap)]
-       (if-not db-sid
-         (log/err "Cannot delete session variables because session ID is not valid"
-                  (log/for-user (user-id smap) (user-email smap)))
-         (deleter db-sid)))))
-  ([opts sid-or-smap]
-   (if (session? sid-or-smap)
-     (let [^Session smap sid-or-smap
-           opts          (or opts (.config ^Session smap))
-           deleter       (get opts :fn/var-del)
+  "Deletes a session variables from `var-names`."
+  ([src var-names]
+   (del-vars! src :session var-names))
+  ([src session-key var-names]
+   (if (not-empty var-names)
+     (let [^Session smap (-session src session-key)
            db-sid        (db-sid-smap ^Session smap)]
        (if-not db-sid
-         (log/err "Cannot delete session variables because session ID is not valid"
+         (log/err "Cannot delete session variable" (first var-names)
+                  "because session ID is not valid"
                   (log/for-user (user-id smap) (user-email smap)))
-         (deleter db-sid)))
-     (let [db-sid  (db-sid-str sid-or-smap)
-           deleter (get opts :fn/var-del)]
-       (if-not db-sid
-         (log/err "Cannot delete session variables because session ID is not valid")
-         (deleter db-sid))))))
+         (-del-vars (.control ^Session smap) db-sid var-names))))))
+
+(defn del-all-vars!
+  "Deletes all session variables which belong to a user (is `single-session?`
+  configuration option is `true`) or just variables for this session (if
+  `single-session?` configuration option is `false`)."
+  ([src session-key]
+   (if-some [^Session smap (-session src session-key)]
+     (let [^SessionControl ctrl (.control ^Session smap)
+           ^SessionConfig  opts (-config ^SessionControl ctrl)]
+       (if (.single-session? ^SessionConfig opts)
+         (if-some [user-id (.user-id ^Session smap)]
+           (-del-uvars ^SessionControl ctrl user-id)
+           (log/err "Cannot delete session variables because user ID is not valid"
+                    (log/for-user nil (user-email smap))))
+         (if-some [db-sid (db-sid-smap ^Session smap)]
+           (-del-svars ^SessionControl ctrl db-sid)
+           (log/err "Cannot delete session variables because session ID is not valid"
+                    (log/for-user (user-id smap) (user-email smap))))))))
+  ([src]
+   (del-all-vars! src :session)))
 
 (defn del-user-vars!
-  "Deletes all session variables which belong to a user. The user may be specified as
-  `user-id` or `smap` (indirectly)."
-  {:arglists '([smap]
-               [smap user-id]
-               [opts user-id])}
-  ([smap]
-   (if-some [^Session smap (-session smap)]
-     (let [deleter (get (.config ^Session smap) :fn/vars-del-user)
-           user-id (.user-id ^Session smap)]
-       (if-not user-id
-         (log/err "Cannot delete session variables because user ID is not valid"
-                  (log/for-user nil (user-email smap)))
-         (deleter user-id)))))
-  ([smap-or-opts user-id]
-   (let [smap    (if (session? smap-or-opts) smap-or-opts)
-         opts    (if smap (.config ^Session smap) smap-or-opts)
-         deleter (get opts :fn/vars-del-user)]
-     (if-not user-id
-       (log/err "Cannot delete session variables because user ID is not set"
-                (log/for-user (user-id smap) (user-email smap)))
-       (deleter user-id)))))
+  "Deletes all session variables which belong to a user across all sessions."
+  ([src session-key]
+   (if-some [^Session smap (-session src session-key)]
+     (if-some [user-id (.user-id ^Session smap)]
+       (-del-uvars (.control ^Session smap) user-id)
+       (log/err "Cannot delete session variables because user ID is not valid"
+                (log/for-user nil (user-email smap))))))
+  ([src]
+   (del-user-vars! src :session)))
+
+(defn del-session-vars!
+  "Deletes all session variables which belong to a user."
+  ([src session-key]
+   (if-some [^Session smap (-session src session-key)]
+     (if-some [db-sid (db-sid-smap ^Session smap)]
+       (-del-svars (.control ^Session smap) db-sid)
+       (log/err "Cannot delete session variables because session ID is not valid"
+                (log/for-user (user-id smap) (user-email smap))))))
+  ([src]
+   (del-session-vars! src :session)))
 
 (defn get-var
-  "Gets a session variable and de-serializes it to a Clojure data structure."
-  {:arglists '([smap var-name]
-               [smap var-name & names]
-               [opts sid var-name]
-               [opts sid var-name & names])}
-  ([smap-or-opts var-name-or-sid & names]
-   (if (session? smap-or-opts)
-     (let [^Session smap smap-or-opts
-           getter        (get (.config ^Session smap) :fn/var-get)
-           db-sid        (db-sid-smap smap)
-           var-name      var-name-or-sid]
+  "Gets a session variable and de-serializes it into a Clojure data structure."
+  ([src var-name]
+   (get-var src :session var-name))
+  ([src session-key var-name]
+   (if var-name
+     (let [^Session smap (-session src session-key)
+           db-sid        (db-sid-smap smap)]
        (if-not db-sid
          (log/err "Cannot get session variable" var-name "because session ID is not valid"
                   (log/for-user (user-id smap) (user-email smap)))
-         (if names (apply getter db-sid var-name names) (getter db-sid var-name))))
-     (let [getter   (get smap-or-opts :fn/var-get)
-           db-sid   (db-sid-str var-name-or-sid)
-           var-name (first names)
-           names    (next names)]
+         (-get-var (.control ^Session smap) db-sid var-name))))))
+
+(defn get-vars
+  "Gets a session variables and de-serializes them into a Clojure data structures."
+  ([src var-names]
+   (get-var src :session var-names))
+  ([src session-key var-names]
+   (if (not-empty var-names)
+     (let [^Session smap (-session src session-key)
+           db-sid        (db-sid-smap smap)]
        (if-not db-sid
-         (log/err "Cannot get session variable" var-name "because session ID is not valid")
-         (if names (apply getter db-sid var-name names) (getter db-sid var-name)))))))
+         (log/err "Cannot get session variable" (first var-names)
+                  "because session ID is not valid"
+                  (log/for-user (user-id smap) (user-email smap)))
+         (-get-vars (.control ^Session smap) db-sid var-names))))))
 
 (defn fetch-var!
   "Like `get-var` but removes session variable after it is successfully read from a
-  database."
-  {:arglists '([smap var-name & names]
-               [opts sid var-name & names])}
-  [smap-or-opts var-name-or-sid & names]
-  (if (session? smap-or-opts)
-    (let [^Session smap smap-or-opts
-          sid           (.id ^Session smap)
-          opts          (.config ^Session smap)
-          getter        (get opts :fn/var-get)
-          db-sid        (db-sid-smap smap)
-          var-name      var-name-or-sid]
-      (if-not db-sid
-        (log/err "Cannot get session variable" var-name "because session ID is not valid"
-                 (log/for-user (user-id smap) (user-email smap)))
-        (if names
-          (let [r (apply getter db-sid var-name names)] (apply del-var! opts sid var-name names) r)
-          (let [v (getter db-sid var-name)] (del-var! opts sid var-name) v))))
-    (let [sid      var-name-or-sid
-          opts     smap-or-opts
-          getter   (get opts :fn/var-get)
-          db-sid   (db-sid-str sid)
-          var-name (first names)
-          names    (next names)]
-      (if-not db-sid
-        (log/err "Cannot get session variable" var-name "because session ID is not valid")
-        (if names
-          (let [r (apply getter db-sid var-name names)] (apply del-var! opts sid var-name names) r)
-          (let [v (getter db-sid var-name)] (del-var! opts sid var-name) v))))))
+  database. Variable is not removed if there was a problem with reading or
+  de-serializing it."
+  ([src var-name]
+   (fetch-var! src :session var-name))
+  ([src session-key var-name]
+   (if var-name
+     (let [^Session smap (-session src session-key)
+           db-sid        (db-sid-smap smap)]
+       (if-not db-sid
+         (log/err "Cannot get session variable" var-name "because session ID is not valid"
+                  (log/for-user (user-id smap) (user-email smap)))
+         (let [^SessionControl ctrl (.control ^Session smap)
+               r                    (-get-var ctrl db-sid var-name)]
+           (if (not= ::db/get-failed r) (-del-var ctrl db-sid var-name))
+           r))))))
+
+(defn fetch-vars!
+  "Like `get-vars` but removes session variable after it is successfully read from a
+  database. Variables are not removed if there was a problem with reading or
+  de-serializing them."
+  ([src var-names]
+   (fetch-var! src :session var-names))
+  ([src session-key var-names]
+   (if (not-empty var-names)
+     (let [^Session smap (-session src session-key)
+           db-sid        (db-sid-smap smap)]
+       (if-not db-sid
+         (log/err "Cannot get session variable" (first var-names)
+                  "because session ID is not valid"
+                  (log/for-user (user-id smap) (user-email smap)))
+         (let [^SessionControl ctrl (.control ^Session smap)
+               r                    (-get-vars ctrl db-sid var-names)]
+           (if (not= ::db/get-failed r) (-del-vars ctrl db-sid var-names))
+           r))))))
+
+(defn put-var!
+  "Puts a session variable `var-name` with a value `value` into a database."
+  ([src var-name value]
+   (put-var! src :session var-name value))
+  ([src session-key var-name value]
+   (if var-name
+     (let [^Session smap (-session src session-key)
+           db-sid        (db-sid-smap smap)]
+       (if-not db-sid
+         (log/err "Cannot store session variable" var-name "because session ID is not valid")
+         (-put-var (.control ^Session smap) db-sid var-name value))))))
+
+(defn put-vars!
+  "Puts session variables with associated values (`var-names-values`) expressed as
+  pairs into a database."
+  ([src pairs]
+   (put-var! src :session pairs))
+  ([src session-key pairs]
+   (if (not-empty pairs)
+     (let [^Session smap (-session src session-key)
+           db-sid        (db-sid-smap smap)]
+       (if-not db-sid
+         (log/err "Cannot store session variable" var-name "because session ID is not valid")
+         (-put-vars (.control ^Session smap) db-sid pairs))))))
 
 (defn get-variable-failed?
   "Returns `true` if the value `v` obtained from a session variable indicates that it
@@ -918,58 +1098,17 @@
   [v]
   (= ::db/get-failed v))
 
-(defn put-var!
-  "Puts a session variable `var-name` with a value `value` into a database. The session
-  can be identified with a session ID (`sid`) or a session map (`smap`). Optional
-  `pairs` of variable names and values can be given to perform a batch operation for
-  multiple variables."
-  {:arglists '([smap var-name value & pairs]
-               [opts sid var-name value & pairs])}
-  [smap-or-opts var-name-or-sid value-or-var-name & pairs]
-  (if (session? smap-or-opts)
-    (let [^Session smap smap-or-opts
-          setter        (get (.config ^Session smap) :fn/var-set)
-          db-sid        (db-sid-smap smap)
-          var-name      var-name-or-sid
-          value         value-or-var-name]
-      (if-not db-sid
-        (log/err "Cannot store session variable" var-name "because session ID is not valid")
-        (if pairs (apply setter db-sid var-name value pairs) (setter db-sid var-name value))))
-    (let [setter   (get smap-or-opts :fn/var-set)
-          db-sid   (db-sid-str var-name-or-sid)
-          var-name value-or-var-name
-          value    (first pairs)
-          pairs    (next pairs)]
-      (if-not db-sid
-        (log/err "Cannot store session variable" var-name "because session ID is not valid")
-        (if pairs (apply setter db-sid var-name value pairs) (setter db-sid var-name value))))))
-
 ;; Cache invalidation.
 
 (defn invalidate-cache!
   "Invalidates cache."
-  {:arglists '([req]
-               [req opts]
-               [req session-key]
-               [opts sid ip-address]
-               [invalidator-fn sid ip-address]
-               [invalidator-fn smap ip-address])}
-  ([req]
-   (invalidate-cache! req :session))
-  ([req opts-or-session-key]
-   (if (keyword? opts-or-session-key)
-     (if-some [^Session smap (-session req opts-or-session-key)]
-       (if-some [invalidator (get (.config ^Session smap) :fn/invalidator)]
-         (invalidator (or (.id ^Session smap) (.err-id ^Session smap)) (get req :remote-ip))))
-     (if-some [invalidator (get opts-or-session-key :fn/invalidator)]
-       (if-some [^Session smap (-session req (get opts-or-session-key :session-key))]
-         (invalidator (or (.id ^Session smap) (.err-id ^Session smap)) (get req :remote-ip))))))
-  ([opts-or-fn sid-or-smap ip-address]
-   (if-some [invalidator (if (map? opts-or-fn) (get opts-or-fn :fn/invalidator) opts-or-fn)]
-     (invalidator (if (session? sid-or-smap)
-                    (or (.id ^Session sid-or-smap) (.err-id ^Session sid-or-smap))
-                    sid-or-smap)
-                  ip-address))))
+  ([src]
+   (invalidate-cache! src :session nil))
+  ([src session-key]
+   (invalidate-cache! src session-key nil))
+  ([src session-key remote-ip]
+   (if-some [^Session s (-session src session-key)]
+     (-invalidate (.control ^Session smap) (db-sid-smap s) (or remote-ip (.ip ^Session smap))))))
 
 ;; Cache invalidation when time-sensitive value (last active time) exceeds TTL.
 
@@ -1014,55 +1153,30 @@
   remote IP, request map and configuration options. It tries to get session ID string
   from form parameters of the request map and if the string is valid obtains session
   from a database using `getter-fn` (passing configuration options, database
-  connection, table, session ID and remote IP to the call). The database connection
-  object should be present in options under the `:db` key or given as an argument. If
-  there is no session ID present in a request (obtained with `identifier-fn`), `nil`
-  is returned."
-  ([req]
-   (handler req :session))
-  ([req opts-or-session-key]
-   (let [opts (config-options opts-or-session-key)]
-     (handler opts
-              (get opts :fn/getter)
-              (get opts :fn/checker)
-              (get opts :id-field)
-              (get opts :session-key)
-              (some-str ((get opts :fn/identifier) req))
-              (get req :remote-ip))))
-  ([req opts-or-session-key sid remote-ip]
-   (let [opts (config-options req opts-or-session-key)]
-     (handler opts
-              (get opts :fn/getter)
-              (get opts :fn/checker)
-              (get opts :id-field)
-              (get opts :session-key)
-              sid remote-ip)))
-  ([opts sid remote-ip]
-   (handler opts
-            (get opts :fn/getter)
-            (get opts :fn/checker)
-            (get opts :id-field)
-            (get opts :session-key)
-            sid remote-ip))
-  ([opts getter-fn checker-fn session-id-field session-key sid remote-ip]
+  connection, table, session ID and remote IP to the call). Control field will not be
+  set and it is the responsibility of a caller to update it afterwards when the
+  session control object (which implements `SessionControl`) was not passed as an
+  argument."
+  (^Session [src sid remote-ip]
+   (handler src :session sid remote-ip))
+  (^Session [src session-key sid remote-ip]
+   (if-some [^SessionControl (-control src session-key)]
+     (handler (-config ctrl) #(-from-db ctrl %1 %2) #(-token-ok? ctrl %1 %2) sid remote-ip)))
+  (^Session [^SessionConfig opts getter-fn checker-fn sid remote-ip]
    (let [[sid-db pass] (split-secure-sid sid)
          secure?       (some? (not-empty pass))
          smap-db       (getter-fn sid-db remote-ip)
-         ^Session smap (map->Session smap-db)
-         smap          (if secure?
-                         (-> smap
-                             (map/qassoc :security-passed? (checker-fn pass (get smap :secure-token)))
-                             (dissoc :secure-token))
-                         smap)
+         token-ok?     (checker-fn pass (get smap-db :secure-token))
+         ^Session smap (map->Session (dissoc smap-db :secure-token))
+         smap          (if secure? (map/qassoc smap :security-passed? token-ok?) smap)
          smap          (map/qassoc
                         smap
                         :id          sid
                         :db-id       sid-db
                         :ip          (ip/to-address (.ip ^Session smap))
                         :secure?     secure?
-                        :session-key (or session-key (get opts :session-key) :session)
-                        :id-field    (or session-id-field (get opts :id-field) "session-id")
-                        :config      opts)
+                        :session-key (or (.session-key ^SessionConfig opts) :session)
+                        :id-field    (or (.id-field    ^SessionConfig opts) "session-id"))
          stat          (state smap remote-ip)]
      (if (get stat :cause)
        (mkbad smap :error stat)
@@ -1108,7 +1222,7 @@
                         {:reason   "Malformed session-id parameter"
                          :cause    :session/malformed-session-id
                          :severity :info}
-                        opts)
+                        ctrl)
               :id-path (get opts :id-path))
        (let [remote-ip     (get req :remote-ip)
              ^Session smap (map/qassoc (handler-fn sid remote-ip) :config opts)]
@@ -1133,7 +1247,7 @@
                false false false false false
                (or session-key (get opts :session-key) :session)
                (or session-id-field (get opts :id-field) "session-id")
-               nil opts))))
+               nil ctrl))))
 
 (defn prolong
   "Re-validates session by updating its timestamp and re-running validation."
@@ -1190,24 +1304,26 @@
    (let [opts (config-options req opts-or-session-key)]
      (if-some [creator (get opts :fn/create)]
        (creator user-id user-email ip-address))))
-  ([opts setter-fn invalidator-fn var-del-fn vars-del-user-fn single-session? secured?
-    session-id-field session-key user-id user-email ip-address]
+  ([^SessionControl ctrl user-id user-email ip-address]
    (let [user-id    (valuable user-id)
          user-email (some-str user-email)]
      (if-not (and user-id user-email)
        (do (if-not user-id    (log/err "No user ID given when creating a session"))
            (if-not user-email (log/err "No user e-mail given when creating a session"))
            nil)
-       (let [t             (t/now)
-             ip            (ip/to-address ip-address)
-             ipplain       (ip/plain-ip-str ip)
-             id-field      (or session-id-field (get opts :id-field) "session-id")
-             skey          (or session-key (get opts :session-key) :session)
-             ^Session sess (Session. nil nil nil nil user-id user-email t t ip
-                                     false false false false false skey id-field nil opts)
-             sess          (gen-session-id sess secured? user-id ipplain)
-             sid-db        (db-sid-smap sess)
-             stat          (state sess ip)]
+       (let [t                   (t/now)
+             ip                  (ip/to-address ip-address)
+             ipplain             (ip/plain-ip-str ip)
+             ^SessionConfig opts (-config ctrl)
+             single-session?     (.single-session  ^SessionConfig opts)
+             secured?            (.secured?        ^SessionConfig opts)
+             id-field            (or (.id-field    ^SessionConfig opts) "session-id")
+             skey                (or (.session-key ^SessionConfig opts) :session)
+             ^Session sess       (Session. nil nil nil nil user-id user-email t t ip
+                                           false false false false false skey id-field nil ctrl)
+             sess                (gen-session-id sess secured? user-id ipplain)
+             db-sid              (db-sid-smap sess)
+             stat                (state sess ip)]
          (log/msg "Opening session" (log/for-user user-id user-email ipplain))
          (if-not (correct? (get stat :cause))
            (do (log/err "Session incorrect after creation" (log/for-user user-id user-email ipplain))
@@ -1217,8 +1333,8 @@
              (invalidator-fn (or (.id ^Session sess) (.err-id ^Session sess)) ip)
              (if (pos-int? updated-count)
                (do (if single-session?
-                     (vars-del-user-fn user-id)
-                     (var-del-fn sess))
+                     (-del-uvars ctrl user-id)
+                     (-del-svars ctrl db-sid))
                    (mkgood sess))
                (do (log/err "Problem saving session" (log/for-user user-id user-email ipplain))
                    (mkbad sess
@@ -1252,7 +1368,7 @@
 
 (defn- setup-id-fn
   [id-path]
-  (let [id-path (if (coll? id-path) id-path (cons id-path nil))]
+  (let [id-path (if (coll? id-path) id-path [:params id-path])]
     (identify-session-path-compile id-path)))
 
 (defn wrap-session
@@ -1261,8 +1377,8 @@
   (let [dbname             (db/db-name (get config :db))
         config             (-> config
                                (update :db               db/ds)
-                               (update :table/sessions   #(or (to-snake-simple-str %) "sessions"))
-                               (update :table/variables  #(or (to-snake-simple-str %) "session_variables"))
+                               (update :sessions-table   #(or (to-snake-simple-str %) "sessions"))
+                               (update :variables-table  #(or (to-snake-simple-str %) "session_variables"))
                                (update :expires          time/parse-duration)
                                (update :hard-expires     time/parse-duration)
                                (update :cache-ttl        time/parse-duration)
@@ -1270,21 +1386,21 @@
                                (update :token-cache-ttl  time/parse-duration)
                                (update :token-cache-size safe-parse-long)
                                (update :session-key      #(or (some-keyword %) :session))
-                               (update :id-path          #(if (valuable? %) (if (coll? %) (vec %) %) "session-id"))
+                               (update :id-path          #(if (valuable? %) (if (coll? %) (vec %) [:params %]) [:params %]))
                                (update :id-field         #(if (ident? %) % (some-str %)))
                                (update :single-session?  boolean)
                                (update :secured?         boolean)
-                               (calc-cache-expires))
+                               (calc-cache-expires)
+                               (map->SessionConfig))
         db                 (get config :db)
         session-key        (get config :session-key)
-        sessions-table     (get config :table/sessions)
-        variables-table    (get config :table/variables)
+        sessions-table     (get config :sessions-table)
+        variables-table    (get config :variables-table)
         session-id-path    (get config :id-path)
         session-id-field   (get config :id-field)
         cache-expires      (get config :expires)
         single-session?    (get config :single-session?)
         secured?           (get config :secured?)
-        checker-config     (set/rename-keys config {:token-cache-size :cache-size :token-cache-ttl :cache-ttl})
         session-id-field   (or session-id-field (if (coll? session-id-path) (last session-id-path) session-id-path))
         config             (assoc config :id-field (or session-id-field "session-id"))
         identifier-fn      (setup-id-fn session-id-path)
@@ -1292,6 +1408,7 @@
         getter-fn          (setup-fn config :fn/getter get-session-by-id)
         getter-fn-w        #(getter-fn config db sessions-table %1 %2)
         config             (assoc config :fn/getter getter-fn-w)
+        checker-config     (set/rename-keys config {:token-cache-size :cache-size :token-cache-ttl :cache-ttl})
         checker-fn         (setup-fn config :fn/checker check-encrypted)
         checker-fn-w       (db/memoizer checker-fn checker-config)
         config             (assoc config :fn/checker checker-fn-w)
@@ -1305,38 +1422,31 @@
                              ([sid-db remote-ip t]
                               (update-active-fn config db sessions-table sid-db remote-ip t)))
         config             (assoc config :fn/update-active update-active-fn-w)
-        var-get-core-fn    (db/make-setting-getter  variables-table :session-id)
-        var-set-core-fn    (db/make-setting-setter  variables-table :session-id)
-        var-del-core-fn    (db/make-setting-deleter variables-table :session-id)
-        vars-del-user-fn   (setup-fn config :fn/vars-del-user delete-user-vars)
-        var-get-fn         (fn
-                             ([session-id setting-id]
-                              (var-get-core-fn db session-id setting-id))
-                             ([session-id setting-id & setting-ids]
-                              (apply var-get-core-fn db session-id setting-id setting-ids)))
-        var-set-fn         (fn
-                             ([session-id setting-id value]
-                              (var-set-core-fn db session-id setting-id value))
-                             ([session-id setting-id value & pairs]
-                              (apply var-set-core-fn db session-id setting-id value pairs)))
-        var-del-fn         (fn
-                             ([session-id]
-                              (var-del-core-fn db session-id))
-                             ([session-id setting-id]
-                              (var-del-core-fn db session-id setting-id))
-                             ([session-id setting-id & setting-ids]
-                              (apply var-del-core-fn db session-id setting-id setting-ids)))
+        var-get-fn         (db/make-setting-getter  variables-table :session-id)
+        var-put-fn         (db/make-setting-setter  variables-table :session-id)
+        var-del-fn         (db/make-setting-deleter variables-table :session-id)
+        vars-put-fn        #(apply var-put-fn %1 %2 %3)
+        vars-get-fn        #(apply var-get-fn %1 %2 %3)
+        vars-del-fn        #(apply var-del-fn %1 %2 %3)
+        vars-del-user-fn   (setup-fn config :fn/del-user-vars delete-user-vars)
+        vars-del-sess-fn   (setup-fn config :fn/del-sess-vars delete-session-vars)
         vars-del-user-fn-w #(vars-del-user-fn config db sessions-table variables-table %)
+        vars-del-sess-fn-w #(vars-del-sess-fn config db sessions-table variables-table %)
         config             (assoc config
-                                  :fn/var-get var-get-fn
-                                  :fn/var-set var-set-fn
-                                  :fn/var-del var-del-fn
-                                  :fn/vars-del-user vars-del-user-fn-w)
+                                  :fn/get-var       var-get-fn
+                                  :fn/get-vars      vars-get-fn
+                                  :fn/put-var       var-put-fn
+                                  :fn/put-vars      vars-put-fn
+                                  :fn/del-var       var-del-fn
+                                  :fn/del-vars      vars-del-fn
+                                  :fn/del-user-vars vars-del-user-fn-w
+                                  :fn/del-sess-vars vars-del-sess-fn-w)
         setter-fn          (setup-fn config :fn/setter set-session)
         setter-fn-w        #(setter-fn config db sessions-table %)
         config             (assoc config :fn/setter setter-fn-w)
-        pre-handler        #(handler config getter-fn-w checker-fn-w session-id-field session-key %1 %2)
+        pre-handler        #(handler config getter-fn-w checker-fn-w %1 %2)
         mem-handler        (db/memoizer pre-handler config)
+        handler-fn-w       #(if-some [^Session s (mem-handler %2 %3)] (qassoc s :control %1))
         invalidator-fn     (setup-invalidator pre-handler mem-handler)
         config             (assoc config :fn/invalidator invalidator-fn :fn/handler mem-handler)
         refresh-fn         #(refresh-times config last-active-fn-w invalidator-fn cache-expires %1 %2)
@@ -1347,7 +1457,23 @@
                                     setter-fn-w invalidator-fn var-del-fn vars-del-user-fn-w
                                     single-session? secured? session-id-field session-key
                                     %1 %2 %3)
-        config             (assoc config :fn/create create-fn)]
+        config             (assoc config :fn/create create-fn)
+        cfg                config
+        control            (reify SessionControl
+                             (^SessionConfig -config [_] config)
+                             (^Boolean -token-ok?  [_ plain enc]  (checker-fn-w plain enc))
+                             (^Session -from-db    [_ db-sid ip]  (getter-fn-w db-sid ip))
+                             (^Session -handle     [_ sid ip]     (handler-fn-w c sid ip))
+                             (^Object  -invalidate [_ sid ip]     (invalidator-fn sid ip))
+                             (^Object  -identify   [_ req]        (identifier-fn req))
+                             (^Object  -put-var    [_ db-sid k v] (var-put-fn db sid k v))
+                             (^Object  -put-vars   [_ db-sid kvs] (vars-put-fn db sid kvs))
+                             (^Object  -get-var    [_ db-sid k]   (var-get-fn db sid k))
+                             (^Object  -get-vars   [_ db-sid ks]  (vars-get-fn db sid ks))
+                             (^Object  -del-var    [_ db-sid k]   (var-del-fn db sid k))
+                             (^Object  -del-vars   [_ db-sid ks]  (var-del-fn db sid ks))
+                             (^Object  -del-svars  [_ db-sid]     (vars-del-sess-fn-w db-sid))
+                             (^Object  -del-uvars  [_ user-id]    (vars-del-user-fn-w user-id)))]
     (log/msg "Installing session handler:" k)
     (if dbname (log/msg "Using database" dbname "for storing sessions"))
     {:name    (keyword k)
