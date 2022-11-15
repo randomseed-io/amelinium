@@ -6,7 +6,7 @@
 
     amelinium.http.middleware.session
 
-  (:refer-clojure :exclude [parse-long uuid random-uuid])
+  (:refer-clojure :exclude [parse-long uuid random-uuid empty?])
 
   (:require [clojure.set                  :as        set]
             [clojure.string               :as        str]
@@ -90,15 +90,15 @@
 
   (-inject  ([dst smap] smap) ([dst smap _] smap))
 
-  (-not-empty?
+  (empty?
     (^Boolean [src]
-     (or (some? (.id     ^Session src))
-         (some? (.err-id ^Session src))
-         (some? (.error  ^Session src))))
+     (and (nil? (.id     ^Session src))
+          (nil? (.err-id ^Session src))
+          (nil? (.error  ^Session src))))
     (^Boolean [src _]
-     (or (some? (.id     ^Session src))
-         (some? (.err-id ^Session src))
-         (some? (.error  ^Session src)))))
+     (and (nil? (.id     ^Session src))
+          (nil? (.err-id ^Session src))
+          (nil? (.error  ^Session src)))))
 
   (-control
     (^SessionControl [src]   (.control ^Session src))
@@ -115,19 +115,19 @@
     (^Session [req]             (if-some [s (get req :session)] s))
     (^Session [req session-key] (if-some [s (get req (or session-key :session))] s)))
 
-  (-not-empty?
+  (empty?
     (^Boolean [req]
      (if-some [^Session s (p/session req :session)]
-       (not (and (nil? (.id     ^Session s))
-                 (nil? (.err-id ^Session s))
-                 (nil? (.error  ^Session s))))
-       false))
+       (and (nil? (.id     ^Session s))
+            (nil? (.err-id ^Session s))
+            (nil? (.error  ^Session s)))
+       true))
     (^Boolean [req session-key]
      (if-some [^Session s (p/session req session-key)]
-       (not (and (nil? (.id     ^Session s))
-                 (nil? (.err-id ^Session s))
-                 (nil? (.error  ^Session s))))
-       false)))
+       (and (nil? (.id     ^Session s))
+            (nil? (.err-id ^Session s))
+            (nil? (.error  ^Session s)))
+       true)))
 
   (-inject
     (^Session [dst smap]
@@ -164,9 +164,9 @@
     ([src] nil)
     ([src session-key] nil))
 
-  (-not-empty?
-    ([src] false)
-    ([src session-key] false))
+  (empty?
+    ([src] true)
+    ([src session-key] true))
 
   (-inject
     ([src smap] nil)
@@ -273,13 +273,21 @@
   (^Session [src] (p/session src))
   (^Session [src session-key] (p/session src session-key)))
 
+(defn empty?
+  "Returns `false` is `src` contains a session or is a session, and the session has
+  usable identifier set (`:id` or `:err-id` field is set) or has the `:error` field
+  set. Optional `session-key` can be given to express a key in associative
+  structure (defaults to `:session`)."
+  (^Boolean [src] (p/empty? src))
+  (^Boolean [src session-key] (p/empty? src session-key)))
+
 (defn not-empty?
   "Returns `true` is `src` contains a session or is a session, and the session has
   usable identifier set (`:id` or `:err-id` field is set) or has the `:error` field
   set. Optional `session-key` can be given to express a key in associative
   structure (defaults to `:session`)."
-  (^Boolean [src] (p/not-empty? src))
-  (^Boolean [src session-key] (p/not-empty? src session-key)))
+  (^Boolean [src] (not (p/empty? src)))
+  (^Boolean [src session-key] (not (p/empty? src session-key))))
 
 (defn inject
   "Returns an object updated with session record of type `Session` under an optional
@@ -289,17 +297,17 @@
   ([dst smap session-key] (p/inject dst smap session-key)))
 
 (defn not-empty-of
-  "Returns `true` is `src` contains a session or is a session, and the session has
+  "Returns a session if `src` contains a session or is a session, and the session has
   usable identifier set (`:id` or `:err-id` field is set) or has the `:error` field
   set. Optional `session-key` can be given to express a key in associative
   structure (defaults to `:session`). Returns `nil` if session is not usable (does
   not have `:id`, `:err-id` not `:error` set)."
-  (^Session [src]
+  (^Session [^Sessionable  src]
    (let [^Session s (p/session src)]
-     (if (p/not-empty? s) s)))
-  (^Session [src session-key]
+     (if-not (p/empty? s) s)))
+  (^Session [^Sessionable src session-key]
    (let [^Session s (p/session src session-key)]
-     (if (p/not-empty? s) s))))
+     (if-not (p/empty? s) s))))
 
 (defn control?
   ^Boolean [v]

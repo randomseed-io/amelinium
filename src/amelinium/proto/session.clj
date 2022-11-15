@@ -40,9 +40,9 @@
   provided and an optional `session-key` if session must be looked in an associative
   structure (defaults to `:session`).")
 
-  (not-empty?
+  (empty?
     [src] [src session-key]
-    "Returns `true` is `src` contains a session or is a session, and the session has
+    "Returns `false` is `src` contains a session or is a session, and the session has
   usable identifier set (`:id` or `:err-id` field is set) or has the `:error` field
   set. Optional `session-key` can be given to express a key in associative
   structure (defaults to `:session`).")
