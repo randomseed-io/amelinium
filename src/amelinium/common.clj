@@ -1353,58 +1353,6 @@
   [v]
   (session/get-variable-failed? v))
 
-(defn session-valid?
-  "Returns `true` if the given session exists and it is a valid session. Returns
-  `false` when the session is invalid. Returns `nil` when there is no session."
-  ([src session-key]
-   (session/valid? src session-key))
-  ([src]
-   (session/valid? src)))
-
-(defn session-invalid?
-  "Returns `true` if the given session does not exists or it is an invalid session."
-  ([src session-key]
-   (not (session/valid? src session-key)))
-  ([src]
-   (not (session/valid? src))))
-
-(defn session-error?
-  "Returns `true` when there is a session and it has an error. Returns `false` when
-  there is no error. Returns `nil` when there is no session."
-  ([src session-key]
-   (session/error? src session-key))
-  ([src]
-   (session/error? src)))
-
-(defn session-error
-  "Returns session error map or `nil` if there was no error or session does not exist."
-  ([src session-key]
-   (session/error src session-key))
-  ([src]
-   (session/error src)))
-
-(defn no-session?
-  "Returns `true` if the given session:
-   - does not exist, or
-   - exists but lacks both `:id` and `:err/id` and is not marked as erroneous.
-  Optional `session-error` argument can be given to speed up calculations (when it is
-  not `nil` and not `false` then `false` is to be returned, meaning there is a
-  session, even without any ID, but it has errors)."
-  ([smap]
-   (or (nil? smap)
-       (let [^Session smap (session/of smap)]
-         (not (or (.id     ^Session smap)
-                  (.err-id ^Session smap)
-                  (.error  ^Session smap))))))
-  ([smap session-error]
-   (if session-error
-     false
-     (or (nil? smap)
-         (let [^Session smap (session/of smap)]
-           (not (or (.id     ^Session smap)
-                    (.err-id ^Session smap)
-                    (.error  ^Session smap))))))))
-
 ;; Context and roles
 
 (defn roles-refresh

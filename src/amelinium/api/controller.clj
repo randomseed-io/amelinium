@@ -161,7 +161,7 @@
 
       ;; There is no session. Short-circuit.
 
-      (common/no-session? sess session-error)
+      (session/empty? sess)
       (-> req (cleanup-req @auth-state))
 
       ;; Account is manually hard-locked.
