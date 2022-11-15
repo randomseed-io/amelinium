@@ -662,8 +662,8 @@
         (not (sid-valid? any-sid))  {:cause    :session/malformed-session-id
                                      :reason   (str "Malformed session ID " @for-user)
                                      :severity :info}
-        (not user-ident)            {:cause    :session/unknown-id
-                                     :reason   (some-str-spc "Unknown session ID" sid @for-user)
+        (not user-ident)            {:cause    :session/unknown-user
+                                     :reason   (some-str-spc "Unknown user" sid @for-user)
                                      :severity :info}
         (not user-id)               {:cause    :session/malformed-user-id
                                      :reason   (str "User ID not found or malformed " @for-user)
