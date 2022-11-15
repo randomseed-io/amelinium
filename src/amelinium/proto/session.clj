@@ -4,7 +4,9 @@
       :author "Paweł Wilk"
       :added  "1.0.0"}
 
-    amelinium.proto.session)
+    amelinium.proto.session
+
+  (:refer-clojure :exclude [empty?]))
 
 (defprotocol SessionControl
   "This protocol promises access to session configuration data and basic actions which
