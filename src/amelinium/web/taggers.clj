@@ -209,7 +209,7 @@
          (let [args                  (map common/string-from-param (take 2 args))
                [param-id param-type] (coercion/split-error args)]
            (if (contains? fe param-id)
-             (let [translator-sub (translator-sub ctx translations-fn)
+             (let [translator-sub (i18n/no-default (translator-sub ctx translations-fn))
                    param-type     (or param-type (get fe param-id))
                    param-type     (if param-type (common/string-from-param param-type))
                    ptype-class    (if param-type (str " param-type-" param-type))
