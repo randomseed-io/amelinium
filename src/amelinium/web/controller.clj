@@ -464,7 +464,7 @@
                      (common/query-string-encode joint-params)))))
            ;; render a separate page describing invalid parameters
            ;; instead of current page
-           (let [translate-sub (common/translator-sub req)]
+           (let [translate-sub (i18n/no-default (common/translator-sub req))]
              (-> req
                  (map/assoc-missing :app/data common/empty-lazy-map)
                  (qassoc

@@ -305,7 +305,7 @@
     (case ctype
 
       :reitit.coercion/request-coercion
-      (let [tr-sub (common/translator-sub req)
+      (let [tr-sub (i18n/no-default (common/translator-sub req))
             errors (coercion/explain-errors data tr-sub)]
         (-> (api/assoc-body req :parameters/errors errors)
             (api/render-bad-params)
