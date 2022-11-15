@@ -1085,12 +1085,12 @@
 
 (defn invalidate-cache!
   "Invalidates cache for the specific session."
-  ([src]
+  ([^Sessionable src]
    (invalidate-cache! src :session nil))
-  ([src session-key]
+  ([^Sessionable src session-key]
    (invalidate-cache! src session-key nil))
-  ([src session-key remote-ip]
-   (if-some [^Session s (p/session src session-key)]
+  ([^Sessionable src session-key remote-ip]
+   (if-some [^Session smap (p/session src session-key)]
      (p/invalidate (.control  ^Session smap)
                    (p/identify ^Session smap)
                    (or remote-ip (.ip ^Session smap))))))
