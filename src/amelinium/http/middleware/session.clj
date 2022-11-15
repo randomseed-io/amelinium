@@ -1097,41 +1097,53 @@
 
 ;; Cache invalidation when time-sensitive value (last active time) exceeds TTL.
 
+(defn- refresh-times-core
+  [^Session smap ^SessionControl ctrl cache-expires remote-ip]
+  (or (if cache-expires
+        (if-some [last-active (.active ^Session smap)]
+          (let [inactive-for (t/between last-active (t/now))]
+            (when (t/> inactive-for cache-expires)
+              (let [new-active    (p/get-active ^SessionControl ctrl (db-sid-smap smap) remote-ip)
+                    ^Session smap (if new-active (map/qassoc smap :active new-active) smap)
+                    expired?      (p/expired? ^SessionControl ctrl (or new-active last-active))]
+                (p/invalidate ^SessionControl ctrl
+                              (or (.id ^Session smap) (.err-id ^Session smap))
+                              remote-ip)
+                (if expired?
+                  (mkbad smap :error (state smap remote-ip))
+                  smap))))))
+      smap))
+
 (defn refresh-times
-  "If the time left before expiry is smaller than the cache TTL then the session map
-  will be updated using a database query."
-  {:arglists '([src]
-               [src session-key]
-               [src remote-ip]
-               [src session-key remote-ip]
-               [src session-key ctrl remote-ip]
-               [src session-key ctrl cache-expires remote-ip])}
+  "Checks last active time. If the time left before expiry is smaller than the cache
+  TTL then the session map will be updated using a database query."
+  {:arglists '([^Sessionable src]
+               [^Sessionable src session-key]
+               [^Sessionable src remote-ip]
+               [^Sessionable src session-key remote-ip])}
   (^Session [^Sessionable src]
-   (refresh-times src :session nil nil nil))
+   (if-some [^Session smap (p/session src)]
+     (refresh-times-core smap
+                         (.control       ^Session smap)
+                         (.cache-expires ^Session smap)
+                         (.ip            ^Session smap))))
   (^Session [^Sessionable src session-key-or-ip]
    (if (session? src)
-     (refresh-times src nil nil nil session-key-or-ip)
-     (refresh-times src session-key-or-ip nil nil nil)))
+     (refresh-times-core src
+                         (.control       ^Session src)
+                         (.cache-expires ^Session src)
+                         session-key-or-ip)
+     (if-some [^Session smap (p/session src session-key-or-ip)]
+       (refresh-times-core smap
+                           (.control       ^Session smap)
+                           (.cache-expires ^Session smap)
+                           (.ip            ^Session smap)))))
   (^Session [^Sessionable src session-key remote-ip]
-   (refresh-times src session-key nil nil remote-ip))
-  (^Session [^Sessionable src session-key ^SessionControl ctrl remote-ip]
-   (refresh-times src session-key ctrl nil remote-ip))
-  (^Session [^Sessionable src session-key ^SessionControl ctrl cache-expires remote-ip]
    (if-some [^Session smap (p/session src session-key)]
-     (let [^SessionControl ctrl (or ctrl (.control ^Session smap))
-           cache-expires        (or cache-expires
-                                    (.cache-expires ^SessionConfig (p/config ^SessionControl ctrl)))]
-       (or (if cache-expires
-             (if-some [last-active (.active ^Session smap)]
-               (let [inactive-for (t/between last-active (t/now))]
-                 (if (t/> inactive-for cache-expires)
-                   (let [remote-ip (or remote-ip (.ip ^Session smap))]
-                     (if (pos-int? (p/set-active ^SessionControl ctrl (db-sid-smap smap) remote-ip))
-                       (map/qassoc smap :active last-active))
-                     (p/invalidate ^SessionControl ctrl (or (.id ^Session smap)
-                                                            (.err-id ^Session smap))
-                                   remote-ip))))))
-           smap)))))
+     (refresh-times-core smap
+                         (.control       ^Session smap)
+                         (.cache-expires ^Session smap)
+                         remote-ip))))
 
 ;; Session handling, creation and prolongation
 
