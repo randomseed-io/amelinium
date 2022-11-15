@@ -1148,24 +1148,21 @@
 ;; Session handling, creation and prolongation
 
 (defn handler
-  "Processes session information by taking configuration options, session ID string,
-  remote IP, request map and configuration options. It tries to get session ID string
-  from form parameters of the request map and if the string is valid obtains session
-  from a database using `getter-fn` (passing configuration options, database
-  connection, table, session ID and remote IP to the call). Control field will not be
-  set and it is the responsibility of a caller to update it afterwards when the
-  session control object (which implements `SessionControl`) was not passed as an
-  argument."
+  "Processes session information by taking session control object, configuration options,
+  session ID string, remote IP, request map and configuration options. It tries to
+  get the session data from a database (using the given session ID) to create a
+  session object which is then validated."
   (^Session [src sid remote-ip]
    (handler src :session sid remote-ip))
   (^Session [src session-key sid remote-ip]
-   (if-some [^SessionControl (p/control src session-key)]
-     (handler (p/config ctrl) #(p/from-db ctrl %1 %2) #(p/token-ok? ctrl %1 %2) sid remote-ip)))
-  (^Session [^SessionConfig opts getter-fn checker-fn sid remote-ip]
+   (if-some [^SessionControl ctrl (p/control src session-key)]
+     (let [^SessionConfig opts (p/config ^SessionControl ctrl)]
+       (handler ctrl (.session-key ^SessionConfig opts) (.id-field ^SessionConfig opts) sid remote-ip))))
+  (^Session [^SessionControl ctrl session-key id-field sid remote-ip]
    (let [[sid-db pass] (split-secure-sid sid)
          secure?       (some? (not-empty pass))
-         smap-db       (getter-fn sid-db remote-ip)
-         token-ok?     (checker-fn pass (get smap-db :secure-token))
+         smap-db       (p/from-db   ^SessionControl ctrl sid-db remote-ip)
+         token-ok?     (p/token-ok? ^SessionControl ctrl pass (get smap-db :secure-token))
          ^Session smap (map->Session (dissoc smap-db :secure-token))
          smap          (if secure? (map/qassoc smap :security-passed? token-ok?) smap)
          smap          (map/qassoc
@@ -1174,11 +1171,12 @@
                         :db-id       sid-db
                         :ip          (ip/to-address (.ip ^Session smap))
                         :secure?     secure?
-                        :session-key (or (.session-key ^SessionConfig opts) :session)
-                        :id-field    (or (.id-field    ^SessionConfig opts) "session-id"))
+                        :control     ctrl
+                        :session-key session-key
+                        :id-field    id-field)
          stat          (state smap remote-ip)]
      (if (get stat :cause)
-       (mkbad smap :error stat)
+       (mkbad  smap :error stat)
        (mkgood smap)))))
 
 (defn process
