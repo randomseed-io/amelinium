@@ -234,6 +234,10 @@
     (^Long [s db-sid ip]      (p/set-active (.control ^Session s) db-sid ip))
     (^Long [s db-sid ip t]    (p/set-active (.control ^Session s) db-sid ip t)))
 
+  (expired?      ^Boolean [s]     (p/expired?      (.control ^Session s) (.active ^Session s)))
+  (hard-expired? ^Boolean [s]     (p/hard-expired? (.control ^Session s) (.active ^Session s)))
+  (token-ok?     ^Boolean [s p e] (p/token-ok?     (.control ^Session s) p e))
+
   clojure.lang.Associative
 
   (config
@@ -554,33 +558,31 @@
   (^Boolean [t-start t-stop max-dur]
    (t/> (t/between t-start t-stop) max-dur)))
 
+(defn calc-expired-core
+  (^Boolean [exp last-active]
+   (time-exceeded? last-active (t/now) exp)))
+
 (defn calc-expired?
   (^Boolean [src session-key]
    (calc-expired? (p/session src session-key)))
   (^Boolean [src]
    (if-some [^Session smap (p/session src)]
-     (if-some [^SessionConfig cfg (config ^Session smap)]
-       (if-some [exp (.expires ^SessionConfig cfg)]
-         (and (pos-int? (time/seconds exp))
-              (time-exceeded? (.active ^Session smap) (t/now) exp)))))))
+     (p/expired? ^Session smap))))
 
 (defn calc-hard-expired?
   (^Boolean [src session-key]
    (calc-hard-expired? (p/session src session-key)))
   (^Boolean [src]
    (if-some [^Session smap (p/session src)]
-     (if-some [^SessionConfig cfg (config ^Session smap)]
-       (if-some [hexp (.hard-expires ^SessionConfig cfg)]
-         (and (pos-int? (time/seconds hexp))
-              (time-exceeded? (.active ^Session smap) (t/now) hexp)))))))
+     (p/hard-expired? ^Session smap))))
 
 (defn calc-soft-expired?
   (^Boolean [src session-key]
    (calc-soft-expired? (p/session src session-key)))
   (^Boolean [src]
    (if-some [^Session smap (p/session src)]
-     (and (calc-expired? ^Session smap)
-          (not (calc-hard-expired? ^Session smap))))))
+     (and (p/expired? ^Session smap)
+          (not (p/hard-expired? ^Session smap))))))
 
 (defn expired?
   ([src]
@@ -676,7 +678,7 @@
         (not (active-valid? smap))  {:cause    :session/bad-last-active-time
                                      :reason   (str "No last active time " @for-user)
                                      :severity :warn}
-        (calc-expired? smap)        {:cause    :session/expired
+        (p/expired? smap)           {:cause    :session/expired
                                      :reason   (str "Session expired " @for-user)
                                      :severity :info}
         (insecure? smap)            {:cause    :session/insecure
@@ -854,7 +856,7 @@
                              (and (= :session/bad-ip cause)
                                   (if-some [^SessionConfig cfg (config ^Session smap)]
                                     (.wrong-ip-expires ^SessionConfig cfg))))
-           hard-expired? (and expired? (calc-hard-expired? smap))
+           hard-expired? (and expired? (p/hard-expired? ^Session smap))
            err-id        (or (.id ^Session smap) (.err-id ^Session smap))
            err-map       (.error ^Session smap)]
        (if (get err-map :severity)
