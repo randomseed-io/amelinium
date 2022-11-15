@@ -244,13 +244,12 @@
     (^SessionConfig [src]             (p/config (p/session src)))
     (^SessionConfig [src session-key] (p/config (p/session src session-key))))
 
-  (-identify
-    (^String [req]
+  (identify
+    ([req]
      (or (p/identify (p/session req))
          (some-str (or (get-in req [:params :session-id])
                        (get-in req [:params "session-id"])))))
-
-    (^String [req session-key-or-req-path]
+    ([req session-key-or-req-path]
      (if (coll? session-key-or-req-path)
        (some-str (get-in req session-key-or-req-path))
        (p/identify (p/session req session-key-or-req-path)))))
@@ -770,12 +769,12 @@
   [path]
   (let [[a b c d & more] path]
     (case (count path)
-      0 (fn ^String [req] (if-some [p (get req :params)] (some-str (or (get p :session-id) (get p "session-id")))))
-      1 (fn ^String [req] (some-str (get req a)))
-      2 (fn ^String [req] (get (get req a) b))
-      3 (fn ^String [req] (get (get (get req a) b) c))
-      4 (fn ^String [req] (get (get (get (get req a) b) c) d))
-      (fn   ^String [req] (get-in req path)))))
+      0 (fn [req] (if-some [p (get req :params)] (some-str (or (get p :session-id) (get p "session-id")))))
+      1 (fn [req] (some-str (get req a)))
+      2 (fn [req] (some-str (get (get req a) b)))
+      3 (fn [req] (some-str (get (get (get req a) b) c)))
+      4 (fn [req] (some-str (get (get (get (get req a) b) c) d)))
+      (fn   [req] (some-str (get-in req path))))))
 
 ;; SQL defaults
 
