@@ -111,19 +111,30 @@
                            :banned    "Account Blocked"}
    :output                {:error "Invalid output data"}
    :parameters            {:error "Invalid parameters"}
-   :parameter             {:phone            "Phone number"
-                           :email            "E-mail address"
-                           :login            "Login"
-                           :password         "Password"
-                           :password-relaxed "Password"
-                           :name             "Name"
-                           :last-name        "Last name"
-                           :second-name      "Second name"
-                           :middle-name      "Middle name"
-                           :token            "Token"
-                           :session-id       "Session identifier"
-                           :language         "Language identifier"
-                           :lang             "Language identifier"}
+   :parameter             {:phone                 "Phone number"
+                           :email                 "E-mail address"
+                           :login                 "Login"
+                           :password              "Password"
+                           :password-relaxed      "Password"
+                           :name                  "Name"
+                           :first-name            "First name"
+                           :last-name             "Last name"
+                           :second-name           "Second name"
+                           :middle-name           "Middle name"
+                           :user.phone            :parameter/phone
+                           :user.email            :parameter/email
+                           :user.login            :parameter/login
+                           :user.password         :parameter/password
+                           :user.password-relaxed :parameter/password-relaxed
+                           :user.name             :parameter/name
+                           :user.first-name       :parameter/first-name
+                           :user.last-name        :parameter/last-name
+                           :user.second-name      :parameter/second-name
+                           :user.middle-name      :parameter/middle-name
+                           :token                 "Token"
+                           :session-id            "Session identifier"
+                           :language              "Language identifier"
+                           :lang                  "Language identifier"}
    :parameter-type        {:string            "String"
                            :integer           "Integer number"
                            :boolean           "Decision field"
@@ -147,21 +158,33 @@
                            :secure-session-id "Secure session ID should be a string consisting two hexadecimal numbers separated by hyphen."
                            :language          "Language ID should express a correct, supported language code."
                            :lang              "Language ID should express a correct, supported language code."}
-   :parameter-should      {:phone                     :type-should/phone
-                           :email                     :type-should/email
-                           :login                     "Login should be a valid e-mail address."
-                           :password                  :type-should/password
-                           :password-relaxed          :type-should/password-relaxed
-                           :password.password         "Password should have min. 8 characters, big and small letters, a digit and a special character."
-                           :password.password-relaxed "Password must be present."
-                           :name                      :type-should/name
-                           :last-name                 "Last name should consist of letters with optional hyphen and cannot have blanks (like space)."
-                           :second-name               "Second name should consist of letters with optional hyphen and cannot have blanks (like space)."
-                           :middle-name               "Middle name should consist of letters with optional hyphen and cannot have blanks (like space)."
-                           :token                     :type-should/token
-                           :session-id                :type-should/session-id
-                           :language                  :type-should/language
-                           :lang                      :type-should/language}
+   :parameter-should      {:phone                          :type-should/phone
+                           :email                          :type-should/email
+                           :login                          "Login should be a valid e-mail address."
+                           :password                       :type-should/password
+                           :password-relaxed               :type-should/password-relaxed
+                           :password.password              "Password should have min. 8 letters (big and small), a digit, and a special character."
+                           :password.password-relaxed      "Password must be present."
+                           :name                           :type-should/name
+                           :first-name                     :type-should/name
+                           :last-name                      "Last name should consist of letters with optional hyphen and without blanks (like space)."
+                           :second-name                    "Second name should consist of letters with optional hyphen and without blanks (like space)."
+                           :middle-name                    "Middle name should consist of letters with optional hyphen and without blanks (like space)."
+                           :user.phone                     :type-should/phone
+                           :user.email                     :type-should/email
+                           :user.login                     "Login should be a valid e-mail address."
+                           :user.password                  :type-should/password
+                           :user.password-relaxed          :type-should/password-relaxed
+                           :user.password.password         :parameter-should/password.password
+                           :user.password.password-relaxed :parameter-should/password.password-relaxed
+                           :user.name                      :type-should/name
+                           :user.first-name                :type-should/name
+                           :user.last-name                 :parameter-should/last-name
+                           :user.second-name               :parameter-should/second-name
+                           :user.middle-name               :parameter-should/middle-name
+                           :token                          :type-should/token
+                           :session-id                     :type-should/session-id
+                           :language                       :type-should/language
+                           :lang                           :type-should/language}
 
    :tongue/pluralizer amelinium.i18n.pluralizers/en}}}
-

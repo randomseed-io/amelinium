@@ -110,21 +110,32 @@
                            :user      "Użytkownik zalogowany"
                            :self      "Właściciel zasobu"
                            :banned    "Konto zablokowane"}
-   :output                {:error            "Błędne dane wyjściowe"}
-   :parameters            {:error            "Błędne parametry"}
-   :parameter             {:phone            "Numer telefoniczny"
-                           :email            "Adres e-mailowy"
-                           :login            "Login"
-                           :password         "Hasło"
-                           :password-relaxed "Hasło"
-                           :name             "Imię"
-                           :last-name        "Nazwisko"
-                           :second-name      "Drugie imię"
-                           :middle-name      "Drugie imię"
-                           :token            "Token"
-                           :session-id       "Identyfikator sesji"
-                           :language         "Identyfikator języka"
-                           :lang             "Identyfikator języka"}
+   :output                {:error "Błędne dane wyjściowe"}
+   :parameters            {:error "Błędne parametry"}
+   :parameter             {:phone                 "Numer telefoniczny"
+                           :email                 "Adres e-mailowy"
+                           :login                 "Login"
+                           :password              "Hasło"
+                           :password-relaxed      "Hasło"
+                           :name                  "Imię"
+                           :first-name            "Imię"
+                           :last-name             "Nazwisko"
+                           :second-name           "Drugie imię"
+                           :middle-name           "Drugie imię"
+                           :user.phone            :parameter/phone
+                           :user.email            :parameter/email
+                           :user.login            :parameter/login
+                           :user.password         :parameter/password
+                           :user.password-relaxed :parameter/password-relaxed
+                           :user.name             :parameter/name
+                           :user.first-name       :parameter/first-name
+                           :user.last-name        :parameter/last-name
+                           :user.second-name      :parameter/second-name
+                           :user.middle-name      :parameter/middle-name
+                           :token                 "Token"
+                           :session-id            "Identyfikator sesji"
+                           :language              "Identyfikator języka"
+                           :lang                  "Identyfikator języka"}
    :parameter-type        {:string            "Napis tekstowy"
                            :integer           "Liczba"
                            :boolean           "Pole decyzji"
@@ -146,20 +157,33 @@
                            :session-id        "Identyfikator sesji powinien być jednym lub dwoma łańcuchami znakowymi w zapisie szesnastkowym."
                            :secure-session-id "Bezpieczny identyfikator sesji powinien być jedną lub dwoma liczbami szesnastkowymi oddzielonymi dywizem."
                            :language          "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."}
-   :parameter-should      {:phone                     :type-should/phone
-                           :email                     :type-should/email
-                           :login                     "Login powinien być poprawnym adresem e-mailowym."
-                           :password                  :type-should/password
-                           :password-relaxed          :type-should/password-relaxed
-                           :password.password         "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
-                           :password.password-relaxed "Należy podać hasło."
-                           :name                      :type-should/name
-                           :last-name                 "Nazwisko może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
-                           :second-name               "Drugie imię może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
-                           :middle-name               "Drugie imię może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
-                           :token                     :type-should/token
-                           :session-id                :type-should/session-id
-                           :language                  :type-should/language
-                           :lang                      :type-should/language}
+   :parameter-should      {:phone                          :type-should/phone
+                           :email                          :type-should/email
+                           :login                          "Login powinien być poprawnym adresem e-mailowym."
+                           :password                       :type-should/password
+                           :password-relaxed               :type-should/password-relaxed
+                           :password.password              "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
+                           :password.password-relaxed      "Należy podać hasło."
+                           :name                           :type-should/name
+                           :first-name                     :type-should/name
+                           :last-name                      "Nazwisko może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
+                           :second-name                    "Drugie imię może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
+                           :middle-name                    "Drugie imię może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
+                           :user.phone                     :type-should/phone
+                           :user.email                     :type-should/email
+                           :user.login                     :parameter-should/login
+                           :user.password                  :type-should/password
+                           :user.password-relaxed          :type-should/password-relaxed
+                           :user.password.password         :parameter-should/password.password
+                           :user.password.password-relaxed :parameter-should/password.password-relaxed
+                           :user.name                      :type-should/name
+                           :user.first-name                :type-should/name
+                           :user.last-name                 :parameter-should/last-name
+                           :user.second-name               :parameter-should/second-name
+                           :user.middle-name               :parameter-should/middle-name
+                           :token                          :type-should/token
+                           :session-id                     :type-should/session-id
+                           :language                       :type-should/language
+                           :lang                           :type-should/language}
 
    :tongue/pluralizer amelinium.i18n.pluralizers/pl}}}
