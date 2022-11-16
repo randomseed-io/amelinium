@@ -1140,47 +1140,46 @@
        (mkgood smap)))))
 
 (defn process
-  "Takes a session control object and a request map, and validates session against a
-  database or memoized session data. Returns a session map."
-  ([^SessionControl ctrl ^clojure.lang.Associative req]
-   (if-some [^String sid (p/identify ^SessionControl ctrl req)]
-     (let [^SessionConfig opts (p/config ^SessionControl ctrl)]
-       (if-not (sid-valid? sid)
-         (mkbad (Session. sid nil nil nil nil nil nil nil nil
-                          false false false false false
-                          (or (.session-key      ^SessionConfig opts) :session)
-                          (or (.session-id-field ^SessionConfig opts) "session-id")
-                          {:reason   "Malformed session-id parameter"
-                           :cause    :session/malformed-session-id
-                           :severity :info}
-                          ctrl))
-         (let [remote-ip     (get req :remote-ip)
-               ^Session smap (p/handle ^SessionControl ctrl sid remote-ip)]
-           (if-not (valid? smap)
-             smap
-             (let [cache-expires (.cache-expires ^SessionConfig opts)
-                   ^Session smap (if cache-expires
-                                   (refresh-times ^Session smap nil ^SessionControl ctrl remote-ip)
-                                   smap)]
-               (if (and cache-expires (not (valid? smap)))
-                 smap
-                 (if (pos-int? (p/set-active ^SessionControl ctrl (db-sid-smap smap) remote-ip))
-                   (mkgood smap)
-                   (mkbad smap
-                          :error {:severity :error
-                                  :cause    :session/db-problem
-                                  :reason   (some-str-spc
-                                             "Problem updating session data"
-                                             (log/for-user
-                                              (.user-id    ^Session smap)
-                                              (.user-email ^Session smap)
-                                              (or (ip/plain-ip-str (ip/to-address (.ip ^Session smap)))
-                                                  (get req :remote-ip/str))))}))))))))
-     (Session. nil nil nil nil nil nil nil nil nil
-               false false false false false
-               (or (.session-key      ^SessionConfig opts) :session)
-               (or (.session-id-field ^SessionConfig opts) "session-id")
-               nil ctrl))))
+  "Takes a session control object, functions, settings and a request map, and validates
+  session against a database or memoized session data. Returns a session map or dummy
+  session map if session was not obtained (session ID was not found in a database)."
+  [ctrl identifier-fn handler-fn update-active-fn
+   cache-expires session-key id-field req]
+  (if-some [sid (identifier-fn req)]
+    (if-not (sid-valid? sid)
+      (mkbad (Session. sid nil nil nil nil nil nil nil nil
+                       false false false false false
+                       session-key id-field
+                       {:reason   "Malformed session-id parameter"
+                        :cause    :session/malformed-session-id
+                        :severity :info}
+                       ctrl))
+      (let [remote-ip (ip/to-address (get req :remote-ip))
+            smap      (handler-fn ^SessionControl ctrl sid remote-ip)]
+        (if-not (valid? smap)
+          smap
+          (let [^Session smap (refresh-times-core ^Session smap
+                                                  ^SessionControl ctrl
+                                                  cache-expires
+                                                  remote-ip)]
+            (if-not (valid? smap)
+              smap
+              (if (pos-int? (update-active-fn (db-sid-smap smap) remote-ip))
+                (mkgood smap)
+                (mkbad smap
+                       :error {:severity :error
+                               :cause    :session/db-problem
+                               :reason   (some-str-spc
+                                          "Problem updating session data"
+                                          (log/for-user
+                                           (.user-id    ^Session smap)
+                                           (.user-email ^Session smap)
+                                           (or (ip/plain-ip-str (ip/to-address (.ip ^Session smap)))
+                                               (get req :remote-ip/str))))})))))))
+    (Session. nil nil nil nil nil nil nil nil nil
+              false false false false false
+              session-key id-field
+              nil ctrl)))
 
 (defn prolong
   "Re-validates session by updating its timestamp and re-running validation."
