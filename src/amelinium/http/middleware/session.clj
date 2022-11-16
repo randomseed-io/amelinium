@@ -1183,36 +1183,27 @@
 
 (defn prolong
   "Re-validates session by updating its timestamp and re-running validation."
-  {:arglists '([req]
-               [req session-key]
-               [smap ip-address]
-               [opts handler-fn update-active-fn invalidator-fn smap ip-address])}
-  ([req-or-smap]
-   (if (session? req-or-smap)
-     (prolong req-or-smap )
-     (prolong req-or-smap :session)))
-  ([req-or-smap session-key-or-ip]
-   (if (session? req-or-smap)
-     (if-some [prolonger (get (.config ^Session req-or-smap) :fn/prolong)]
-       (prolonger req-or-smap session-key-or-ip))
-     (if-some [^Session smap (p/session req-or-smap session-key-or-ip)]
-       (if-some [prolonger (get (.config ^Session smap) :fn/prolong)]
-         (prolonger smap (get req-or-smap :ip-address))))))
-  ([opts handler-fn update-active-fn invalidator-fn smap ip-address]
-   (if-some [^Session smap (p/session smap)]
+  ([src]
+   (prolong src nil nil))
+  ([src ip-address]
+   (prolong src nil ip-address))
+  ([src session-key ip-address]
+   (if-some [^Session smap (p/session src session-key)]
      (if-some [sid (or (.err-id ^Session smap) (.id ^Session smap))]
-       (let [ip-address (ip/to-address ip-address)
-             ipplain    (ip/plain-ip-str ip-address)
-             new-time   (t/now)
-             sid-db     (or (db-sid-smap smap) (db-sid-str sid))]
+       (let [^SessionControl ctrl (.control ^Session smap)
+             ip-address           (ip/to-address (or ip-address (.ip ^Session smap)))
+             ipplain              (ip/plain-ip-str ip-address)
+             new-time             (t/now)
+             db-sid               (or (db-sid-smap smap) (db-sid-str sid))]
          (log/msg "Prolonging session" (log/for-user (.user-id ^Session smap) (.user-email ^Session smap) ipplain))
          (let [test-smap (map/qassoc smap :id sid :active new-time)
                stat      (state test-smap ip-address)]
-           (invalidator-fn sid ip-address)
            (if (correct? (get stat :cause))
-             (do (update-active-fn sid-db ip-address (t/instant new-time))
-                 (map/qassoc (handler-fn sid ip-address) :config opts :prolonged? true))
-             (do (log/wrn "Session re-validation error" (log/for-user (:user-id smap) (:user-email smap) ipplain))
+             (do (p/set-active ^SessionControl ctrl db-sid ip-address new-time)
+                 (p/invalidate ^SessionControl ctrl sid ip-address)
+                 (map/qassoc (p/handle ^SessionControl ctrl sid ip-address) :prolonged? true))
+             (do (log/wrn "Session re-validation error"
+                          (log/for-user (.user-id ^Session smap) (.user-email ^Session smap) ipplain))
                  (mkbad smap :error stat)))))))))
 
 (defn create
@@ -1223,22 +1214,20 @@
          user-email           (some-str user-email)
          ids?                 (and user-id user-email)]
      (cond
-
        (not ctrl) (do (log/err "Session control object was not found.") nil)
        (not ids?) (do (if-not user-id    (log/err "No user ID given when creating a session"))
-                      (if-not user-email (log/err "No user e-mail given when creating a session"))
-                      nil)
+                      (if-not user-email (log/err "No user e-mail given when creating a session")) nil)
        :ok
        (let [t                   (t/now)
              ip                  (ip/to-address ip-address)
              ipplain             (ip/plain-ip-str ip)
              ^SessionConfig opts (p/config ^SessionControl ctrl)
-             single-session?     (.single-session  ^SessionConfig opts)
              secured?            (.secured?        ^SessionConfig opts)
              id-field            (or (.id-field    ^SessionConfig opts) "session-id")
              skey                (or (.session-key ^SessionConfig opts) :session)
              ^Session sess       (Session. nil nil nil nil user-id user-email t t ip
-                                           false false false false false skey id-field ctrl)
+                                           false false false false false
+                                           skey id-field nil ctrl)
              sess                (gen-session-id sess secured? user-id ipplain)
              stat                (state sess ip)]
          (log/msg "Opening session" (log/for-user user-id user-email ipplain))
@@ -1249,7 +1238,7 @@
                  sess          (map/qassoc sess :db-token nil)]
              (p/invalidate ^SessionControl ctrl (p/identify ^Session sess) ip)
              (if (pos-int? updated-count)
-               (do (if single-session?
+               (do (if (.single-session? ^SessionConfig opts)
                      (p/del-uvars ^SessionControl ctrl user-id)
                      (p/del-svars ^SessionControl ctrl (db-sid-smap sess)))
                    (mkgood sess))
