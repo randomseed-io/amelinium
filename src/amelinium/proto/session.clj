@@ -6,7 +6,7 @@
 
     amelinium.proto.session
 
-  (:refer-clojure :exclude [empty?]))
+  (:refer-clojure :exclude [empty empty?]))
 
 (defprotocol SessionControl
   "This protocol promises access to session configuration data and basic actions which
@@ -15,6 +15,7 @@
   should later be reified, after settings are parsed, and the anonymous object with
   implementations should be stored in all created `Session` records, in their
   `:control` fields."
+  (empty         [c] [c s-k]                    "Returns an empty session with the `:control` field populated.")
   (config        [c] [c s-k]                    "Gets a session configuration settings.")
   (expired?      [c] [c t]                      "Returns `true` if expiration time was exceeded for `t`.")
   (hard-expired? [c] [c t]                      "Returns `true` if hard-expiration time was exceeded for `t`.")
