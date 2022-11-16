@@ -58,25 +58,30 @@
   ^Boolean [v]
   (instance? SessionConfig v))
 
+(defrecord SessionError
+    [^clojure.lang.Keyword severity
+     ^clojure.lang.Keyword  id
+     ^String                cause])
+
 (defrecord Session
-    [^String                        id
-     ^String                        err-id
-     ^String                        db-id
-     ^String                        db-token
-     ^Long                          user-id
-     ^String                        user-email
-     ^Instant                       created
-     ^Instant                       active
-     ^IPAddress                     ip
-     ^Boolean                       valid?
-     ^Boolean                       expired?
-     ^Boolean                       hard-expired?
-     ^Boolean                       secure?
-     ^Boolean                       security-passed?
-     ^String                        session-key
-     ^Object                        id-field
-     ^clojure.lang.IPersistentMap   error
-     ^SessionControl                control])
+    [^String         id
+     ^String         err-id
+     ^String         db-id
+     ^String         db-token
+     ^Long           user-id
+     ^String         user-email
+     ^Instant        created
+     ^Instant        active
+     ^IPAddress      ip
+     ^Boolean        valid?
+     ^Boolean        expired?
+     ^Boolean        hard-expired?
+     ^Boolean        secure?
+     ^Boolean        security-passed?
+     ^String         session-key
+     ^Object         id-field
+     ^SessionError   error
+     ^SessionControl control])
 
 (defn session?
   ^Boolean [v]
@@ -204,8 +209,8 @@
     (^Long    [s _]           (p/to-db (.control ^Session s) s)))
 
   (identify
-    ([s]                      (or (.id ^Session s) (.err-id ^Session s)))
-    ([s req]                  (or (.id ^Session s) (.err-id ^Session s)
+    (^String [s]              (or (.id ^Session s) (.err-id ^Session s)))
+    (^String [s req]          (or (.id ^Session s) (.err-id ^Session s)
                                   (p/identify (.control ^Session s) req))))
 
   (from-db
@@ -245,11 +250,11 @@
     (^SessionConfig [src session-key] (p/config (p/session src session-key))))
 
   (identify
-    ([req]
+    (^String [req]
      (or (p/identify (p/session req))
          (some-str (or (get-in req [:params :session-id])
                        (get-in req [:params "session-id"])))))
-    ([req session-key-or-req-path]
+    (^String [req session-key-or-req-path]
      (if (coll? session-key-or-req-path)
        (some-str (get-in req session-key-or-req-path))
        (p/identify (p/session req session-key-or-req-path)))))
@@ -526,22 +531,20 @@
        (if-some [remote-ip (ip/to-address remote-ip)]
          (if-not (or (= (ip/to-v6 remote-ip) (ip/to-v6 session-ip))
                      (= (ip/to-v4 remote-ip) (ip/to-v4 session-ip)))
-           {:cause    :session/bad-ip
-            :reason   (str-spc "Session IP address" (str "(" (ip/plain-ip-str session-ip) ")")
-                               "is different than the remote IP address"
-                               (str "(" (ip/plain-ip-str remote-ip) ")")
-                               (log/for-user user-id user-email))
-            :severity :warn})
+           (SessionError. :warn :session/bad-ip
+                          (str-spc "Session IP address" (str "(" (ip/plain-ip-str session-ip) ")")
+                                   "is different than the remote IP address"
+                                   (str "(" (ip/plain-ip-str remote-ip) ")")
+                                   (log/for-user user-id user-email))))
          (if-some [str-addr (ip/to-str remote-ip)]
            (if-not (or (= str-addr (ip/to-str session-ip))
                        (= str-addr (ip/to-str (ip/to-v4 session-ip)))
                        (= str-addr (ip/to-str (ip/to-v6 session-ip))))
-             {:cause    :session/bad-ip
-              :reason   (str-spc "Session IP string" (str "(" (ip/to-str remote-ip) ")")
-                                 "is different than the remote IP string"
-                                 (str "(" str-addr ")")
-                                 (log/for-user user-id user-email))
-              :severity :warn})))))))
+             (SessionError. :warn :session/bad-ip
+                            (str-spc "Session IP string" (str "(" (ip/to-str remote-ip) ")")
+                                     "is different than the remote IP string"
+                                     (str "(" str-addr ")")
+                                     (log/for-user user-id user-email))))))))))
 
 (defn same-ip?
   (^Boolean [state-result]
@@ -638,9 +641,7 @@
   of type `Session`."
   [smap ip-address]
   (if-not (session? smap)
-    {:cause    :session/missing
-     :reason   (str-spc "No session:" smap)
-     :severity :info}
+    (SessionError. :info :session/missing (str-spc "No session:" smap))
     (let [^Session smap smap
           sid           (.id         ^Session smap)
           esid          (.err-id     ^Session smap)
@@ -653,50 +654,39 @@
           for-user      (delay (log/for-user user-id user-email
                                              (ip/plain-ip-str ip-address)))]
       (cond
-        (not any-sid)               {:cause    :session/no-id
-                                     :reason   (some-str-spc "No session ID" @for-user)
-                                     :severity :info}
-        (not (sid-valid? any-sid))  {:cause    :session/malformed-session-id
-                                     :reason   (str "Malformed session ID " @for-user)
-                                     :severity :info}
-        (not user-ident)            {:cause    :session/unknown-id
-                                     :reason   (some-str-spc "Unknown session ID" any-sid @for-user)
-                                     :severity :info}
-        (not sid)                   {:cause    :session/unknown-id
-                                     :reason   (some-str-spc "Unknown session ID" esid @for-user)
-                                     :severity :info}
-        (not user-id)               {:cause    :session/malformed-user-id
-                                     :reason   (str "User ID not found or malformed " @for-user)
-                                     :severity :info}
-        (not user-email)            {:cause    :session/malformed-user-email
-                                     :reason   (str "User e-mail not found or malformed " @for-user)
-                                     :severity :info}
-        (not (created-valid? smap)) {:cause    :session/bad-creation-time
-                                     :reason   (str "No creation time " @for-user)
-                                     :severity :warn}
-        (not (active-valid? smap))  {:cause    :session/bad-last-active-time
-                                     :reason   (str "No last active time " @for-user)
-                                     :severity :warn}
-        (p/expired? smap)           {:cause    :session/expired
-                                     :reason   (str "Session expired " @for-user)
-                                     :severity :info}
-        (insecure? smap)            {:cause    :session/insecure
-                                     :reason   (str "Session not secured with encrypted token " @for-user)
-                                     :severity :warn}
-        (security-failed? smap)     {:cause    :session/bad-security-token
-                                     :reason   (str "Bad session security token " @for-user)
-                                     :severity :warn}
+        (not any-sid)               (SessionError. :info :session/no-id
+                                                   (some-str-spc "No session ID" @for-user))
+        (not (sid-valid? any-sid))  (SessionError. :info :session/malformed-session-id
+                                                   (str "Malformed session ID " @for-user))
+        (not user-ident)            (SessionError. :info :session/unknown-id
+                                                   (some-str-spc "Unknown session ID" any-sid @for-user))
+        (not sid)                   (SessionError. :info :session/unknown-id
+                                                   (some-str-spc "Unknown session ID" esid @for-user))
+        (not user-id)               (SessionError. :info :session/malformed-user-id
+                                                   (str "User ID not found or malformed " @for-user))
+        (not user-email)            (SessionError. :info :session/malformed-user-email
+                                                   (str "User e-mail not found or malformed " @for-user))
+        (not (created-valid? smap)) (SessionError. :warn :session/bad-creation-time
+                                                   (str "No creation time " @for-user))
+        (not (active-valid? smap))  (SessionError. :warn :session/bad-last-active-time
+                                                   (str "No last active time " @for-user))
+        (p/expired? smap)           (SessionError. :info :session/expired
+                                                   (str "Session expired " @for-user))
+        (insecure? smap)            (SessionError. :warn :session/insecure
+                                                   (str "Session not secured with encrypted token " @for-user))
+        (security-failed? smap)     (SessionError. :warn :session/bad-security-token
+                                                   (str "Bad session security token " @for-user))
         :ip-address-check           (ip-state smap user-id user-email ip-address)))))
 
-(defn correct?
+(defn correct-state?
   "Returns `true` if a session exists and its state is correct. Never throws an
   exception."
   (^Boolean [state-result]
-   (nil? state-result))
+   (not (instance? SessionError state-result)))
   (^Boolean [src ip-address]
-   (nil? (state (try (p/session src) (catch Throwable _ nil)) ip-address)))
+   (not (instance? SessionError (state (try (p/session src) (catch Throwable _ nil)) ip-address))))
   (^Boolean [src session-key ip-address]
-   (nil? (state (try (p/session src session-key) (catch Throwable _ nil)) ip-address))))
+   (not (instance? SessionError (state (try (p/session src session-key) (catch Throwable _ nil)) ip-address)))))
 
 (defn valid?
   "Returns `true` if a session is marked as valid."
@@ -769,12 +759,12 @@
   [path]
   (let [[a b c d & more] path]
     (case (count path)
-      0 (fn [req] (if-some [p (get req :params)] (some-str (or (get p :session-id) (get p "session-id")))))
-      1 (fn [req] (some-str (get req a)))
-      2 (fn [req] (some-str (get (get req a) b)))
-      3 (fn [req] (some-str (get (get (get req a) b) c)))
-      4 (fn [req] (some-str (get (get (get (get req a) b) c) d)))
-      (fn   [req] (some-str (get-in req path))))))
+      0 (fn ^String [req] (if-some [p (get req :params)] (some-str (or (get p :session-id) (get p "session-id")))))
+      1 (fn ^String [req] (some-str (get req a)))
+      2 (fn ^String [req] (some-str (get (get req a) b)))
+      3 (fn ^String [req] (some-str (get (get (get req a) b) c)))
+      4 (fn ^String [req] (some-str (get (get (get (get req a) b) c) d)))
+      (fn   ^String [req] (some-str (get-in req path))))))
 
 ;; SQL defaults
 
@@ -850,28 +840,38 @@
    (mkbad (map/qassoc smap k v)))
   ([^Session smap]
    (if-some [^Session smap (p/session smap)]
-     (let [cause         (get (.error ^Session smap) :cause)
-           expired?      (or (= :session/expired cause)
-                             (and (= :session/bad-ip cause)
-                                  (if-some [^SessionConfig cfg (config ^Session smap)]
-                                    (.wrong-ip-expires ^SessionConfig cfg))))
-           hard-expired? (and expired? (p/hard-expired? ^Session smap))
-           err-id        (or (.id ^Session smap) (.err-id ^Session smap))
-           err-map       (.error ^Session smap)]
-       (if (get err-map :severity)
-         (map/qassoc smap
-                     :valid?        false
-                     :err-id        err-id
-                     :expired?      expired?
-                     :hard-expired? hard-expired?
-                     :id            nil)
-         (map/qassoc smap
-                     :valid?        false
-                     :err-id        err-id
-                     :error         (map/qassoc err-map :severity :warn)
-                     :expired?      expired?
-                     :hard-expired? hard-expired?
-                     :id            nil))))))
+     (let [^SessionError e (.error ^Session smap)
+           have-error?     (instance? SessionError e)
+           id              (.id ^SessionError e)
+           id?             (some? id)
+           expired?        (and id?
+                                (or (= :session/expired id)
+                                    (and (= :session/bad-ip id)
+                                         (if-some [^SessionConfig cfg (config ^Session smap)]
+                                           (.wrong-ip-expires ^SessionConfig cfg)))))
+           h-expired?      (and expired? (p/hard-expired? ^Session smap))
+           err-id          (or (.id ^Session smap) (.err-id ^Session smap))
+           ^SessionError e (if have-error?
+                             (let [cause?           (some? (.cause ^SessionError e))
+                                   ^SessionError er (if (some? (.severity ^SessionError e)) e
+                                                        (map/qassoc e :severity :warn))]
+                               (if id?
+                                 (if cause?
+                                   er
+                                   (if (= id :session/unknown-error)
+                                     (map/qassoc er :cause "Unknown session error")
+                                     er))
+                                 (if cause?
+                                   (map/qassoc er :id :session/unknown-error)
+                                   (map/qassoc er :id :session/unknown-error :cause "Unknown session error"))))
+                             (SessionError. :warn :session/unknown-error "Unknown session error"))]
+       (map/qassoc smap
+                   :error         e
+                   :valid?        false
+                   :err-id        err-id
+                   :expired?      expired?
+                   :hard-expired? h-expired?
+                   :id            nil)))))
 
 ;; Session variables
 
@@ -1135,9 +1135,13 @@
                         :session-key session-key
                         :id-field    id-field)
          stat          (state smap remote-ip)]
-     (if (get stat :cause)
+     (if (instance? SessionError stat)
        (mkbad  smap :error stat)
        (mkgood smap)))))
+
+(def ^SessionError malformed-id
+  (SessionError. :info :session/malformed-session-id
+                 "Malformed session-id parameter"))
 
 (defn process
   "Takes a session control object, functions, settings and a request map, and validates
@@ -1150,9 +1154,7 @@
       (mkbad (Session. sid nil nil nil nil nil nil nil nil
                        false false false false false
                        session-key id-field
-                       {:reason   "Malformed session-id parameter"
-                        :cause    :session/malformed-session-id
-                        :severity :info}
+                       malformed-id
                        ctrl))
       (let [remote-ip (ip/to-address (get req :remote-ip))
             smap      (handler-fn ^SessionControl ctrl sid remote-ip)]
@@ -1167,15 +1169,14 @@
               (if (pos-int? (update-active-fn (db-sid-smap smap) remote-ip))
                 (mkgood smap)
                 (mkbad smap
-                       :error {:severity :error
-                               :cause    :session/db-problem
-                               :reason   (some-str-spc
-                                          "Problem updating session data"
-                                          (log/for-user
-                                           (.user-id    ^Session smap)
-                                           (.user-email ^Session smap)
-                                           (or (ip/plain-ip-str (ip/to-address (.ip ^Session smap)))
-                                               (get req :remote-ip/str))))})))))))
+                       :error (SessionError. :error :session/db-problem
+                                             (some-str-spc
+                                              "Problem updating session data"
+                                              (log/for-user
+                                               (.user-id    ^Session smap)
+                                               (.user-email ^Session smap)
+                                               (or (ip/plain-ip-str (ip/to-address (.ip ^Session smap)))
+                                                   (get req :remote-ip/str))))))))))))
     (Session. nil nil nil nil nil nil nil nil nil
               false false false false false
               session-key id-field
@@ -1198,7 +1199,7 @@
          (log/msg "Prolonging session" (log/for-user (.user-id ^Session smap) (.user-email ^Session smap) ipplain))
          (let [test-smap (map/qassoc smap :id sid :active new-time)
                stat      (state test-smap ip-address)]
-           (if (correct? (get stat :cause))
+           (if (correct-state? stat)
              (do (p/set-active ^SessionControl ctrl db-sid ip-address new-time)
                  (p/invalidate ^SessionControl ctrl sid ip-address)
                  (map/qassoc (p/handle ^SessionControl ctrl sid ip-address) :prolonged? true))
@@ -1231,7 +1232,7 @@
              sess                (gen-session-id sess secured? user-id ipplain)
              stat                (state sess ip)]
          (log/msg "Opening session" (log/for-user user-id user-email ipplain))
-         (if-not (correct? (get stat :cause))
+         (if-not (correct-state? stat)
            (do (log/err "Session incorrect after creation" (log/for-user user-id user-email ipplain))
                (mkbad sess :error stat))
            (let [updated-count (p/to-db ^SessionControl ctrl ^Session sess)
@@ -1244,10 +1245,9 @@
                    (mkgood sess))
                (do (log/err "Problem saving session" (log/for-user user-id user-email ipplain))
                    (mkbad sess
-                          :error  {:reason   (str "Session cannot be saved"
-                                                  (log/for-user user-id user-email ipplain))
-                                   :cause    :session/db-problem
-                                   :severity :error}))))))))))
+                          :error (SessionError. :error :session/db-problem
+                                                (str "Session cannot be saved"
+                                                     (log/for-user user-id user-email ipplain)))))))))))))
 
 ;; Initialization
 
@@ -1372,7 +1372,7 @@
                                   (set-active    ^Long    [_ db-sid ip]   (update-active-fn-w db-sid ip))
                                   (set-active    ^Long    [_ db-sid ip t] (update-active-fn-w db-sid ip t))
                                   (get-active    ^Instant [_ db-sid ip]   (last-active-fn-w db-sid ip))
-                                  (identify      [_ req]        (identifier-fn req))
+                                  (identify      ^String  [_ req]         (identifier-fn req))
                                   (invalidate    [c sid ip]     (invalidator-fn c sid ip))
                                   (put-var       [_ db-sid k v] (var-put-fn  db db-sid k v))
                                   (get-var       [_ db-sid k]   (var-get-fn  db db-sid k))

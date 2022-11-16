@@ -342,8 +342,8 @@
                             :op      :session
                             :ok?     false
                             :level   (:severity sess-err)
-                            :msg     (:reason   sess-err "Unknown error"))
-              (log/log (:severity sess-err :warn) (:reason sess-err "Unknown error")))))
+                            :msg     (:cause    sess-err "Unknown session error"))
+              (log/log (:severity sess-err :warn) (:cause sess-err "Unknown session error")))))
 
         ;; Remove goto session variable as we already injected it into a response.
         ;; Remove goto session variable if it seems broken.

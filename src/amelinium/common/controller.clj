@@ -208,11 +208,11 @@
                             (if-not (session/valid? sess)
 
                               (let [e (session/error sess)
-                                    r (:reason   e)
+                                    c (:cause    e)
                                     s (:severity e)]
-                                (when r
-                                  (log/log (or s :warn) r)
-                                  (oplog-fn :level s :user-id user-id :op :session :ok? false :msg r))
+                                (when c
+                                  (log/log (or s :warn) c)
+                                  (oplog-fn :level s :user-id user-id :op :session :ok? false :msg c))
                                 (qassoc req :user/authenticated? false :user/authorized? false
                                         :auth/ok? false :response/status :auth/session-error))
 

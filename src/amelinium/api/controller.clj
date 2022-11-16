@@ -188,8 +188,8 @@
             expired?      (session/expired?   sess)
             user-id       (session/user-id    sess)
             email         (session/user-email sess)
-            reason        (get session-error :reason)
-            cause         (get session-error :cause)
+            error-id      (get session-error :id)
+            error-cause   (get session-error :cause)
             ip-addr       (:remote-ip/str req)
             for-user      (log/for-user user-id email ip-addr)
             for-mail      (log/for-user nil email ip-addr)
@@ -206,18 +206,18 @@
                          :ok?     false
                          :msg     (str "Expired " for-mail)))
           ;; Session invalid in another way.
-          (when (some? cause)
+          (when (some? error-id)
             (api/oplog req
                        :user-id user-id
                        :op      :session
                        :ok?     false
                        :level   (:severity session-error)
-                       :msg     reason)
-            (log/log (:severity session-error :warn) reason)))
+                       :msg     error-cause)
+            (log/log (:severity session-error :warn) error-cause)))
 
         ;; Generate a response describing an invalid session.
         (-> req
-            (api/add-missing-sub-status cause :session-status :response/body translate-sub)
+            (api/add-missing-sub-status error-id :session-status :response/body translate-sub)
             (api/render-error :auth/session-error)))
 
       ;; Authorization failed but session error was not handled for some strange reason.
