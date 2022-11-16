@@ -49,7 +49,7 @@
      ^Duration                      cache-ttl
      ^Long                          cache-size
      ^Duration                      token-cache-ttl
-     ^Duration                      token-cache-size
+     ^Long                          token-cache-size
      ^Duration                      cache-expires
      ^Boolean                       single-session?
      ^Boolean                       secured?])
