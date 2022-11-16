@@ -1315,7 +1315,7 @@
 ;; Sessions
 
 (p/import-vars [amelinium.http.middleware.session
-                session-field allow-expired allow-soft-expired allow-hard-expired])
+                allow-expired allow-soft-expired allow-hard-expired])
 
 (defn session
   "Gets a session map from the given request map."

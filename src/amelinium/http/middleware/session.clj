@@ -873,46 +873,6 @@
                      :hard-expired? hard-expired?
                      :id            nil))))))
 
-;; Configuration
-
-(defn session-field
-  "Returns a string or an ident of configured session ID field name by extracting it
-  from `opts` which can be a map containing the last (or only) element of `:id-path`
-  configuration option (exposed as `:id-field`), a request map containing the given
-  `result-key` associated with a map with `:id-field`, or a keyword (returned
-  immediately). Optional `other` map can be provided which will be used as a second
-  try when `opts` lookup will fail. The function returns \"session-id\" string when
-  all methods fail."
-  ([opts]
-   (session-field opts :session))
-  ([opts result-key]
-   (if (keyword? opts)
-     opts
-     (or (get opts :id-field)
-         (get (get opts result-key) :id-field)
-         (get (get opts :config) :id-field)
-         (get (:config (get opts result-key)) :id-field)
-         "session-id")))
-  ([opts other result-key]
-   (if (keyword? opts)
-     opts
-     (or (get opts :id-field)
-         (get (get opts result-key) :id-field)
-         (get (get opts :config) :id-field)
-         (get (:config (get opts result-key)) :id-field)
-         (:id-field other)
-         (get (result-key other) :id-field)
-         (get (:config other) :id-field)
-         (get (get (result-key other) :config) :id-field)
-         "session-id"))))
-
-(defn- config-options
-  [req opts-or-session-key]
-  (if (keyword? opts-or-session-key)
-    (if-some [^Session s (p/session req (or opts-or-session-key :session))]
-      (config ^Session s))
-    opts-or-session-key))
-
 ;; Session variables
 
 (defn del-var!
