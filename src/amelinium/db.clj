@@ -12,6 +12,7 @@
             [clojure.string                :as                    str]
             [clojure.core.cache            :as                  cache]
             [clojure.core.cache.wrapped    :as                    cwr]
+            [clojure.core.memoize          :as                    mem]
             [clj-uuid                      :as                   uuid]
             [next.jdbc                     :as                   jdbc]
             [next.jdbc.sql                 :as                    sql]
@@ -176,6 +177,17 @@
            next
            (map #(vector (as-uuid (nth % 0)) (nth % 1)))
            (into {})))))
+
+;; Memoization
+
+(defn mem-assoc-existing!
+  "Set a key `k` to a value `v` in a map being a cached result of prior calling
+  memoized function `f`. Will not associate anything if the destination does not
+  exist. The caching key should be given as `args` vector."
+  [f args k v]
+  (mem/memo-swap! f #(if-some [e (cache/lookup %1 %2)]
+                       (cache/miss %1 %2 (delay (map/qassoc @e k v))) %1)
+                  args))
 
 ;; UUID caching
 
