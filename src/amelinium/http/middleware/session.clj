@@ -1206,7 +1206,7 @@
                                                     remote-ip)]
               (if-not (valid? smap)
                 smap
-                (if (pos-int? (update-active-fn ctrl sid (db-sid-smap smap) remote-ip))
+                (if (pos-int? (update-active-fn sid (db-sid-smap smap) remote-ip))
                   (mkgood smap)
                   (mkbad smap :error (SessionError. :error :session/db-problem
                                                     (some-str-spc
@@ -1288,8 +1288,7 @@
 
 (defn- setup-invalidator
   [pre-handler mem-handler]
-  (if (or (not mem-handler)
-          (= mem-handler pre-handler))
+  (if (or (not mem-handler) (= mem-handler pre-handler))
     (constantly nil)
     (db/invalidator mem-handler)))
 
@@ -1371,13 +1370,12 @@
         last-active-fn-w      #(last-active-fn config db sessions-table %1 %2)
         config                (assoc config :fn/last-active last-active-fn-w)
         update-active-fn-w    (fn
-                                (^Long [ctrl sid db-sid remote-ip]
+                                (^Long [sid db-sid remote-ip]
                                  (let [t (t/now)]
-                                   ;; todo: key transformer from meta should be handled in mem-assoc-existing!
                                    ;; session prolongation causes invalid params to be injected without validation!
                                    (db/mem-assoc-existing! mem-handler [sid remote-ip] :active t)
                                    (update-active-fn config db sessions-table db-sid remote-ip t)))
-                                (^Long [ctrl sid db-sid remote-ip t]
+                                (^Long [sid db-sid remote-ip t]
                                  (db/mem-assoc-existing! mem-handler [sid remote-ip] :active t)
                                  (update-active-fn config db sessions-table db-sid remote-ip t)))
         config                     (assoc config :fn/update-active update-active-fn-w)
@@ -1420,12 +1418,12 @@
                                      (from-db       ^Session [_ db-sid ip]       (getter-fn-w db-sid ip))
                                      (handle        ^Session [c sid ip]          (handler-fn-w c sid ip))
                                      (to-db         ^Long    [_ smap]            (setter-fn-w smap))
-                                     (set-active    ^Long    [c sid db-sid ip]   (update-active-fn-w c sid db-sid ip))
-                                     (set-active    ^Long    [c sid db-sid ip t] (update-active-fn-w c sid db-sid ip t))
+                                     (set-active    ^Long    [_ sid db-sid ip]   (update-active-fn-w sid db-sid ip))
+                                     (set-active    ^Long    [_ sid db-sid ip t] (update-active-fn-w sid db-sid ip t))
                                      (get-active    ^Instant [_ db-sid ip]       (last-active-fn-w db-sid ip))
                                      (identify      ^String  [_ req]             (identifier-fn req))
                                      (mem-handler   [c]            mem-handler)
-                                     (invalidate    [c sid ip]     (invalidator-fn c sid ip))
+                                     (invalidate    [_ sid ip]     (invalidator-fn sid ip))
                                      (put-var       [_ db-sid k v] (var-put-fn  db db-sid k v))
                                      (get-var       [_ db-sid k]   (var-get-fn  db db-sid k))
                                      (del-var       [_ db-sid k]   (var-del-fn  db db-sid k))
