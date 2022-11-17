@@ -17,6 +17,7 @@
   `:control` fields."
   (empty         [c] [c s-k]                    "Returns an empty session with the `:control` field populated.")
   (config        [c] [c s-k]                    "Gets a session configuration settings.")
+  (mem-handler   [c] [c s-k]                    "Returns memoized handler function used by `handle`.")
   (expired?      [c] [c t]                      "Returns `true` if expiration time was exceeded for `t`.")
   (hard-expired? [c] [c t]                      "Returns `true` if hard-expiration time was exceeded for `t`.")
   (identify      [c req] [c]                    "Extracts session ID.")
@@ -25,7 +26,7 @@
   (from-db       [c db-sid ip]   [c db-sid] [c] "Gets the session data from a database.")
   (to-db         [c smap]                       "Puts the session data into a database.")
   (get-active    [c db-sid ip]   [c db-sid] [c] "Gets the session last active time from a database.")
-  (set-active    [c db-sid ip t] [c db-sid ip]  [c db-sid] [c] "Sets the session last active time in a database.")
+  (set-active    [c sid db-sid ip t] [c sid db-sid ip]  [s ip t] [s ip] [s] "Sets the session last active time in a database.")
   (token-ok?     [c plain enc]                  "Checks if the security token is valid.")
   (get-var       [c db-sid k]    [c k]          "Gets session variable from a persistent storage.")
   (get-vars      [c db-sid ks]   [c ks]         "Gets session variables from a persistent storage.")
