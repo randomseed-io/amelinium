@@ -183,11 +183,15 @@
 (defn mem-assoc-existing!
   "Set a key `k` to a value `v` in a map being a cached result of prior calling
   memoized function `f`. Will not associate anything if the destination does not
-  exist. The caching key should be given as `args` vector."
-  [f args k v]
-  (mem/memo-swap! f #(if-some [e (cache/lookup %1 %2)]
-                       (cache/miss %1 %2 (delay (map/qassoc @e k v))) %1)
-                  args))
+  exist. The caching key should be given as a `key` vector."
+  ([f key k v]
+   (mem/memo-swap! f #(if-some [e (cache/lookup %1 %2)]
+                        (cache/miss %1 %2 (delay (map/qassoc @e k v))) %1)
+                   key))
+  ([f key k v & kvs]
+   (mem/memo-swap! f #(if-some [e (cache/lookup %1 %2)]
+                        (cache/miss %1 %2 (delay (apply map/qassoc @e k v kvs))) %1)
+                   key)))
 
 ;; UUID caching
 
