@@ -1106,12 +1106,12 @@
         (if-some [last-active (.active ^Session smap)]
           (let [inactive-for (t/between last-active (t/now))]
             (when (t/> inactive-for cache-expires)
-              (let [new-active    (p/get-active ^SessionControl ctrl (db-sid-smap smap) remote-ip)
-                    ^Session smap (if new-active (map/qassoc smap :active new-active) smap)
-                    expired?      (p/expired? ^SessionControl ctrl (or new-active last-active))
+              (let [fresh-active  (p/get-active ^SessionControl ctrl (db-sid-smap smap) remote-ip)
+                    ^Session smap (if fresh-active (map/qassoc smap :active fresh-active) smap)
+                    expired?      (p/expired? ^SessionControl ctrl (or fresh-active last-active))
                     sid           (or (.id ^Session smap) (.err-id ^Session smap))]
-                (if (and new-active (not= new-active last-active))
-                  (db/mem-assoc-existing! (p/mem-handler ^SessionControl ctrl) [sid remote-ip] :active new-active))
+                (if (and fresh-active (not= fresh-active last-active))
+                  (db/mem-assoc-existing! (p/mem-handler ^SessionControl ctrl) [sid remote-ip] :active fresh-active))
                 (if expired?
                   (mkbad smap :error (state smap remote-ip))
                   smap))))))
