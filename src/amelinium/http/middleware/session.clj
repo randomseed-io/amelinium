@@ -952,13 +952,22 @@
   "Marks the given session `smap` as valid by setting `:valid?` field to `true`,
   `:expired?` and `:hard-expired?` fields to `false`, and `:error` field to
   `nil`. The given object should be a session."
-  [^Session smap]
-  (if-some [^Session smap (p/session smap)]
-    (-> (map/qassoc smap
-                    :valid?        true
-                    :expired?      false
-                    :hard-expired? false
-                    :error         nil))))
+  ([src session-key]
+   (if-some [^Session smap (p/session src session-key)]
+     (-> (if (.id smap) smap (map/qassoc smap :id (.err-id smap)))
+         (map/qassoc :valid?        true
+                     :expired?      false
+                     :hard-expired? false
+                     :err-id        nil
+                     :error         nil))))
+  ([src]
+   (if-some [^Session smap (p/session src)]
+     (-> (if (.id smap) smap (map/qassoc smap :id (.err-id smap)))
+         (map/qassoc :valid?        true
+                     :expired?      false
+                     :hard-expired? false
+                     :err-id        nil
+                     :error         nil)))))
 
 (defn mkbad
   "Marks session as invalid and sets `:err-id` field's value to the value of `:id`
