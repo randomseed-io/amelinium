@@ -25,6 +25,8 @@
   (invalidate    [c sid ip]      [c sid]    [c] "Invalidates internal cache.")
   (from-db       [c db-sid ip]   [c db-sid] [c] "Gets the session data from a database.")
   (to-db         [c smap]                       "Puts the session data into a database.")
+  (mem-atom      [c]                            "Returns an Atom object keeping reference to a cache object associated with memoized session handler.")
+  (mem-cache     [c]                            "Returns a cache object associated with memoized session handler.")
   (get-active    [c db-sid ip]   [c db-sid] [c] "Gets the session last active time from a database.")
   (set-active    [c sid db-sid ip t] [c sid db-sid ip]  [s ip t] [s ip] [s] "Sets the session last active time in a database.")
   (token-ok?     [c plain enc]                  "Checks if the security token is valid.")
