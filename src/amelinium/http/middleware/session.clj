@@ -32,7 +32,11 @@
   (:import [java.time Instant Duration]
            [javax.sql DataSource]
            [inet.ipaddr IPAddress]
+           [clojure.core.memoize PluggableMemoization]
+           [clojure.core.cache TTLCacheQ]
            [amelinium.proto.session SessionControl Sessionable]))
+
+(set! *warn-on-reflection* true)
 
 (def ^:const sid-match (re-pattern "|^[a-f0-9]{30,128}(-[a-f0-9]{30,128})?$"))
 
@@ -51,9 +55,10 @@
      ^Long                          cache-size
      ^Duration                      token-cache-ttl
      ^Long                          token-cache-size
-     ^Duration                      cache-expires
+     ^Duration                      cache-margin
      ^Boolean                       single-session?
-     ^Boolean                       secured?])
+     ^Boolean                       secured?
+     ^Boolean                       bad-ip-expires?])
 
 (defn config?
   ^Boolean [v]
@@ -288,9 +293,11 @@
   (^Boolean hard-expired? [s] false)
 
   (to-db        [s]             nil)
+  (mem-atom     [s]             nil)
+  (mem-cache    [s]             nil)
+  (mem-handler ([s]             nil) ([s s-k]       nil))
   (empty       ([s]             nil) ([s s-k]       nil))
   (config      ([s]             nil) ([s s-k]       nil))
-  (mem-handler ([s]             nil) ([s s-k]       nil))
   (identify    ([s]             nil) ([s req]       nil))
   (from-db     ([s db-sid ip]   nil) ([s db-sid]    nil) ([s]        nil))
   (handle      ([s db-sid ip]   nil) ([s db-sid]    nil) ([s]        nil))
@@ -420,6 +427,89 @@
 (defn id-field
   ([src] (if-some [^Session s (p/session src)] (.id-field ^Session src)))
   ([src session-key] (if-some [^Session s (p/session src session-key)] (.id-field ^Session src))))
+
+(defn mem-ctime
+  "Retrieves an entry creation time (in milliseconds) associated with the given `key`
+  in a TTL map of a current handler cache. If the entry does not exist, `nil` is
+  returned."
+  [^SessionControl ctrl key]
+  (if-some [^PluggableMemoization m (p/mem-cache ctrl)]
+    (nth (get (.ttl ^TTLCacheQ (.cache m)) key) 1 nil)))
+
+(defn mem-etime
+  "Retrieves an expiration time (in milliseconds since the beginning of the Unix epoch)
+  of an entry identified by the given key `key` in a TTL map of a current handler
+  cache. It is calculated by adding cache's TTL to entry's creation time. If the
+  entry does not exist, `nil` is returned."
+  [^SessionControl ctrl key]
+  (if-some [^PluggableMemoization m (p/mem-cache ctrl)]
+    (let [^TTLCacheQ c (.cache m)]
+      (if-some [ctime (nth (get (.ttl c) key) 1 nil)]
+        (+ ctime (.ttl-ms c))))))
+
+(defn mem-cache-expired?
+  "Returns `true` if an entry associated with the given key `key` in a TTL map of a
+  current handler cache has expired. If the entry does not exist, `true` is
+  returned. Optional argument `t` may be given with a time expressed as an
+  instant (`java.time.Instant`) to be used as a source of current time."
+  ([^SessionControl ctrl key t]
+   (if-some [etime (mem-etime ctrl key)]
+     (> (time/timestamp t) etime)
+     true))
+  ([^SessionControl ctrl key]
+   (if-some [etime (mem-etime ctrl key)]
+     (> (java.lang.System/currentTimeMillis) etime)
+     true)))
+
+(defn mem-cache-almost-expired?
+  "Returns `true` if an entry associated with the given key `key` in a TTL map of a
+  current handler cache has almost expired. The `knee` argument should be a number of
+  milliseconds (defaults to 1000 if not given) to be added to a current time in order
+  to shift it forward. If the entry does not exist, `true` is returned. Negative
+  `knee` values will cause it to have 0 impact. Optional argument `t` may be given
+  with a time expressed as an instant (`java.time.Instant`) to be used as a source of
+  current time."
+  ([^SessionControl ctrl key]
+   (mem-cache-almost-expired? ctrl key 1000))
+  ([^SessionControl ctrl key knee]
+   (if-some [etime (mem-etime ctrl key)]
+     (let [knee (if (and knee (not (neg? knee))) knee 0)]
+       (> (+ (java.lang.System/currentTimeMillis) knee) etime))
+     true))
+  ([^SessionControl ctrl key knee t]
+   (if-some [etime (mem-etime ctrl key)]
+     (let [knee (if (and knee (not (neg? knee))) knee 0)]
+       (> (+ (time/timestamp t) knee) etime))
+     true)))
+
+(defn mem-cache-time-left
+  "Returns a time left to a cache expiry for an entry associated with the given key
+  `key` in a TTL map of a current handler cache. The returned object is of type
+  `java.time.Duration`. If the entry does not exist, `nil` is returned. Optional `t`
+  argument may be given to express current time as `java.time.Instant`."
+  ([^SessionControl ctrl key]
+   (if-some [etime (mem-etime ctrl key)]
+     (let [tl (- etime (java.lang.System/currentTimeMillis))]
+       (t/new-duration (if (pos? tl) tl 0) :millis))))
+  ([^SessionControl ctrl key t]
+   (if-some [etime (mem-etime ctrl key)]
+     (let [tl (- etime (time/timestamp t))]
+       (t/new-duration (if (pos? tl) tl 0) :millis)))))
+
+(defn mem-cache-time-passed
+  "Returns a time which passed till now from the creation of an entry associated with
+  the given key `key` in a TTL map of a current handler cache. The returned object is
+  of type `java.time.Duration` and its value may exceed the configured TTL when there
+  was no cache update nor eviction for the entry. Optional `t` argument may be
+  given to express current time as `java.time.Instant`."
+  ([^SessionControl ctrl key]
+   (if-some [ctime (mem-ctime ctrl key)]
+     (let [tp (- (java.lang.System/currentTimeMillis) ctime)]
+       (t/new-duration (if (pos? tp) tp 0) :millis))))
+  ([^SessionControl ctrl key t]
+   (if-some [ctime (mem-ctime ctrl key)]
+     (let [tp (- (time/timestamp t) ctime)]
+       (t/new-duration (if (pos? tp) tp 0) :millis)))))
 
 ;; Secure sessions
 
@@ -677,12 +767,12 @@
   (^Boolean [src session-key] (t/instant? (active src session-key))))
 
 (defn state
-  "Returns session state. If there is anything wrong, returns an error
-  string. Otherwise it returns `nil`. Unknown session detection is performed by
+  "Returns session state. If there is anything wrong, returns a `SessionError`
+  record. Otherwise it returns `nil`. Unknown session detection is performed by
   checking if a value associated with the `:id` key is `nil` and a value associated
-  with the `:err-id` key is not `nil`. First argument `smap` must be a session object
+  with the `:err-id` key is not `nil`. First argument must be a session object
   of type `Session`."
-  [smap ip-address]
+  [^Session smap ip-address]
   (if-not (session? smap)
     (SessionError. :info :session/missing (str-spc "No session:" smap))
     (let [^Session smap smap
@@ -890,8 +980,8 @@
            expired?        (and id?
                                 (or (= :session/expired id)
                                     (and (= :session/bad-ip id)
-                                         (if-some [^SessionConfig cfg (config ^Session smap)]
-                                           (.wrong-ip-expires ^SessionConfig cfg)))))
+                                         (if-some [^SessionConfig cfg (p/config smap)]
+                                           (.bad-ip-expires? cfg)))))
            h-expired?      (and expired? (p/hard-expired? ^Session smap))
            err-id          (or (.id ^Session smap) (.err-id ^Session smap))
            ^SessionError e (if have-error?
@@ -1101,11 +1191,11 @@
 ;; Cache invalidation when time-sensitive value (last active time) exceeds TTL.
 
 (defn- refresh-times-core
-  [^Session smap ^SessionControl ctrl cache-expires remote-ip]
-  (or (if cache-expires
+  [^Session smap ^SessionControl ctrl cache-margin remote-ip]
+  (or (if cache-margin
         (if-some [last-active (.active ^Session smap)]
           (let [inactive-for (t/between last-active (t/now))]
-            (when (t/> inactive-for cache-expires)
+            (when (t/> inactive-for cache-margin)
               (let [fresh-active  (p/get-active ^SessionControl ctrl (db-sid-smap smap) remote-ip)
                     ^Session smap (if fresh-active (map/qassoc smap :active fresh-active) smap)
                     expired?      (p/expired? ^SessionControl ctrl (or fresh-active last-active))
@@ -1121,7 +1211,7 @@
   "Checks a last-active time of the session. If the time left to expiration is smaller
   than the cache TTL then the session record will be updated using a database query
   and session cache invalidated for a session ID. Uses pre-calculated value stored in
-  the `:cache-expires` field of a session record (see `calc-cache-expires` for more
+  the `:cache-margin` field of a session record (see `calc-cache-margin` for more
   info)."
   {:arglists '([^Sessionable src]
                [^Sessionable src session-key]
@@ -1131,24 +1221,24 @@
    (if-some [^Session smap (p/session src)]
      (refresh-times-core smap
                          (.control       ^Session smap)
-                         (.cache-expires ^Session smap)
+                         (if-some [^SessionConfig cfg (p/config smap)] (.cache-margin cfg))
                          (.ip            ^Session smap))))
   (^Session [^Sessionable src session-key-or-ip]
    (if (session? src)
      (refresh-times-core src
                          (.control       ^Session src)
-                         (.cache-expires ^Session src)
+                         (if-some [^SessionConfig cfg (p/config src)] (.cache-margin cfg))
                          session-key-or-ip)
      (if-some [^Session smap (p/session src session-key-or-ip)]
        (refresh-times-core smap
                            (.control       ^Session smap)
-                           (.cache-expires ^Session smap)
+                           (if-some [^SessionConfig cfg (p/config smap)] (.cache-margin cfg))
                            (.ip            ^Session smap)))))
   (^Session [^Sessionable src session-key remote-ip]
    (if-some [^Session smap (p/session src session-key)]
      (refresh-times-core smap
                          (.control       ^Session smap)
-                         (.cache-expires ^Session smap)
+                         (if-some [^SessionConfig cfg (p/config smap)] (.cache-margin cfg))
                          remote-ip))))
 
 ;; Session handling, creation and prolongation
@@ -1156,10 +1246,12 @@
 (defn handler
   "Gets session data from a database and processes them with session control functions
   and configuration options to generate a session record. When the record is created
-  it is validated for errors and expiration times. The results of calling this
-  function may be memoized to reduce database hits. Note that if the cache TTL is
-  larger than the remaining expiration time for a session, it may be required to
-  refresh the times and re-validate the session object (see `refresh-times`)."
+  it is validated for errors and expiration times.
+
+  The results of calling this function may be memoized to reduce database hits. Note
+  that if the cache TTL is larger than the remaining expiration time for a session,
+  it may be required to refresh the times and re-validate the session object (see
+  `refresh-times`)."
   (^Session [src sid remote-ip]
    (handler src :session sid remote-ip))
   (^Session [src session-key sid remote-ip]
@@ -1187,35 +1279,94 @@
        (mkbad  smap :error stat)
        (mkgood smap)))))
 
+(defn- needs-refresh?
+  [^SessionControl ctrl key cache-margin last-active expires-in expired?]
+  (and (some? cache-margin) (some? last-active)
+       (let [now (t/now)]
+         (or (when (and (not expired?) (t/> (t/between last-active now) cache-margin))
+               (log/dbg "Session margin" cache-margin "exceeded for" (db-sid-str (first key)))
+               true)
+             (let [ttl-margin (if expires-in (t/min expires-in cache-margin) cache-margin)]
+               (when  (t/> (mem-cache-time-passed ctrl key now) ttl-margin)
+                 (log/dbg "Cache TTL exceeded" ttl-margin "for" (db-sid-str (first key)))
+                 true))))))
+
+(defn process-handler
+  "Session processing handler wrapper. For the given session ID `sid` and remote IP
+  address `remote-ip` it runs `handle` (from `SessionControl` protocol) using
+  `ctrl`. Then it quickly checks if the refresh is needed (by checking whether
+  session is expired or by calling `needs-refresh?`). If re-reading expiration time
+  from a database is required, it will do it and check if the time really has
+  changed. In such case the session data in will be updated (by refreshing just the
+  last active time or by handling it again after cache eviction)."
+  [^SessionControl ctrl cache-margin expires-in sid remote-ip]
+  (let [^Session smap  (p/handle ctrl sid remote-ip)
+        s-args         [sid remote-ip]
+        active         (.active   smap)
+        expired?       (.expired? smap)
+        needs-refresh? (needs-refresh? ctrl s-args cache-margin active expires-in expired?)
+        new-expired?   (and needs-refresh? (not expired?) (p/expired? smap))
+        new-active     (if (and needs-refresh? (not new-expired?))
+                         (let [db-sid (db-sid-smap smap)]
+                           (log/dbg "Getting last active time from a database for" db-sid)
+                           (if-some [t (p/get-active ctrl db-sid remote-ip)]
+                             (if (= t active) nil t))))]
+    (if (nil? new-active)
+      (if new-expired?
+        (do (log/dbg "Session expiry detected after recalculating times for" (.db-id smap))
+            (p/invalidate ctrl sid remote-ip)
+            (mkbad smap :error (state smap remote-ip)))
+        smap)
+      (let [new-expired? (p/expired? ctrl new-active)]
+        (cond
+
+          ;; no change in expiration status after getting active time from a db
+          ;; (update active time in cache and in current session)
+
+          (= expired? new-expired?)
+          (do (log/dbg "Updating active time of" (.db-id smap))
+              (db/mem-assoc-existing! (p/mem-handler ctrl) s-args :active new-active)
+              (map/qassoc smap :active new-active))
+
+          ;; (was) expired -> (is) not expired
+          ;; (possible cross-node change, clear the cache and re-run handling)
+
+          expired?
+          (do (log/dbg "Session no longer expired, re-running handler for" (.db-id smap))
+              (p/invalidate ctrl sid remote-ip)
+              (p/handle ctrl sid remote-ip))
+
+          ;; (was) not expired -> (is) expired
+          ;; (duration margin, clear the cache, re-run validation and mark session as bad)
+
+          new-expired?
+          (let [^Session smap (map/qassoc smap :active new-active)]
+            (log/dbg "Session expired after syncing last active time for" (.db-id smap))
+            (p/invalidate ctrl sid remote-ip)
+            (mkbad smap :error (state smap remote-ip))))))))
+
 (defn process
   "Takes a session control object, functions, settings and a request map, and validates
   session against a database or memoized session data. Returns a session map or dummy
   session map if session was not obtained (session ID was not found in a database)."
-  [^SessionControl ctrl ^Session malformed-session ^Session empty-session
-   identifier-fn handler-fn update-active-fn cache-expires req]
-  (if-some [sid (identifier-fn req)]
+  [^SessionControl ctrl ^Session malformed-session ^Session empty-session cache-margin expires-in req]
+  (if-some [sid (p/identify ctrl req)]
     (let [remote-ip (ip/to-address (get req :remote-ip))]
       (if-not (sid-valid? sid)
         (mkbad malformed-session :id sid :ip remote-ip)
-        (let [smap (handler-fn ^SessionControl ctrl sid remote-ip)]
-          (if-not (valid? smap)
+        (let [^Session smap (process-handler ctrl cache-margin expires-in sid remote-ip)]
+          (if-not (.valid? smap)
             smap
-            (let [^Session smap (refresh-times-core ^Session smap
-                                                    ^SessionControl ctrl
-                                                    cache-expires
-                                                    remote-ip)]
-              (if-not (valid? smap)
-                smap
-                (if (pos-int? (update-active-fn sid (db-sid-smap smap) remote-ip))
-                  (mkgood smap)
-                  (mkbad smap :error (SessionError. :error :session/db-problem
-                                                    (some-str-spc
-                                                     "Problem updating session data"
-                                                     (log/for-user
-                                                      (.user-id    ^Session smap)
-                                                      (.user-email ^Session smap)
-                                                      (or (ip/plain-ip-str (ip/to-address (.ip ^Session smap)))
-                                                          (get req :remote-ip/str)))))))))))))
+            (if (pos-int? (p/set-active ctrl sid (db-sid-smap smap) remote-ip))
+              (mkgood smap)
+              (mkbad smap :error (SessionError. :error :session/db-problem
+                                                (some-str-spc
+                                                 "Problem updating session data"
+                                                 (log/for-user
+                                                  (.user-id    smap)
+                                                  (.user-email smap)
+                                                  (or (ip/plain-ip-str (ip/to-address (.ip smap)))
+                                                      (get req :remote-ip/str)))))))))))
     empty-session))
 
 (defn prolong
@@ -1232,12 +1383,13 @@
              ipplain              (ip/plain-ip-str ip-address)
              new-time             (t/now)]
          (log/msg "Prolonging session" (log/for-user (.user-id ^Session smap) (.user-email ^Session smap) ipplain))
-         (let [test-smap (map/qassoc smap :id sid :active new-time)
-               stat      (state test-smap ip-address)]
+         (let [^Session new-smap (map/qassoc smap :id sid :active new-time)
+               stat              (state new-smap ip-address)]
            (if (correct-state? stat)
-             (do (p/set-active ^SessionControl ctrl sid (or (db-sid-smap smap) (db-sid-str sid)) ip-address new-time)
-                 (p/invalidate ^SessionControl ctrl sid ip-address)
-                 (map/qassoc (p/handle ^SessionControl ctrl sid ip-address) :prolonged? true))
+             (do  (p/set-active ctrl sid (or (db-sid-smap new-smap) (db-sid-str sid)) ip-address new-time)
+                  (p/invalidate ctrl sid ip-address)
+                  (if (not= ip-address (.ip smap)) (p/invalidate ctrl sid (.ip smap)))
+                  (map/qassoc (p/handle ctrl sid ip-address) :prolonged? true))
              (do (log/wrn "Session re-validation error"
                           (log/for-user (.user-id ^Session smap) (.user-email ^Session smap) ipplain))
                  (mkbad smap :error stat)))))))))
@@ -1292,21 +1444,48 @@
     (constantly nil)
     (db/invalidator mem-handler)))
 
-(defn- calc-cache-expires
-  "Calculates `:cache-expires` field which is a basis for deciding if session cache for
+(defn- get-mem-atom
+  [f]
+  (let [mc (::mem/cache (meta f))]
+    (if (and (instance? clojure.lang.IRef    mc)
+             (instance? PluggableMemoization @mc)
+             (instance? TTLCacheQ (.cache ^PluggableMemoization @mc))
+             (some? (.ttl ^TTLCacheQ (.cache ^PluggableMemoization @mc))))
+      mc)))
+
+(defn- calc-cache-margin
+  "Calculates `:cache-margin` field which is a basis for deciding if session cache for
   the given ID must be refreshed due to potential miscalculation of the expiration
-  time caused by the marginal duration. When the configured TTL for a cache is
-  greater than configured expiration duration then it sets `:cache-expires` to 1
-  second. Otherwise it sets it to be the difference between expiration time and cache
-  TTL. Used in the `refresh-times`."
+  time caused by the marginal duration. Uses `:expires` and `:cache-ttl`
+  configuration settings. Returns a duration.
+
+  If the expiration time is greater than cache TTL more than twice, the result will
+  be a simple subtraction of TTL duration from expiration duration.
+
+  If the expiration time is greater than cache TTL but no more than twice, the result
+  will be a TTL duration.
+
+  If the expiration time is lesser than cache TTL more than twice, the result will be
+  an expiration duration.
+
+  If the expiration time is lesser than cache TTL but no more than twice, the result
+  will be a simple subtraction of expiration duration from TTL duration.
+
+  The `:cache-margin` is used as a precondition when investigating real time left in
+  cache before making a decision about getting last active time from a database and
+  refreshing internal structures (session, session cache)."
   [config]
   (let [expires   (get config :expires)
         cache-ttl (get config :cache-ttl)]
-    (map/qassoc config :cache-expires
-                (if (and expires cache-ttl)
-                  (if (t/> cache-ttl expires)
-                    one-second
-                    (t/- expires cache-ttl))))))
+    (map/qassoc config :cache-margin
+                (if (and expires cache-ttl (pos? (t/seconds cache-ttl)) (pos? (t/seconds expires)))
+                  (if (t/> expires cache-ttl)
+                    (if (>= (t/divide expires cache-ttl) 2)
+                      (t/- expires cache-ttl)
+                      cache-ttl)
+                    (if (>= (t/divide cache-ttl expires) 2)
+                      expires
+                      (t/- cache-ttl expires)))))))
 
 (defn- setup-fn
   [config k default]
@@ -1320,64 +1499,65 @@
 (defn wrap-session
   "Session maintaining middleware."
   [k config]
-  (let [dbname                (db/db-name (get config :db))
-        ^SessionConfig config (-> config
-                                  (update :db               db/ds)
-                                  (update :sessions-table   #(or (to-snake-simple-str %) "sessions"))
-                                  (update :variables-table  #(or (to-snake-simple-str %) "session_variables"))
-                                  (update :expires          time/parse-duration)
-                                  (update :hard-expires     time/parse-duration)
-                                  (update :cache-ttl        time/parse-duration)
-                                  (update :cache-size       safe-parse-long)
-                                  (update :token-cache-ttl  time/parse-duration)
-                                  (update :token-cache-size safe-parse-long)
-                                  (update :session-key      #(or (some-keyword %) :session))
-                                  (update :id-path          #(if (valuable? %) (if (coll? %) (vec %) [:params %]) [:params %]))
-                                  (update :id-field         #(if (ident? %) % (some-str %)))
-                                  (update :single-session?  boolean)
-                                  (update :secured?         boolean)
-                                  (calc-cache-expires)
-                                  (map->SessionConfig))
-        db                    (get config :db)
-        session-key           (get config :session-key)
-        sessions-table        (get config :sessions-table)
-        variables-table       (get config :variables-table)
-        session-id-path       (get config :id-path)
-        session-id-field      (get config :id-field)
-        cache-expires         (get config :cache-expires)
-        single-session?       (get config :single-session?)
-        secured?              (get config :secured?)
-        expires               (get config :expires)
-        hard-expires          (get config :hard-expires)
-        session-id-field      (or session-id-field (if (coll? session-id-path) (last session-id-path) session-id-path))
-        config                (assoc config :id-field (or session-id-field "session-id"))
-        expirer-fn            (if (pos-int? (time/seconds expires)) #(calc-expired-core expires %1) (constantly false))
-        expirer-hard-fn       (if (pos-int? (time/seconds hard-expires)) #(calc-expired-core hard-expires %1) (constantly false))
-        identifier-fn         (setup-id-fn session-id-path)
-        config                (assoc config :fn/identifier identifier-fn)
-        getter-fn             (setup-fn config :fn/getter get-session-by-id)
-        getter-fn-w           #(getter-fn config db sessions-table %1 %2)
-        config                (assoc config :fn/getter getter-fn-w)
-        checker-config        (set/rename-keys config {:token-cache-size :cache-size :token-cache-ttl :cache-ttl})
-        checker-fn            (setup-fn config :fn/checker check-encrypted)
-        checker-fn-w          (db/memoizer checker-fn checker-config)
-        config                (assoc config :fn/checker checker-fn-w)
-        pre-handler           ^{::mem/args-fn rest} #(handler %1 session-key session-id-field %2 %3)
-        mem-handler           (db/memoizer pre-handler config)
-        handler-fn-w          mem-handler
-        last-active-fn        (setup-fn config :fn/last-active get-last-active)
-        update-active-fn      (setup-fn config :fn/update-active update-last-active)
-        last-active-fn-w      #(last-active-fn config db sessions-table %1 %2)
-        config                (assoc config :fn/last-active last-active-fn-w)
-        update-active-fn-w    (fn
-                                (^Long [sid db-sid remote-ip]
-                                 (let [t (t/now)]
-                                   ;; session prolongation causes invalid params to be injected without validation!
-                                   (db/mem-assoc-existing! mem-handler [sid remote-ip] :active t)
-                                   (update-active-fn config db sessions-table db-sid remote-ip t)))
-                                (^Long [sid db-sid remote-ip t]
-                                 (db/mem-assoc-existing! mem-handler [sid remote-ip] :active t)
-                                 (update-active-fn config db sessions-table db-sid remote-ip t)))
+  (let [dbname                     (db/db-name (get config :db))
+        ^SessionConfig config      (-> config
+                                       (update :db               db/ds)
+                                       (update :sessions-table   #(or (to-snake-simple-str %) "sessions"))
+                                       (update :variables-table  #(or (to-snake-simple-str %) "session_variables"))
+                                       (update :expires          time/parse-duration)
+                                       (update :hard-expires     time/parse-duration)
+                                       (update :cache-ttl        time/parse-duration)
+                                       (update :cache-size       safe-parse-long)
+                                       (update :token-cache-ttl  time/parse-duration)
+                                       (update :token-cache-size safe-parse-long)
+                                       (update :session-key      #(or (some-keyword %) :session))
+                                       (update :id-path          #(if (valuable? %) (if (coll? %) (vec %) [:params %]) [:params %]))
+                                       (update :id-field         #(if (ident? %) % (some-str %)))
+                                       (update :single-session?  boolean)
+                                       (update :secured?         boolean)
+                                       (calc-cache-margin)
+                                       (map->SessionConfig))
+        db                         (get config :db)
+        session-key                (get config :session-key)
+        sessions-table             (get config :sessions-table)
+        variables-table            (get config :variables-table)
+        session-id-path            (get config :id-path)
+        session-id-field           (get config :id-field)
+        cache-margin               (get config :cache-margin)
+        single-session?            (get config :single-session?)
+        secured?                   (get config :secured?)
+        expires                    (get config :expires)
+        hard-expires               (get config :hard-expires)
+        session-id-field           (or session-id-field (if (coll? session-id-path) (last session-id-path) session-id-path))
+        config                     (assoc config :id-field (or session-id-field "session-id"))
+        expirer-fn                 (if (pos-int? (time/seconds expires)) #(calc-expired-core expires %1) (constantly false))
+        expirer-hard-fn            (if (pos-int? (time/seconds hard-expires)) #(calc-expired-core hard-expires %1) (constantly false))
+        identifier-fn              (setup-id-fn session-id-path)
+        config                     (assoc config :fn/identifier identifier-fn)
+        getter-fn                  (setup-fn config :fn/getter get-session-by-id)
+        getter-fn-w                #(getter-fn config db sessions-table %1 %2)
+        config                     (assoc config :fn/getter getter-fn-w)
+        checker-config             (set/rename-keys config {:token-cache-size :cache-size :token-cache-ttl :cache-ttl})
+        checker-fn                 (setup-fn config :fn/checker check-encrypted)
+        checker-fn-w               (db/memoizer checker-fn checker-config)
+        config                     (assoc config :fn/checker checker-fn-w)
+        pre-handler                ^{::mem/args-fn rest} #(handler %1 session-key session-id-field %2 %3)
+        mem-handler                (db/memoizer pre-handler config)
+        handler-fn-w               mem-handler
+        mem-atom                   (get-mem-atom mem-handler)
+        last-active-fn             (setup-fn config :fn/last-active get-last-active)
+        update-active-fn           (setup-fn config :fn/update-active update-last-active)
+        last-active-fn-w           #(last-active-fn config db sessions-table %1 %2)
+        config                     (assoc config :fn/last-active last-active-fn-w)
+        update-active-fn-w         (fn
+                                     (^Long [sid db-sid remote-ip]
+                                      (let [t (t/now)]
+                                        ;; session prolongation causes invalid params to be injected without validation!
+                                        (db/mem-assoc-existing! mem-handler [sid remote-ip] :active t)
+                                        (update-active-fn config db sessions-table db-sid remote-ip t)))
+                                     (^Long [sid db-sid remote-ip t]
+                                      (db/mem-assoc-existing! mem-handler [sid remote-ip] :active t)
+                                      (update-active-fn config db sessions-table db-sid remote-ip t)))
         config                     (assoc config :fn/update-active update-active-fn-w)
         var-get-fn                 (db/make-setting-getter  variables-table :session-id)
         var-put-fn                 (db/make-setting-setter  variables-table :session-id)
@@ -1422,7 +1602,9 @@
                                      (set-active    ^Long    [_ sid db-sid ip t] (update-active-fn-w sid db-sid ip t))
                                      (get-active    ^Instant [_ db-sid ip]       (last-active-fn-w db-sid ip))
                                      (identify      ^String  [_ req]             (identifier-fn req))
-                                     (mem-handler   [c]            mem-handler)
+                                     (mem-handler   [_] mem-handler)
+                                     (mem-atom      [_] mem-atom)
+                                     (mem-cache     [_] (if mem-atom (deref mem-atom)))
                                      (invalidate    [_ sid ip]     (invalidator-fn sid ip))
                                      (put-var       [_ db-sid k v] (var-put-fn  db db-sid k v))
                                      (get-var       [_ db-sid k]   (var-get-fn  db db-sid k))
@@ -1448,10 +1630,8 @@
                        (map/qassoc req session-key (delay (process control
                                                                    malformed-session
                                                                    empty-session
-                                                                   identifier-fn
-                                                                   handler-fn-w
-                                                                   update-active-fn-w
-                                                                   cache-expires
+                                                                   cache-margin
+                                                                   expires
                                                                    req))))))))}))
 
 (system/add-init  ::default [k config] (wrap-session k config))
