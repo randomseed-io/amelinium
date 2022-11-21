@@ -367,7 +367,7 @@
 
 (defn control?
   ^Boolean [v]
-  (satisfies? SessionControl v))
+  (instance? SessionControl v))
 
 (defn control
   (^SessionControl [src] (p/control src))
