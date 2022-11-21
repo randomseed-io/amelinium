@@ -97,7 +97,7 @@
                 (map/assoc-missing   :context-transformer ctx-transformer)))
  (msg-with-val
   "Configuration profile:" (or (some-str (:profile (:system config))) "unknown")
-  (str "[" (or (some-str (:node (:system config))) "unknown") " node]")
+  (str "[" (or (some-str (:node (:system config))) "unknown") " node, log level: " (some-str (:level config)) "]")
   config))
 
 (system/add-halt!
