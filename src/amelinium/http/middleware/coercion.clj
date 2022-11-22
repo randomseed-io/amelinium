@@ -272,7 +272,7 @@
                               not-empty)))
 
 (defn inject-errors
-  "Takes coercion errors, parses them and injects into a `req` under a key named
+  "Takes coercion errors, parses them, and injects into a `req` under a key named
   `:form/errors`."
   [req errors]
   (qassoc req :form/errors (delay (parse-errors errors))))

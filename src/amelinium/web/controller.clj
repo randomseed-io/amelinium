@@ -390,28 +390,36 @@
 
 (defn handle-coercion-error
   "Called when coercion exception is thrown by the handler executed earlier in a
-  middleware chain. Takes exception object `e`, response wrapper `respond` and
-  `raise` function.
+  middleware chain. Takes an exception object `e`, response wrapper `respond`, and
+  a `raise` function.
 
-  When a coercion error is detected during request processing, it creates a map (by
-  calling `amelinium.http.middleware.coercion/map-errors`) containing parameter
+  When coercion error is detected during request processing, it creates a map (by
+  calling the `amelinium.http.middleware.coercion/map-errors`) containing parameter
   identifiers associated with parameter types (or with `nil` values if type
-  information is not available). If there is a session then this map it is stored in
-  a session variable `:form-errors` under the `:errors` key (additionally, there is a
-  `:dest` key identifying a path of the current page). If there is no valid session
-  or a session variable cannot be stored, the result is serialized as a query string
-  parameter `form-errors` with erroneous fields separated by commas. If type name is
-  available then a string in a form of `parameter:type` is generated. If type name is
-  not available, a simple parameter name is generated. So the example value (before
-  encoding) may look like `email,secret:password` (`email` parameter without type
-  information, `secret` parameter with type named `password`).
+  information is not available).
 
-  Next, the originating URI is obtained from `Referer` header and a temporary
+  If there is a session then this map is stored in a session variable `:form-errors`
+  under the `:errors` key (additionally, there is a `:dest` key identifying a path of
+  the current page).
+
+  If there is no valid session or a session variable cannot be stored, the result is
+  serialized as a query string parameter `form-errors` with erroneous fields
+  separated by commas.
+
+  If type name is available then a string in a form of `parameter:type` is
+  generated.
+
+  If type name is not available, a simple parameter name is generated. So the example
+  value (before encoding) may look like `email,secret:password` (`email` parameter
+  without type information, `secret` parameter with type named `password`).
+
+  Next, the originating URI is obtained from the `Referer` header and a temporary
   redirect (with HTTP code 307) is generated with this path and a query string
   containing `form-errors` parameter. The value of the parameter is empty if form
-  errors were saved in a session variable. The destination of the redirect can be
-  overriden by the `:form-errors/page` configuration option associated with HTTP
-  route data.
+  errors were saved in a session variable.
+
+  The destination of the redirect can be overriden by the `:form-errors/page`
+  configuration option associated with HTTP route data.
 
   If the destination URI cannot be established, or if a coercion error happened during
   handling some previous coercion error (so current page is where the browser had
