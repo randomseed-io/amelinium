@@ -22,6 +22,7 @@
             [amelinium.system             :as     system]
             [amelinium.auth.algo.scrypt   :as     scrypt]
             [amelinium.proto.session      :as          p]
+            [amelinium.types.session      :refer    :all]
             [io.randomseed.utils          :refer    :all]
             [io.randomseed.utils.time     :as       time]
             [io.randomseed.utils.var      :as        var]
@@ -34,7 +35,8 @@
            [inet.ipaddr IPAddress]
            [clojure.core.memoize PluggableMemoization]
            [clojure.core.cache TTLCacheQ]
-           [amelinium.proto.session SessionControl Sessionable]))
+           [amelinium.proto.session SessionControl Sessionable]
+           [amelinium.types.session Session SessionConfig SessionError]))
 
 (set! *warn-on-reflection* true)
 
@@ -42,52 +44,9 @@
 
 (def one-second (t/new-duration 1 :seconds))
 
-(defrecord SessionConfig
-    [^DataSource                    db
-     ^String                        sessions-table
-     ^String                        variables-table
-     ^clojure.lang.Keyword          session-key
-     ^clojure.lang.PersistentVector id-path
-     ^Object                        id-field
-     ^Duration                      expires
-     ^Duration                      hard-expires
-     ^Duration                      cache-ttl
-     ^Long                          cache-size
-     ^Duration                      token-cache-ttl
-     ^Long                          token-cache-size
-     ^Duration                      cache-margin
-     ^Boolean                       single-session?
-     ^Boolean                       secured?
-     ^Boolean                       bad-ip-expires?])
-
 (defn config?
   ^Boolean [v]
   (instance? SessionConfig v))
-
-(defrecord SessionError
-    [^clojure.lang.Keyword severity
-     ^clojure.lang.Keyword  id
-     ^String                cause])
-
-(defrecord Session
-    [^String         id
-     ^String         err-id
-     ^String         db-id
-     ^String         db-token
-     ^Long           user-id
-     ^String         user-email
-     ^Instant        created
-     ^Instant        active
-     ^IPAddress      ip
-     ^Boolean        valid?
-     ^Boolean        expired?
-     ^Boolean        hard-expired?
-     ^Boolean        secure?
-     ^Boolean        security-passed?
-     ^String         session-key
-     ^Object         id-field
-     ^SessionError   error
-     ^SessionControl control])
 
 (defn session?
   ^Boolean [v]

@@ -37,7 +37,7 @@
             [io.randomseed.utils.map              :refer     [qassoc]]
             [io.randomseed.utils                  :refer         :all])
 
-  (:import [amelinium.http.middleware.session Session]
+  (:import [amelinium.types.session Session]
            [lazy_map.core LazyMapEntry LazyMap]
            [reitit.core Match]))
 

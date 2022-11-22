@@ -18,67 +18,30 @@
             [buddy.core.hash                   :as          hash]
             [buddy.core.codecs                 :as        codecs]
             [tick.core                         :as             t]
-            [phone-number.core                 :as         phone]
             [amelinium.db                      :as            db]
             [amelinium.auth                    :as          auth]
             [amelinium.auth.pwd                :as           pwd]
+            [amelinium.proto.auth              :as             p]
             [amelinium.http.middleware.session :as       session]
             [amelinium.http.middleware.roles   :as         roles]
             [amelinium.model.confirmation      :as  confirmation]
+            [amelinium.types.auth              :refer       :all]
             [io.randomseed.utils.time          :as          time]
             [io.randomseed.utils.ip            :as            ip]
             [io.randomseed.utils.map           :as           map]
             [io.randomseed.utils.map           :refer   [qassoc]]
             [io.randomseed.utils               :refer       :all])
 
-  (:import [javax.sql          DataSource]
-           [java.time          Duration]
-           [phone_number.core  Phoneable]
-           [amelinium.auth.pwd Suites SuitesJSON]
-           [amelinium.auth     AuthConfig AuthSettings AuthLocking AuthConfirmation AccountTypes]))
+  (:import [javax.sql            DataSource]
+           [java.time            Duration]
+           [amelinium.proto.auth Authorizable]
+           [amelinium.types.auth Suites SuitesJSON]
+           [amelinium.types.auth UserData AuthQueries DBPassword]
+           [amelinium.types.auth AuthConfig AuthSettings AuthLocking AuthConfirmation AccountTypes]))
 
 (defonce props-cache    (atom nil))
 (defonce settings-cache (atom nil))
 (defonce ids-cache      (atom nil))
-
-;; DBPassword record is to pass intrinsic suite in JSON format and shared suite ID.
-;; It's used to pass data around.
-
-(defrecord DBPassword [^Long   password_suite_id
-                       ^String password])
-
-;; UserData record is to pass user data between models and controllers
-;; in a bit faster way than with regular maps.
-
-(defrecord UserData   [^String               email
-                       ^Phoneable            phone
-                       ^clojure.lang.Keyword account-type
-                       ^AuthConfig           auth-config
-                       ^DataSource           db
-                       ^String               password
-                       ^String               password-shared
-                       ^Long                 password-suite-id
-                       ^String               first-name
-                       ^String               middle-name
-                       ^String               last-name
-                       ^Duration             expires-in
-                       ^Long                 max-attempts])
-
-;; AuthQueries record is used to pass a set of SQL queries in some structured form.
-
-(defrecord AuthQueries [^String generic
-                        ^String pre
-                        ^String post
-                        ^String single])
-
-;; Authorizable protocol is to support class-based, single method dispatch when
-;; dealing with authorization and authentication data. The auth-source can be a data
-;; source, an AuthConfig record or a global AuthSettings record.
-
-(defprotocol Authorizable
-  (get-user-auth-data
-    [auth-source email queries]
-    [auth-source email account-type queries]))
 
 ;; User data initialization
 
@@ -577,7 +540,7 @@
                  password-query-atypes-post
                  password-query-atypes-single))
 
-(extend-protocol Authorizable
+(extend-protocol p/Authorizable
 
   AuthConfig
 
@@ -601,7 +564,7 @@
                 db
                 (cons (.single ^AuthQueries queries) (cons email (cons (name ac-type) nil)))
                 db/opts-simple-map)))))
-       (get-user-auth-data src email queries))))
+       (p/get-user-auth-data src email queries))))
 
   AuthSettings
 
@@ -610,13 +573,13 @@
      (if email
        (let [db (.db ^AuthSettings src)]
          (if-some [ac-type (keyword (prop-by-email db :account-type email))]
-           (get-user-auth-data (get (.types ^AuthSettings src) ac-type) email ac-type queries)))))
+           (p/get-user-auth-data (get (.types ^AuthSettings src) ac-type) email ac-type queries)))))
     ([^AuthSettings src email ac-type ^AuthQueries queries]
      (if-some [ac-type (if (keyword? ac-type) ac-type (some-keyword ac-type))]
        (if email
          (if-some [auth-config (get (.types ^AuthSettings src) ac-type)]
-           (get-user-auth-data auth-config email ac-type queries)))
-       (get-user-auth-data src email queries))))
+           (p/get-user-auth-data auth-config email ac-type queries)))
+       (p/get-user-auth-data src email queries))))
 
   DataSource
 
@@ -632,21 +595,21 @@
          (jdbc/execute-one! src
                             (cons (.single ^AuthQueries queries) (cons email (cons ac-type nil)))
                             db/opts-simple-map))
-       (get-user-auth-data src email queries)))))
+       (p/get-user-auth-data src email queries)))))
 
 (defn get-login-data
   "Returns data required for user to log in, including password information."
-  ([^amelinium.model.user.Authorizable auth-source email]
-   (get-user-auth-data auth-source email login-data-queries))
-  ([^amelinium.model.user.Authorizable auth-source email account-type]
-   (get-user-auth-data auth-source email account-type login-data-queries)))
+  ([^Authorizable auth-source email]
+   (p/get-user-auth-data auth-source email login-data-queries))
+  ([^Authorizable auth-source email account-type]
+   (p/get-user-auth-data auth-source email account-type login-data-queries)))
 
 (defn get-password-suites
   "Returns password information."
-  ([^amelinium.model.user.Authorizable auth-source email]
-   (get-user-auth-data auth-source email password-data-queries))
-  ([^amelinium.model.user.Authorizable auth-source email account-type]
-   (get-user-auth-data auth-source email account-type password-data-queries)))
+  ([^Authorizable auth-source email]
+   (p/get-user-auth-data auth-source email password-data-queries))
+  ([^Authorizable auth-source email account-type]
+   (p/get-user-auth-data auth-source email account-type password-data-queries)))
 
 (def ^:const insert-shared-suite-query
   (str-spc

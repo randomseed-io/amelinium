@@ -32,9 +32,11 @@
             [taoensso.nippy                :as                  nippy]
             [amelinium.app                 :as                    app]
             [amelinium.system              :as                 system]
-            [amelinium.logging             :as                    log])
+            [amelinium.logging             :as                    log]
+            [amelinium.types.db            :refer                :all])
 
   (:import [com.zaxxer.hikari HikariConfig HikariDataSource HikariPoolMXBean]
+           [amelinium.types.db DBConfig]
            [java.sql Connection]
            [javax.sql DataSource]
            [java.lang.reflect Method]
@@ -281,14 +283,6 @@
 
 ;; Configuration record
 
-(defrecord DBConfig [^clojure.lang.Fn initializer
-                     ^clojure.lang.Fn finalizer
-                     ^clojure.lang.Fn suspender
-                     ^clojure.lang.Fn resumer
-                     ^clojure.lang.Keyword dbkey
-                     ^String dbname
-                     datasource])
-
 (defn db-config?
   "Returns true if a value of the given argument is an instance of DBConfig record
   type."
@@ -298,7 +292,7 @@
 (defn ds
   "Gets the data source from the DBConfig record. If the given argument is not an
   instance of DBConfig, it simply returns it."
-  [v]
+  ^DataSource [v]
   (if (instance? DBConfig v) (:datasource v) v))
 
 ;; Configuration helpers

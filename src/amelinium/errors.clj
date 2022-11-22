@@ -14,25 +14,28 @@
             [clj-uuid                 :as          uuid]
             [amelinium.system         :as        system]
             [amelinium.http           :as          http]
+            [amelinium.proto.errors   :as             p]
             [io.randomseed.utils.time :as          time]
             [io.randomseed.utils.map  :as           map]
             [io.randomseed.utils.var  :as           var]
-            [io.randomseed.utils      :refer       :all]))
+            [io.randomseed.utils      :refer       :all]
+            [amelinium.types.errors   :refer       :all])
 
-(defrecord ErrorsConfig [priorities responses default-response])
+  (:import [amelinium.types.errors ErrorsConfig]))
 
-(defprotocol ErrorsConfigurable
-  (config [src]))
-
-(extend-protocol ErrorsConfigurable
+(extend-protocol p/ErrorsConfigurable
 
   ErrorsConfig
+
   (config [src] src)
 
   clojure.lang.IPersistentMap
-  (config
-    [src]
-    (http/get-route-data src :errors/config)))
+
+  (config [src] (http/get-route-data src :errors/config))
+
+  nil
+
+  (config [src] nil))
 
 (defn config?
   "Returns `true` if the given object is an instance of `ErrorsConfig`."
@@ -53,8 +56,8 @@
   (if errors
     (if (ident? errors)
       errors
-      (if-some [config (config config-src)]
-        (or (some errors (.priorities ^ErrorsConfig config))
+      (if-some [^ErrorsConfig config (p/config config-src)]
+        (or (some errors (.priorities config))
             (first errors))))))
 
 (defn render-fn
@@ -66,16 +69,16 @@
    (render-fn config-src errors nil))
   ([config-src errors default]
    (if errors
-     (if-some [config (config config-src)]
-       (or (get (.responses ^ErrorsConfig config) (most-significant config errors))
+     (if-some [^ErrorsConfig config (p/config config-src)]
+       (or (get (.responses config) (most-significant config errors))
            default)))))
 
 (defn default-response
   "Returns the default error response rendering function. Returns `nil` when
   `config-src` is `nil`."
   [config-src]
-  (if-some [config (config config-src)]
-    (.default-response ^ErrorsConfig config)))
+  (if-some [^ErrorsConfig config (p/config config-src)]
+    (.default-response config)))
 
 (defn render
   "Renders an error or status response using `render-fn`. If the response rendering
@@ -87,45 +90,50 @@
   ([config-src error]
    (render config-src error nil))
   ([config-src error default]
-   (if-some [config (config config-src)]
+   (if-some [^ErrorsConfig config (p/config config-src)]
      (if-some [render-fn (or (render-fn config error default)
-                             (.default-response ^ErrorsConfig config))]
+                             (.default-response config))]
        (render-fn))))
   ([config-src error default req]
-   (if-some [config (config config-src)]
+   (if-some [^ErrorsConfig config (p/config config-src)]
      (if-some [render-fn (or (render-fn config error default)
-                             (.default-response ^ErrorsConfig config))]
+                             (.default-response config))]
        (render-fn req))))
   ([config-src error default req a]
-   (if-some [config (config config-src)]
+   (if-some [^ErrorsConfig config (p/config config-src)]
      (if-some [render-fn (or (render-fn config error default)
-                             (.default-response ^ErrorsConfig config))]
+                             (.default-response config))]
        (render-fn req a))))
   ([config-src error default req a b]
-   (if-some [config (config config-src)]
+   (if-some [^ErrorsConfig config (p/config config-src)]
      (if-some [render-fn (or (render-fn config error default)
-                             (.default-response ^ErrorsConfig config))]
+                             (.default-response config))]
        (render-fn req a b))))
   ([config-src error default req a b c]
-   (if-some [config (config config-src)]
+   (if-some [^ErrorsConfig config (p/config config-src)]
      (if-some [render-fn (or (render-fn config error default)
-                             (.default-response ^ErrorsConfig config))]
+                             (.default-response config))]
        (render-fn req a b c))))
   ([config-src error default req a b c d]
-   (if-some [config (config config-src)]
+   (if-some [^ErrorsConfig config (p/config config-src)]
      (if-some [render-fn (or (render-fn config error default)
-                             (.default-response ^ErrorsConfig config))]
+                             (.default-response config))]
        (render-fn req a b c d))))
   ([config-src error default req a b c d e]
-   (if-some [config (config config-src)]
+   (if-some [^ErrorsConfig config (p/config config-src)]
      (if-some [render-fn (or (render-fn config error default)
-                             (.default-response ^ErrorsConfig config))]
+                             (.default-response config))]
        (render-fn req a b c d e))))
   ([config-src error default req a b c d e & more]
-   (if-some [config (config config-src)]
+   (if-some [^ErrorsConfig config (p/config config-src)]
      (if-some [render-fn (or (render-fn config error default)
-                             (.default-response ^ErrorsConfig config))]
+                             (.default-response config))]
        (apply render-fn req a b c d e more)))))
+
+(defn config
+  "Returns `ErrorsConfig` record extracted from configuration source `config-src`."
+  ^ErrorsConfig [config-src]
+  (p/config config-src))
 
 (defn specific-id
   "Makes errors `errors` more specific by replacing generic bad ID error (as a keyword)

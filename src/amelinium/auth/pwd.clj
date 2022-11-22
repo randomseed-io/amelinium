@@ -22,7 +22,10 @@
             [io.randomseed.utils.map :refer    [qassoc
                                                 qupdate]]
             [io.randomseed.utils     :refer         :all]
-            [amelinium.auth.specs    :refer         :all]))
+            [amelinium.auth.specs    :refer         :all]
+            [amelinium.types.auth    :refer         :all])
+
+  (:import [amelinium.types.auth Suites SuitesJSON]))
 
 (defonce ^:private lock 'lock)
 
@@ -30,12 +33,6 @@
   {:wait        1
    :wait-random [0 2]
    :wait-nouser 2})
-
-(defrecord Suites     [^clojure.lang.IPersistentMap shared
-                       ^clojure.lang.IPersistentMap intrinsic])
-
-(defrecord SuitesJSON [^String shared
-                       ^String intrinsic])
 
 ;;
 ;; Helper functions

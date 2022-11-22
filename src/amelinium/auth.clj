@@ -13,13 +13,16 @@
             [amelinium.auth.pwd       :as       pwd]
             [amelinium.http           :as      http]
             [amelinium.system         :as    system]
+            [amelinium.proto.auth     :as         p]
+            [amelinium.types.auth     :refer   :all]
             [io.randomseed.utils      :refer   :all]
             [io.randomseed.utils.time :as      time]
             [io.randomseed.utils.var  :as       var]
             [io.randomseed.utils.map  :as       map]
             [tick.core                :as         t])
 
-  (:import [javax.sql DataSource]
+  (:import [amelinium.types.auth AccountTypes AuthLocking AuthConfirmation AuthPasswords AuthConfig AuthSettings]
+           [javax.sql DataSource]
            [java.time Duration]
            [reitit.core Match]))
 
@@ -27,80 +30,25 @@
 
 (def confirmation-expires-default (t/new-duration 10 :minutes))
 
-(defrecord AccountTypes     [^String                        sql
-                             ^clojure.lang.PersistentVector ids
-                             ^clojure.lang.PersistentVector names
-                             ^clojure.lang.Keyword          default
-                             ^String                        default-name])
-
-(defrecord AuthLocking      [^Long                max-attempts
-                             ^Duration            lock-wait
-                             ^Duration            fail-expires])
-
-(defrecord AuthConfirmation [^Long                max-attempts
-                             ^Duration            expires])
-
-(defrecord AuthPasswords    [^clojure.lang.Keyword id
-                             ^clojure.lang.ISeq    suite
-                             ^clojure.lang.Fn      check
-                             ^clojure.lang.Fn      check-json
-                             ^clojure.lang.Fn      encrypt
-                             ^clojure.lang.Fn      encrypt-json
-                             ^clojure.lang.Fn      wait])
-
-(defrecord AuthConfig       [^clojure.lang.Keyword id
-                             ^DataSource           db
-                             ^AccountTypes         account-types
-                             ^AccountTypes         parent-account-types
-                             ^AuthConfirmation     confirmation
-                             ^AuthLocking          locking
-                             ^AuthPasswords        passwords])
-
-(defrecord AuthSettings     [^DataSource                  db
-                             ^clojure.lang.Keyword        default-type
-                             ^AuthConfig                  default
-                             ^clojure.lang.IPersistentMap types])
-
-(defprotocol Authenticable
-  "This protocol is used to access authentication settings and configuration."
-
-  (^{:tag AuthSettings}
-   -settings
-   [settings-src]
-   "Returns a global authentication settings of type `AuthSettings` on a basis of
-  configuration source provided.")
-
-  (^{:tag AuthConfig}
-   -config
-   [settings-src] [settings-src account-type]
-   "Returns an authentication configuration of type `AuthConfig` on a basis of
-  configuration source `settings-src` and `account-type` provided.")
-
-  (^{:tag DataSource}
-   -db
-   [settings-src] [settings-src account-type]
-   "Returns a database connection object on a basis of configuration source
-  `settings-src` and optional `account-type` provided."))
-
 ;; Access to settings and configuration
 
 (defn settings
   "Returns authentication settings for the given authentication settings source
   `src`."
-  ^AuthSettings [src] (-settings src))
+  ^AuthSettings [src] (p/-settings src))
 
 (defn config
   "Returns an authentication configuration for the given account type `account-type`
   using authentication settings source `src`. If the second argument is not given it
   will use a default account type."
-  (^AuthConfig [src] (-config src))
-  (^AuthConfig [src account-type] (-config src account-type)))
+  (^AuthConfig [src] (p/-config src))
+  (^AuthConfig [src account-type] (p/-config src account-type)))
 
 (defn db
   "Returns an authentication database connection object using the given authentication
   settings source `src` and optional account type `account-type`."
-  (^DataSource [src] (-db src))
-  (^DataSource [src account-type] (-db src account-type)))
+  (^DataSource [src] (p/-db src))
+  (^DataSource [src account-type] (p/-db src account-type)))
 
 (defn config-by-type
   "Returns authentication configuration for the given account type using an
@@ -163,7 +111,7 @@
 
 ;; Authenticable implementation
 
-(extend-protocol Authenticable
+(extend-protocol p/Authenticable
 
   AuthSettings
 

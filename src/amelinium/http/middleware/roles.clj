@@ -28,7 +28,7 @@
             [io.randomseed.utils.map           :as        map]
             [io.randomseed.utils.ip            :as         ip])
 
-  (:import [amelinium.http.middleware.session Session]))
+  (:import [amelinium.types.session Session]))
 
 (defn known?
   [config role]
