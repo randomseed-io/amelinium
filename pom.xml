@@ -20,7 +20,7 @@
     <tag>1.0.0</tag>
     <url>https://github.com/randomseed-io/amelinium/</url>
   </scm>
-    <developers>
+  <developers>
     <developer>
       <id>siefca</id>
       <name>Paweł Wilk</name>
@@ -32,7 +32,7 @@
         <role>architect</role>
         <role>developer</role>
       </roles>
-      <timezone></timezone>
+      <timezone>Europe/Warsaw</timezone>
     </developer>
   </developers>
   <dependencies>
