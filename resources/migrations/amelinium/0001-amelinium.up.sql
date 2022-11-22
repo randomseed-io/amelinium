@@ -137,7 +137,7 @@ CREATE TABLE IF NOT EXISTS confirmations (
   expires           TIMESTAMP(6) NOT NULL,
   confirmed         BOOLEAN NOT NULL DEFAULT FALSE,
   req_id            CHAR(128) NULL,
-  account_type      ENUM('system', 'manager', 'lawyer', 'user') NULL,
+  account_type      ENUM('system', 'manager', 'editor', 'user') NULL,
   first_name        VARCHAR(64),
   middle_name       VARCHAR(64),
   last_name         VARCHAR(64),
