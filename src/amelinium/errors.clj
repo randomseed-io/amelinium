@@ -42,7 +42,7 @@
 (defn configurable?
   [v]
   "Returns `true` if the given object implements `ErrorsConfigurable` protocol."
-  (instance? ErrorsConfigurable v))
+  (satisfies? p/ErrorsConfigurable v))
 
 (defn most-significant
   "Returns the most significant error from the given `errors` using the given
