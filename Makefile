@@ -14,7 +14,7 @@ docs:
 			bin/docs "$(VERSION)"
 
 push-docs:
-			git subtree push --prefix=docs docs master
+			git subtree push --prefix=docs docs main
 
 test-clj:
 			bin/test
