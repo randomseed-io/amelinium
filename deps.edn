@@ -161,11 +161,11 @@
            :pack      {:extra-deps {pack/pack.alpha {:git/url "https://github.com/juxt/pack.alpha.git"
                                                      :sha     "2769a6224bfb938e777906ea311b3daf7d2220f5"}}}}
  :codox   {:name        "Amelinium"
-           :description "Opinionated Web Library"
+           :description "Opinionated Clojure Web Engine"
            :license     "GNU LGPL"
            :package     io.randomseed/amelinium
            :version     "1.0.0"
            :output-path "docs"
-           :source-uri  "https://github.com/randomseed-io/amelinium/utils/tree/{version}/{filepath}#lines-{line}"
+           :source-uri  "https://github.com/randomseed-io/amelinium/tree/{version}/{filepath}#L{line}"
            :metadata    {:doc/format :markdown}
            :themes      [:default :randomseed]}}
