@@ -2,8 +2,7 @@
 
     ^{:doc    "amelinium service, appender which always fails."
       :author "Paweł Wilk"
-      :added  "1.0.0"
-      :no-doc true}
+      :added  "1.0.0"}
 
     amelinium.auth.algo.fail
 

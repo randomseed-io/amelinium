@@ -2,8 +2,7 @@
 
     ^{:doc    "amelinium service, common controller functions."
       :author "Paweł Wilk"
-      :added  "1.0.0"
-      :no-doc true}
+      :added  "1.0.0"}
 
     amelinium.common.controller
 
