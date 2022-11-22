@@ -863,25 +863,25 @@
 (defn get-session-by-id
   "Standard session getter. Uses `db` to connect to a database and gets data identified
   by `sid` from a table `table`. Returns a map."
-  [opts db table sid-db remote-ip]
+  [^SessionConfig opts ^DataSource db table sid-db remote-ip]
   (sql/get-by-id db table sid-db db/opts-simple-map))
 
 (defn get-last-active
-  ^Instant [opts db table sid-db remote-ip]
+  ^Instant [^SessionConfig opts ^DataSource db table sid-db remote-ip]
   (first (jdbc/execute-one! db
                             [(str "SELECT active FROM " table " WHERE id = ?") sid-db]
                             db/opts-simple-vec)))
 
 (defn update-last-active
-  (^Long [opts db table sid-db remote-ip]
+  (^Long [^SessionConfig opts ^DataSource db table sid-db remote-ip]
    (::jdbc/update-count
     (sql/update! db table {:active (t/now)} {:id sid-db} db/opts-simple-map)))
-  (^Long [opts db table sid-db remote-ip t]
+  (^Long [^SessionConfig opts ^DataSource db table sid-db remote-ip t]
    (::jdbc/update-count
     (sql/update! db table {:active (t/instant t)} {:id sid-db} db/opts-simple-map))))
 
 (defn set-session
-  ^Long [opts db table smap]
+  ^Long [^SessionConfig opts ^DataSource db table smap]
   (::jdbc/update-count
    (db/replace! db table
                 (-> smap
@@ -890,7 +890,7 @@
                 db/opts-simple-map)))
 
 (defn delete-user-vars
-  [opts db sessions-table variables-table user-id]
+  [^SessionConfig opts ^DataSource db sessions-table variables-table user-id]
   (jdbc/execute-one! db [(str-spc "DELETE FROM" variables-table
                                   "WHERE EXISTS (SELECT 1 FROM" sessions-table
                                   (str "WHERE " sessions-table ".user_id = ?")
@@ -898,7 +898,7 @@
                          user-id]))
 
 (defn delete-session-vars
-  [opts db sessions-table variables-table db-id]
+  [^SessionConfig opts ^DataSource db sessions-table variables-table db-id]
   (jdbc/execute-one! db [(str-spc "DELETE FROM" variables-table
                                   "WHERE EXISTS (SELECT 1 FROM" sessions-table
                                   (str "WHERE " sessions-table ".id = ?")
@@ -1442,7 +1442,7 @@
   The `:cache-margin` is used as a precondition when investigating real time left in
   cache before making a decision about getting last active time from a database and
   refreshing internal structures (session, session cache)."
-  [config]
+  [^SessionConfig config]
   (let [expires   (get config :expires)
         cache-ttl (get config :cache-ttl)]
     (map/qassoc config :cache-margin
@@ -1456,7 +1456,7 @@
                       (t/- cache-ttl expires)))))))
 
 (defn- setup-fn
-  [config k default]
+  [^SessionConfig config k default]
   (or (var/deref (get config k)) default))
 
 (defn- setup-id-fn
@@ -1464,140 +1464,149 @@
   (let [id-path (if (coll? id-path) id-path [:params id-path])]
     (identify-session-path-compile id-path)))
 
+(defn- make-session-config
+  ^SessionConfig [m]
+  (-> m
+      (update :db               db/ds)
+      (update :sessions-table   #(or (to-snake-simple-str %) "sessions"))
+      (update :variables-table  #(or (to-snake-simple-str %) "session_variables"))
+      (update :expires          time/parse-duration)
+      (update :hard-expires     time/parse-duration)
+      (update :cache-ttl        time/parse-duration)
+      (update :cache-size       safe-parse-long)
+      (update :token-cache-ttl  time/parse-duration)
+      (update :token-cache-size safe-parse-long)
+      (update :session-key      #(or (some-keyword %) :session))
+      (update :id-path          #(if (valuable? %) (if (coll? %) (vec %) [:params %]) [:params %]))
+      (update :id-field         #(if (ident? %) % (some-str %)))
+      (update :single-session?  boolean)
+      (update :secured?         boolean)
+      (calc-cache-margin)
+      (map->SessionConfig)))
+
 (defn wrap-session
   "Session maintaining middleware."
   [k config]
-  (let [dbname                     (db/db-name (get config :db))
-        ^SessionConfig config      (-> config
-                                       (update :db               db/ds)
-                                       (update :sessions-table   #(or (to-snake-simple-str %) "sessions"))
-                                       (update :variables-table  #(or (to-snake-simple-str %) "session_variables"))
-                                       (update :expires          time/parse-duration)
-                                       (update :hard-expires     time/parse-duration)
-                                       (update :cache-ttl        time/parse-duration)
-                                       (update :cache-size       safe-parse-long)
-                                       (update :token-cache-ttl  time/parse-duration)
-                                       (update :token-cache-size safe-parse-long)
-                                       (update :session-key      #(or (some-keyword %) :session))
-                                       (update :id-path          #(if (valuable? %) (if (coll? %) (vec %) [:params %]) [:params %]))
-                                       (update :id-field         #(if (ident? %) % (some-str %)))
-                                       (update :single-session?  boolean)
-                                       (update :secured?         boolean)
-                                       (calc-cache-margin)
-                                       (map->SessionConfig))
-        db                         (get config :db)
-        session-key                (get config :session-key)
-        sessions-table             (get config :sessions-table)
-        variables-table            (get config :variables-table)
-        session-id-path            (get config :id-path)
-        session-id-field           (get config :id-field)
-        cache-margin               (get config :cache-margin)
-        single-session?            (get config :single-session?)
-        secured?                   (get config :secured?)
-        expires                    (get config :expires)
-        hard-expires               (get config :hard-expires)
-        session-id-field           (or session-id-field (if (coll? session-id-path) (last session-id-path) session-id-path))
-        config                     (assoc config :id-field (or session-id-field "session-id"))
-        expirer-fn                 (if (pos-int? (time/seconds expires)) #(calc-expired-core expires %1) (constantly false))
-        expirer-hard-fn            (if (pos-int? (time/seconds hard-expires)) #(calc-expired-core hard-expires %1) (constantly false))
-        identifier-fn              (setup-id-fn session-id-path)
-        config                     (assoc config :fn/identifier identifier-fn)
-        getter-fn                  (setup-fn config :fn/getter get-session-by-id)
-        getter-fn-w                #(getter-fn config db sessions-table %1 %2)
-        config                     (assoc config :fn/getter getter-fn-w)
-        checker-config             (set/rename-keys config {:token-cache-size :cache-size :token-cache-ttl :cache-ttl})
-        checker-fn                 (setup-fn config :fn/checker check-encrypted)
-        checker-fn-w               (db/memoizer checker-fn checker-config)
-        config                     (assoc config :fn/checker checker-fn-w)
-        pre-handler                ^{::mem/args-fn rest} #(handler %1 session-key session-id-field %2 %3)
-        mem-handler                (db/memoizer pre-handler config)
-        handler-fn-w               mem-handler
-        mem-atom                   (get-mem-atom mem-handler)
-        last-active-fn             (setup-fn config :fn/last-active get-last-active)
-        update-active-fn           (setup-fn config :fn/update-active update-last-active)
-        last-active-fn-w           #(last-active-fn config db sessions-table %1 %2)
-        config                     (assoc config :fn/last-active last-active-fn-w)
-        update-active-fn-w         (fn
-                                     (^Long [sid db-sid remote-ip]
-                                      (let [t (t/now)]
-                                        ;; session prolongation causes invalid params to be injected without validation!
-                                        (db/mem-assoc-existing! mem-handler [sid remote-ip] :active t)
-                                        (update-active-fn config db sessions-table db-sid remote-ip t)))
-                                     (^Long [sid db-sid remote-ip t]
+  (let [dbname                   (db/db-name (get config :db))
+        ^SessionConfig cfg       (make-session-config config)
+        ^DataSource db           (get cfg :db)
+        ^Duration cache-ttl      (get cfg :cache-ttl)
+        session-key              (get cfg :session-key)
+        sessions-table           (get cfg :sessions-table)
+        variables-table          (get cfg :variables-table)
+        session-id-path          (get cfg :id-path)
+        session-id-field         (get cfg :id-field)
+        ^Duration cache-margin   (get cfg :cache-margin)
+        ^Boolean single-session? (get cfg :single-session?)
+        ^Boolean secured?        (get cfg :secured?)
+        ^Duration expires        (get cfg :expires)
+        ^Duration hard-expires   (get cfg :hard-expires)
+        session-id-field         (or session-id-field (if (coll? session-id-path) (last session-id-path) session-id-path))
+        cfg                      (assoc cfg :id-field (or session-id-field "session-id"))
+        expirer-fn               (if (pos-int? (time/seconds expires)) #(calc-expired-core expires %1) (constantly false))
+        expirer-hard-fn          (if (pos-int? (time/seconds hard-expires)) #(calc-expired-core hard-expires %1) (constantly false))
+        identifier-fn            (setup-id-fn session-id-path)
+        cfg                      (assoc cfg :fn/identifier identifier-fn)
+        getter-fn                (setup-fn cfg :fn/getter get-session-by-id)
+        getter-fn-w              #(getter-fn cfg db sessions-table %1 %2)
+        cfg                      (assoc cfg :fn/getter getter-fn-w)
+        checker-config           (set/rename-keys cfg {:token-cache-size :cache-size :token-cache-ttl :cache-ttl})
+        checker-fn               (setup-fn cfg :fn/checker check-encrypted)
+        checker-fn-w             (db/memoizer checker-fn checker-config)
+        cfg                      (assoc cfg :fn/checker checker-fn-w)
+        pre-handler              ^{::mem/args-fn rest} #(handler %1 session-key session-id-field %2 %3)
+        mem-handler              (db/memoizer pre-handler cfg)
+        handler-fn-w             mem-handler
+        mem-atom                 (get-mem-atom mem-handler)
+        last-active-fn           (setup-fn cfg :fn/last-active get-last-active)
+        update-active-fn         (setup-fn cfg :fn/update-active update-last-active)
+        last-active-fn-w         #(last-active-fn cfg db sessions-table %1 %2)
+        ^SessionConfig cfg       (assoc cfg :fn/last-active last-active-fn-w)
+        update-active-fn-w       (fn
+                                   (^Long [sid db-sid remote-ip]
+                                    (let [t (t/now)]
+                                      ;; session prolongation causes invalid params to be injected without validation!
                                       (db/mem-assoc-existing! mem-handler [sid remote-ip] :active t)
-                                      (update-active-fn config db sessions-table db-sid remote-ip t)))
-        config                     (assoc config :fn/update-active update-active-fn-w)
-        var-get-fn                 (db/make-setting-getter  variables-table :session-id)
-        var-put-fn                 (db/make-setting-setter  variables-table :session-id)
-        var-del-fn                 (db/make-setting-deleter variables-table :session-id)
-        vars-put-fn                #(apply var-put-fn %1 %2 %3)
-        vars-get-fn                #(apply var-get-fn %1 %2 %3)
-        vars-del-fn                #(apply var-del-fn %1 %2 %3)
-        vars-del-user-fn           (setup-fn config :fn/del-user-vars delete-user-vars)
-        vars-del-sess-fn           (setup-fn config :fn/del-sess-vars delete-session-vars)
-        vars-del-user-fn-w         #(vars-del-user-fn config db sessions-table variables-table %)
-        vars-del-sess-fn-w         #(vars-del-sess-fn config db sessions-table variables-table %)
-        config                     (assoc config
-                                          :fn/get-var       var-get-fn
-                                          :fn/get-vars      vars-get-fn
-                                          :fn/put-var       var-put-fn
-                                          :fn/put-vars      vars-put-fn
-                                          :fn/del-var       var-del-fn
-                                          :fn/del-vars      vars-del-fn
-                                          :fn/del-user-vars vars-del-user-fn-w
-                                          :fn/del-sess-vars vars-del-sess-fn-w)
-        setter-fn                  (setup-fn config :fn/setter set-session)
-        setter-fn-w                #(setter-fn config db sessions-table %)
-        config                     (assoc config :fn/setter setter-fn-w)
-        invalidator-fn             (setup-invalidator pre-handler mem-handler)
-        config                     (assoc config :fn/invalidator invalidator-fn :fn/handler mem-handler)
-        prolong-fn                 prolong
-        ^Session empty-session     (Session. nil nil nil nil nil nil nil nil nil
-                                             false false false false false
-                                             session-key session-id-field
-                                             nil nil)
-        ^SessionConfig  config     (assoc config :fn/prolong prolong-fn)
-        ^SessionControl control    (reify p/SessionControl
-                                     (config        ^SessionConfig [_]           config)
-                                     (empty         ^Session [c]                 (map/qassoc empty-session :control c))
-                                     (expired?      ^Boolean [_ t]               (expirer-fn t))
-                                     (hard-expired? ^Boolean [_ t]               (expirer-hard-fn t))
-                                     (token-ok?     ^Boolean [_ plain enc]       (checker-fn-w plain enc))
-                                     (from-db       ^Session [_ db-sid ip]       (getter-fn-w db-sid ip))
-                                     (handle        ^Session [c sid ip]          (handler-fn-w c sid ip))
-                                     (to-db         ^Long    [_ smap]            (setter-fn-w smap))
-                                     (set-active    ^Long    [_ sid db-sid ip]   (update-active-fn-w sid db-sid ip))
-                                     (set-active    ^Long    [_ sid db-sid ip t] (update-active-fn-w sid db-sid ip t))
-                                     (get-active    ^Instant [_ db-sid ip]       (last-active-fn-w db-sid ip))
-                                     (identify      ^String  [_ req]             (identifier-fn req))
-                                     (mem-handler   [_] mem-handler)
-                                     (mem-atom      [_] mem-atom)
-                                     (mem-cache     [_] (if mem-atom (deref mem-atom)))
-                                     (invalidate    [_ sid ip]     (invalidator-fn sid ip))
-                                     (put-var       [_ db-sid k v] (var-put-fn  db db-sid k v))
-                                     (get-var       [_ db-sid k]   (var-get-fn  db db-sid k))
-                                     (del-var       [_ db-sid k]   (var-del-fn  db db-sid k))
-                                     (put-vars      [_ db-sid kvs] (vars-put-fn db db-sid kvs))
-                                     (get-vars      [_ db-sid ks]  (vars-get-fn db db-sid ks))
-                                     (del-vars      [_ db-sid ks]  (var-del-fn  db db-sid ks))
-                                     (del-svars     [_ db-sid]     (vars-del-sess-fn-w db-sid))
-                                     (del-uvars     [_ user-id]    (vars-del-user-fn-w user-id)))
-        ^Session empty-session     (p/empty ^SessionControl control)
-        ^Session malformed-session (map/qassoc empty-session
-                                               :error (SessionError. :info :session/malformed-session-id
-                                                                     "Malformed session-id parameter"))]
+                                      (update-active-fn cfg db sessions-table db-sid remote-ip t)))
+                                   (^Long [sid db-sid remote-ip t]
+                                    (db/mem-assoc-existing! mem-handler [sid remote-ip] :active t)
+                                    (update-active-fn cfg db sessions-table db-sid remote-ip t)))
+        cfg                      (assoc cfg :fn/update-active update-active-fn-w)
+        var-get-fn               (db/make-setting-getter  variables-table :session-id)
+        var-put-fn               (db/make-setting-setter  variables-table :session-id)
+        var-del-fn               (db/make-setting-deleter variables-table :session-id)
+        vars-put-fn              #(apply var-put-fn %1 %2 %3)
+        vars-get-fn              #(apply var-get-fn %1 %2 %3)
+        vars-del-fn              #(apply var-del-fn %1 %2 %3)
+        vars-del-user-fn         (setup-fn cfg :fn/del-user-vars delete-user-vars)
+        vars-del-sess-fn         (setup-fn cfg :fn/del-sess-vars delete-session-vars)
+        vars-del-user-fn-w       #(vars-del-user-fn cfg db sessions-table variables-table %)
+        vars-del-sess-fn-w       #(vars-del-sess-fn cfg db sessions-table variables-table %)
+        cfg                      (assoc cfg
+                                        :fn/get-var       var-get-fn
+                                        :fn/get-vars      vars-get-fn
+                                        :fn/put-var       var-put-fn
+                                        :fn/put-vars      vars-put-fn
+                                        :fn/del-var       var-del-fn
+                                        :fn/del-vars      vars-del-fn
+                                        :fn/del-user-vars vars-del-user-fn-w
+                                        :fn/del-sess-vars vars-del-sess-fn-w)
+        setter-fn                (setup-fn cfg :fn/setter set-session)
+        setter-fn-w              #(setter-fn cfg db sessions-table %)
+        cfg                      (assoc cfg :fn/setter setter-fn-w)
+        invalidator-fn           (setup-invalidator pre-handler mem-handler)
+        cfg                      (assoc cfg :fn/invalidator invalidator-fn :fn/handler mem-handler)
+        prolong-fn               prolong
+        ^Session empty-sess      (Session. nil nil nil nil nil nil nil nil nil
+                                           false false false false false
+                                           session-key session-id-field
+                                           nil nil)
+        ^SessionConfig  cfg      (assoc cfg :fn/prolong prolong-fn)
+        ^SessionControl ctrl     (reify p/SessionControl
+                                   (config        ^SessionConfig [_]           cfg)
+                                   (empty         ^Session [c]                 (map/qassoc empty-sess :control c))
+                                   (expired?      ^Boolean [_ t]               (expirer-fn t))
+                                   (hard-expired? ^Boolean [_ t]               (expirer-hard-fn t))
+                                   (token-ok?     ^Boolean [_ plain enc]       (checker-fn-w plain enc))
+                                   (from-db       ^Session [_ db-sid ip]       (getter-fn-w db-sid ip))
+                                   (handle        ^Session [c sid ip]          (handler-fn-w c sid ip))
+                                   (to-db         ^Long    [_ smap]            (setter-fn-w smap))
+                                   (set-active    ^Long    [_ sid db-sid ip]   (update-active-fn-w sid db-sid ip))
+                                   (set-active    ^Long    [_ sid db-sid ip t] (update-active-fn-w sid db-sid ip t))
+                                   (get-active    ^Instant [_ db-sid ip]       (last-active-fn-w db-sid ip))
+                                   (identify      ^String  [_ req]             (identifier-fn req))
+                                   (mem-handler   [_] mem-handler)
+                                   (mem-atom      [_] mem-atom)
+                                   (mem-cache     [_] (if mem-atom (deref mem-atom)))
+                                   (invalidate    [_ sid ip]     (invalidator-fn sid ip))
+                                   (put-var       [_ db-sid k v] (var-put-fn  db db-sid k v))
+                                   (get-var       [_ db-sid k]   (var-get-fn  db db-sid k))
+                                   (del-var       [_ db-sid k]   (var-del-fn  db db-sid k))
+                                   (put-vars      [_ db-sid kvs] (vars-put-fn db db-sid kvs))
+                                   (get-vars      [_ db-sid ks]  (vars-get-fn db db-sid ks))
+                                   (del-vars      [_ db-sid ks]  (var-del-fn  db db-sid ks))
+                                   (del-svars     [_ db-sid]     (vars-del-sess-fn-w db-sid))
+                                   (del-uvars     [_ user-id]    (vars-del-user-fn-w user-id)))
+        ^Session empty-sess      (p/empty ^SessionControl ctrl)
+        ^Session mlf-sess        (map/qassoc empty-sess
+                                             :error (SessionError. :info :session/malformed-session-id
+                                                                   "Malformed session-id parameter"))]
     (log/msg "Installing session handler:" k)
-    (if dbname (log/msg "Using database" dbname "for storing sessions"))
+    (log/msg (str "Session exp: "   (str/replace (or expires      "-") "PT" "")
+                  ", hard-exp: "    (str/replace (or hard-expires "-") "PT" "")
+                  ", cache TTL: "   (str/replace (or cache-ttl    "-") "PT" "")
+                  ", time margin: " (str/replace (or cache-margin "-") "PT" "")))
+    (if dbname (log/msg "Using database" dbname "for storing sessions of" k))
     {:name    (keyword k)
-     :config  config
+     :config  cfg
      :compile (fn [{:keys [no-session?]} opts]
                 (if (and (not no-session?) db)
                   (fn [h]
                     (fn [req]
                       (h
-                       (map/qassoc req session-key (delay (process control
-                                                                   malformed-session
-                                                                   empty-session
+                       (map/qassoc req session-key (delay (process ctrl
+                                                                   mlf-sess
+                                                                   empty-sess
                                                                    cache-margin
                                                                    expires
                                                                    req))))))))}))

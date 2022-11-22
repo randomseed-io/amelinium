@@ -1338,7 +1338,7 @@
    (config+session req :session))
   ([req session-key]
    (if-some [^Session s (session/of req session-key)]
-     [(.config ^Session s) s]
+     [(or (session/config s) (session/config req session-key)) s]
      [nil nil])))
 
 (defn session-inject
