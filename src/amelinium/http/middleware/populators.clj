@@ -32,7 +32,6 @@
 
 (defn compile-populator
   "Prepares a single populator."
-  {:no-doc true}
   [data to-enable to-disable entry]
   (cond
     (sequential? entry) (compile-populator data to-enable to-disable
@@ -56,7 +55,8 @@
                               (let [f  (derefn f)
                                     cf (if (not f) (derefn cf))
                                     f  (or f (if cf (cf data id cargs) (derefn (symbol id))))]
-                                (if (fn? f) [id (fn populator [req] (f req id args))])))))))
+                                (if (fn? f)
+                                  [id (fn populator [req] (f req id args))])))))))
 
 (defn compile
   "Prepares population map an a basis of configuration sequence by processing its
@@ -78,7 +78,12 @@
   [data config]
   (let [to-en (set (get data :populators/enable))
         to-di (set (get data :populators/disable))]
-    (->> config (map (partial compile-populator data to-en to-di)) (filter vector?) vec)))
+    (->> config
+         (map (partial compile-populator data to-en to-di))
+         (filter vector?)
+         (filter (comp ifn? second))
+         (filter identity)
+         vec not-empty)))
 
 (defn populate
   "For each populator map calls the function identified by map's value and associates
@@ -105,6 +110,12 @@
 (derive ::web  ::default)
 (derive ::api  ::default)
 (derive ::all  ::default)
+(derive ::pre  ::default)
+(derive ::mid  ::default)
 (derive ::post ::default)
+(derive ::web-pre  ::default)
+(derive ::api-pre  ::default)
+(derive ::web-mid  ::default)
+(derive ::api-mid  ::default)
 (derive ::web-post ::default)
 (derive ::api-post ::default)
