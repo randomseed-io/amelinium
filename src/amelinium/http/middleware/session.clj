@@ -576,13 +576,13 @@
 (def ^:const salt-splitter  (re-pattern "\\$"))
 
 (defn- bytes->b64u
-  [v]
+  ^String [^"[B" v]
   (try (if v (codecs/bytes->str (codecs/bytes->b64u v)))
        (catch Throwable _
          nil)))
 
 (defn- b64u->bytes
-  [v]
+  ^"[B" [^String v]
   (try (if v (codecs/b64u->bytes (codecs/str->bytes v)))
        (catch Throwable _
          nil)))
@@ -592,7 +592,7 @@
   salt. Returns a Base64-encoded string with salt and encrypted password separated
   with a dollar character. The encrypted password is a result of applying one-way
   hashing function to the `plain-token` and salt."
-  ^String [plain-token]
+  ^String [^String plain-token]
   (if plain-token
     (if-some [enc (scrypt/encrypt plain-token scrypt-options)]
       (str (bytes->b64u (bytes (get enc :salt))) "$"
@@ -602,9 +602,9 @@
   "Checks if the encrypted token given as `encrypted-token-b64-str` matches the given
   `plain-token`. Verifies its correctness by re-encrypting it with the same salt
   parameter as it was used when original token was created."
-  ^Boolean [plain-token encrypted-token-b64-str]
+  ^Boolean [^String plain-token ^String encrypted-token-b64-str]
   (if (and plain-token encrypted-token-b64-str)
-    (if-some [salt-pass (str/split encrypted-token-b64-str salt-splitter 2)]
+    (if-some [^String salt-pass (str/split encrypted-token-b64-str salt-splitter 2)]
       (crypto/eq? (b64u->bytes (nth salt-pass 1 nil))
                   (get (scrypt/encrypt plain-token
                                        (b64u->bytes (nth salt-pass 0 nil))
@@ -635,8 +635,8 @@
 (defn db-sid-smap
   "Extracts a database session ID from a secure session object."
   ^String [^Session smap]
-  (or (.db-id ^Session smap)
-      (nth (split-secure-sid (.id ^Session smap) 0 nil))))
+  (or (.db-id smap)
+      (nth (split-secure-sid (.id smap) 0 nil))))
 
 (defn db-sid-str
   "Extracts a database session ID from a secure session ID."
@@ -673,7 +673,7 @@
   set to a truthy value, it returns it.  If there is no session, it returns `false`."
   (^Boolean [^Sessionable src]
    (if-some [^Session s (p/session src)]
-     (or (.secure? ^Session s)
+     (or (.secure? s)
          (not (if-some [^SessionConfig c (config s)] (.secured? c))))
      false))
   (^Boolean [^Sessionable src ^Keyword session-key]
@@ -688,8 +688,8 @@
   value, it returns `false`. If there is no session, it returns `true`."
   (^Boolean [^Sessionable src]
    (if-some [^Session s (p/session src)]
-     (and (not (.secure? ^Session s))
-          (if-some [^SessionConfig c (config ^Session s)] (.secured? c) false))
+     (and (not (.secure? s))
+          (if-some [^SessionConfig c (config s)] (.secured? c) false))
      true))
   (^Boolean [^Sessionable src ^Keyword session-key]
    (if-some [^Session s (p/session src session-key)]
@@ -882,11 +882,10 @@
   [^Session smap ^IPAddress ip-address]
   (if-not (session? smap)
     (SessionError. :info :session/missing (str-spc "No session:" smap))
-    (let [^Session smap      smap
-          ^String sid        (.id         ^Session smap)
-          ^String esid       (.err-id     ^Session smap)
-          ^Long user-id      (.user-id    ^Session smap)
-          ^String user-email (.user-email ^Session smap)
+    (let [^String sid        (.id         smap)
+          ^String esid       (.err-id     smap)
+          ^Long user-id      (.user-id    smap)
+          ^String user-email (.user-email smap)
           ^String any-sid    (or sid esid)
           user-ident         (or user-id user-email)
           ^Long user-id      (valuable user-id)
@@ -977,7 +976,7 @@
               (not   (.valid? smap))
               (nil?  (.id     smap))
               (some? (.err-id smap )))
-       (map/qassoc smap :valid? true :id (.err-id ^Session smap))
+       (map/qassoc smap :valid? true :id (.err-id smap))
        smap)))
   (^Session [^Sessionable src ^Keyword session-key]
    (if-some [^Session smap (p/session src session-key)]
@@ -985,7 +984,7 @@
               (not   (.valid? smap))
               (nil?  (.id     smap))
               (some? (.err-id smap )))
-       (map/qassoc smap :valid? true :id (.err-id ^Session smap))
+       (map/qassoc smap :valid? true :id (.err-id smap))
        smap))))
 
 (defn allow-soft-expired
@@ -1116,7 +1115,7 @@
                                          (if-some [^SessionConfig cfg (p/config smap)]
                                            (.bad-ip-expires? cfg)))))
            h-expired?      (and expired? (p/hard-expired? smap))
-           ^String err-id  (or (.id ^Session smap) (.err-id smap))
+           ^String err-id  (or (.id smap) (.err-id smap))
            ^SessionError e (if have-error?
                              (let [cause?           (some? (.cause e))
                                    ^SessionError er (if (some? (.severity e)) e
@@ -1324,7 +1323,7 @@
 (defn- refresh-times-core
   [^Session smap ^SessionControl ctrl ^Duration cache-margin ^IPAddress remote-ip]
   (or (if cache-margin
-        (if-some [last-active (.active ^Session smap)]
+        (if-some [last-active (.active smap)]
           (let [inactive-for (t/between last-active (t/now))]
             (when (t/> inactive-for cache-margin)
               (let [fresh-active  (p/get-active ctrl (db-sid-smap smap) remote-ip)
@@ -1394,19 +1393,18 @@
    (let [[^String sid-db
           ^String pass]     (split-secure-sid sid)
          secure?            (some? (not-empty pass))
-         smap-db            (p/from-db   ctrl sid-db remote-ip)
-         token-ok?          (p/token-ok? ctrl pass (get smap-db :secure-token))
-         ^Session smap      (map->Session (dissoc smap-db :secure-token))
-         ^Session smap      (if secure? (map/qassoc smap :security-passed? token-ok?) smap)
+         smap-db            (p/from-db ctrl sid-db remote-ip)
+         token-ok?          (if secure? (p/token-ok? ctrl pass (get smap-db :secure-token)) false)
          ^Session smap      (map/qassoc
-                             smap
-                             :id          sid
-                             :db-id       sid-db
-                             :ip          (ip/to-address (.ip ^Session smap))
-                             :secure?     secure?
-                             :control     ctrl
-                             :session-key session-key
-                             :id-field    id-field)
+                             (map->Session (dissoc smap-db :secure-token))
+                             :id               sid
+                             :db-id            sid-db
+                             :ip               (ip/to-address (get smap-db :ip))
+                             :secure?          secure?
+                             :security-passed? token-ok?
+                             :control          ctrl
+                             :session-key      session-key
+                             :id-field         id-field)
          ^SessionError stat (state smap remote-ip)]
      (if (instance? SessionError stat)
        (mkbad  smap :error stat)
@@ -1484,8 +1482,11 @@
   session against a database or memoized session data. Returns a session map or dummy
   session map if session was not obtained (session ID was not found in a database)."
   ^Session [^SessionControl ctrl
-            ^Session malformed-session ^Session empty-session
-            ^Duration cache-margin ^Duration expires-in req]
+            ^Session        malformed-session
+            ^Session        empty-session
+            ^Duration       cache-margin
+            ^Duration       expires-in
+            req]
   (if-some [^String sid (p/identify ctrl req)]
     (let [^IPAddress remote-ip (ip/to-address (get req :remote-ip))]
       (if-not (sid-valid? sid)
@@ -1514,11 +1515,11 @@
   ([^Sessionable src ^Keyword session-key ^IPAddress ip-address]
    (if-some [^Session smap (p/session src session-key)]
      (if-some [sid (or (.err-id smap) (.id smap))]
-       (let [^SessionControl ctrl  (.control smap)
+       (let [^SessionControl  ctrl (.control smap)
              ^IPAddress ip-address (ip/to-address (or ip-address (.ip smap)))
-             ^String    ipplain    (ip/plain-ip-str ip-address)
-             ^Instant   new-time   (t/now)]
-         (log/msg "Prolonging session" (log/for-user (.user-id ^Session smap) (.user-email ^Session smap) ipplain))
+             ^String       ipplain (ip/plain-ip-str ip-address)
+             ^Instant     new-time (t/now)]
+         (log/msg "Prolonging session" (log/for-user (.user-id smap) (.user-email smap) ipplain))
          (let [^Session      new-smap (map/qassoc smap :id sid :active new-time)
                ^SessionError stat     (state new-smap ip-address)]
            (if (correct-state? stat)
@@ -1527,7 +1528,7 @@
                   (if (not= ip-address (.ip smap)) (p/invalidate ctrl sid (.ip smap)))
                   (map/qassoc (p/handle ctrl sid ip-address) :prolonged? true))
              (do (log/wrn "Session re-validation error"
-                          (log/for-user (.user-id ^Session smap) (.user-email ^Session smap) ipplain))
+                          (log/for-user (.user-id smap) (.user-email smap) ipplain))
                  (mkbad smap :error stat)))))))))
 
 (defn create
@@ -1554,9 +1555,9 @@
          (if-not (correct-state? stat)
            (do (log/err "Session incorrect after creation" (log/for-user user-id user-email ipplain))
                (mkbad sess :error stat))
-           (let [updated-count (p/to-db ^SessionControl ctrl ^Session sess)
-                 sess          (map/qassoc sess :db-token nil)]
-             (p/invalidate ctrl (p/identify ^Session sess) ip)
+           (let [updated-count (p/to-db ctrl sess)
+                 ^Session sess (map/qassoc sess :db-token nil)]
+             (p/invalidate ctrl (p/identify sess) ip)
              (if (pos-int? updated-count)
                (do (if (.single-session? opts)
                      (p/del-uvars ctrl user-id)
@@ -1610,7 +1611,9 @@
   (let [^Duration expires   (get config :expires)
         ^Duration cache-ttl (get config :cache-ttl)]
     (map/qassoc config :cache-margin
-                (if (and expires cache-ttl (pos? (t/seconds cache-ttl)) (pos? (t/seconds expires)))
+                (if (and expires cache-ttl
+                         (pos? (t/seconds cache-ttl))
+                         (pos? (t/seconds expires)))
                   (if (t/> expires cache-ttl)
                     (if (>= (t/divide expires cache-ttl) 2)
                       (t/- expires cache-ttl)
@@ -1738,9 +1741,9 @@
                                    (set-active    ^Long    [_ sid db-sid ip t] (update-active-fn-w sid db-sid ip t))
                                    (get-active    ^Instant [_ db-sid ip]       (last-active-fn-w db-sid ip))
                                    (identify      ^String  [_ req]             (identifier-fn req))
-                                   (mem-handler   [_] mem-handler)
-                                   (mem-atom      [_] mem-atom)
-                                   (mem-cache     [_] (if mem-atom (deref mem-atom)))
+                                   (mem-handler   [_]            mem-handler)
+                                   (mem-atom      [_]            mem-atom)
+                                   (mem-cache     [_]            (if mem-atom (deref mem-atom)))
                                    (invalidate    [_ sid ip]     (invalidator-fn sid ip))
                                    (put-var       [_ db-sid k v] (var-put-fn  db db-sid k v))
                                    (get-var       [_ db-sid k]   (var-get-fn  db db-sid k))
@@ -1750,7 +1753,7 @@
                                    (del-vars      [_ db-sid ks]  (var-del-fn  db db-sid ks))
                                    (del-svars     [_ db-sid]     (vars-del-sess-fn-w db-sid))
                                    (del-uvars     [_ user-id]    (vars-del-user-fn-w user-id)))
-        ^Session empty-sess      (p/empty ^SessionControl ctrl)
+        ^Session empty-sess      (p/empty ctrl)
         ^Session mlf-sess        (map/qassoc empty-sess
                                              :error (SessionError. :info :session/malformed-session-id
                                                                    "Malformed session-id parameter"))]
