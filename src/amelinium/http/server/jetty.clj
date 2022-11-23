@@ -6,7 +6,7 @@
 
     amelinium.http.server.jetty
 
-  (:require  [ring.adapter.jetty9          :as      jetty]
+  (:require  [ring.adapter.jetty           :as      jetty]
              [amelinium.server.ssl         :as        ssl]
              [amelinium.system             :as     system]
              [amelinium.logging            :as        log]

@@ -46,11 +46,11 @@
            metosin/muuntaja                     {:mvn/version "0.6.8"}        ;; HTTP transformations
            metosin/muuntaja-msgpack             {:mvn/version "0.6.8"}        ;; HTTP MessagePack format
            metosin/ring-http-response           {:mvn/version "0.9.3"}        ;; HTTP responses (replaces ring.util.response)
-           ring/ring-core                       {:mvn/version "1.9.5"}        ;; HTTP handler
+           ring/ring-core                       {:mvn/version "1.9.6"}        ;; HTTP handler
            ring/ring-codec                      {:mvn/version "1.2.0"}        ;; HTTP encoding
            ring/ring-mock                       {:mvn/version "0.4.0"}        ;; HTTP request mocks
            ring-cors/ring-cors                  {:mvn/version "0.1.13"}       ;; HTTP cross-origin handling for Ring
-           info.sunng/ring-jetty9-adapter       {:mvn/version "0.17.6"
+           ring/ring-jetty-adapter              {:mvn/version "1.9.6"
                                                  :exclusions  [org.slf4j/slf4j-api]}
            fundingcircle/ring-accept            {:mvn/version "2.0.4"}        ;; HTTP accept-language and similar headers handling for Ring
            ;;aleph/aleph                          {:mvn/version "0.4.7"}      ;; Network server
