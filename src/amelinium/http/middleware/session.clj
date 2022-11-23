@@ -1526,7 +1526,10 @@
              (do  (p/set-active ctrl sid (or (db-sid-smap new-smap) (db-sid-str sid)) ip-address new-time)
                   (p/invalidate ctrl sid ip-address)
                   (if (not= ip-address (.ip smap)) (p/invalidate ctrl sid (.ip smap)))
-                  (map/qassoc (p/handle ctrl sid ip-address) :prolonged? true))
+                  (let [^Session smap (p/handle ctrl sid ip-address)]
+                    (if (.valid? smap)
+                      (map/qassoc smap :prolonged? true)
+                      smap)))
              (do (log/wrn "Session re-validation error"
                           (log/for-user (.user-id smap) (.user-email smap) ipplain))
                  (mkbad smap :error stat)))))))))
