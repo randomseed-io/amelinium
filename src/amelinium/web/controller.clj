@@ -443,7 +443,8 @@
     (case ctype
 
       :reitit.coercion/request-coercion
-      (let [orig-page              (http/get-route-data req :form-errors/page)
+      (let [route-data             (http/get-route-data req)
+            orig-page              (get route-data :form-errors/page)
             referer                (if (nil? orig-page) (some-str (get-in req [:headers "referer"])))
             [orig-uri orig-params] (if referer (common/url->uri+params req referer))
             handling-previous?     (contains? (get req :query-params) "form-errors")]
@@ -459,7 +460,7 @@
                  destination  (or orig-page orig-uri)
                  dest-uri     (if (keyword? destination) (common/page req destination) destination)
                  dest-uri     (some-str dest-uri)
-                 session?     (and smap (session/valid? smap)
+                 session?     (and smap (or (session/valid? smap) (session/soft-expired? smap))
                                    (session/put-var! smap :form-errors {:dest   dest-uri
                                                                         :errors errors}))
                  error-params (if session? "" (coercion/join-errors errors))
