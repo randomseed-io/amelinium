@@ -1,0 +1,34 @@
+Check if roles could be optimized by getting them from route data when initializing roles
+instead of reading from req->route-data. We can start a middleware per route data.
+
+
+https://www.imdb.com/title/tt0366780/?ref_=ttls_li_tt
+
+
+{[78a163e48832df0d1c188140b7cdfd87-f63edd462b8e2406839d50ee6bd6b686
+#object[inet.ipaddr.ipv6.IPv6Address 0x49a336f5 ::1]]
+#amelinium.http.middleware.session.Session{:id nil, :err-id
+78a163e48832df0d1c188140b7cdfd87-f63edd462b8e2406839d50ee6bd6b686, :db-id
+78a163e48832df0d1c188140b7cdfd87, :db-token nil, :user-id 1, :user-email pw@gnu.org,
+:created #time/instant "2022-11-17T02:44:30.558Z", :active #time/instant
+"2022-11-17T02:44:30.558Z", :ip #object[inet.ipaddr.ipv6.IPv6Address 0x3a6648cc ::1],
+:valid? false, :expired? true, :hard-expired? false, :secure? true, :security-passed?
+true, :session-key :session, :id-field session-id, :error
+#amelinium.http.middleware.session.SessionError{:severity :info, :id
+:session/expired, :cause Session expired for pw@gnu.org (1) [::1]}, :control
+#object[amelinium.http.middleware.session$wrap_session$reify__216790 0x4679ee55
+amelinium.http.middleware.session$wrap_session$reify__216790@4679ee55]}}
+
+{[78a163e48832df0d1c188140b7cdfd87-f63edd462b8e2406839d50ee6bd6b686
+#object[inet.ipaddr.ipv6.IPv6Address 0x49a336f5 ::1]]
+#amelinium.http.middleware.session.Session{:id nil, :err-id
+78a163e48832df0d1c188140b7cdfd87-f63edd462b8e2406839d50ee6bd6b686, :db-id
+78a163e48832df0d1c188140b7cdfd87, :db-token nil, :user-id 1, :user-email pw@gnu.org,
+:created #time/instant "2022-11-17T02:44:30.558Z", :active #time/instant
+"2022-11-17T02:44:30.558Z", :ip #object[inet.ipaddr.ipv6.IPv6Address 0x3a6648cc ::1],
+:valid? false, :expired? true, :hard-expired? false, :secure? true, :security-passed?
+true, :session-key :session, :id-field session-id, :error
+#amelinium.http.middleware.session.SessionError{:severity :info, :id
+:session/expired, :cause Session expired for pw@gnu.org (1) [::1]}, :control
+#object[amelinium.http.middleware.session$wrap_session$reify__216790 0x4679ee55
+amelinium.http.middleware.session$wrap_session$reify__216790@4679ee55]}}
