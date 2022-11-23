@@ -248,8 +248,8 @@
   parameter names as keys and parameter types as values.
 
   Used to parse input from a query string or saved session variable when visiting a
-  page with a previously visited form which is to be corrected (after redirecting to
-  it).
+  page containing a previously visited form which needs to be corrected (after
+  redirecting to it).
 
   The `explain-form-error` template tag can make use of such map to decide whether an
   input field had invalid data."

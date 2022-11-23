@@ -20,7 +20,7 @@
   (:import [java.io File FileInputStream IOException]
            [java.security KeyStore]
            [java.security.cert Certificate]
-           [javax.security.cert X509Certificate]
+           [java.security.cert X509Certificate]
            [javax.security.auth.x500 X500Principal]
            [io.undertow.server HttpServerExchange ConnectionSSLSessionInfo]
            [io.undertow.server.protocol.http HttpServerConnection]))

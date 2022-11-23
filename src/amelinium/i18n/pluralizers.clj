@@ -72,7 +72,7 @@
   ([n singular plural]
    (if (= 1 n) singular plural))
   ([n zero singular plural]
-   (case n 1 singular 0 zero plural))
+   (case (int n) 1 singular 0 zero plural))
   ([n zero singular plural-genitive plural-nominative]
    (cond
      (= 1 n)            singular

@@ -45,10 +45,12 @@
 (def one-second (t/new-duration 1 :seconds))
 
 (defn config?
+  "Returns `true` if the given value `v` is an instance of `SessionConfig` record."
   ^Boolean [v]
   (instance? SessionConfig v))
 
 (defn session?
+  "Returns `true` if the given value `v` is an instance of `Session` record."
   ^Boolean [v]
   (instance? Session v))
 
@@ -160,14 +162,17 @@
 
   Session
 
-  (get-var       [s k]   (p/get-var       (.control ^Session s) (db-sid-smap s) k))
-  (get-vars      [s ks]  (p/get-vars      (.control ^Session s) (db-sid-smap s) ks))
-  (put-var       [s k v] (p/put-var       (.control ^Session s) (db-sid-smap s) k v))
-  (put-vars      [s kvs] (p/put-vars      (.control ^Session s) (db-sid-smap s) kvs))
-  (del-var       [s k]   (p/del-var       (.control ^Session s) (db-sid-smap s) k))
-  (del-vars      [s ks]  (p/del-vars      (.control ^Session s) (db-sid-smap s) ks))
-  (del-svars     [s]     (p/del-svars     (.control ^Session s) (db-sid-smap s)))
-  (del-uvars     [s]     (p/del-uvars     (.control ^Session s) (.user-id ^Session s)))
+  (get-var     [s k]   (p/get-var       (.control ^Session s) (db-sid-smap s) k))
+  (get-vars    [s ks]  (p/get-vars      (.control ^Session s) (db-sid-smap s) ks))
+  (put-var     [s k v] (p/put-var       (.control ^Session s) (db-sid-smap s) k v))
+  (put-vars    [s kvs] (p/put-vars      (.control ^Session s) (db-sid-smap s) kvs))
+  (del-var     [s k]   (p/del-var       (.control ^Session s) (db-sid-smap s) k))
+  (del-vars    [s ks]  (p/del-vars      (.control ^Session s) (db-sid-smap s) ks))
+  (del-svars   [s]     (p/del-svars     (.control ^Session s) (db-sid-smap s)))
+  (del-uvars   [s]     (p/del-uvars     (.control ^Session s) (.user-id ^Session s)))
+  (mem-atom    [s]     (p/mem-atom      (.control ^Session s)))
+  (mem-handler [s]     (p/mem-handler   (.control ^Session s)))
+  (mem-cache   [s]     (p/mem-cache     (.control ^Session s)))
 
   (config
     (^SessionConfig [s]       (p/config (.control ^Session s)))
@@ -182,9 +187,9 @@
     (^Long    [s _]           (p/to-db (.control ^Session s) s)))
 
   (identify
-    (^String [s]              (or (.id ^Session s) (.err-id ^Session s)))
-    (^String [s req]          (or (.id ^Session s) (.err-id ^Session s)
-                                  (p/identify (.control ^Session s) req))))
+    (^String  [s]              (or (.id ^Session s) (.err-id ^Session s)))
+    (^String  [s req]          (or (.id ^Session s) (.err-id ^Session s)
+                                   (p/identify (.control ^Session s) req))))
 
   (from-db
     (^Session [s]             (p/from-db (.control ^Session s) (db-sid-smap s) (.ip ^Session s)))
@@ -1525,7 +1530,6 @@
         update-active-fn-w       (fn
                                    (^Long [sid db-sid remote-ip]
                                     (let [t (t/now)]
-                                      ;; session prolongation causes invalid params to be injected without validation!
                                       (db/mem-assoc-existing! mem-handler [sid remote-ip] :active t)
                                       (update-active-fn cfg db sessions-table db-sid remote-ip t)))
                                    (^Long [sid db-sid remote-ip t]

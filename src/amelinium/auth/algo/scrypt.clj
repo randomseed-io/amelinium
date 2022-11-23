@@ -35,18 +35,18 @@
   ([plain options]
    (encrypt plain options {}))
   ([plain options settings]
-   (let [options (if (or (nil? options) (map? options)) options {:salt options})
-         options (conj default-options
-                       (map/remove-empty-values (select-keys settings required-keys))
-                       (map/remove-empty-values (select-keys options  required-keys)))
-         salt    (to-bytes (or (get options :salt) (pwd/salt-bytes 16)))
-         result  (SCrypt/scrypt
-                  (text-to-bytes plain)
-                  salt
-                  (int (get options :cpu-cost))
-                  (int (get options :mem-cost))
-                  (int (get options :parallel))
-                  (int 32))]
+   (let [options    (if (or (nil? options) (map? options)) options {:salt options})
+         options    (conj default-options
+                          (map/remove-empty-values (select-keys settings required-keys))
+                          (map/remove-empty-values (select-keys options  required-keys)))
+         ^"[B" salt (to-bytes (or (get options :salt) (pwd/salt-bytes 16)))
+         result     (SCrypt/scrypt
+                     ^"[B" (text-to-bytes plain)
+                     salt
+                     (int (get options :cpu-cost))
+                     (int (get options :mem-cost))
+                     (int (get options :parallel))
+                     (int 32))]
      (qassoc options :salt salt :password result))))
 
 (def check (partial pwd/standard-check encrypt))

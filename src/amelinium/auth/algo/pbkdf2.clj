@@ -34,18 +34,18 @@
   ([plain options]
    (encrypt plain options {}))
   ([plain options settings]
-   (let [options (if (or (nil? options) (map? options)) options {:salt options})
-         options (conj default-options
-                       (map/remove-empty-values (select-keys settings required-keys))
-                       (map/remove-empty-values (select-keys options required-keys)))
-         options (map/update-existing options :algorithm normalize-name)
-         salt    (to-bytes (map/lazy-get options :salt (pwd/salt-bytes 8)))
-         result  (PBKDF/pbkdf2
-                  (get options :algorithm)
-                  (text-to-bytes plain)
-                  salt
-                  (int (get options :iterations))
-                  (int 160))]
+   (let [options    (if (or (nil? options) (map? options)) options {:salt options})
+         options    (conj default-options
+                          (map/remove-empty-values (select-keys settings required-keys))
+                          (map/remove-empty-values (select-keys options required-keys)))
+         options    (map/update-existing options :algorithm normalize-name)
+         ^"[B" salt (to-bytes (map/lazy-get options :salt (pwd/salt-bytes 8)))
+         result     (PBKDF/pbkdf2
+                     ^String (get options :algorithm)
+                     ^"[B" (text-to-bytes plain)
+                     salt
+                     (int (get options :iterations))
+                     (int 160))]
      (qassoc options :salt salt :password result))))
 
 (def check (partial pwd/standard-check encrypt))

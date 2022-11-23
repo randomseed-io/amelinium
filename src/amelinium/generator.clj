@@ -9,12 +9,14 @@
 
   (:require [amelinium.core                :as  amelinium]
             [clojure.test.check.rose-tree  :as  rose]
-            [clojure.test.check.generators :as  gens]))
+            [clojure.test.check.generators :as  gens])
+
+  (:import [java.util Random]))
 
 (def amelinium
   (gens/no-shrink
    (clojure.test.check.generators/->Generator
-    (fn [rng _]
+    (fn [^Random rng _]
       (rose/make-rose
        (amelinium/generate nil nil (constantly true) nil nil (.nextLong rng))
        [])))))
