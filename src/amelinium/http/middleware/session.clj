@@ -541,20 +541,27 @@
   [sid]
   (nth (split-secure-sid sid) 0 nil))
 
-;; SID generation
+;; Session creation
 
-(defn gen-session-id
-  [^Session smap ^Boolean secured? & args]
-  (let [rnd (str (apply str args) (time/timestamp) (gen-digits 8))
-        sid (-> rnd hash/md5 codecs/bytes->hex)]
-    (if secured?
-      (let [pass (-> (gen-digits 10) hash/md5 codecs/bytes->hex)
-            stok (encrypt pass)
-            ssid (str sid "-" pass)]
-        (if (not-empty stok)
-          (map/qassoc smap :id ssid :db-id sid :db-token stok :secure? true :security-passed? true)
-          (map/qassoc smap :id  sid :db-id sid :secure? false)))
-      (map/qassoc smap :id sid :db-id sid :secure? false))))
+(defn make
+  "Generates a session ID and adds it to newly created session object. The `secured?`
+  flag can be set to generate secure session ID."
+  ^Session [^Boolean secured? ^SessionControl ctrl skey id-field
+            ^Long user-id ^String user-email ^IPAddress ip]
+  (let [^Instant t  (t/now)
+        ^String rnd (str (time/timestamp) user-email (gen-digits 8))
+        ^String sid (-> rnd hash/md5 codecs/bytes->hex)]
+    (or (if secured?
+          (let [^String pass (-> (gen-digits 10) hash/md5 codecs/bytes->hex)
+                ^String stok (encrypt pass)]
+            (if (not-empty stok)
+              (Session. (str sid "-" pass)
+                        nil sid stok user-id user-email t t ip
+                        false false false false true true
+                        skey id-field nil ctrl))))
+        (Session. sid nil sid nil user-id user-email t t ip
+                  false false false false false false
+                  skey id-field nil ctrl))))
 
 ;; Session validation
 
@@ -620,30 +627,30 @@
      true)))
 
 (defn ip-state
-  ([src session-key user-id user-email remote-ip]
-   (ip-state (p/session src session-key) user-id user-email remote-ip))
-  ([src user-id user-email remote-ip]
-   (if-some [^Session smap (p/session src)]
-     (if-some [session-ip (or (.ip ^Session smap) (get smap :ip-address))]
-       (if-some [remote-ip (ip/to-address remote-ip)]
-         (if-not (or (= (ip/to-v6 remote-ip) (ip/to-v6 session-ip))
-                     (= (ip/to-v4 remote-ip) (ip/to-v4 session-ip)))
-           (SessionError. :warn :session/bad-ip
-                          (str-spc "Session IP address" (str "(" (ip/plain-ip-str session-ip) ")")
-                                   "is different than the remote IP address"
-                                   (str "(" (ip/plain-ip-str remote-ip) ")")
-                                   (log/for-user user-id user-email))))
-         (if-some [str-addr (ip/to-str remote-ip)]
-           (if-not (or (= str-addr (ip/to-str session-ip))
-                       (= str-addr (ip/to-str (ip/to-v4 session-ip)))
-                       (= str-addr (ip/to-str (ip/to-v6 session-ip))))
-             (SessionError. :warn :session/bad-ip
-                            (str-spc "Session IP string" (str "(" (ip/to-str remote-ip) ")")
-                                     "is different than the remote IP string"
-                                     (str "(" str-addr ")")
-                                     (log/for-user user-id user-email))))))))))
+  "Returns session IP state for the given session. If IP address is correct, returns
+  `nil`, otherwise a `SessionError` record."
+  [^Session smap user-id user-email remote-ip]
+  (if smap
+    (if-some [session-ip (or (.ip ^Session smap) (get smap :ip-address))]
+      (if-some [remote-ip (ip/to-address remote-ip)]
+        (if-not (or (= (ip/to-v6 remote-ip) (ip/to-v6 session-ip))
+                    (= (ip/to-v4 remote-ip) (ip/to-v4 session-ip)))
+          (SessionError. :warn :session/bad-ip
+                         (str-spc "Session IP address" (str "(" (ip/plain-ip-str session-ip) ")")
+                                  "is different than the remote IP address"
+                                  (str "(" (ip/plain-ip-str remote-ip) ")")
+                                  (log/for-user user-id user-email))))
+        (if-some [str-addr (ip/to-str remote-ip)]
+          (if-not (or (= str-addr (ip/to-str session-ip))
+                      (= str-addr (ip/to-str (ip/to-v4 session-ip)))
+                      (= str-addr (ip/to-str (ip/to-v6 session-ip))))
+            (SessionError. :warn :session/bad-ip
+                           (str-spc "Session IP string" (str "(" (ip/to-str remote-ip) ")")
+                                    "is different than the remote IP string"
+                                    (str "(" str-addr ")")
+                                    (log/for-user user-id user-email)))))))))
 
-(defn same-ip?
+(defn- same-ip?
   (^Boolean [state-result]
    (nil? state-result))
   (^Boolean [src user-id user-email remote-ip]
@@ -651,17 +658,21 @@
   (^Boolean [src session-key user-id user-email remote-ip]
    (nil? (ip-state src session-key user-id user-email remote-ip))))
 
-(defn time-exceeded?
+(defn- time-exceeded?
   (^Boolean [dur max-dur]
    (t/> dur max-dur))
   (^Boolean [t-start t-stop max-dur]
    (t/> (t/between t-start t-stop) max-dur)))
 
-(defn calc-expired-core
+(defn- calc-expired-core
   (^Boolean [exp last-active]
    (time-exceeded? last-active (t/now) exp)))
 
 (defn calc-expired?
+  "Returns `true` if the given session is expired by performing calculations on its
+  last-active time and a configured timeout. The session can be passed directly or as
+  a request map from which it should be extracted (in such case the optional
+  `session-key` argument may be given)."
   (^Boolean [src session-key]
    (calc-expired? (p/session src session-key)))
   (^Boolean [src]
@@ -669,6 +680,10 @@
      (p/expired? ^Session smap))))
 
 (defn calc-hard-expired?
+  "Returns `true` if the given session is hard-expired by performing calculations on
+  its last-active time and a configured timeout. The session can be passed directly
+  or as a request map from which it should be extracted (in such case the optional
+  `session-key` argument may be given)."
   (^Boolean [src session-key]
    (calc-hard-expired? (p/session src session-key)))
   (^Boolean [src]
@@ -676,6 +691,10 @@
      (p/hard-expired? ^Session smap))))
 
 (defn calc-soft-expired?
+  "Returns `true` if the given session is soft-expired by performing calculations on
+  its last-active time and a configured timeout. The session can be passed directly
+  or as a request map from which it should be extracted (in such case the optional
+  `session-key` argument may be given)."
   (^Boolean [src session-key]
    (calc-soft-expired? (p/session src session-key)))
   (^Boolean [src]
@@ -684,6 +703,9 @@
           (not (p/hard-expired? ^Session smap))))))
 
 (defn expired?
+  "Returns `true` if the given session is marked as expired. The session can be passed
+  directly or as a request map from which it should be extracted (in such case the
+  optional `session-key` argument may be given)."
   ([src]
    (if-some [^Session s (p/session src)]
      (.expired? ^Session s)
@@ -694,6 +716,9 @@
      false)))
 
 (defn hard-expired?
+  "Returns `true` if the given session is marked as hard-expired. The session can be
+  passed directly or as a request map from which it should be extracted (in such case
+  the optional `session-key` argument may be given)."
   ([src]
    (if-some [^Session s (p/session src)]
      (.hard-expired? ^Session s)
@@ -704,6 +729,9 @@
      false)))
 
 (defn soft-expired?
+  "Returns `true` if the given session is marked as soft-expired. The session can be
+  passed directly or as a request map from which it should be extracted (in such case
+  the optional `session-key` argument may be given)."
   ([src]
    (if-some [^Session s (p/session src)]
      (and (.expired? ^Session s)
@@ -716,6 +744,7 @@
      false)))
 
 (defn sid-valid?
+  "Returns `true` if the given session ID is valid."
   ^Boolean [sid]
   (boolean
    (and sid (string? sid)
@@ -723,10 +752,16 @@
         (re-matches sid-match sid))))
 
 (defn created-valid?
+  "Returns `true` if the given session has valid creation time. The session can be
+  passed directly or as a request map from which it should be extracted (in such case
+  the optional `session-key` argument may be given)."
   (^Boolean [src] (t/instant? (created src)))
   (^Boolean [src session-key] (t/instant? (created src session-key))))
 
 (defn active-valid?
+  "Returns `true` if the given session has valid last-active time. The session can be
+  passed directly or as a request map from which it should be extracted (in such case
+  the optional `session-key` argument may be given)."
   (^Boolean [src] (t/instant? (active src)))
   (^Boolean [src session-key] (t/instant? (active src session-key))))
 
@@ -1379,17 +1414,13 @@
        (not ids?) (do (if-not user-id    (log/err "No user ID given when creating a session"))
                       (if-not user-email (log/err "No user e-mail given when creating a session")) nil)
        :ok
-       (let [t                   (t/now)
-             ip                  (ip/to-address ip-address)
+       (let [ip                  (ip/to-address ip-address)
              ipplain             (ip/plain-ip-str ip)
              ^SessionConfig opts (p/config ^SessionControl ctrl)
              secured?            (.secured?        ^SessionConfig opts)
              id-field            (or (.id-field    ^SessionConfig opts) "session-id")
              skey                (or (.session-key ^SessionConfig opts) :session)
-             ^Session sess       (Session. nil nil nil nil user-id user-email t t ip
-                                           false false false false false
-                                           skey id-field nil ctrl)
-             sess                (gen-session-id sess secured? user-id ipplain)
+             ^Session sess       (make secured? ctrl skey id-field user-id user-email ip)
              stat                (state sess ip)]
          (log/msg "Opening session" (log/for-user user-id user-email ipplain))
          (if-not (correct-state? stat)
@@ -1562,7 +1593,7 @@
         cfg                      (assoc cfg :fn/invalidator invalidator-fn :fn/handler mem-handler)
         prolong-fn               prolong
         ^Session empty-sess      (Session. nil nil nil nil nil nil nil nil nil
-                                           false false false false false
+                                           false false false false false false
                                            session-key session-id-field
                                            nil nil)
         ^SessionConfig  cfg      (assoc cfg :fn/prolong prolong-fn)

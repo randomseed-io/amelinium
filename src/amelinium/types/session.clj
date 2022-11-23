@@ -46,9 +46,10 @@
      ^Boolean                       valid?
      ^Boolean                       expired?
      ^Boolean                       hard-expired?
+     ^Boolean                       prolonged?
      ^Boolean                       secure?
      ^Boolean                       security-passed?
-     ^String                      session-key
+     ^String                        session-key
      ^Object                        id-field
      ^SessionError                  error
      control])
