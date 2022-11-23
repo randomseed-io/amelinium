@@ -478,9 +478,9 @@
   and can be converted to a session. Optional `session-key` can be given when passing
   a request map."
   (^Boolean [^Sessionable src]
-   (if-some [^Session s (p/session src)] (.prolonged? s)))
+   (if-some [^Session s (p/session src)] (.prolonged? s) false))
   (^Boolean [^Sessionable src ^Keyword session-key]
-   (if-some [^Session s (p/session src session-key)] (.prolonged? s))))
+   (if-some [^Session s (p/session src session-key)] (.prolonged? s)) false))
 
 (defn mem-ctime
   "Retrieves an entry creation time (in milliseconds) associated with the given `key`
