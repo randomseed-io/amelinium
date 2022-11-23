@@ -49,7 +49,7 @@
      ^Boolean                       prolonged?
      ^Boolean                       secure?
      ^Boolean                       security-passed?
-     ^String                        session-key
+     ^clojure.lang.Keyword          session-key
      ^Object                        id-field
      ^SessionError                  error
      control])
