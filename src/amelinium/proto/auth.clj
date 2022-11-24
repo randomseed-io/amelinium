@@ -16,19 +16,19 @@
   "This protocol is used to access authentication settings and configuration."
 
   (^{:tag AuthSettings}
-   -settings
+   settings
    [settings-src]
    "Returns a global authentication settings of type `AuthSettings` on a basis of
   configuration source provided.")
 
   (^{:tag AuthConfig}
-   -config
+   config
    [settings-src] [settings-src account-type]
    "Returns an authentication configuration of type `AuthConfig` on a basis of
   configuration source `settings-src` and `account-type` provided.")
 
   (^{:tag DataSource}
-   -db
+   db
    [settings-src] [settings-src account-type]
    "Returns a database connection object on a basis of configuration source
   `settings-src` and optional `account-type` provided."))

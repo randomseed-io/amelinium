@@ -22,10 +22,11 @@
             [io.randomseed.utils.map  :as       map]
             [tick.core                :as         t])
 
-  (:import [amelinium AccountTypes AuthLocking AuthConfirmation AuthPasswords AuthConfig AuthSettings]
-           [javax.sql DataSource]
-           [java.time Duration]
-           [reitit.core Match]))
+  (:import [amelinium    AccountTypes AuthLocking AuthConfirmation AuthPasswords AuthConfig AuthSettings]
+           [clojure.lang Keyword]
+           [javax.sql    DataSource]
+           [java.time    Duration]
+           [reitit.core  Match]))
 
 (defonce setup nil)
 
@@ -36,20 +37,20 @@
 (defn settings
   "Returns authentication settings for the given authentication settings source
   `src`."
-  ^AuthSettings [src] (p/-settings src))
+  ^AuthSettings [src] (p/settings src))
 
 (defn config
   "Returns an authentication configuration for the given account type `account-type`
   using authentication settings source `src`. If the second argument is not given it
   will use a default account type."
-  (^AuthConfig [src] (p/-config src))
-  (^AuthConfig [src account-type] (p/-config src account-type)))
+  (^AuthConfig [src] (p/config src))
+  (^AuthConfig [src ^Keyword account-type] (p/config src account-type)))
 
 (defn db
   "Returns an authentication database connection object using the given authentication
   settings source `src` and optional account type `account-type`."
-  (^DataSource [src] (p/-db src))
-  (^DataSource [src account-type] (p/-db src account-type)))
+  (^DataSource [src] (p/db src))
+  (^DataSource [src account-type] (p/db src account-type)))
 
 (defn config-by-type
   "Returns authentication configuration for the given account type using an
@@ -116,17 +117,17 @@
 
   AuthSettings
 
-  (-settings
+  (settings
     ^AuthSettings [settings-src]
     settings-src)
-  (-config
+  (config
     (^AuthConfig [settings-src]
      (.default ^AuthSettings settings-src))
     (^AuthConfig [settings-src account-type]
      (if account-type
        (get (.types ^AuthSettings settings-src)
             (if (keyword? account-type) account-type (keyword account-type))))))
-  (-db
+  (db
     (^DataSource [settings-src]
      (.db ^AuthSettings settings-src))
     (^DataSource [settings-src account-type]
@@ -137,24 +138,24 @@
 
   AuthConfig
 
-  (-config
+  (config
     (^AuthConfig [config-source] config-source))
-  (-db
+  (db
     (^DataSource [settings-src]
      (.db ^AuthConfig settings-src)))
 
   DataSource
 
-  (-db
+  (db
     (^DataSource [settings-src]
      settings-src))
 
   Match
 
-  (-settings
+  (settings
     ^AuthSettings [m]
     (get (.data ^Match m) :auth/setup))
-  (-config
+  (config
     (^AuthConfig [m]
      (if-some [^AuthSettings as (get (.data ^Match m) :auth/setup)]
        (.default ^AuthSettings as)))
@@ -163,7 +164,7 @@
        (if-some [^AuthSettings as (get (.data ^Match m) :auth/setup)]
          (get (.types ^AuthSettings as)
               (if (keyword? account-type) account-type (keyword account-type)))))))
-  (-db
+  (db
     (^DataSource [m]
      (if-some [as (get (.data ^Match m) :auth/setup)]
        (.db ^AuthSettings as)))
@@ -176,10 +177,10 @@
 
   clojure.lang.IPersistentMap
 
-  (-settings
+  (settings
     ^AuthSettings [req]
     (http/get-route-data req :auth/setup))
-  (-config
+  (config
     (^AuthConfig [req]
      (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
        (.default ^AuthSettings as)))
@@ -188,7 +189,7 @@
        (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
          (get (.types ^AuthSettings as)
               (if (keyword? account-type) account-type (keyword account-type)))))))
-  (-db
+  (db
     (^DataSource [req]
      (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
        (.db ^AuthSettings as)))
@@ -201,10 +202,10 @@
 
   clojure.lang.Associative
 
-  (-settings
+  (settings
     ^AuthSettings [req]
     (http/get-route-data req :auth/setup))
-  (-config
+  (config
     (^AuthConfig [req]
      (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
        (.default ^AuthSettings as)))
@@ -213,7 +214,7 @@
        (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
          (get (.types ^AuthSettings as)
               (if (keyword? account-type) account-type (keyword account-type)))))))
-  (-db
+  (db
     (^DataSource [req]
      (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
        (.db ^AuthSettings as)))
@@ -226,11 +227,11 @@
 
   nil
 
-  (-settings [settings-src] nil)
-  (-config
+  (settings [settings-src] nil)
+  (config
     ([settings-src] nil)
     ([settings-src account-type] nil))
-  (-db
+  (db
     ([settings-src] nil)
     ([settings-src account-type] nil)))
 
