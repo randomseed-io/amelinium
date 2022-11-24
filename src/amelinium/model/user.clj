@@ -24,6 +24,7 @@
             [amelinium.http.middleware.session :as       session]
             [amelinium.http.middleware.roles   :as         roles]
             [amelinium.model.confirmation      :as  confirmation]
+            [amelinium                         :refer       :all]
             [amelinium.types.auth              :refer       :all]
             [io.randomseed.utils.time          :as          time]
             [io.randomseed.utils.ip            :as            ip]
@@ -31,12 +32,12 @@
             [io.randomseed.utils.map           :refer   [qassoc]]
             [io.randomseed.utils               :refer       :all])
 
-  (:import [javax.sql            DataSource]
-           [java.time            Duration]
-           [amelinium.proto.auth Authorizable]
-           [amelinium.types.auth Suites SuitesJSON]
-           [amelinium.types.auth UserData AuthQueries DBPassword]
-           [amelinium.types.auth AuthConfig AuthSettings AuthLocking AuthConfirmation AccountTypes]))
+  (:import [amelinium.proto.auth Authorizable]
+           [amelinium            Suites SuitesJSON]
+           [amelinium            UserData AuthQueries DBPassword]
+           [amelinium            AuthConfig AuthSettings AuthLocking AuthConfirmation AccountTypes]
+           [javax.sql            DataSource]
+           [java.time            Duration]))
 
 (defonce props-cache    (atom nil))
 (defonce settings-cache (atom nil))

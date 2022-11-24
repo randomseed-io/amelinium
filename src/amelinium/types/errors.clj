@@ -4,6 +4,12 @@
       :author "Paweł Wilk"
       :added  "1.0.0"}
 
-    amelinium.types.errors)
+    amelinium.types.errors
 
-(defrecord ErrorsConfig [priorities responses default-response])
+  (:require [amelinium]))
+
+(in-ns 'amelinium)
+
+(defrecord ErrorsConfig [priorities
+                         responses
+                         default-response])

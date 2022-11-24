@@ -22,13 +22,15 @@
             [amelinium.logging                 :as        log]
             [amelinium.system                  :as     system]
             [amelinium.http.middleware.session :as    session]
+            [amelinium.types.session           :refer    :all]
+            [amelinium                         :refer    :all]
             [io.randomseed.utils               :refer    :all]
             [io.randomseed.utils.time          :as       time]
             [io.randomseed.utils.var           :as        var]
             [io.randomseed.utils.map           :as        map]
             [io.randomseed.utils.ip            :as         ip])
 
-  (:import [amelinium.types.session Session]))
+  (:import [amelinium Session]))
 
 (defn known?
   [config role]

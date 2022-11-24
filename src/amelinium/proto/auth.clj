@@ -6,10 +6,10 @@
 
     amelinium.proto.auth
 
-  (:require [amelinium.types.auth])
-  (:import  [amelinium.types.auth AccountTypes AuthLocking AuthConfirmation AuthPasswords AuthConfig AuthSettings]
-            [javax.sql DataSource]
-            [java.time Duration]
+  (:require [amelinium] [amelinium.types.auth])
+  (:import  [amelinium   AccountTypes AuthLocking AuthConfirmation AuthPasswords AuthConfig AuthSettings]
+            [javax.sql   DataSource]
+            [java.time   Duration]
             [reitit.core Match]))
 
 (defprotocol Authenticable

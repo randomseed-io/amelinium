@@ -12,7 +12,6 @@
             [clojure.string                       :as             str]
             [clojure.core.memoize                 :as             mem]
             [clojure.java.io                      :as              io]
-            [potemkin.namespaces                  :as               p]
             [tick.core                            :as               t]
             [reitit.core                          :as               r]
             [reitit.coercion                      :as        coercion]
@@ -20,6 +19,8 @@
             [ring.util.codec                      :as           codec]
             [ring.util.http-response              :as            resp]
             [ring.util.request                    :as             req]
+            [amelinium                            :as               p]
+            [amelinium.types.session              :refer         :all]
             [amelinium.auth                       :as            auth]
             [amelinium.http                       :as            http]
             [amelinium.http.middleware.roles      :as           roles]
@@ -37,7 +38,7 @@
             [io.randomseed.utils.map              :refer     [qassoc]]
             [io.randomseed.utils                  :refer         :all])
 
-  (:import [amelinium.types.session Session]
+  (:import [amelinium Session]
            [lazy_map.core LazyMapEntry LazyMap]
            [reitit.core Match]))
 
@@ -1313,9 +1314,6 @@
          (if (time/pos-duration? d) d))))))
 
 ;; Sessions
-
-(p/import-vars [amelinium.http.middleware.session
-                allow-expired allow-soft-expired allow-hard-expired])
 
 (defn session
   "Gets a session map from the given request map."

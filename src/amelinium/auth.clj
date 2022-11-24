@@ -15,13 +15,14 @@
             [amelinium.system         :as    system]
             [amelinium.proto.auth     :as         p]
             [amelinium.types.auth     :refer   :all]
+            [amelinium                :refer   :all]
             [io.randomseed.utils      :refer   :all]
             [io.randomseed.utils.time :as      time]
             [io.randomseed.utils.var  :as       var]
             [io.randomseed.utils.map  :as       map]
             [tick.core                :as         t])
 
-  (:import [amelinium.types.auth AccountTypes AuthLocking AuthConfirmation AuthPasswords AuthConfig AuthSettings]
+  (:import [amelinium AccountTypes AuthLocking AuthConfirmation AuthPasswords AuthConfig AuthSettings]
            [javax.sql DataSource]
            [java.time Duration]
            [reitit.core Match]))

@@ -6,8 +6,12 @@
 
     amelinium.types.db
 
-  (:import [java.sql Connection]
-           [javax.sql DataSource]))
+  (:require [amelinium]))
+
+(in-ns 'amelinium)
+
+(import [java.sql  Connection]
+        [javax.sql DataSource])
 
 (defrecord DBConfig [^clojure.lang.Fn      initializer
                      ^clojure.lang.Fn      finalizer

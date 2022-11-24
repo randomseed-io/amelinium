@@ -60,12 +60,6 @@
                 hard-lock-time hard-locked?
                 soft-lock-time soft-lock-passed soft-locked? soft-lock-remains])
 
-;; Sessions
-
-(p/import-vars [amelinium.common
-                session-variable-get-failed?
-                allow-expired allow-soft-expired allow-hard-expired])
-
 ;; Context and roles
 
 (p/import-vars [amelinium.common

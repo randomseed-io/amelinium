@@ -8,10 +8,10 @@
 
   (:refer-clojure :exclude [empty empty?])
 
-  (:require [amelinium.types.session])
-  (:import  [amelinium.types.session Session SessionError SessionConfig]
+  (:require [amelinium] [amelinium.types.session])
+  (:import  [amelinium            Session SessionError SessionConfig]
             [clojure.core.memoize PluggableMemoization]
-            [java.time Instant]))
+            [java.time            Instant]))
 
 (defprotocol SessionControl
   "This protocol promises access to session configuration data and basic actions which
@@ -130,7 +130,7 @@
 (defprotocol Sessionable
   "This protocol is used to access session data."
 
-  (^{:tag amelinium.types.session.Session}
+  (^{:tag amelinium.Session}
    session
    [src] [src session-key]
    "Returns a session record of type `Session` on a basis of configuration source
@@ -145,7 +145,7 @@
   set. Optional `session-key` can be given to express a key in associative
   structure (defaults to `:session`).")
 
-  (^{:tag amelinium.types.session.Session}
+  (^{:tag amelinium.proto.session.Sessionable}
    inject
    [dst smap] [dst smap session-key]
    "Returns an object updated with session record of type `Session` under an optional

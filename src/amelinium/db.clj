@@ -30,13 +30,14 @@
             [phone-number.util             :as                 phutil]
             [phone-number.core             :as                  phone]
             [taoensso.nippy                :as                  nippy]
+            [amelinium                     :refer                :all]
             [amelinium.app                 :as                    app]
             [amelinium.system              :as                 system]
             [amelinium.logging             :as                    log]
             [amelinium.types.db            :refer                :all])
 
   (:import [com.zaxxer.hikari HikariConfig HikariDataSource HikariPoolMXBean]
-           [amelinium.types.db DBConfig]
+           [amelinium DBConfig]
            [java.sql Connection]
            [javax.sql DataSource]
            [java.lang.reflect Method]

@@ -23,6 +23,7 @@
             [amelinium.auth.algo.scrypt   :as     scrypt]
             [amelinium.proto.session      :as          p]
             [amelinium.types.session      :refer    :all]
+            [amelinium                    :refer    :all]
             [io.randomseed.utils          :refer    :all]
             [io.randomseed.utils.time     :as       time]
             [io.randomseed.utils.var      :as        var]
@@ -30,14 +31,14 @@
             [io.randomseed.utils.ip       :as         ip]
             [io.randomseed.utils.db.types :as      types])
 
-  (:import [clojure.lang Keyword PersistentVector IPersistentMap]
-           [java.time Instant Duration]
-           [javax.sql DataSource]
-           [inet.ipaddr IPAddress]
-           [clojure.core.memoize PluggableMemoization]
-           [clojure.core.cache TTLCacheQ]
+  (:import [clojure.lang            Keyword PersistentVector IPersistentMap IFn Fn]
+           [java.time               Instant Duration]
+           [javax.sql               DataSource]
+           [inet.ipaddr             IPAddress]
+           [clojure.core.memoize    PluggableMemoization]
+           [clojure.core.cache      TTLCacheQ]
            [amelinium.proto.session SessionControl Sessionable]
-           [amelinium.types.session Session SessionConfig SessionError]))
+           [amelinium               Session SessionConfig SessionError]))
 
 (set! *warn-on-reflection* true)
 
@@ -193,35 +194,54 @@
                                    (p/identify (.control ^Session s) req))))
 
   (from-db
-    (^Session [s]             (p/from-db (.control ^Session s) (db-sid-smap s) (.ip ^Session s)))
-    (^Session [s db-sid]      (p/from-db (.control ^Session s) db-sid (.ip ^Session s)))
-    (^Session [s db-sid ip]   (p/from-db (.control ^Session s) db-sid ip)))
+    (^Session [s]
+     (p/from-db (.control ^Session s) (db-sid-smap s) (.ip ^Session s)))
+    (^Session [s ^String db-sid]
+     (p/from-db (.control ^Session s) db-sid (.ip ^Session s)))
+    (^Session [s ^String db-sid ^IPAddress ip]
+     (p/from-db (.control ^Session s) db-sid ip)))
 
   (handle
-    (^Session [s]             (p/handle (.control ^Session s) (p/identify ^Session s) (.ip ^Session s)))
-    (^Session [s sid]         (p/handle (.control ^Session s) sid (.ip ^Session s)))
-    (^Session [s sid ip]      (p/handle (.control ^Session s) sid ip)))
+    (^Session [s]
+     (p/handle (.control ^Session s) (p/identify ^Session s) (.ip ^Session s)))
+    (^Session [s ^String sid]
+     (p/handle (.control ^Session s) sid (.ip ^Session s)))
+    (^Session [s ^String sid ^IPAddress ip]
+     (p/handle (.control ^Session s) sid ip)))
 
   (mem-handler
-    ([s]                      (p/mem-handler (.control ^Session s)))
-    ([s _]                    (p/mem-handler (.control ^Session s))))
+    (^Fn [s]
+     (p/mem-handler (.control ^Session s)))
+    (^Fn [s _]
+     (p/mem-handler (.control ^Session s))))
 
   (invalidate
-    ([s]                      (p/invalidate (.control ^Session s) (p/identify ^Session s) (.ip ^Session s)))
-    ([s sid]                  (p/invalidate (.control ^Session s) sid (.ip ^Session s)))
-    ([s sid ip]               (p/invalidate (.control ^Session s) sid ip)))
+    ([s]
+     (p/invalidate (.control ^Session s) (p/identify ^Session s) (.ip ^Session s)))
+    ([s ^String sid]
+     (p/invalidate (.control ^Session s) sid (.ip ^Session s)))
+    ([s ^String sid ^IPAddress ip]
+     (p/invalidate (.control ^Session s) sid ip)))
 
   (get-active
-    (^Instant [s]             (p/get-active (.control ^Session s) (p/identify ^Session s) (.ip ^Session s)))
-    (^Instant [s db-sid]      (p/get-active (.control ^Session s) db-sid (.ip ^Session s)))
-    (^Instant [s db-sid ip]   (p/get-active (.control ^Session s) db-sid ip)))
+    (^Instant [s]
+     (p/get-active (.control ^Session s) (p/identify ^Session s) (.ip ^Session s)))
+    (^Instant [s ^String db-sid]
+     (p/get-active (.control ^Session s) db-sid (.ip ^Session s)))
+    (^Instant [s ^String db-sid ^IPAddress ip]
+     (p/get-active (.control ^Session s) db-sid ip)))
 
   (set-active
-    (^Long [s]                 (p/set-active (.control ^Session s) (p/identify s) (db-sid-smap s) (.ip ^Session s)))
-    (^Long [s ip]              (p/set-active (.control ^Session s) (p/identify s) (db-sid-smap s) ip))
-    (^Long [s ip t]            (p/set-active (.control ^Session s) (p/identify s) (db-sid-smap s) ip t))
-    (^Long [s sid db-sid ip]   (p/set-active (.control ^Session s) sid db-sid ip))
-    (^Long [s sid db-sid ip t] (p/set-active (.control ^Session s) sid db-sid ip t)))
+    (^Long [s]
+     (p/set-active (.control ^Session s) (p/identify s) (db-sid-smap s) (.ip ^Session s)))
+    (^Long [s ^IPAddress ip]
+     (p/set-active (.control ^Session s) (p/identify s) (db-sid-smap s) ip))
+    (^Long [s ^IPAddress ip ^Instant t]
+     (p/set-active (.control ^Session s) (p/identify s) (db-sid-smap s) ip t))
+    (^Long [s ^String sid ^String db-sid ^IPAddress ip]
+     (p/set-active (.control ^Session s) sid db-sid ip))
+    (^Long [s ^String sid ^String db-sid ^IPAddress ip ^Instant t]
+     (p/set-active (.control ^Session s) sid db-sid ip t)))
 
   (expired?      ^Boolean [s]     (p/expired?      (.control ^Session s) (.active ^Session s)))
   (hard-expired? ^Boolean [s]     (p/hard-expired? (.control ^Session s) (.active ^Session s)))
@@ -1383,8 +1403,8 @@
   it may be required to refresh the times and re-validate the session object."
   (^Session [^Sessionable src ^String sid ^IPAddress remote-ip]
    (handler src :session sid remote-ip))
-  (^Session [^Sessionable src ^Keyword
-             session-key ^String sid ^IPAddress remote-ip]
+  (^Session [^Sessionable src ^Keyword session-key
+             ^String sid ^IPAddress remote-ip]
    (if-some [^SessionControl ctrl (p/control src session-key)]
      (let [^SessionConfig opts (p/config ^SessionControl ctrl)]
        (handler ctrl (.session-key opts) (.id-field opts) sid remote-ip))))
@@ -1406,9 +1426,9 @@
                              :session-key      session-key
                              :id-field         id-field)
          ^SessionError stat (state smap remote-ip)]
-     (if (instance? SessionError stat)
-       (mkbad  smap :error stat)
-       (mkgood smap)))))
+     (if (nil? stat)
+       (mkgood smap)
+       (mkbad  smap :error stat)))))
 
 (defn- needs-refresh?
   ^Boolean [^SessionControl ctrl key ^Duration cache-margin

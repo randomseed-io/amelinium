@@ -6,9 +6,13 @@
 
     amelinium.types.session
 
-  (:import [java.time Instant Duration]
-           [javax.sql DataSource]
-           [inet.ipaddr IPAddress]))
+  (:require [amelinium]))
+
+(in-ns 'amelinium)
+
+(import [java.time   Instant Duration]
+        [javax.sql   DataSource]
+        [inet.ipaddr IPAddress])
 
 (defrecord SessionConfig
     [^DataSource                    db

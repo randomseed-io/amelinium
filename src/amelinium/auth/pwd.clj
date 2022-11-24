@@ -22,9 +22,10 @@
                                                 qupdate]]
             [io.randomseed.utils     :refer         :all]
             [amelinium.auth.specs    :refer         :all]
-            [amelinium.types.auth    :refer         :all])
+            [amelinium.types.auth    :refer         :all]
+            [amelinium               :refer         :all])
 
-  (:import [amelinium.types.auth Suites SuitesJSON]))
+  (:import [amelinium Suites SuitesJSON]))
 
 (defonce ^:private lock 'lock)
 

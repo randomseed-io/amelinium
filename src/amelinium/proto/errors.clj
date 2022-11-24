@@ -6,9 +6,8 @@
 
     amelinium.proto.errors
 
-  (:require [amelinium.types.errors])
-  (:import  [amelinium.types.errors ErrorsConfig]))
+  (:require [amelinium] [amelinium.types.errors])
+  (:import  [amelinium ErrorsConfig]))
 
 (defprotocol ErrorsConfigurable
   (^{:tag ErrorsConfig} config [src]))
-
