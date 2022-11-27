@@ -12,6 +12,7 @@
             [reitit.core                        :as               r]
             [ring.util.http-response            :as            resp]
             [clojure.string                     :as             str]
+            [amelinium.types.session            :refer         :all]
             [amelinium.logging                  :as             log]
             [amelinium.model.user               :as            user]
             [amelinium.common                   :as          common]
@@ -27,22 +28,25 @@
             [io.randomseed.utils.map            :refer     [qassoc
                                                             qupdate]]
             [io.randomseed.utils                :refer         :all]
-            [potpuri.core                       :refer [deep-merge]]))
+            [potpuri.core                       :refer [deep-merge]])
+
+  (:import [amelinium Session]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Authentication
 
 (defn saved-params
-  "Gets go-to data for a valid (and not expired) session. Returns form data as a
-  map. The resulting map has `:session-id` entry removed (if found). We assume that
-  all parameters were validated earlier."
+  "Gets go-to data for a valid (and not expired) session. Returns data as a map. The
+  resulting map has, among form data, `:session-id` entry removed (if found) but
+  `:ref-uri`, `:page` and other entries kept."
   ([req gmap]
    (saved-params req gmap nil))
-  ([req gmap smap]
+  ([req gmap ^Session smap]
    (if (and gmap (= (get req :uri) (get gmap :uri)))
-     (if-some [gmap (valuable (select-keys gmap [:form-params :query-params :parameters :session-id]))]
-       (let [smap      (or (session/of smap) (session/of req))
-             sid-field (or (session/id-field smap) "session-id")]
+     (if-some [gmap (valuable (select-keys gmap [:form-params :query-params
+                                                 :session-id :ref-uri :page]))]
+       (let [^Session smap     (or (session/of smap) (session/of req))
+             ^String sid-field (or (session/id-field smap) "session-id")]
          (if (and (= (session/db-id smap) (get gmap :session-id false)))
            (-> gmap
                (common/remove-form-params sid-field)
@@ -60,34 +64,31 @@
 
 (defn inject-goto
   "Injects go-to data (`gmap`) into a request map `req` (affected, form-related keys
-  are: `:parameters`, `:form-params`, `:query-params` and `:params`. Form data is
-  merged only if a go-to URI (`:uri` key of `gmap`) matches the URI of a current
-  page. Go-to URI is always injected. When the given `gmap` is broken, it will set
-  `:goto-injected?` to `true` but `:goto-uri` and `:goto` to `false`."
+  are: `:form-params`, `:query-params` and `:params`. Form data is merged only if a
+  go-to URI (`:uri` key of `gmap`) matches the URI of a current page. Go-to URI is
+  always injected. When the given `gmap` is broken, it will set `:goto-injected?` to
+  `true` but `:goto-uri` and `:goto` to `false`."
   ([req gmap]
    (inject-goto req gmap nil))
-  ([req gmap smap]
+  ([req gmap ^Session smap]
    (if-not gmap
      req
-     (if (common/session-variable-get-failed? gmap)
+     (if (or (common/session-variable-get-failed? gmap)
+             (not (get gmap :uri)))
        (qassoc req
                :goto-injected? true
                :goto-uri      false
                :goto          false)
-       (let [req (qassoc req :goto-injected? true :goto-uri (get gmap :uri))]
-         (if-some [{:keys [form-params query-params parameters]
-                    :or   {form-params {} query-params {} parameters {}}}
-                   (saved-params req gmap smap)]
-           (let [req-parameters   (get req :parameters)
+       (let [dest-uri (get gmap :uri)
+             req      (qassoc req :goto gmap :goto-injected? true :goto-uri dest-uri)
+             {:keys [form-params query-params parameters ref-uri page]}
+             (saved-params req gmap smap)]
+         (if (or form-params ref-uri page query-params parameters)
+           (let [headers          (get req :headers)
                  req-form-params  (get req :form-params)
                  req-query-params (get req :query-params)
                  req-params       (get req :params)
-                 req              (if (nil? req-parameters) req
-                                      (qassoc req :parameters
-                                              (delay
-                                                (deep-merge :into parameters
-                                                            (qupdate req-parameters :form
-                                                                     #(if (some? %) (dissoc % :am/goto) %))))))
+                 req              (qassoc req :headers (qassoc headers "referer" ref-uri))
                  req              (if (nil? req-form-params) req
                                       (qassoc req :form-params
                                               (delay
@@ -117,12 +118,12 @@
 
 (defn get-goto
   "Gets go-to map from a session variable even if the session is not valid."
-  [smap]
+  [^Session smap]
   (session/get-var smap :goto))
 
 (defn get-goto-for-valid
   "Gets go-to map from session variable if the session is valid (and not expired)."
-  [smap]
+  [^Session smap]
   (if (and smap (session/valid? smap))
     (get-goto smap)))
 
@@ -135,7 +136,7 @@
   Go-to data will not be populated (or even tried) if there is no session, or is
   there is already a value associated with the `:goto-injected` key, or form params
   does not contain `am/goto` parameter of any value (even an empty string or `nil`)."
-  [req smap]
+  [req ^Session smap]
   (if (and smap
            (contains? (get req :form-params) "am/goto")
            (not (get req :goto-injected?)))
@@ -187,14 +188,14 @@
   If the session is valid then the given request map is returned with the
   `:authenticated!` key set to `true`."
   [req]
-  (let [form-params    (get req :form-params)
-        user-email     (some-str (get form-params "login"))
-        password       (if user-email (some-str (get form-params "password")))
-        sess           (session/of req)
-        lang           (web/pick-language-str req :user)
-        valid-session? (session/valid? sess)
-        ring-match     (get req ::r/match)
-        route-data     (http/get-route-data ring-match)]
+  (let [form-params        (get req :form-params)
+        ^String user-email (some-str (get form-params "login"))
+        ^String password   (if user-email (some-str (get form-params "password")))
+        ^Session sess      (session/of req)
+        ^String lang       (web/pick-language-str req :user)
+        valid-session?     (session/valid? sess)
+        ring-match         (get req ::r/match)
+        route-data         (http/get-route-data ring-match)]
     (cond
       password          (auth-user-with-password! req user-email password sess route-data lang)
       valid-session?    (if (some? (language/from-path req))
@@ -207,26 +208,24 @@
 (defn login!
   "Prepares response data to be displayed on a login page."
   [req]
-  (let [sess     (session/not-empty-of req)
-        app-data (get req :app/data web/empty-lazy-map)
-        rem-mins (delay (super/lock-remaining-mins req (auth/db req) sess t/now))
-        req      (if sess (qassoc req
-                                  (session/session-key sess)
-                                  (qassoc sess :prolonged? false)) req)]
+  (let [^Session sess (session/not-empty-of req)
+        app-data      (get req :app/data web/empty-lazy-map)
+        rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))]
     (qassoc req :app/data (qassoc app-data :lock-remains rem-mins))))
 
 (defn prolong!
   "Prepares response data to be displayed on a prolongation page."
   [req]
-  (let [sess (session/not-empty-of req)]
+  (let [^Session sess (session/not-empty-of req)]
     (cond
 
       (and sess (session/soft-expired? sess) (some? (get-goto sess)))
-      (let [app-data (get req :app/data web/empty-lazy-map)
-            sess-key (or (session/session-key sess) :session)
-            rem-mins (delay (super/lock-remaining-mins req (auth/db req) sess t/now))]
+      (let [app-data      (get req :app/data web/empty-lazy-map)
+            sess-key      (or (session/session-key sess) :session)
+            ^Session sess (session/allow-soft-expired sess)
+            rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))]
         (qassoc req
-                sess-key  (qassoc (session/allow-soft-expired sess) :prolonged? true)
+                sess-key  (qassoc sess :prolonged? true)
                 :app/data (qassoc app-data :lock-remains rem-mins)))
 
       (and sess (session/hard-expired? sess))
@@ -240,12 +239,12 @@
 (defn prep-request!
   "Prepares a request before any web controller is called."
   [req]
-  (let [req         (qassoc req :app/data-required [] :app/data web/empty-lazy-map)
-        sess        (session/not-empty-of req)
-        route-data  (http/get-route-data req)
-        auth-state  (delay (common/login-auth-state req :login-page? :auth-page?))
-        login-data? (delay (login-data? req))
-        auth-db     (delay (auth/db req))]
+  (let [req           (qassoc req :app/data-required [] :app/data web/empty-lazy-map)
+        ^Session sess (session/not-empty-of req)
+        route-data    (http/get-route-data req)
+        auth-state    (delay (common/login-auth-state req :login-page? :auth-page?))
+        login-data?   (delay (login-data? req))
+        auth-db       (delay (auth/db req))]
 
     (cond
 
@@ -297,14 +296,15 @@
 
       (super/prolongation? sess @auth-state @login-data?)
       (let [req           (cleanup-req req @auth-state)
-            sess          (session/allow-soft-expired sess)
+            ^Session sess (session/allow-soft-expired sess)
             session-field (or (session/id-field sess) "session-id")
             req-to-save   (common/remove-form-params req session-field)]
         (session/put-var! sess
-                          :goto {:uri          (get req :uri)
-                                 :ts           (t/now)
+                          :goto {:ts           (t/now)
+                                 :uri          (get req :uri)
+                                 :ref-uri      (some-str (get (get req :headers) "referer"))
+                                 :page         (get route-data :name)
                                  :session-id   (session/db-id sess)
-                                 :parameters   (get req-to-save :parameters)
                                  :form-params  (get req-to-save :form-params)
                                  :query-params (get req-to-save :query-params)
                                  :params       (get req-to-save :params)})
@@ -443,9 +443,10 @@
     (case ctype
 
       :reitit.coercion/request-coercion
-      (let [route-data             (http/get-route-data req)
-            orig-page              (get route-data :form-errors/page)
-            referer                (if (nil? orig-page) (some-str (get-in req [:headers "referer"])))
+      (let [goto-page              (if-let [goto (get req :goto)] (get goto :page))
+            orig-from-goto         (if goto-page (http/route-data-param req goto-page))
+            orig-page              (or orig-from-goto (http/get-route-data req :form-errors/page))
+            referer                (if (nil? orig-page) (some-str (get (get req :headers) "referer")))
             [orig-uri orig-params] (if referer (common/url->uri+params req referer))
             handling-previous?     (contains? (get req :query-params) "form-errors")]
         (respond
@@ -453,18 +454,18 @@
                   (not handling-previous?))
            ;; redirect to a form-submission page allowing user to correct errors
            ;; transfer form errors using query params or form params (if a session is present)
-           (let [errors       (coercion/map-errors data)
-                 orig-uri     (if orig-uri (some-str orig-uri))
-                 orig-params  (if orig-uri orig-params)
-                 smap         (session/not-empty-of req)
-                 destination  (or orig-page orig-uri)
-                 dest-uri     (if (keyword? destination) (common/page req destination) destination)
-                 dest-uri     (some-str dest-uri)
-                 session?     (and smap (or (session/valid? smap) (session/soft-expired? smap))
-                                   (session/put-var! smap :form-errors {:dest   dest-uri
-                                                                        :errors errors}))
-                 error-params (if session? "" (coercion/join-errors errors))
-                 joint-params (qassoc orig-params "form-errors" error-params)]
+           (let [errors        (coercion/map-errors data)
+                 orig-uri      (if orig-uri (some-str orig-uri))
+                 orig-params   (if orig-uri orig-params)
+                 destination   (or orig-page orig-uri)
+                 dest-uri      (if (keyword? destination) (common/page req destination) destination)
+                 dest-uri      (some-str dest-uri)
+                 ^Session smap (session/not-empty-of req)
+                 stored?       (and (session/valid? smap)
+                                    (session/put-var! smap :form-errors {:dest   dest-uri
+                                                                         :errors errors}))
+                 error-params  (if stored? "" (coercion/join-errors errors))
+                 joint-params  (qassoc orig-params "form-errors" error-params)]
              (if dest-uri
                (common/temporary-redirect req dest-uri nil joint-params)
                (resp/temporary-redirect
