@@ -351,11 +351,22 @@
   structure (defaults to `:session`). Returns `nil` if session is not usable (does
   not have `:id`, `:err-id` not `:error` set)."
   (^Session [^Sessionable  src]
-   (let [^Session s (p/session src)]
+   (if-let [^Session s (p/session src)]
      (if-not (p/empty? s) s)))
   (^Session [^Sessionable src ^Keyword session-key]
-   (let [^Session s (p/session src session-key)]
+   (if-let [^Session s (p/session src session-key)]
      (if-not (p/empty? s) s))))
+
+(defn valid-of
+  "Returns a session if `src` contains a session or is a session, and the session is
+  valid. Optional `session-key` may be given to express a key in associative
+  structure (defaults to `:session`). Returns `nil` if session is not valid."
+  (^Session [^Sessionable  src]
+   (if-let [^Session s (p/session src)]
+     (if (.valid? s) s)))
+  (^Session [^Sessionable src ^Keyword session-key]
+   (if-let [^Session s (p/session src session-key)]
+     (if (.valid? s) s))))
 
 (defn control?
   "Returns `true` if the given value is an instance of a class which satisfies

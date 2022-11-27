@@ -100,14 +100,17 @@
   [req _ _]
   (delay
     (if-some [qp (get req :query-params)]
-      (if-some [query-params-errors (get qp "form-errors")]
-        (let [smap            (session/of req)
-              session?        (session/valid? smap)
-              sess-var        (if session? (session/fetch-var! smap :form-errors))
-              expected-uri    (if sess-var (get sess-var :dest))
-              uri-ok?         (or (not expected-uri) (= expected-uri (get req :uri)))
-              sess-var-errors (if uri-ok? (not-empty (get sess-var :errors)))]
-          (coercion/parse-errors (or sess-var-errors query-params-errors)))))))
+      (if-let [query-params-errors (get qp "form-errors")]
+        (coercion/parse-errors
+         (or (if-let [smap (session/valid-of req)]
+               (let [sess-var (session/fetch-var! smap :form-errors)]
+                 (if (map? sess-var)
+                   (let [expected-uri (get sess-var :dest)]
+                     (if (or (not expected-uri) (= expected-uri (get req :uri)))
+                       (let [sess-var-errors (get sess-var :errors)]
+                         (if (and (map? sess-var-errors) (not-empty sess-var-errors))
+                           sess-var-errors)))))))
+             query-params-errors))))))
 
 (def form-errors
   {:compile (fn [data _ _]
