@@ -951,7 +951,7 @@
   "Returns the `:valid?` (validity) property of a session. The `src` can be a session
   record (`Session`) or any object which satisfies the `Sessionable` protocol and can
   be converted to a session. Optional `session-key` can be given when passing a
-  request map."
+  request map. If there is no session, returns `false`."
   (^Boolean [^Sessionable src]
    (if-some [^Session s (p/session src)]
      (.valid? s)
@@ -1435,6 +1435,7 @@
                              :db-id            sid-db
                              :ip               (ip/to-address (get smap-db :ip))
                              :secure?          secure?
+                             :prolonged?       false
                              :security-passed? token-ok?
                              :control          ctrl
                              :session-key      session-key
