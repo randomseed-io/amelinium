@@ -192,23 +192,22 @@
         ^String user-email (some-str (get form-params "login"))
         ^String password   (if user-email (some-str (get form-params "password")))
         ^Session sess      (session/of req)
-        ^String lang       (web/pick-language-str req :user)
-        valid-session?     (session/valid? sess)
-        ring-match         (get req ::r/match)
-        route-data         (http/get-route-data ring-match)]
+        ^String lang       (delay (web/pick-language-str req :user))
+        route-data         (delay (http/get-route-data req))
+        valid-session?     (delay (session/valid? sess))]
     (cond
-      password          (auth-user-with-password! req user-email password sess route-data lang)
-      valid-session?    (if (some? (language/from-path req))
+      password          (auth-user-with-password! req user-email password sess @route-data @lang)
+      @valid-session?   (if (some? (language/from-path req))
                           ;; Render the contents in a language specified by the current path.
                           req
                           ;; Redirect to a proper language version of this very page.
-                          (web/move-to req (or (get route-data :name) (get req :uri)) lang))
-      :invalid-session! (web/move-to req (or (get route-data :auth/login) :auth/login) lang))))
+                          (web/move-to req (or (get @route-data :name) (get req :uri)) @lang))
+      :invalid-session! (web/move-to req (or (get @route-data :auth/login) :auth/login) @lang))))
 
 (defn login!
   "Prepares response data to be displayed on a login page."
   [req]
-  (let [^Session sess (session/not-empty-of req)
+  (let [^Session sess (session/of req)
         app-data      (get req :app/data web/empty-lazy-map)
         rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))]
     (qassoc req :app/data (qassoc app-data :lock-remains rem-mins))))
@@ -216,10 +215,10 @@
 (defn prolong!
   "Prepares response data to be displayed on a prolongation page."
   [req]
-  (let [^Session sess (session/not-empty-of req)]
+  (let [^Session sess (session/of req)]
     (cond
 
-      (and sess (session/soft-expired? sess) (some? (get-goto sess)))
+      (and (session/soft-expired? sess) (some? (get-goto sess)))
       (let [app-data      (get req :app/data web/empty-lazy-map)
             sess-key      (or (session/session-key sess) :session)
             ^Session sess (session/allow-soft-expired sess)
@@ -461,7 +460,7 @@
                  dest-uri      (if (keyword? destination) (common/page req destination) destination)
                  dest-uri      (some-str dest-uri)
                  ^Session smap (session/not-empty-of req)
-                 stored?       (and (session/valid? smap)
+                 stored?       (and smap (session/valid? smap)
                                     (session/put-var! smap :form-errors {:dest   dest-uri
                                                                          :errors errors}))
                  error-params  (if stored? "" (coercion/join-errors errors))

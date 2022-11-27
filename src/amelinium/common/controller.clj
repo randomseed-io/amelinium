@@ -34,7 +34,10 @@
             [amelinium.auth                     :as        auth]
             [amelinium.http                     :as        http]
             [amelinium.http.middleware.language :as    language]
-            [amelinium.http.middleware.session  :as     session]))
+            [amelinium.http.middleware.session  :as     session]
+            [amelinium.types.session            :refer     :all])
+
+  (:import [amelinium Session]))
 
 (def ^:const keywordize-params? false)
 
@@ -80,7 +83,7 @@
    (lock-remaining-mins req auth-db smap time-fn :login))
   ([req auth-db smap time-fn id-form-field]
    (if auth-db
-     (if-some [user (or (user/props-by-session auth-db smap)
+     (if-some [user (or (and smap (user/props-by-session auth-db smap))
                         (user/props-by-email auth-db (get (get (get req :parameters) :form) id-form-field)))]
        (if-some [auth-config (auth/config req (get user :account-type))]
          (if-some [mins (time/minutes (common/soft-lock-remains user auth-config (time-fn)))]
@@ -91,7 +94,7 @@
   current user is not logged in, there is no login data present, and we are not
   authenticating any user. In other words: returns `true` when we are good with
   redirecting a user to a session prolongation page (a form of login page)."
-  [sess [login? auth?] login-data?]
+  [^Session sess [login? auth?] login-data?]
   (or (and (not login?)
            (or (not auth?) (not login-data?))
            (session/soft-expired? sess))
@@ -101,7 +104,7 @@
   "Returns `true` if user visited the prolongation page after submitting credentials to
   the authentication page is being authenticated to prolongate the soft-expired
   session."
-  [sess login? auth? login-data?]
+  [^Session sess login? auth? login-data?]
   (or (and login-data?
            auth?
            (not login?)
@@ -110,18 +113,18 @@
 
 (defn regular-auth?
   "Returns `true` if user is being authenticated."
-  [sess login? auth? login-data?]
+  [^Session sess login? auth? login-data?]
   (or (and auth?
            login-data?
            (not login?)
-           (not sess))
+           (or (not sess) (session/empty? sess)))
       false))
 
 (defn hard-expiry?
   "Returns `true` if the session is hard-expired and we are not on the hard-expired
   login page. Uses the given, previously collected session data. Does not connect to
   a database."
-  [req sess route-data]
+  [req ^Session sess route-data]
   (or (and (session/hard-expired? sess)
            (not (common/on-page? req (get route-data :auth/session-expired :login/session-expired))))
       false))
@@ -131,7 +134,7 @@
   soft-expired. Used to get the destination URI from a session variable when user is
   authenticated to be redirected into a page where session expiration has been
   encountered a moment ago."
-  [req sess]
+  [req ^Session sess]
   (if (and (session/soft-expired? sess)
            (contains? (get req :form-params) "am/goto"))
     (if-some [g (session/get-var sess :goto)]
@@ -151,8 +154,7 @@
   ([req user-email password sess route-data]
    (auth-user-with-password! req user-email password sess route-data false))
   ([req user-email password sess route-data auth-only-mode]
-   (let [sess          (or sess (session/of req))
-         route-data    (or route-data (http/get-route-data req))
+   (let [route-data    (or route-data (http/get-route-data req))
          ipaddr        (get req :remote-ip)
          ipplain       (get req :remote-ip/str)
          auth-settings (or (get route-data :auth/setup) (auth/settings req))
@@ -199,11 +201,12 @@
        :authenticate! (do (log/msg "Login successful" for-user)
                           (oplog true :info "Login OK" for-mail)
                           (user/update-login-ok auth-db user-id ipaddr)
-                          (let [goto-uri (get-goto-uri req sess)
-                                goto?    (some? goto-uri)
-                                sess     (if goto?
-                                           (session/prolong sess ipaddr)
-                                           (session/create  sess user-id user-email ipaddr))]
+                          (let [^Session sess (or sess (session/of req))
+                                goto-uri      (get-goto-uri req sess)
+                                goto?         (boolean goto-uri)
+                                ^Session sess (if goto?
+                                                (session/prolong sess ipaddr)
+                                                (session/create  sess user-id user-email ipaddr))]
                             (if-not (session/valid? sess)
 
                               (let [e (session/error sess)
@@ -241,22 +244,21 @@
   route data, or from `:login` route identifier (as default). If the session is valid
   then the given request map is returned as-is."
   [req user-email user-password]
-  (let [user-email     (some-str user-email)
-        user-password  (if user-email (some-str user-password))
-        sess           (session/of req)
-        valid-session? (session/valid? sess)
-        route-data     (http/get-route-data req)]
+  (let [user-email    (some-str user-email)
+        user-password (if user-email (some-str user-password))
+        ^Session sess (session/of req)
+        route-data    (delay (http/get-route-data req))]
 
     (if user-password
 
       ;; Authenticate using email and password.
-      (auth-user-with-password! req user-email user-password sess route-data)
+      (auth-user-with-password! req user-email user-password sess @route-data)
 
       ;; Check session.
-      (if-not valid-session?
+      (if (session/invalid? sess)
 
         ;; Invalid session causes a redirect to a login page.
-        (common/move-to req (get route-data :auth/info :auth/info))
+        (common/move-to req (get @route-data :auth/info :auth/info))
 
         ;; Valid session causes page to be served.
         req))))

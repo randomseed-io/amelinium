@@ -93,14 +93,15 @@
   If the session is valid then the given request map is returned as is."
   [req]
   (let [body-params (get req :body-params)
-        user-email  (some-str (get body-params :login))
-        password    (if user-email (some-str (get body-params :password)))
-        sess        (session/of req :utoken)
-        route-data  (http/get-route-data req)]
+        user-email     (some-str (get body-params :login))
+        password       (if user-email (some-str (get body-params :password)))
+        sess           (session/of req :utoken)
+        route-data     (delay (http/get-route-data req))
+        valid-session? (delay (session/valid? sess))]
     (cond
-      password              (auth-user-with-password! req user-email password sess route-data nil false)
-      (session/valid? sess) req
-      :invalid!             (api/move-to req (get route-data :auth/info :auth/info)))))
+      password        (auth-user-with-password! req user-email password sess @route-data nil false)
+      @valid-session? req
+      :invalid!       (api/move-to req (get @route-data :auth/info :auth/info)))))
 
 (defn authenticate-only!
   "Logs user in when user e-mail and password are given.
