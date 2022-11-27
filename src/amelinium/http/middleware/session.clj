@@ -961,6 +961,20 @@
      (.valid? s)
      false)))
 
+(defn invalid?
+  "Returns negated value of the `:valid?` (validity) property of a session. The `src`
+  can be a session record (`Session`) or any object which satisfies the `Sessionable`
+  protocol and can be converted to a session. Optional `session-key` can be given
+  when passing a request map. If there is no session, returns `true`."
+  (^Boolean [^Sessionable src]
+   (if-some [^Session s (p/session src)]
+     (not (.valid? s))
+     true))
+  (^Boolean [^Sessionable src ^Keyword session-key]
+   (if-some [^Session s (p/session src session-key)]
+     (not (.valid? s))
+     true)))
+
 (defn error?
   "Returns `true` if the `:error` (session error) property of a session is not
   `nil`. The `src` can be a session record (`Session`) or any object which satisfies
