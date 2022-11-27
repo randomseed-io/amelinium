@@ -56,10 +56,10 @@
 (defn account-locked?
   "Returns true if an account associated with the session is hard-locked.
   Uses cached property."
-  ([req session]
+  (^Boolean [req session]
    (if-some [db (auth/db req)]
      (account-locked? req session db)))
-  ([req session db]
+  (^Boolean [req session db]
    (some? (some->> session :user/id (user/prop-get-locked db)))))
 
 (defn lock-remaining-mins
@@ -81,7 +81,7 @@
   current user is not logged in, there is no login data present, and we are not
   authenticating any user. In other words: returns `true` when we are good with
   redirecting a user to a session prolongation page (a form of login page)."
-  [^Session sess [login? auth?] login-data?]
+  ^Boolean [^Session sess [login? auth?] login-data?]
   (or (and (not login?)
            (or (not auth?) (not login-data?))
            (session/soft-expired? sess))
@@ -91,7 +91,7 @@
   "Returns `true` if user visited the prolongation page after submitting credentials to
   the authentication page is being authenticated to prolongate the soft-expired
   session."
-  [^Session sess login? auth? login-data?]
+  ^Boolean [^Session sess login? auth? login-data?]
   (or (and login-data?
            auth?
            (not login?)
@@ -100,7 +100,7 @@
 
 (defn regular-auth?
   "Returns `true` if user is being authenticated."
-  [^Session sess login? auth? login-data?]
+  ^Boolean [^Session sess login? auth? login-data?]
   (or (and auth?
            login-data?
            (not login?)
@@ -111,7 +111,7 @@
   "Returns `true` if the session is hard-expired and we are not on the hard-expired
   login page. Uses the given, previously collected session data. Does not connect to
   a database."
-  [req ^Session sess route-data]
+  ^Boolean [req ^Session sess route-data]
   (or (and (session/hard-expired? sess)
            (not (common/on-page? req (get route-data :auth/session-expired :login/session-expired))))
       false))
@@ -231,10 +231,10 @@
   route data, or from `:login` route identifier (as default). If the session is valid
   then the given request map is returned as-is."
   [req user-email user-password]
-  (let [user-email    (some-str user-email)
-        user-password (if user-email (some-str user-password))
-        ^Session sess (session/of req)
-        route-data    (delay (http/get-route-data req))]
+  (let [^String  user-email    (some-str user-email)
+        ^String  user-password (if user-email (some-str user-password))
+        ^Session sess          (session/of req)
+        route-data             (delay (http/get-route-data req))]
 
     (if user-password
 
