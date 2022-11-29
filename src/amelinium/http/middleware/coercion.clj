@@ -336,7 +336,7 @@
       (coercer (map/map-values var/deref-symbol config)))))
 
 (system/add-init  ::coercer [k config] (var/make k (init-coercer k config)))
-(system/add-halt! ::coerder [k config] (var/make k nil))
+(system/add-halt! ::coercer [k config] (var/make k nil))
 
 (system/add-init  ::exceptions [k config] (var/make k (init-exceptions-handler k config)))
 (system/add-halt! ::exceptions [k config] (var/make k nil))
