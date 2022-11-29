@@ -9,7 +9,6 @@
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require [tick.core                          :as               t]
-            [reitit.core                        :as               r]
             [ring.util.http-response            :as            resp]
             [clojure.string                     :as             str]
             [amelinium.types.session            :refer         :all]
@@ -88,7 +87,7 @@
                  req-form-params  (get req :form-params)
                  req-query-params (get req :query-params)
                  req-params       (get req :params)
-                 req              (qassoc req :headers (qassoc headers "referer" ref-uri))
+                 req              (qassoc req :headers (delay (qassoc headers "referer" ref-uri)))
                  req              (if (nil? req-form-params) req
                                       (qassoc req :form-params
                                               (delay
