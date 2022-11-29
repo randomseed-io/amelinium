@@ -12,6 +12,8 @@
             [tick.core                            :as          t]
             [reitit.core                          :as          r]
             [selmer.parser                        :as     selmer]
+            [selmer.util                          :as      sutil]
+            [selmer.filter-parser                 :as         fp]
             [amelinium.i18n                       :as       i18n]
             [amelinium.common                     :as     common]
             [amelinium.http.middleware.session    :as    session]
@@ -222,6 +224,17 @@
                (if (or summary description)
                  (str "<div class=\"form-error param-" param-id ptype-class "\">"
                       summary description "</div>"))))))))
+
+    (selmer/add-tag!
+     :prefill-form-field
+     (fn [args ctx]
+       (if-some [fe (not-empty (get ctx :form/errors))]
+         (if-some [pa (not-empty (get fe :params))]
+           (if-let [param-id (common/keyword-from-param (first args))]
+             (if-some [param (some-str (get pa param-id))]
+               (binding [sutil/*escape-variables* true]
+                 (fp/escape-html* param))))))))
+
     nil))
 
 ;; Configuration initializers
