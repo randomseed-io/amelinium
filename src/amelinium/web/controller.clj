@@ -192,7 +192,7 @@
         ^String user-email (some-str (get form-params "login"))
         ^String password   (if user-email (some-str (get form-params "password")))
         ^Session sess      (session/of req)
-        ^String lang       (delay (web/pick-language-str req :user))
+        lang               (delay (web/pick-language-str req :user))
         route-data         (delay (http/get-route-data req))
         valid-session?     (delay (session/valid? sess))]
     (cond

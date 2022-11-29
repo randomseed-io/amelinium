@@ -23,7 +23,10 @@
             [amelinium.http                     :as           http]
             [amelinium.http.middleware.session  :as        session]
             [amelinium.http.middleware.language :as       language]
-            [amelinium.http.middleware.coercion :as       coercion]))
+            [amelinium.http.middleware.coercion :as       coercion]
+            [amelinium.types.session            :refer        :all])
+
+  (:import [amelinium Session]))
 
 (p/import-vars [amelinium.common.controller
                 check-password lock-remaining-mins
@@ -59,9 +62,9 @@
   conditions and may render a response. Initial session `sess` will serve as a
   configuration source to create a new session and inject it into a request map `req`
   under configured session key."
-  ([req user-email password sess route-data lang]
+  ([req user-email password ^Session sess route-data lang]
    (auth-user-with-password! req user-email password sess route-data lang false))
-  ([req user-email password sess route-data lang auth-only-mode]
+  ([req user-email password ^Session sess route-data lang auth-only-mode]
    (let [req (super/auth-user-with-password! req user-email password sess route-data auth-only-mode)]
      (if (api/response? req)
        req
@@ -92,12 +95,12 @@
 
   If the session is valid then the given request map is returned as is."
   [req]
-  (let [body-params (get req :body-params)
-        user-email     (some-str (get body-params :login))
-        password       (if user-email (some-str (get body-params :password)))
-        sess           (session/of req :utoken)
-        route-data     (delay (http/get-route-data req))
-        valid-session? (delay (session/valid? sess))]
+  (let [body-params        (get req :body-params)
+        ^String user-email (some-str (get body-params :login))
+        ^String password   (if user-email (some-str (get body-params :password)))
+        ^Session sess      (session/of req :utoken)
+        route-data         (delay (http/get-route-data req))
+        valid-session?     (delay (session/valid? sess))]
     (cond
       password        (auth-user-with-password! req user-email password sess @route-data nil false)
       @valid-session? req
@@ -114,22 +117,22 @@
   If there is no e-mail nor password given (the value is `nil`, `false` or an empty
   string) then authentication is not performed."
   [req]
-  (let [body-params (get req :body-params)
-        user-email  (some-str (get body-params :login))
-        password    (if user-email (some-str (get body-params :password)))
-        route-data  (http/get-route-data req)
-        sess        (session/of req :utoken)]
+  (let [body-params        (get req :body-params)
+        ^String user-email (some-str (get body-params :login))
+        ^String password   (if user-email (some-str (get body-params :password)))
+        ^Session sess      (session/of req :utoken)
+        route-data         (http/get-route-data req)]
     (auth-user-with-password! req user-email password sess route-data nil true)))
 
 (defn info!
   "Returns login information."
   [req]
-  (let [auth-db    (auth/db req)
-        sess       (session/of req :utoken)
-        sess-key   (session/session-key sess)
-        prolonged? (some? (and (session/expired? sess) (get req :goto-uri)))
-        remaining  (lock-remaining-mins req auth-db (if prolonged? sess) t/now)
-        body       (qassoc (get req :response/body) :lock-remains remaining)]
+  (let [auth-db       (auth/db req)
+        ^Session sess (session/of req :utoken)
+        sess-key      (session/session-key sess)
+        prolonged?    (some? (and (session/expired? sess) (get req :goto-uri)))
+        remaining     (lock-remaining-mins req auth-db (if prolonged? sess) t/now)
+        body          (qassoc (get req :response/body) :lock-remains remaining)]
     (qassoc req
             :response/body body
             sess-key       (delay
@@ -144,7 +147,7 @@
   valid (if validators are configured). If there is a session present, checks for its
   validity and tests if an account is locked."
   [req]
-  (let [sess          (session/of req :utoken)
+  (let [^Session sess (session/of req :utoken)
         auth-state    (delay (common/login-auth-state req :login-page? :auth-page?))
         auth?         (delay (nth @auth-state 1 false))
         login-data?   (delay (login-data? req))
