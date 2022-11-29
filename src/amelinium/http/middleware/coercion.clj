@@ -272,10 +272,11 @@
                               not-empty)))
 
 (defn inject-errors
-  "Takes coercion errors, parses them, and injects into a `req` under a key named
-  `:form/errors`."
+  "Takes coercion errors, parses them, and puts it into a newly created map under the
+  key named `:errors` among with a current URI associated with the key `:dest`. The
+  whole map is then injected into a request map `req` under the key `:form/errors`."
   [req errors]
-  (qassoc req :form/errors (delay (parse-errors errors))))
+  (qassoc req :form/errors (delay {:errors (parse-errors errors) :dest (get req :uri)})))
 
 ;; Default exception handler
 

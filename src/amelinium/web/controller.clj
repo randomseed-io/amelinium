@@ -426,7 +426,9 @@
   with:
 
   - `:title` (translated message of `:parameters/error`),
-  - `:form/errors` (result of `amelinium.http.middleware.coercion/map-errors`),
+  - `:form/errors` (a map with the result of calling
+                    `amelinium.http.middleware.coercion/map-errors`
+                    under `:errors` and ),
   - `:coercion/errors` (result of `amelinium.http.middleware.coercion/explain-errors`).
 
   When a coercion error is detected during response processing, a web page of HTTP
@@ -460,9 +462,13 @@
                  dest-uri      (if (keyword? destination) (common/page req destination) destination)
                  dest-uri      (some-str dest-uri)
                  ^Session smap (session/not-empty-of req)
-                 stored?       (and smap (session/valid? smap)
-                                    (session/put-var! smap :form-errors {:dest   dest-uri
-                                                                         :errors errors}))
+                 stored?       (if (and smap (session/valid? smap))
+                                 (session/put-var!
+                                  smap :form-errors
+                                  {:dest   dest-uri
+                                   :errors errors
+                                   :params (->> (keys (get data :transformed))
+                                                (select-keys (get data :value)))}))
                  error-params  (if stored? "" (coercion/join-errors errors))
                  joint-params  (qassoc orig-params "form-errors" error-params)]
              (if dest-uri
@@ -479,8 +485,11 @@
                   :app/data
                   (-> (get req :app/data web/empty-lazy-map)
                       (qassoc :title           (delay (translate-sub :parameters/error))
-                              :form/errors     (delay (coercion/map-errors data))
-                              :coercion/errors (delay (coercion/explain-errors data translate-sub)))))
+                              :coercion/errors (delay (coercion/explain-errors data translate-sub))
+                              :form/errors     (delay {:errors (coercion/map-errors data)
+                                                       :dest   (:uri req)
+                                                       :params (->> (keys (get data :transformed))
+                                                                    (select-keys (get data :value)))}))))
                  web/render-bad-params)))))
 
       :reitit.coercion/response-coercion

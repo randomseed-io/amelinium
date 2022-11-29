@@ -206,7 +206,8 @@
      :explain-form-error
      (fn [args ctx]
        (if-some [fe (get ctx :form/errors)]
-         (let [args                  (map common/string-from-param (take 2 args))
+         (let [fe                    (get fe :errors)
+               args                  (map common/string-from-param (take 2 args))
                [param-id param-type] (coercion/split-error args)]
            (if (contains? fe param-id)
              (let [translator-sub (i18n/no-default (translator-sub ctx translations-fn))

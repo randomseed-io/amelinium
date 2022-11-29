@@ -82,21 +82,25 @@
 
 (defn populate-form-errors
   "Tries to obtain form errors from previously visited page, saved as a session
-  variable `:form-errors` or as a query parameter `form-errors`."
+  variable `:form-errors` or as a query parameter `form-errors`. The result is a map
+  of at least 3 keys: `:errors` (parsed errors), `:dest` (destination URI, matching
+  current URI if using a session variable), `:params` (map of other parameters and
+  their values, only when session variable is a source)."
   [req _ _]
   (delay
     (if-some [qp (get req :query-params)]
       (if-let [query-params-errors (get qp "form-errors")]
-        (coercion/parse-errors
-         (or (if-let [smap (session/valid-of req)]
-               (let [sess-var (session/fetch-var! smap :form-errors)]
-                 (if (map? sess-var)
-                   (let [expected-uri (get sess-var :dest)]
-                     (if (or (not expected-uri) (= expected-uri (get req :uri)))
-                       (let [sess-var-errors (get sess-var :errors)]
-                         (if (and (map? sess-var-errors) (not-empty sess-var-errors))
-                           sess-var-errors)))))))
-             query-params-errors))))))
+        (or (if-let [smap (session/valid-of req)]
+              (let [sess-var (session/fetch-var! smap :form-errors)]
+                (if (map? sess-var)
+                  (let [expected-uri (get sess-var :dest)]
+                    (if (or (not expected-uri) (= expected-uri (get req :uri)))
+                      (let [sess-var-errors (get sess-var :errors)]
+                        (if (and (map? sess-var-errors) (not-empty sess-var-errors))
+                          (map/qassoc sess-var :errors (coercion/parse-errors sess-var-errors)))))))))
+            {:errors (coercion/parse-errors query-params-errors)
+             :dest   (get req :uri)
+             :params nil})))))
 
 (def form-errors
   {:compile (fn [data _ _]
