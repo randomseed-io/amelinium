@@ -113,6 +113,7 @@
    :output                {:error "Błędne dane wyjściowe"}
    :parameters            {:error "Błędne parametry"}
    :parameter             {:phone                 "Numer telefoniczny"
+                           :regular-phone         :parameter/phone
                            :email                 "Adres e-mailowy"
                            :login                 "Login"
                            :password              "Hasło"
@@ -122,6 +123,7 @@
                            :last-name             "Nazwisko"
                            :second-name           "Drugie imię"
                            :middle-name           "Drugie imię"
+                           :user.regular-phone    :parameter/phone
                            :user.phone            :parameter/phone
                            :user.email            :parameter/email
                            :user.login            :parameter/login
@@ -140,6 +142,7 @@
                            :integer           "Liczba"
                            :boolean           "Pole decyzji"
                            :phone             "Numer telefoniczny"
+                           :regular-phone     "Zwyczajny numer telefoniczny"
                            :email             "Adres e-mailowy"
                            :password          "Hasło"
                            :password-relaxed  "Hasło"
@@ -149,6 +152,7 @@
                            :secure-session-id "Bezpieczny identyfikator sesji"
                            :language          "Identyfikator języka"}
    :type-should           {:phone             "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa."
+                           :regular-phone     "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa i nie być numerem specjalnym."
                            :email             "Adres e-mailowy powinien zawierać część lokalną i poprawną domenę."
                            :password          "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
                            :password-relaxed  "Należy podać hasło."
@@ -158,6 +162,7 @@
                            :secure-session-id "Bezpieczny identyfikator sesji powinien być jedną lub dwoma liczbami szesnastkowymi oddzielonymi dywizem."
                            :language          "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."}
    :parameter-should      {:phone                          :type-should/phone
+                           :regular-phone                  :type-should/regular-phone
                            :email                          :type-should/email
                            :login                          "Login powinien być poprawnym adresem e-mailowym."
                            :password                       :type-should/password

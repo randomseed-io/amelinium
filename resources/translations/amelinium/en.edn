@@ -112,6 +112,7 @@
    :output                {:error "Invalid output data"}
    :parameters            {:error "Invalid parameters"}
    :parameter             {:phone                 "Phone number"
+                           :regular-phone         "Phone number"
                            :email                 "E-mail address"
                            :login                 "Login"
                            :password              "Password"
@@ -122,6 +123,7 @@
                            :second-name           "Second name"
                            :middle-name           "Middle name"
                            :user.phone            :parameter/phone
+                           :user.regular-phone    :parameter/phone
                            :user.email            :parameter/email
                            :user.login            :parameter/login
                            :user.password         :parameter/password
@@ -139,6 +141,7 @@
                            :integer           "Integer number"
                            :boolean           "Decision field"
                            :phone             "Phone number"
+                           :regular-phone     "Regular phone number"
                            :email             "E-mail address"
                            :login             "Login"
                            :password          "Password"
@@ -149,6 +152,7 @@
                            :secure-session-id "Secure session identifier"
                            :language          "Language identifier"}
    :type-should           {:phone             "Phone number should contain a country code with a plus sign."
+                           :regular-phone     "Phone number should contain a country code with a plus sign and be a regular (non-special) number."
                            :email             "E-mail address should have a local part and a valid domain name."
                            :password          "Password should have at least 8 characters, big and small letters, a digit and a special character."
                            :password-relaxed  "Password must be present."
@@ -159,6 +163,7 @@
                            :language          "Language ID should express a correct, supported language code."
                            :lang              "Language ID should express a correct, supported language code."}
    :parameter-should      {:phone                          :type-should/phone
+                           :regular-phone                  :type-should/regular-phone
                            :email                          :type-should/email
                            :login                          "Login should be a valid e-mail address."
                            :password                       :type-should/password
