@@ -1591,7 +1591,9 @@
 (defn string-from-param
   [s]
   (if-some [s (some-str s)]
-    (if (= \: (.charAt ^String s 0)) (subs s 1) s)))
+    (if (= \: (.charAt ^String s 0))
+      (let [s (subs s 1)] (if (pos? (count s)) s))
+      s)))
 
 (defn keyword-from-param
   [s]
@@ -1599,7 +1601,9 @@
     s
     (if-some [^String s (some-str s)]
       (keyword
-       (if (= \: (.charAt ^String s 0)) (subs s 1) s)))))
+       (if (= \: (.charAt ^String s 0))
+         (let [s (subs s 1)] (if (pos? (count s)) s))
+         s)))))
 
 (defn parse-query-params
   [req qstr]
