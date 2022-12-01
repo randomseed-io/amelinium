@@ -271,8 +271,8 @@
   `raise` function.
 
   When a coercion error is detected during **request processing**, it creates a sequence
-  of maps (by calling `amelinium.http.middleware.coercion/explain-errors`) where each
-  contains the following keys:
+  of maps (by calling `amelinium.http.middleware.coercion/explain-errors-simple`) where
+  each contains the following keys:
 
   - `:parameter/id`,
   - `:parameter/src`,
@@ -309,7 +309,7 @@
 
       :reitit.coercion/request-coercion
       (let [tr-sub (i18n/no-default (common/translator-sub req))
-            errors (coercion/explain-errors data tr-sub)]
+            errors (coercion/explain-errors-simple data tr-sub)]
         (-> (api/assoc-body req :parameters/errors errors)
             (api/render-bad-params)
             (respond)))

@@ -107,7 +107,7 @@
 (defn recode-errors-simple
   "Uses exception data to recode coercion errors in a form of a map. To be used mainly
   with API handlers. For web form error reporting `map-errors`, `list-errors`
-  and `explain-errors` are better suited."
+  and `explain-errors-simple` are better suited."
   [data]
   (let [dat (coercion/encode-error data)
         src (get dat :in)
@@ -130,7 +130,7 @@
                      :parameter/value (get e :value)})))))
            (filter identity)))))
 
-(defn explain-errors
+(defn explain-errors-simple
   "Like `recode-errors-simple` but each error map contains the additional key
   `:parameter/message` containing a human-readable messages created with translation
   function `translate-sub`. Enriches the output map with `:parameter/name`,

@@ -428,13 +428,16 @@
   - `:form/errors` (a map with the result of calling
                     `amelinium.http.middleware.coercion/map-errors`
                     under `:errors` and ),
-  - `:coercion/errors` (result of `amelinium.http.middleware.coercion/explain-errors`).
+  - `:coercion/errors` (result of `amelinium.http.middleware.coercion/explain-errors-simple`).
 
   When a coercion error is detected during response processing, a web page of HTTP
   code 500 is rendered. The `:app/data` key of a request map is updated with the:
 
   - `:title` (translated message of `:output/error`),
-  - `:form/errors` (result of `amelinium.http.middleware.coercion/explain-errors`)."
+  - `:form/errors` (result of `amelinium.http.middleware.coercion/explain-errors-simple`).
+
+  Please note that if error is detected in a nested structure of parameter's value,
+  the whole parameter will be reported as bad."
   [e respond raise]
   (let [data  (ex-data e)
         req   (get data :request)
@@ -484,7 +487,7 @@
                   :app/data
                   (-> (get req :app/data web/empty-lazy-map)
                       (qassoc :title           (delay (translate-sub :parameters/error))
-                              :coercion/errors (delay (coercion/explain-errors data translate-sub))
+                              :coercion/errors (delay (coercion/explain-errors-simple data translate-sub))
                               :form/errors     (delay {:errors (coercion/map-errors data)
                                                        :dest   (:uri req)
                                                        :params (->> (keys (get data :transformed))
