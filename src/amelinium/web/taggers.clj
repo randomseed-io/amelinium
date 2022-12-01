@@ -246,12 +246,12 @@
               lang-settings] args
              out-path        (lang-url router ctx path-or-name lang false params query-params lang-param)]
          (if (and sid sfld)
-           (str "<form name=\"sessionLink\" class=\"formlink\" action=\"" out-path "\" method=\"post\">"
-                (anti-spam-code validators)
-                "<button type=\"submit\" class=\"link\" name=\"" sfld "\" value=\"" sid "\">"
-                (get-in content [:link :content])
-                "</button></form>")
-           (str "<a href=\"" out-path "\" class=\"link\">" (get-in content [:link :content]) "</a>"))))
+           (strb "<form name=\"sessionLink\" class=\"formlink\" action=\"" out-path "\" method=\"post\">"
+                 (anti-spam-code validators)
+                 "<button type=\"submit\" class=\"link\" name=\"" sfld "\" value=\"" sid "\">"
+                 (get-in content [:link :content])
+                 "</button></form>")
+           (strb "<a href=\"" out-path "\" class=\"link\">" (get-in content [:link :content]) "</a>"))))
      :endlink)
 
     (selmer/add-tag!
@@ -262,12 +262,12 @@
              sid  (session/id smap)
              sfld (session/id-field smap)]
          (if (and sid sfld)
-           (str "<form name=\"sessionLink\" class=\"formlink\" action=\"" url "\" method=\"post\">"
-                (anti-spam-code validators)
-                "<button type=\"submit\" class=\"link\" name=\"" sfld "\" value=\"" sid "\">"
-                (get-in content [:slink :content])
-                "</button></form>")
-           (str "<a href=\"" url  "\" class=\"link\">" (get-in content [:slink :content]) "</a>"))))
+           (strb "<form name=\"sessionLink\" class=\"formlink\" action=\"" url "\" method=\"post\">"
+                 (anti-spam-code validators)
+                 "<button type=\"submit\" class=\"link\" name=\"" sfld "\" value=\"" sid "\">"
+                 (get-in content [:slink :content])
+                 "</button></form>")
+           (strb "<a href=\"" url  "\" class=\"link\">" (get-in content [:slink :content]) "</a>"))))
      :endslink)
 
     (selmer/add-tag!
@@ -275,29 +275,28 @@
      (fn [args ctx]
        (let [smap (session/of ctx)
              sfld (session/id-field smap)]
-         (str (anti-spam-code validators)
-              "<input type=\"hidden\" name=\"" sfld "\" value=\"" (session/id smap) "\" />"))))
+         (strb (anti-spam-code validators)
+               "<input type=\"hidden\" name=\"" sfld "\" value=\"" (session/id smap) "\" />"))))
 
     (selmer/add-tag!
      :explain-form-error
      (fn [args ctx]
        (if-some [fe (get ctx :form/errors)]
-         (let [fe                    (get fe :errors)
-               args                  (map common/string-from-param (take 2 args))
-               [param-id param-type] (coercion/split-error args)]
-           (if (contains? fe param-id)
+         (let [fe         (get fe :errors)
+               param-id   (common/string-from-param (first args))
+               param-type (common/string-from-param (second args))]
+           (if (and param-id (contains? fe (keyword param-id)))
              (let [translator-sub (i18n/no-default (translator-sub ctx translations-fn))
                    param-type     (or param-type (get fe param-id))
-                   param-type     (if param-type (common/string-from-param param-type))
-                   ptype-class    (if param-type (str " param-type-" param-type))
+                   ptype-class    (if param-type (strb " param-type-" param-type))
                    messages       (coercion/translate-error translator-sub param-id param-type)
                    summary        (some-str (get messages :error/summary))
                    description    (some-str (get messages :error/description))
-                   summary        (if summary (str "<p class=\"error-summary\">" summary "</p>"))
-                   description    (if description (str "<p class=\"error-description\">" description "</p>"))]
+                   summary        (if summary (strb "<p class=\"error-summary\">" summary "</p>"))
+                   description    (if description (strb "<p class=\"error-description\">" description "</p>"))]
                (if (or summary description)
-                 (str "<div class=\"form-error param-" param-id ptype-class "\">"
-                      summary description "</div>"))))))))
+                 (strb "<div class=\"form-error param-" param-id ptype-class "\">"
+                       summary description "</div>"))))))))
 
     (selmer/add-tag!
      :prefill-form-field
@@ -307,7 +306,7 @@
            (if-let [param-id (common/keyword-from-param (first args))]
              (if-some [param (some-str (get pa param-id))]
                (binding [sutil/*escape-variables* true]
-                 (fp/escape-html* param))))))))
+                 (html-escape param))))))))
 
     nil))
 
