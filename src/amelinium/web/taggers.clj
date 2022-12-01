@@ -308,6 +308,53 @@
                (binding [sutil/*escape-variables* true]
                  (html-escape param))))))))
 
+    (selmer/add-tag!
+     :form-fields
+     (fn [args ctx]
+       (binding [sutil/*escape-variables* true]
+         (let [tr-sub      (delay (i18n/no-default (translator-sub ctx translations-fn)))
+               form-errors (not-empty (get ctx :form/errors))
+               errors      (if form-errors (get form-errors :errors))
+               params      (if form-errors (get form-errors :params))]
+           (str/join
+            "\n"
+            (for [field (->> args parse-args (partition-by #{"|"}) (take-nth 2))
+                  :let  [field (apply array-map (map #(%1 %2) (cycle [common/keyword-from-param identity]) field))]
+                  :when (and (map? field) (pos? (count field)))
+                  :let  [{:keys [id name label-tr label type value-tr value placeholder-tr placeholder input-type]} field]
+                  :let  [id-kw      (common/keyword-from-param id)]
+                  :when id-kw
+                  :let  [value?     (contains? params id-kw)
+                         error?     (contains? errors id-kw)
+                         id-str     (common/string-from-param id)
+                         name       (common/string-from-param name)
+                         type       (common/string-from-param type)
+                         itype      (common/string-from-param input-type)
+                         label      (param-try-tr tr-sub :forms label id)
+                         phold      (param-try-tr tr-sub :forms placeholder id)
+                         value      (if value? (get params id-kw) (param-try-tr tr-sub :forms value id))
+                         type       (or type (if error? (get errors id-kw)))
+                         err-msgs   (if error?   (coercion/translate-error @tr-sub id-kw type))
+                         err-summ   (if err-msgs (some-str (get err-msgs :error/summary)))
+                         err-desc   (if err-msgs (some-str (get err-msgs :error/description)))
+                         error?     (boolean (or err-summ err-desc))
+                         html-id    (html-escape id-str)
+                         html-label (if label    (html-escape label))
+                         html-name  (if name     (html-escape name)  html-id)
+                         html-itype (if itype    (html-escape itype) "text")
+                         html-ptcls (if type     (strb " param-type-"    (html-escape type)))
+                         html-value (if value    (strb " value=\""       (html-escape value)  "\""))
+                         html-phold (if phold    (strb " placeholder=\"" (html-escape phold) "\""))
+                         html-esumm (if err-summ (strb "      <p class=\"error-summary\">"     (html-escape err-summ) "</p>\n"))
+                         html-edesc (if err-desc (strb "      <p class=\"error-description\">" (html-escape err-desc) "</p>\n"))
+                         html-error (if error?   (strb "    <div class=\"form-error\">" html-esumm html-edesc "</div>\n"))
+                         html-label (if label    (strb "    <label for=\"" id-str "\" class=\"label\">" html-label "</label>\n"))]]
+              (strb "  <div class=\"field param-" html-id " " html-ptcls "\">\n"
+                    html-label
+                    "    <input type=\"" html-itype "\" name=\"" html-name "\" id=\"" html-id "\""
+                    html-phold html-value " />\n"
+                    html-error
+                    "  </div>\n")))))))
     nil))
 
 ;; Configuration initializers
