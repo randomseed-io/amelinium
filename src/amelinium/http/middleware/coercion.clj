@@ -58,49 +58,50 @@
   ([translate-sub param-id param-type _ _]
    (let [param-type? (some? param-type)
          param-id?   (some? param-id)
+         param-str   (if param-id? (some-str param-id))
          mixed-id    (if (and param-type? param-id?) (str param-id "." param-type))
          mixed-id?   (some? mixed-id)
-         param-name  (translate-sub :parameter param-id param-type)
+         param-name  (translate-sub :parameter param-str param-type)
          param-name? (some? param-name)
-         param-name  (if param-name? param-name (some-str param-id))
-         type-name   (if param-type? (translate-sub :parameter-type param-type param-id))
+         param-name  (if param-name? param-name param-str)
+         type-name   (if param-type? (translate-sub :parameter-type param-type param-str))
          type-name?  (some? type-name)
          output      {:parameter/name param-name :parameter-type/name type-name}]
      (-> output
          (qassoc :error/summary
-                 (or (if param-id?   (translate-sub :parameter-error param-id
+                 (or (if param-id?   (translate-sub :parameter-error param-str
                                                     param-name
-                                                    param-id
+                                                    param-str
                                                     param-type))
                      (if param-name? (translate-sub :error/parameter-name nil
                                                     param-name
-                                                    param-id
+                                                    param-str
                                                     param-type))
                      (if param-type? (translate-sub :type-error param-type
                                                     param-name
-                                                    param-id
+                                                    param-str
                                                     param-type))
                      (if type-name?  (translate-sub :error/type-name nil
                                                     type-name
-                                                    param-id
+                                                    param-str
                                                     param-type))
                      (if param-id?   (translate-sub :error/parameter nil
-                                                    param-id
+                                                    param-str
                                                     param-type))
                      (if param-type? (translate-sub :error/parameter-of-type
                                                     nil param-type))))
          (qassoc :error/description
                  (or (if mixed-id?   (translate-sub :parameter-should mixed-id
                                                     param-name
-                                                    param-id
+                                                    param-str
                                                     param-type))
-                     (if param-id?   (translate-sub :parameter-should param-id
+                     (if param-id?   (translate-sub :parameter-should param-str
                                                     param-name
-                                                    param-id
+                                                    param-str
                                                     param-type))
                      (if param-type? (translate-sub :type-should param-type
                                                     param-name
-                                                    param-id
+                                                    param-str
                                                     param-type))))))))
 
 (defn recode-errors
@@ -121,7 +122,7 @@
             (fn [e]
               (if (map? e)
                 (if-some [param-path (get e :path)]
-                  (if-some [param-id (and (coll? param-path) (some-str (first param-path)))]
+                  (if-some [param-id (and (coll? param-path) (some-keyword (first param-path)))]
                     {:parameter/id    param-id
                      :parameter/src   src
                      :parameter/path  param-path
@@ -139,17 +140,17 @@
     (map #(into % (translate-error translate-sub %)) r)))
 
 (defn list-errors
-  "Returns a sequence of coercion errors containing 3-element sequences. First element
-  of each being a parameter identifier, second element being a parameter type
+  "Returns a sequence of coercion errors consisting of 3-element sequences. First
+  element of each being a parameter identifier, second element being a parameter type
   described by schema (if detected), and third being its current value. Takes an
   exception data map which should contain the `:coercion` key. Used, among other
-  applications, to expose form errors to another page which should indicate them to
-  a visitor."
+  applications, to expose form errors to another page which should indicate them to a
+  visitor."
   [data]
   (let [dat (coercion/encode-error data)
         err (get dat :errors)
         err (if (coll? err) err (if (some? err) (cons err nil)))]
-    (->> err (filter identity) (map (juxt-seq (comp some-str first :path) param-type :value)))))
+    (->> err (filter identity) (map (juxt-seq (comp some-keyword first :path) param-type :value)))))
 
 (defn map-errors
   "Like `list-errors` but returns a map in which keys are parameter names and values
@@ -173,7 +174,7 @@
     (if-some [errors (seq errors)]
       (->> errors
            (map (fn [[param-id param-type _]]
-                  (if-some [param-id (and param-id (some-str (str/trim (str param-id))))]
+                  (if-some [param-id (and param-id (some-str (str/trim (some-str param-id))))]
                     (if-some [param-type (and param-type (some-str (str/trim (str param-type))))]
                       (str param-id ":" param-type)
                       param-id))))
@@ -196,7 +197,7 @@
     (if-some [errors (seq errors)]
       (->> errors
            (map (fn [[param-id param-type param-value]]
-                  (if-some [param-id (and param-id (some-str (str/trim (str param-id))))]
+                  (if-some [param-id (and param-id (some-str (str/trim (some-str param-id))))]
                     (let [param-type (and param-type (some-str (str/trim (str param-type))))]
                       (str param-id ":" param-type ":" param-value)))))
            (filter identity)
@@ -221,7 +222,7 @@
            ty (if ty (str/trim ty))]
        (if (or (and id (pos? (count id)))
                (and ty (pos? (count ty))))
-         [id ty va]))))
+         [(keyword id) ty va]))))
   ([param-id param-type]
    (if-not param-type
      (if param-id (split-error param-id))
@@ -231,16 +232,17 @@
            ty (if ty (str/trim ty))]
        (if (or (and id (pos? (count id)))
                (and ty (pos? (count ty))))
-         [id ty nil]))))
+         [(keyword id) ty nil]))))
   ([param-id]
    (if (and (sequential? param-id) (seq param-id))
      (apply split-error (take 3 param-id))
      (if-some [param-id (some-str param-id)]
-       (let [[f s v] (str/split (str/trim param-id) #":" 3)
-             f       (if f (some-str (str/trim f)))
-             s       (if s (some-str (str/trim s)))
-             v       (if v (some-str v))]
-         (if (or f s) [f s v]))))))
+       (if-some [param-id (not-empty (str/trim param-id))]
+         (let [[f s v] (str/split param-id #":" 3)
+               f       (if f (some-str (str/trim f)))
+               s       (if s (some-str (str/trim s)))
+               v       (if v (some-str v))]
+           (if (or f s) [(keyword f) s v])))))))
 
 (defn parse-errors
   "Transforms a string previously exposed with `join-errors`, a list created with
