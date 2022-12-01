@@ -112,6 +112,7 @@
   (let [dat (coercion/encode-error data)
         src (get dat :in)
         err (get dat :errors)
+        vls (get dat :value)
         err (if (coll? err) err (if (some? err) (cons err nil)))
         src (if (coll? src) src (if (some? src) (cons src nil)))
         src (if (= (first src) :request) (rest src) src)
@@ -127,7 +128,7 @@
                      :parameter/src   src
                      :parameter/path  param-path
                      :parameter/type  (param-type e)
-                     :parameter/value (get e :value)})))))
+                     :parameter/value (if vls (get vls param-id))})))))
            (filter identity)))))
 
 (defn explain-errors-simple
