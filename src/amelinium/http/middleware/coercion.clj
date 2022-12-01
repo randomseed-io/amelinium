@@ -104,7 +104,7 @@
                                                     param-str
                                                     param-type))))))))
 
-(defn recode-errors
+(defn recode-errors-simple
   "Uses exception data to recode coercion errors in a form of a map. To be used mainly
   with API handlers. For web form error reporting `map-errors`, `list-errors`
   and `explain-errors` are better suited."
@@ -131,12 +131,12 @@
            (filter identity)))))
 
 (defn explain-errors
-  "Like `recode-errors` but each error map contains the additional key
+  "Like `recode-errors-simple` but each error map contains the additional key
   `:parameter/message` containing a human-readable messages created with translation
   function `translate-sub`. Enriches the output map with `:parameter/name`,
   `:error/summary` and `:error/description` entries. To be used in API responses."
   [data translate-sub]
-  (if-some [r (recode-errors data)]
+  (if-some [r (recode-errors-simple data)]
     (map #(into % (translate-error translate-sub %)) r)))
 
 (defn list-errors
