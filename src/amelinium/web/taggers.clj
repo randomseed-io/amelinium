@@ -133,6 +133,80 @@
             (common/keyword-from-param (second args))
             (nnext args)))))
 
+(defn kw-param?
+  [v]
+  (or (keyword? v)
+      (and (string? v)
+           (pos? (count ^String v))
+           (= \: (.charAt ^String v 0)))))
+
+(defn param-try-tr
+  ([tr-sub v]
+   (if (kw-param? v)
+     (if-some [v (common/keyword-from-param v)]
+       ((force tr-sub) v))
+     (str v)))
+  ([tr-sub k v]
+   (if (kw-param? v)
+     (if-some [v (common/string-from-param v)]
+       ((force tr-sub) (some-str k) v))
+     (str v)))
+  ([tr-sub k v a]
+   (if (kw-param? v)
+     (if-some [v (common/string-from-param v)]
+       ((force tr-sub) (some-str k) v a))
+     (str v)))
+  ([tr-sub k v a b]
+   (if (kw-param? v)
+     (if-some [v (common/string-from-param v)]
+       ((force tr-sub) (some-str k) v a b))
+     (str v)))
+  ([tr-sub k v a b & more]
+   (if (kw-param? v)
+     (if-some [v (common/string-from-param v)]
+       (apply (force tr-sub) (some-str k) v a b more))
+     (str v))))
+
+(defn html-escape
+  [v]
+  (fp/escape-html* v))
+
+(defn parse-args
+  [args]
+  (fp/fix-filter-args args))
+
+(defn strb
+  (^String [^String a]
+   (or a ""))
+  (^String [^String a ^String b]
+   (.toString ^StringBuilder (.append ^StringBuilder (StringBuilder. (or a "")) (or b ""))))
+  (^String [^String a ^String b ^String c]
+   (.toString
+    ^StringBuilder (doto (StringBuilder. (or a ""))
+                     (.append (or b ""))
+                     (.append (or c "")))))
+  (^String [^String a ^String b ^String c ^String d]
+   (.toString
+    ^StringBuilder (doto (StringBuilder. (or a ""))
+                     (.append (or b ""))
+                     (.append (or c ""))
+                     (.append (or d "")))))
+  (^String [^String a ^String b ^String c ^String d ^String e]
+   (.toString
+    ^StringBuilder (doto (StringBuilder. (or a ""))
+                     (.append (or b ""))
+                     (.append (or c ""))
+                     (.append (or d ""))
+                     (.append (or e "")))))
+  (^String [^String a ^String b ^String c ^String d ^String e & more]
+   (.toString
+    ^StringBuilder (doto (StringBuilder. (or a ""))
+                     (.append (or b ""))
+                     (.append (or c ""))
+                     (.append (or d ""))
+                     (.append (or e ""))
+                     (.append (apply strb more))))))
+
 (defn add-taggers
   [router language translations-fn validators]
 
