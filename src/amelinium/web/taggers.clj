@@ -79,6 +79,49 @@
   [args]
   (if (seq args)
     (apply array-map (map #(%1 %2) (cycle [common/keyword-from-param identity]) args))))
+
+(defn strb
+  (^String [^Object a]
+   (if a (.toString ^Object a) ""))
+  (^String [^String a ^String b]
+   (.toString ^StringBuilder (.append ^StringBuilder (StringBuilder. (or a "")) (or b ""))))
+  (^String [^String a ^String b ^String c]
+   (.toString
+    ^StringBuilder (doto (StringBuilder. (or a ""))
+                     (.append (or b ""))
+                     (.append (or c "")))))
+  (^String [^String a ^String b ^String c ^String d]
+   (.toString
+    ^StringBuilder (doto (StringBuilder. (or a ""))
+                     (.append (or b ""))
+                     (.append (or c ""))
+                     (.append (or d "")))))
+  (^String [^String a ^String b ^String c ^String d ^String e]
+   (.toString
+    ^StringBuilder (doto (StringBuilder. (or a ""))
+                     (.append (or b ""))
+                     (.append (or c ""))
+                     (.append (or d ""))
+                     (.append (or e "")))))
+  (^String [^String a ^String b ^String c ^String d ^String e & more]
+   (.toString
+    ^StringBuilder (doto (StringBuilder. (or a ""))
+                     (.append (or b ""))
+                     (.append (or c ""))
+                     (.append (or d ""))
+                     (.append (or e ""))
+                     (.append (apply strb more))))))
+
+(defmacro strs
+  ([]
+   "")
+  ([a]
+   (if (string? a) `~a `(strb ~a)))
+  ([a & more]
+   `(strb ~@(->> (cons a more)
+                 (partition-by string?)
+                 (mapcat #(if (string? (first %)) (cons (apply strb %) nil) %))))))
+
 (defn anti-spam-code
   "Generates anti-spam HTML string containing randomly selected fields and values using
   `validators/gen-required`."
@@ -96,10 +139,10 @@
                   (if k-blank (map vector k-blank (repeat "")))
                   (if k-any   (map vector k-any   (repeatedly #(common/random-uuid-or-empty rng)))))]
      (if (seq r)
-       (apply str (map #(str "<input type=\"text\" name=\""   (nth % 0)
-                             "\" class=\"subspace\" value=\"" (nth % 1)
-                             "\"/>")
-                       r))))))
+       (apply strb (map #(strb "<input type=\"text\" name=\""   (str (nth % 0))
+                               "\" class=\"subspace\" value=\"" (str (nth % 1))
+                               "\"/>\n")
+                        r))))))
 
 (defn get-lang
   [ctx]
@@ -210,50 +253,6 @@
        ((force tr-sub) (some-str k) v a b))
      (str v)))
   ([tr-sub k v a b & more]
-   (if (kw-param? v)
-     (if-some [v (common/string-from-param v)]
-       (apply (force tr-sub) (some-str k) v a b more))
-     (str v))))
-
-(defn html-escape
-  [v]
-  (fp/escape-html* v))
-
-(defn parse-args
-  [args]
-  (fp/fix-filter-args args))
-
-(defn strb
-  (^String [^String a]
-   (or a ""))
-  (^String [^String a ^String b]
-   (.toString ^StringBuilder (.append ^StringBuilder (StringBuilder. (or a "")) (or b ""))))
-  (^String [^String a ^String b ^String c]
-   (.toString
-    ^StringBuilder (doto (StringBuilder. (or a ""))
-                     (.append (or b ""))
-                     (.append (or c "")))))
-  (^String [^String a ^String b ^String c ^String d]
-   (.toString
-    ^StringBuilder (doto (StringBuilder. (or a ""))
-                     (.append (or b ""))
-                     (.append (or c ""))
-                     (.append (or d "")))))
-  (^String [^String a ^String b ^String c ^String d ^String e]
-   (.toString
-    ^StringBuilder (doto (StringBuilder. (or a ""))
-                     (.append (or b ""))
-                     (.append (or c ""))
-                     (.append (or d ""))
-                     (.append (or e "")))))
-  (^String [^String a ^String b ^String c ^String d ^String e & more]
-   (.toString
-    ^StringBuilder (doto (StringBuilder. (or a ""))
-                     (.append (or b ""))
-                     (.append (or c ""))
-                     (.append (or d ""))
-                     (.append (or e ""))
-                     (.append (apply strb more))))))
 
 (defn add-taggers
   [router language translations-fn validators]
