@@ -1605,6 +1605,15 @@
          (let [s (subs s 1)] (if (pos? (count s)) s))
          s)))))
 
+(defn try-kw-from-param
+  [s]
+  (if (keyword? s)
+    s
+    (if-some [^String s (some-str s)]
+      (if (= \: (.charAt ^String s 0))
+        (let [s (subs s 1)] (if (pos? (count s)) (keyword s)))
+        s))))
+
 (defn parse-query-params
   [req qstr]
   (if req
