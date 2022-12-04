@@ -1600,10 +1600,9 @@
   (if (keyword? s)
     s
     (if-some [^String s (some-str s)]
-      (keyword
-       (if (= \: (.charAt ^String s 0))
-         (let [s (subs s 1)] (if (pos? (count s)) s))
-         s)))))
+      (if (= \: (.charAt ^String s 0))
+        (let [s (subs s 1)] (if (pos? (count s)) (keyword s)))
+        (keyword s)))))
 
 (defn try-kw-from-param
   [s]
