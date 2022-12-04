@@ -106,8 +106,8 @@
 
 (defn recode-errors-simple
   "Uses exception data to recode coercion errors in a form of a map. To be used mainly
-  with API handlers. For web form error reporting `map-errors`, `list-errors`
-  and `explain-errors-simple` are better suited."
+  with API handlers. For web form error reporting `map-errors-simple`,
+  `list-errors-simple` and `explain-errors-simple` are better suited."
   [data]
   (let [dat (coercion/encode-error data)
         src (get dat :in)
@@ -140,7 +140,7 @@
   (if-some [r (recode-errors-simple data)]
     (map #(into % (translate-error translate-sub %)) r)))
 
-(defn list-errors
+(defn list-errors-simple
   "Returns a sequence of coercion errors consisting of 3-element sequences. First
   element of each being a parameter identifier, second element being a parameter type
   described by schema (if detected), and third being its current value. Takes an
@@ -153,22 +153,22 @@
         err (if (coll? err) err (if (some? err) (cons err nil)))]
     (->> err (filter identity) (map (juxt-seq (comp some-keyword first :path) param-type :value)))))
 
-(defn map-errors
-  "Like `list-errors` but returns a map in which keys are parameter names and values
-  are parameter types (as defined in a schema used to validate and coerce them). Used
-  to pass form errors to another page which should expose them to a visitor."
+(defn map-errors-simple
+  "Like `list-errors-simple` but returns a map in which keys are parameter names and
+  values are parameter types (as defined in a schema used to validate and coerce them).
+  Used to pass form errors to another page which should expose them to a visitor."
   [data]
-  (if-some [r (list-errors data)]
+  (if-some [r (list-errors-simple data)]
     (reduce (partial apply qassoc) {} (map butlast r))))
 
 (defn join-errors
   "Used to produce a string containing parameter names and their types (as defined in
   schema) from a coercion errors simple map or coercion errors sequence (produced by
-  `list-errors` or `map-errors` respectively). For anon-empty string it simply returns
-  it. Used to generate a query string containing form errors in a form of `parameter-id`
-  or `parameter-id:parameter-type` separated by commas. The whole string can then be
-  encoded and used as a query parameter `:form-errors` when redirecting anonymous user
-  to a page with a previous form which needs to be corrected."
+  `list-errors-simple` or `map-errors-simple` respectively). For a non-empty string it
+  simply returns it. Used to generate a query string containing form errors in a form
+  of `parameter-id` or `parameter-id:parameter-type` separated by commas. The whole
+  string can then be encoded and used as a query parameter `:form-errors` when
+  redirecting anonymous user to a page with a previous form which needs to be corrected."
   [errors]
   (if (and (string? errors) (pos? (count errors)))
     errors
@@ -185,9 +185,9 @@
 (defn join-errors-with-values
   "Used to produce a string containing parameter names and their types (as defined in
   schema) from a coercion errors simple map or coercion errors sequence (produced by
-  `list-errors` or `map-errors` respectively). For anon-empty string it simply
-  returns it. Used to generate a query string containing form errors in a form of
-  `parameter-id` or `parameter-id:parameter-type:parameter-value` separated by
+  `list-errors-simple` or `map-errors-simple` respectively). For anon-empty string it
+  simply returns it. Used to generate a query string containing form errors in a form
+  of `parameter-id` or `parameter-id:parameter-type:parameter-value` separated by
   commas. The whole string can then be encoded and used as a query parameter
   `:form-errors` when redirecting anonymous user to a page with a previous form which
   needs to be corrected. Be aware that it might be hard to parse the output string if
@@ -247,8 +247,8 @@
 
 (defn parse-errors
   "Transforms a string previously exposed with `join-errors`, a list created with
-  `list-errors` or a map resulted from calling `map-errors`, into a map containing
-  parameter names as keys and parameter types as values.
+  `list-errors-simple` or a map resulted from calling `map-errors-simple`, into
+  a map containing parameter names as keys and parameter types as values.
 
   Used to parse input from a query string or saved session variable when visiting a
   page containing a previously visited form which needs to be corrected (after

@@ -391,8 +391,8 @@
   a `raise` function.
 
   When coercion error is detected during request processing, it creates a map (by
-  calling the `amelinium.http.middleware.coercion/map-errors`) containing parameter
-  identifiers associated with parameter types (or with `nil` values if type
+  calling the `amelinium.http.middleware.coercion/map-errors-simple`) containing
+  parameter identifiers associated with parameter types (or with `nil` values if type
   information is not available).
 
   If there is a session then this map is stored in a session variable `:form-errors`
@@ -426,7 +426,7 @@
 
   - `:title` (translated message of `:parameters/error`),
   - `:form/errors` (a map with the result of calling
-                    `amelinium.http.middleware.coercion/map-errors`
+                    `amelinium.http.middleware.coercion/map-errors-simple`
                     under `:errors` and ),
   - `:coercion/errors` (result of `amelinium.http.middleware.coercion/explain-errors-simple`).
 
@@ -457,7 +457,7 @@
                   (not handling-previous?))
            ;; redirect to a form-submission page allowing user to correct errors
            ;; transfer form errors using query params or form params (if a session is present)
-           (let [errors        (coercion/map-errors data)
+           (let [errors        (coercion/map-errors-simple data)
                  orig-uri      (if orig-uri (some-str orig-uri))
                  orig-params   (if orig-uri orig-params)
                  destination   (or orig-page orig-uri)
@@ -488,14 +488,14 @@
                   (-> (get req :app/data web/empty-lazy-map)
                       (qassoc :title           (delay (translate-sub :parameters/error))
                               :coercion/errors (delay (coercion/explain-errors-simple data translate-sub))
-                              :form/errors     (delay {:errors (coercion/map-errors data)
+                              :form/errors     (delay {:errors (coercion/map-errors-simple data)
                                                        :dest   (:uri req)
                                                        :params (->> (keys (get data :transformed))
                                                                     (select-keys (get data :value)))}))))
                  web/render-bad-params)))))
 
       :reitit.coercion/response-coercion
-      (let [error-list (coercion/list-errors data)]
+      (let [error-list (coercion/list-errors-simple data)]
         (log/err "Response coercion error:" (coercion/join-errors-with-values error-list))
         (respond (web/render-error req :output/error)))
 

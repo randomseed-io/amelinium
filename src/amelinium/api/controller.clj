@@ -316,7 +316,7 @@
 
       :reitit.coercion/response-coercion
       (let [data       (dissoc data :response)
-            error-list (coercion/list-errors data)]
+            error-list (coercion/list-errors-simple data)]
         (log/err "Response coercion error:" (coercion/join-errors-with-values error-list))
         (respond (api/render-error req :output/error)))
 
