@@ -346,55 +346,65 @@
        (let [path-or-name   (first args)
              args           (rest args)
              args           (if (map? (first args)) (cons nil args) args)
-             [lang params
-              query-params] args]
-         (lang-url router ctx path-or-name lang true params query-params lang-param))))
+             [lang
+              path-params
+              query-params] args
+             lang           (or lang (get-lang ctx))
+             path-params    (if path-params  (assignments->kw-map path-params))
+             query-params   (if query-params (assignments->map query-params))]
+         (lang-url router ctx path-or-name lang true path-params query-params lang-param))))
 
     (selmer/add-tag!
      :link
      (fn [args ctx content]
-       (let [smap            (session/of ctx)
-             sid             (session/id smap)
-             sfld            (session/id-field smap)
-             path-or-name    (first args)
-             args            (rest args)
-             args            (if (map? (first args)) (cons nil args) args)
-             [lang params
-              query-params
-              lang-settings] args
-             out-path        (lang-url router ctx path-or-name lang false params query-params lang-param)]
-         (if (and sid sfld)
-           (strb "<form name=\"sessionLink\" class=\"formlink\" action=\"" out-path "\" method=\"post\">"
+       (let [smap           (session/of ctx)
+             sid            (session/id smap)
+             sfld           (session/id-field smap)
+             lcontent       (get (get content :link) :content)
+             sdata          (if (and sid sfld) (strb " name=\"" sfld "\" value=\"" sid "\""))
+             path-or-name   (first args)
+             args           (rest args)
+             args           (if (map? (first args)) (cons nil args) args)
+             [lang
+              path-params
+              query-params] args
+             lang           (or lang (get-lang ctx))
+             path-params    (if path-params  (assignments->kw-map path-params))
+             query-params   (if query-params (assignments->map   query-params))
+             out-path       (lang-url router ctx path-or-name lang false path-params query-params lang-param)]
+         (if sdata
+           (strs "<form name=\"sessionLink\" class=\"formlink\" action=\"" out-path "\" method=\"post\">"
                  (anti-spam-code validators)
-                 "<button type=\"submit\" class=\"link\" name=\"" sfld "\" value=\"" sid "\">"
-                 (get-in content [:link :content])
-                 "</button></form>")
-           (strb "<a href=\"" out-path "\" class=\"link\">" (get-in content [:link :content]) "</a>"))))
-     :endlink)
+                 "<button type=\"submit\" class=\"link\"" sdata ">" lcontent "</button></form>")
+           (strs "<a href=\"" out-path "\" class=\"link\">" lcontent "</a>"))))
+     :end-link)
 
     (selmer/add-tag!
      :slink
      (fn [args ctx content]
-       (let [url  (selmer/render (first args) ctx {:tag-open \[ :tag-close \]})
-             smap (session/of ctx)
-             sid  (session/id smap)
-             sfld (session/id-field smap)]
-         (if (and sid sfld)
-           (strb "<form name=\"sessionLink\" class=\"formlink\" action=\"" url "\" method=\"post\">"
+       (let [url      (first args)
+             ;;url      (selmer/render (first args) ctx {:tag-open \[ :tag-close \]})
+             smap     (session/of ctx)
+             sid      (session/id smap)
+             sfld     (session/id-field smap)
+             sdata    (if (and sid sfld) (strb " name=\"" sfld "\" value=\"" sid "\""))
+             lcontent (get (get content :slink) :content)]
+         (if sdata
+           (strs "<form name=\"sessionLink\" class=\"formlink\" action=\"" url "\" method=\"post\">"
                  (anti-spam-code validators)
-                 "<button type=\"submit\" class=\"link\" name=\"" sfld "\" value=\"" sid "\">"
-                 (get-in content [:slink :content])
-                 "</button></form>")
-           (strb "<a href=\"" url  "\" class=\"link\">" (get-in content [:slink :content]) "</a>"))))
-     :endslink)
+                 "<button type=\"submit\" class=\"link\"" sdata ">" lcontent "</button></form>")
+           (strs "<a href=\"" url  "\" class=\"link\">" lcontent "</a>"))))
+     :end-slink)
 
     (selmer/add-tag!
      :session-data
      (fn [args ctx]
        (let [smap (session/of ctx)
+             sid  (session/id smap)
              sfld (session/id-field smap)]
-         (strb (anti-spam-code validators)
-               "<input type=\"hidden\" name=\"" sfld "\" value=\"" (session/id smap) "\" />"))))
+         (if (and sid sfld)
+           (strs (anti-spam-code validators)
+                 "<input type=\"hidden\" name=\"" sfld "\" value=\"" sid "\" />")))))
 
     (selmer/add-tag!
      :explain-form-error
@@ -413,7 +423,7 @@
                    summary        (if summary (strb "<p class=\"error-summary\">" summary "</p>"))
                    description    (if description (strb "<p class=\"error-description\">" description "</p>"))]
                (if (or summary description)
-                 (strb "<div class=\"form-error param-" param-id ptype-class "\">"
+                 (strs "<div class=\"form-error param-" param-id ptype-class "\">"
                        summary description "</div>"))))))))
 
     (selmer/add-tag!
