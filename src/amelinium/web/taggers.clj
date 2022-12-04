@@ -233,26 +233,35 @@
 
 (defn param-try-tr
   ([tr-sub v]
-   (if (kw-param? v)
-     (if-some [v (common/keyword-from-param v)]
-       ((force tr-sub) v))
-     (str v)))
+   (if v
+     (if (kw-param? v)
+       (if-some [v (common/keyword-from-param v)]
+         ((force tr-sub) v))
+       (not-empty (str v)))))
   ([tr-sub k v]
-   (if (kw-param? v)
-     (if-some [v (common/string-from-param v)]
-       ((force tr-sub) (some-str k) v))
-     (str v)))
+   (if v
+     (if (kw-param? v)
+       (if-some [v (common/string-from-param v)]
+         ((force tr-sub) (some-str k) v))
+       (not-empty (str v)))))
   ([tr-sub k v a]
-   (if (kw-param? v)
-     (if-some [v (common/string-from-param v)]
-       ((force tr-sub) (some-str k) v a))
-     (str v)))
+   (if v
+     (if (kw-param? v)
+       (if-some [v (common/string-from-param v)]
+         ((force tr-sub) (some-str k) v a))
+       (not-empty (str v)))))
   ([tr-sub k v a b]
-   (if (kw-param? v)
-     (if-some [v (common/string-from-param v)]
-       ((force tr-sub) (some-str k) v a b))
-     (str v)))
+   (if v
+     (if (kw-param? v)
+       (if-some [v (common/string-from-param v)]
+         ((force tr-sub) (some-str k) v a b))
+       (not-empty (str v)))))
   ([tr-sub k v a b & more]
+   (if v
+     (if (kw-param? v)
+       (if-some [v (common/string-from-param v)]
+         (apply (force tr-sub) (some-str k) v a b more))
+       (not-empty (str v))))))
 
 (defn add-taggers
   [router language translations-fn validators]
