@@ -91,10 +91,10 @@
       (get ctx :language/default)))
 
 (defn lang-url
-  ([router ctx path-or-name lang localized? params query-params]
-   (lang-url router ctx path-or-name lang localized? params query-params nil))
-  ([router ctx path-or-name lang localized? params]
-   (lang-url router ctx path-or-name lang localized? params nil nil))
+  ([router ctx path-or-name lang localized? path-params query-params]
+   (lang-url router ctx path-or-name lang localized? path-params query-params nil))
+  ([router ctx path-or-name lang localized? path-params]
+   (lang-url router ctx path-or-name lang localized? path-params nil nil))
   ([router ctx path-or-name lang localized?]
    (lang-url router ctx path-or-name lang localized? nil nil nil))
   ([router ctx path-or-name lang]
@@ -103,17 +103,12 @@
    (lang-url router ctx path-or-name nil true nil nil nil))
   ([router ctx]
    (lang-url router ctx nil nil true nil nil nil))
-  ([router ctx path-or-name lang localized? params query-params lang-param]
-   (let [router       (or router (get ctx ::r/router) (get ctx :router))
-         lang         (or lang (get-lang ctx))
+  ([router ctx path-or-name lang localized? path-params query-params lang-param]
+   (let [lang         (or lang (get-lang ctx))
          lang-param   (or lang-param (get ctx :language/settings) (get ctx :language-param) (get ctx :param) :lang)
-         path-or-name (or (valuable path-or-name) (get ctx :current-path) (common/current-page ctx))
-         path-or-name (if path-or-name (selmer/render path-or-name ctx {:tag-open \[ :tag-close \]}))
-         path-or-name (if (and path-or-name (str/starts-with? path-or-name ":")) (keyword (subs path-or-name 1)) path-or-name)
-         path-fn      (if localized? common/localized-path common/path)
-         out-path     (path-fn path-or-name lang params query-params router lang-param)
-         out-path     (or out-path (if-not (ident? path-or-name) (some-str path-or-name)))]
-     out-path)))
+         path-or-name (or (valuable path-or-name) (get ctx :current-path) (common/current-page ctx))]
+     (if-some [out-path (common/lang-url router ctx path-or-name lang localized? path-params query-params lang-param)]
+       (url-esc out-path)))))
 
 (defn translator
   ([ctx]

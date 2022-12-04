@@ -1796,16 +1796,29 @@
 ;; Language helpers
 
 (defn lang-url
-  [req path-or-name lang localized? params query-params lang-settings]
-  (let [router        (or (get req ::r/router) (get req :router))
-        lang          (or lang (get req :language/str) (some-str (get req :language)) (some-str (get req :lang)))
-        lang-settings (or (valuable lang-settings) (get req :language/settings) (get req :language-param) (get req :param) :lang)
-        path-or-name  (or path-or-name (current-page req))
-        path-or-name  (if (and path-or-name (str/starts-with? path-or-name ":")) (keyword (subs path-or-name 1)) path-or-name)
-        path-fn       (if localized? localized-path path)
-        out-path      (path-fn path-or-name lang params query-params router lang-settings)
-        out-path      (or out-path (if-not (ident? path-or-name) (some-str path-or-name)))]
-    out-path))
+  ([router req path-or-name lang localized? path-params]
+   (lang-url router req path-or-name lang localized? path-params nil nil))
+  ([router req path-or-name lang localized?]
+   (lang-url router req path-or-name lang localized? nil nil nil))
+  ([router req path-or-name lang]
+   (lang-url router req path-or-name lang true nil nil nil))
+  ([router req path-or-name]
+   (lang-url router req path-or-name nil true nil nil nil))
+  ([router req]
+   (lang-url router req nil nil true nil nil nil))
+  ([req]
+   (lang-url nil req nil nil true nil nil nil))
+  ([req path-or-name lang localized? path-params query-params lang-param]
+   (lang-url nil req path-or-name lang localized? path-params query-params lang-param))
+  ([router req path-or-name lang localized? path-params query-params lang-param]
+   (let [router       (or router (get req ::r/router) (get req :router))
+         lang         (or lang (get req :language/str) (some-str (get req :language/id)) (some-str (get req :lang)))
+         lang-param   (or lang-param (get req :language/settings) :lang)
+         path-or-name (or (valuable path-or-name) (current-page req))
+         path-or-name (if path-or-name (try-kw-from-param path-or-name))
+         path-fn      (if localized? localized-path path)
+         out-path     (path-fn path-or-name lang path-params query-params router lang-param)]
+     (or out-path (if-not (ident? path-or-name) (some-str path-or-name))))))
 
 (defn lang-param
   [req]
