@@ -307,12 +307,23 @@
               html-phold html-value " />\n"
               html-error
               "  </div>\n")))))
+
 (defn form-fields
   [args tr-sub errors params]
   (str/join
    "\n"
    (for [field (->> args (partition-by #{"|"}) (take-nth 2))]
      (form-field field tr-sub errors params))))
+
+(defn form-submit
+  [label tr-sub session-field session-id validators]
+  (let [label (param-try-tr tr-sub :forms (or label :submit))
+        label (if label (html-esc label) "OK!")
+        sdata (if (and session-field session-id) (strb " name=\"" session-field "\" value=\"" session-id "\""))]
+    (strs (anti-spam-code validators)
+          "  <div class=\"control\">\n"
+          "    <button type=\"submit\"" sdata ">" label "</button>\n"
+          "  </div>\n")))
 
 (defn add-taggers
   [router language translations-fn validators]
@@ -437,6 +448,17 @@
                params      (if form-errors (get form-errors :params))
                args        (parse-args args)]
            (form-field args tr-sub errors params)))))
+
+    (selmer/add-tag!
+     :form-submit
+     (fn [args ctx]
+       (let [args   (parse-args args)
+             props  (get ctx :form-props)
+             smap   (if-not props (session/of ctx))
+             sid    (or (get props :session-id) (session/id smap))
+             sfld   (or (get props :session-id-field) (session/id-field smap))
+             tr-sub (or (get props :tr-sub) (i18n/no-default (translator-sub ctx translations-fn)))]
+         (form-submit (first args) tr-sub sfld sid validators))))
     nil))
 
 ;; Configuration initializers
