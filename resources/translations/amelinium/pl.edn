@@ -190,5 +190,16 @@
                            :session-id                     :type-should/session-id
                            :language                       :type-should/language
                            :lang                           :type-should/language}
+   :forms                 {:logging       "Logowanie"
+                           :login         "Zaloguj!"
+                           :email         :parameter/email
+                           :password      :parameter/password
+                           :name          :parameter/name
+                           :first-name    :parameter/first-name
+                           :second-name   :parameter/second-name
+                           :last-name     :parameter/last-name
+                           :middle-name   :parameter/middle-name
+                           :phone         :parameter/phone
+                           :regular-phone :parameter/regular-phone}
 
    :tongue/pluralizer amelinium.i18n.pluralizers/pl}}}
