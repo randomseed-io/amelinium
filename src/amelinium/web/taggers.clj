@@ -54,6 +54,31 @@
   [v]
   (fp/escape-html* v))
 
+(defn assignments->map
+  [^String s]
+  (if (and s (seq s))
+    (->> (str/split s #"\,")
+         (mapcat #(map str/trim (str/split (str/trim %) #"\=")))
+         (apply array-map)
+         (not-empty))))
+
+(defn assignments->kw-map
+  [^String s]
+  (if (and s (seq s))
+    (->> (str/split s #"\,")
+         (mapcat #(map str/trim (str/split (str/trim %) #"\=")))
+         (map #(%1 %2) (cycle [common/keyword-from-param identity]))
+         (apply array-map)
+         (not-empty))))
+
+(defn parse-args
+  [args]
+  (fp/fix-filter-args args))
+
+(defn args->map
+  [args]
+  (if (seq args)
+    (apply array-map (map #(%1 %2) (cycle [common/keyword-from-param identity]) args))))
 (defn anti-spam-code
   "Generates anti-spam HTML string containing randomly selected fields and values using
   `validators/gen-required`."
