@@ -22,9 +22,37 @@
             [amelinium.http.middleware.coercion   :as   coercion]
             [amelinium.logging                    :as        log]
             [amelinium.system                     :as     system]
-            [io.randomseed.utils                  :refer    :all]))
+            [io.randomseed.utils.map              :as        map]
+            [io.randomseed.utils                  :refer    :all])
+
+  (:import [java.net URLEncoder]))
 
 ;; Template helpers
+
+(defn url-enc
+  ^String [^String s]
+  (URLEncoder/encode s))
+
+(defn url-esc
+  ^String [^String s]
+  (let [slen              (unchecked-int (count s))
+        ^StringBuilder sb (StringBuilder. slen)]
+    (loop [idx (unchecked-int 0)]
+      (if (>= idx slen)
+        (.toString sb)
+        (let [c (char (.charAt s idx))]
+          (case c
+            \< (.append sb "%3C")
+            \> (.append sb "%3E")
+            \" (.append sb "%22")
+            \' (.append sb "%27")
+            (.append sb c))
+          (recur (inc idx))))))
+  s)
+
+(defn html-esc
+  [v]
+  (fp/escape-html* v))
 
 (defn anti-spam-code
   "Generates anti-spam HTML string containing randomly selected fields and values using
