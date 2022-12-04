@@ -446,6 +446,7 @@
                params      (if form-errors (get form-errors :params))
                args        (parse-args args)]
            (form-fields args tr-sub errors params)))))
+
     (selmer/add-tag!
      :form-field
      (fn [args ctx]
@@ -469,6 +470,48 @@
              sfld   (or (get props :session-id-field) (session/id-field smap))
              tr-sub (or (get props :tr-sub) (i18n/no-default (translator-sub ctx translations-fn)))]
          (form-submit (first args) tr-sub sfld sid validators))))
+
+    (selmer/add-tag!
+     :form
+     (fn [args ctx content]
+       (let [args        (args->map (parse-args args))
+             smap        (session/of ctx)
+             sfld        (session/id-field smap)
+             sid         (session/id smap)
+             id-str      (common/string-from-param (get args :id))
+             id-str      (or id-str (str (random-uuid)))
+             tr-sub      (delay (i18n/no-default (translator-sub ctx translations-fn)))
+             lang        (get args :lang)
+             action      (get args :action)
+             method      (get args :method)
+             label       (get args :label)
+             label       (if label (param-try-tr tr-sub :forms label id-str))
+             method      (if method (common/string-from-param method))
+             lang        (if lang   (common/string-from-param lang))
+             action-lang (or (common/string-from-param (get args :action-lang)) lang)
+             form-props  {:tr-sub tr-sub :id id-str :session-id sid :session-id-field sfld}
+             action      (if action
+                           (lang-url router ctx action
+                                     action-lang
+                                     false
+                                     (assignments->kw-map (get args :path-params))
+                                     (assignments->map    (get args :query-params))
+                                     lang-param))
+             html-method (strb " method=\"" (if method (html-esc method) "post") "\"")
+             html-lang   (if lang   (strb " lang=\"" (html-esc lang) "\""))
+             html-action (if action (strb " action=\"" action "\""))
+             html-label  (if label  (html-esc label))
+             html-label  (if label  (strb "<label for=\"" id-str "\""
+                                          html-lang
+                                          " class=\"label\">"
+                                          html-label "</label>\n"))]
+         (strs
+          html-label
+          "<form id=\"" id-str "\" class=\"familiar medium\"" html-lang html-method html-action ">"
+          (selmer/render (get (get content :form) :content) (map/qassoc ctx :form-props form-props) {:tag-second \-})
+          "</form>")))
+     :end-form)
+
     nil))
 
 ;; Configuration initializers
