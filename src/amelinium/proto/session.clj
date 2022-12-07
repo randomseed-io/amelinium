@@ -125,7 +125,15 @@
 
   (del-uvars
     [c uid] [c]
-    "Deletes all user's session variables from a persistent storage."))
+    "Deletes all user's session variables from a persistent storage.")
+
+  (del-session
+    [c db-sid] [c]
+    "Deletes a session from a persistent storage.")
+
+  (del-sessions
+    [c uid] [c]
+    "Deletes all user's sessions from a persistent storage."))
 
 (defprotocol Sessionable
   "This protocol is used to access session data."

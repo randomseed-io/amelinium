@@ -164,17 +164,19 @@
 
   Session
 
-  (get-var     [s k]   (p/get-var       (.control ^Session s) (db-sid-smap s) k))
-  (get-vars    [s ks]  (p/get-vars      (.control ^Session s) (db-sid-smap s) ks))
-  (put-var     [s k v] (p/put-var       (.control ^Session s) (db-sid-smap s) k v))
-  (put-vars    [s kvs] (p/put-vars      (.control ^Session s) (db-sid-smap s) kvs))
-  (del-var     [s k]   (p/del-var       (.control ^Session s) (db-sid-smap s) k))
-  (del-vars    [s ks]  (p/del-vars      (.control ^Session s) (db-sid-smap s) ks))
-  (del-svars   [s]     (p/del-svars     (.control ^Session s) (db-sid-smap s)))
-  (del-uvars   [s]     (p/del-uvars     (.control ^Session s) (.user-id ^Session s)))
-  (mem-atom    [s]     (p/mem-atom      (.control ^Session s)))
-  (mem-handler [s]     (p/mem-handler   (.control ^Session s)))
-  (mem-cache   [s]     (p/mem-cache     (.control ^Session s)))
+  (get-var      [s k]   (p/get-var       (.control ^Session s) (db-sid-smap s) k))
+  (get-vars     [s ks]  (p/get-vars      (.control ^Session s) (db-sid-smap s) ks))
+  (put-var      [s k v] (p/put-var       (.control ^Session s) (db-sid-smap s) k v))
+  (put-vars     [s kvs] (p/put-vars      (.control ^Session s) (db-sid-smap s) kvs))
+  (del-var      [s k]   (p/del-var       (.control ^Session s) (db-sid-smap s) k))
+  (del-vars     [s ks]  (p/del-vars      (.control ^Session s) (db-sid-smap s) ks))
+  (del-svars    [s]     (p/del-svars     (.control ^Session s) (db-sid-smap s)))
+  (del-uvars    [s]     (p/del-uvars     (.control ^Session s) (.user-id ^Session s)))
+  (del-session  [s]     (p/del-session   (.control ^Session s) (db-sid-smap s)))
+  (del-sessions [s]     (p/del-sessions  (.control ^Session s) (.user-id ^Session s)))
+  (mem-atom     [s]     (p/mem-atom      (.control ^Session s)))
+  (mem-handler  [s]     (p/mem-handler   (.control ^Session s)))
+  (mem-cache    [s]     (p/mem-cache     (.control ^Session s)))
 
   (config
     (^SessionConfig [s]       (p/config (.control ^Session s)))
@@ -277,25 +279,27 @@
   (^Boolean expired?      [s] false)
   (^Boolean hard-expired? [s] false)
 
-  (to-db        [s]             nil)
-  (mem-atom     [s]             nil)
-  (mem-cache    [s]             nil)
-  (mem-handler ([s]             nil) ([s s-k]       nil))
-  (empty       ([s]             nil) ([s s-k]       nil))
-  (config      ([s]             nil) ([s s-k]       nil))
-  (identify    ([s]             nil) ([s req]       nil))
-  (from-db     ([s db-sid ip]   nil) ([s db-sid]    nil) ([s]        nil))
-  (handle      ([s db-sid ip]   nil) ([s db-sid]    nil) ([s]        nil))
-  (invalidate  ([s db-sid ip]   nil) ([s db-sid]    nil) ([s]        nil))
-  (get-active  ([s db-sid ip]   nil  ([s db-sid]    nil) ([s]        nil)))
-  (get-var     ([s db-sid k]    nil) ([s k]         nil))
-  (get-vars    ([s db-sid ks]   nil) ([s ks]        nil))
-  (put-var     ([s db-sid k v]  nil) ([s k v]       nil))
-  (put-vars    ([s db-sid kvs]  nil) ([s kvs]       nil))
-  (del-var     ([s db-sid k]    nil) ([s k]         nil))
-  (del-vars    ([s db-sid ks]   nil) ([s ks]        nil))
-  (del-svars   ([s db-sid]      nil) ([s]           nil))
-  (del-uvars   ([s uid]         nil) ([s]           nil))
+  (to-db         [s]             nil)
+  (mem-atom      [s]             nil)
+  (mem-cache     [s]             nil)
+  (mem-handler  ([s]             nil) ([s s-k]       nil))
+  (empty        ([s]             nil) ([s s-k]       nil))
+  (config       ([s]             nil) ([s s-k]       nil))
+  (identify     ([s]             nil) ([s req]       nil))
+  (from-db      ([s db-sid ip]   nil) ([s db-sid]    nil) ([s]        nil))
+  (handle       ([s db-sid ip]   nil) ([s db-sid]    nil) ([s]        nil))
+  (invalidate   ([s db-sid ip]   nil) ([s db-sid]    nil) ([s]        nil))
+  (get-active   ([s db-sid ip]   nil  ([s db-sid]    nil) ([s]        nil)))
+  (get-var      ([s db-sid k]    nil) ([s k]         nil))
+  (get-vars     ([s db-sid ks]   nil) ([s ks]        nil))
+  (put-var      ([s db-sid k v]  nil) ([s k v]       nil))
+  (put-vars     ([s db-sid kvs]  nil) ([s kvs]       nil))
+  (del-var      ([s db-sid k]    nil) ([s k]         nil))
+  (del-vars     ([s db-sid ks]   nil) ([s ks]        nil))
+  (del-svars    ([s db-sid]      nil) ([s]           nil))
+  (del-uvars    ([s uid]         nil) ([s]           nil))
+  (del-session  ([s db-sid]      nil) ([s]           nil))
+  (del-sessions ([s user-id]    nil) ([s]           nil))
   (set-active
     ([s sid db-sid ip t] nil)
     ([s sid db-sid ip] nil)
@@ -1114,6 +1118,17 @@
                                   (str "AND " variables-table ".session_id = " sessions-table ".id)"))
                          db-id]))
 
+(defn delete-session-by-id
+  [^SessionConfig opts ^DataSource db ^String table ^String db-sid]
+  (jdbc/execute! db [(str "DELETE FROM " table
+                          " WHERE id = ? RETURNING id,user_id,user_email,ip") db-sid]
+                 db/opts-simple-map))
+
+(defn delete-sessions-by-uid
+  [^SessionConfig opts ^DataSource db ^String table ^Long user-id]
+  (jdbc/execute! db [(str "DELETE FROM " table " WHERE user_id = ?"
+                          " RETURNING id,user_id,user_email,ip") user-id]
+                 db/opts-simple-map))
 ;; Marking
 
 (defn mkgood
@@ -1757,6 +1772,10 @@
         vars-del-sess-fn         (setup-fn cfg :fn/del-sess-vars delete-session-vars)
         vars-del-user-fn-w       #(vars-del-user-fn cfg db sessions-table variables-table %)
         vars-del-sess-fn-w       #(vars-del-sess-fn cfg db sessions-table variables-table %)
+        delete-session-fn        (setup-fn cfg :fn/del-session  delete-session-by-id)
+        delete-sessions-fn       (setup-fn cfg :fn/del-sessions delete-sessions-by-uid)
+        delete-session-fn-w      #(delete-session-fn  cfg db sessions-table %)
+        delete-sessions-fn-w     #(delete-sessions-fn cfg db sessions-table %)
         ^SessionConfig cfg       (assoc cfg
                                         :fn/get-var       var-get-fn
                                         :fn/get-vars      vars-get-fn
@@ -1765,7 +1784,9 @@
                                         :fn/del-var       var-del-fn
                                         :fn/del-vars      vars-del-fn
                                         :fn/del-user-vars vars-del-user-fn-w
-                                        :fn/del-sess-vars vars-del-sess-fn-w)
+                                        :fn/del-sess-vars vars-del-sess-fn-w
+                                        :fn/del-session   delete-session-fn-w
+                                        :fn/del-sessions  delete-sessions-fn-w)
         setter-fn                (setup-fn cfg :fn/setter set-session)
         setter-fn-w              #(setter-fn cfg db sessions-table %)
         ^SessionConfig cfg       (assoc cfg :fn/setter setter-fn-w)
@@ -1801,7 +1822,9 @@
                                    (get-vars      [_ db-sid ks]  (vars-get-fn db db-sid ks))
                                    (del-vars      [_ db-sid ks]  (var-del-fn  db db-sid ks))
                                    (del-svars     [_ db-sid]     (vars-del-sess-fn-w db-sid))
-                                   (del-uvars     [_ user-id]    (vars-del-user-fn-w user-id)))
+                                   (del-uvars     [_ user-id]    (vars-del-user-fn-w user-id))
+                                   (del-session   [_ db-sid]     (delete-session-fn-w  db-sid))
+                                   (del-sessions  [_ user-id]    (delete-sessions-fn-w user-id)))
         ^Session empty-sess      (p/empty ctrl)
         ^Session mlf-sess        (map/qassoc empty-sess
                                              :error (SessionError. :info :session/malformed-session-id
