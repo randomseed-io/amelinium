@@ -1814,6 +1814,7 @@
     (if dbname (log/msg "Using database" dbname "for storing sessions of" k))
     {:name    (keyword k)
      :config  cfg
+     :control ctrl
      :compile (fn [{:keys [no-session?]} opts]
                 (if (and (not no-session?) db)
                   (fn [h]
