@@ -707,6 +707,76 @@
                   false false false false false false
                   skey id-field nil ctrl))))
 
+;; Session deletion
+
+(defn invalidate-multi
+  [^SessionControl ctrl sessions]
+  (if sessions
+    (doseq [sdata sessions]
+      (if-some [^String sid (:id sdata)]
+        (when-some [^String ip (:ip sdata)]
+          (log/dbg "Invalidating session" sid
+                   (for-user (get sdata :user-id) (get sdata :user-email) ip))
+          (p/invalidate ctrl sid (ip/to-address ip)))))))
+
+(defn delete!
+  "Deletes a session from a database. The session is identified by a session object or
+  any other value which can be transformed into a session (`src`) with optional
+  key (`session-key`) if this object is associative. Session variables are also
+  removed."
+  ([^Sessionable src]
+   (delete! src :session))
+  ([^Sessionable src ^Keyword session-key]
+   (if-some [^Session s (p/session src session-key)]
+     (if-some [^String db-sid (db-sid-smap s)]
+       (let [^SessionControl ctrl (.control s)]
+         (p/del-svars   ctrl db-sid)
+         (p/del-session ctrl db-sid)
+         (p/invalidate  ctrl (p/identify s) (.ip s)))
+       (log/wrn "Cannot delete session because session ID is not valid" (for-user s))))))
+
+(defn delete-all!
+  "Deletes all user sessions from a database. The sessions are identified by a user ID
+  derived from a session object, any other value which can be transformed into a
+  session object (`src`) with optional session key for associative structures, or a
+  user ID given directly (`user-id`). In the last case session will only be used to
+  obtain control object so it may be a default session without any valid identifiers
+  in it. Session variables are also removed."
+  ^{:arglists '([^Sessionable src]
+                [^Sessionable src ^Keyword session-key]
+                [^Sessionable src ^Long user-id]
+                [^Sessionable src ^Keyword session-key ^Long user-id]
+                [^SessionControl ctrl ^Long user-id ^String user-email ip-address])}
+  ([^Sessionable src]
+   (delete-all! src :session))
+  ([^Sessionable src skey-or-user-id]
+   (if (pos-int? skey-or-user-id)
+     (delete-all! src :session skey-or-user-id)
+     (if-some [^Session s (p/session src skey-or-user-id)]
+       (if-some [^Long user-id (.user-id s)]
+         (let [^SessionControl ctrl (.control s)]
+           (p/del-uvars ctrl user-id)
+           (invalidate-multi ctrl (p/del-sessions ctrl user-id)))
+         (log/wrn "Cannot delete sessions because user ID is not valid" (for-user s))))))
+  ([^Sessionable src ^Keyword session-key ^Long user-id]
+   (if user-id
+     (if-some [^Session s (p/session src session-key)]
+       (let [^SessionControl ctrl (.control s)]
+         (p/del-uvars ctrl user-id)
+         (invalidate-multi ctrl (p/del-sessions ctrl user-id)))
+       (log/wrn "Cannot delete sessions because session control not available"
+                (for-user user-id nil
+                          (if (map? src) (or (get src :remote-ip/str)
+                                             (get src :ip)
+                                             (get src :remote-ip))))))))
+  ([^SessionControl ctrl ^Long user-id ^String user-email ip-address]
+   (if user-id
+     (when-some [^SessionControl ctrl (p/control src)]
+       (p/del-uvars ctrl user-id)
+       (invalidate-multi ctrl (p/del-sessions ctrl user-id))
+       (log/wrn "Cannot delete sessions because session control not available"
+                (for-user user-id user-email ip-address))))))
+
 ;; Session validation
 
 (defn secure?
