@@ -600,6 +600,13 @@
      (let [tp (- (time/timestamp t) ctime)]
        (t/new-duration (if (pos? tp) tp 0) :millis)))))
 
+;; Logging
+
+(defn- for-user
+  ([^Session s]              (if s (log/for-user (.user-id s) (.user-email s) (.ip s))))
+  ([user-id user-email]            (log/for-user user-id user-email))
+  ([user-id user-email ip-address] (log/for-user user-id user-email ip-address)))
+
 ;; Secure sessions
 
 (def ^:const scrypt-options
@@ -776,7 +783,7 @@
                          (str-spc "Session IP address" (str "(" (ip/plain-ip-str session-ip) ")")
                                   "is different than the remote IP address"
                                   (str "(" (ip/plain-ip-str remote-ip) ")")
-                                  (log/for-user user-id user-email))))
+                                  (for-user user-id user-email))))
         (if-some [str-addr (ip/to-str remote-ip)]
           (if-not (or (= str-addr (ip/to-str session-ip))
                       (= str-addr (ip/to-str (ip/to-v4 session-ip)))
@@ -785,7 +792,7 @@
                            (str-spc "Session IP string" (str "(" (ip/to-str remote-ip) ")")
                                     "is different than the remote IP string"
                                     (str "(" str-addr ")")
-                                    (log/for-user user-id user-email)))))))))
+                                    (for-user user-id user-email)))))))))
 
 (defn- same-ip?
   (^Boolean [state-result]
@@ -925,8 +932,7 @@
           user-ident         (or user-id user-email)
           ^Long user-id      (valuable user-id)
           ^String user-email (some-str user-email)
-          for-user           (delay (log/for-user user-id user-email
-                                                  (ip/plain-ip-str ip-address)))]
+          for-user           (delay (for-user user-id user-email ip-address))]
       (cond
         (not any-sid)               (SessionError. :info :session/no-id
                                                    (some-str-spc "No session ID" @for-user))
@@ -1129,6 +1135,7 @@
   (jdbc/execute! db [(str "DELETE FROM " table " WHERE user_id = ?"
                           " RETURNING id,user_id,user_email,ip") user-id]
                  db/opts-simple-map))
+
 ;; Marking
 
 (defn mkgood
@@ -1209,8 +1216,8 @@
      (let [^Session smap  (p/session src)
            ^String db-sid (db-sid-smap smap)]
        (if-not db-sid
-         (log/err "Cannot delete session variable" var-name "because session ID is not valid"
-                  (log/for-user (user-id smap) (user-email smap)))
+         (log/err "Cannot delete session variable" var-name
+                  "because session ID is not valid" (for-user smap))
          (p/del-var (.control smap) db-sid var-name))))))
 
 (defn del-vars!
@@ -1223,8 +1230,7 @@
            ^String db-sid (db-sid-smap smap)]
        (if-not db-sid
          (log/err "Cannot delete session variable" (first var-names)
-                  "because session ID is not valid"
-                  (log/for-user (user-id smap) (user-email smap)))
+                  "because session ID is not valid" (for-user smap))
          (p/del-vars (.control smap) db-sid var-names))))))
 
 (defn del-all-vars!
@@ -1238,12 +1244,10 @@
        (if (.single-session? opts)
          (if-some [^Long user-id (.user-id smap)]
            (p/del-uvars ctrl user-id)
-           (log/err "Cannot delete session variables because user ID is not valid"
-                    (log/for-user nil (user-email smap))))
+           (log/err "Cannot delete session variables because user ID is not valid" (for-user smap)))
          (if-some [db-sid (db-sid-smap smap)]
            (p/del-svars ctrl db-sid)
-           (log/err "Cannot delete session variables because session ID is not valid"
-                    (log/for-user (user-id smap) (user-email smap))))))))
+           (log/err "Cannot delete session variables because session ID is not valid" (for-user smap)))))))
   ([^Sessionable src]
    (del-all-vars! src :session)))
 
@@ -1253,8 +1257,7 @@
    (if-some [^Session smap (p/session src session-key)]
      (if-some [user-id (.user-id smap)]
        (p/del-uvars (.control smap) user-id)
-       (log/err "Cannot delete session variables because user ID is not valid"
-                (log/for-user nil (user-email smap))))))
+       (log/err "Cannot delete session variables because user ID is not valid" (for-user smap)))))
   ([^Sessionable src]
    (del-user-vars! src :session)))
 
@@ -1264,8 +1267,7 @@
    (if-some [^Session smap (p/session src session-key)]
      (if-some [db-sid (db-sid-smap smap)]
        (p/del-svars (.control smap) db-sid)
-       (log/err "Cannot delete session variables because session ID is not valid"
-                (log/for-user (user-id smap) (user-email smap))))))
+       (log/err "Cannot delete session variables because session ID is not valid" (for-user smap)))))
   ([^Sessionable src]
    (del-session-vars! src :session)))
 
@@ -1278,12 +1280,12 @@
      (let [^Session smap (p/session src session-key)
            db-sid        (db-sid-smap smap)]
        (if-not db-sid
-         (log/err "Cannot get session variable" var-name "because session ID is not valid"
-                  (log/for-user (user-id smap) (user-email smap)))
+         (log/err "Cannot get session variable" var-name
+                  "because session ID is not valid" (for-user smap))
          (p/get-var (.control smap) db-sid var-name))))))
 
 (defn get-vars
-  "Gets a session variables and de-serializes them into a Clojure data structures."
+  "Gets session variables and de-serializes them into a Clojure data structures."
   ([^Sessionable src var-names]
    (get-vars src :session var-names))
   ([^Sessionable src ^Keyword session-key var-names]
@@ -1292,8 +1294,7 @@
            db-sid        (db-sid-smap smap)]
        (if-not db-sid
          (log/err "Cannot get session variable" (first var-names)
-                  "because session ID is not valid"
-                  (log/for-user (user-id smap) (user-email smap)))
+                  "because session ID is not valid" (for-user smap))
          (p/get-vars (.control smap) db-sid var-names))))))
 
 (defn fetch-var!
@@ -1307,8 +1308,8 @@
      (let [^Session smap (p/session src session-key)
            db-sid        (db-sid-smap smap)]
        (if-not db-sid
-         (log/err "Cannot get session variable" var-name "because session ID is not valid"
-                  (log/for-user (user-id smap) (user-email smap)))
+         (log/err "Cannot get session variable" var-name
+                  "because session ID is not valid" (for-user smap))
          (let [^SessionControl ctrl (.control smap)
                r                    (p/get-var ctrl db-sid var-name)]
            (if (not= ::db/get-failed r) (p/del-var ctrl db-sid var-name))
@@ -1326,8 +1327,7 @@
            db-sid        (db-sid-smap smap)]
        (if-not db-sid
          (log/err "Cannot get session variable" (first var-names)
-                  "because session ID is not valid"
-                  (log/for-user (user-id smap) (user-email smap)))
+                  "because session ID is not valid" (for-user smap))
          (let [^SessionControl ctrl (.control smap)
                r                    (p/get-vars ctrl db-sid var-names)]
            (if (not= ::db/get-failed r) (p/del-vars ctrl db-sid var-names))
@@ -1342,7 +1342,8 @@
      (let [^Session smap (p/session src session-key)
            db-sid        (db-sid-smap smap)]
        (if-not db-sid
-         (log/err "Cannot store session variable" var-name "because session ID is not valid")
+         (log/err "Cannot store session variable" var-name
+                  "because session ID is not valid" (for-user smap))
          (p/put-var (.control smap) db-sid var-name value))))))
 
 (defn put-vars!
@@ -1357,7 +1358,7 @@
        (if-not db-sid
          (log/err "Cannot store session variable"
                   (let [fp (first pairs)] (if (coll? fp) (first fp) fp))
-                  "because session ID is not valid")
+                  "because session ID is not valid" (for-user smap))
          (p/put-vars (.control smap) db-sid pairs))))))
 
 (defn get-variable-failed?
@@ -1560,11 +1561,10 @@
               (mkbad smap :error (SessionError. :error :session/db-problem
                                                 (some-str-spc
                                                  "Problem updating session data"
-                                                 (log/for-user
+                                                 (for-user
                                                   (.user-id    smap)
                                                   (.user-email smap)
-                                                  (or (ip/plain-ip-str (ip/to-address (.ip smap)))
-                                                      (get req :remote-ip/str)))))))))))
+                                                  (or (.ip smap) (get req :remote-ip/str)))))))))))
     empty-session))
 
 (defn prolong
@@ -1578,9 +1578,8 @@
      (if-some [sid (or (.err-id smap) (.id smap))]
        (let [^SessionControl  ctrl (.control smap)
              ^IPAddress ip-address (ip/to-address (or ip-address (.ip smap)))
-             ^String       ipplain (ip/plain-ip-str ip-address)
              ^Instant     new-time (t/now)]
-         (log/msg "Prolonging session" (log/for-user (.user-id smap) (.user-email smap) ipplain))
+         (log/msg "Prolonging session" (for-user (.user-id smap) (.user-email smap) ip-address))
          (let [^Session      new-smap (map/qassoc smap :id sid :active new-time)
                ^SessionError stat     (state new-smap ip-address)]
            (if (correct-state? stat)
@@ -1592,7 +1591,7 @@
                       (map/qassoc smap :prolonged? true)
                       smap)))
              (do (log/wrn "Session re-validation error"
-                          (log/for-user (.user-id smap) (.user-email smap) ipplain))
+                          (for-user (.user-id smap) (.user-email smap) ip-address))
                  (mkbad smap :error stat)))))))))
 
 (defn create
@@ -1608,16 +1607,15 @@
                       (if-not user-email (log/err "No user e-mail given when creating a session")) nil)
        :ok
        (let [^IPAddress       ip (ip/to-address ip-address)
-             ^String     ipplain (ip/plain-ip-str ip)
              ^SessionConfig opts (p/config ^SessionControl ctrl)
              secured?            (.secured?        opts)
              id-field            (or (.id-field    opts) "session-id")
              ^Keyword skey       (or (.session-key opts) :session)
              ^Session sess       (make secured? ctrl skey id-field user-id user-email ip)
              stat                (state sess ip)]
-         (log/msg "Opening session" (log/for-user user-id user-email ipplain))
+         (log/msg "Opening session" (for-user user-id user-email ip))
          (if-not (correct-state? stat)
-           (do (log/err "Session incorrect after creation" (log/for-user user-id user-email ipplain))
+           (do (log/err "Session incorrect after creation" (for-user user-id user-email ip))
                (mkbad sess :error stat))
            (let [updated-count (p/to-db ctrl sess)
                  ^Session sess (map/qassoc sess :db-token nil)]
@@ -1627,11 +1625,11 @@
                      (p/del-uvars ctrl user-id)
                      (p/del-svars ctrl (db-sid-smap sess)))
                    (mkgood sess))
-               (do (log/err "Problem saving session" (log/for-user user-id user-email ipplain))
+               (do (log/err "Problem saving session" (for-user user-id user-email ip))
                    (mkbad sess
                           :error (SessionError. :error :session/db-problem
                                                 (str "Session cannot be saved"
-                                                     (log/for-user user-id user-email ipplain)))))))))))))
+                                                     (for-user user-id user-email ip)))))))))))))
 
 ;; Initialization
 
