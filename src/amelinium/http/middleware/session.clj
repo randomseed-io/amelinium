@@ -664,14 +664,14 @@
   ^String [smap-or-sid]
   (if (session? smap-or-sid)
     (or (.db-id ^Session smap-or-sid)
-        (db-sid (.id ^Session smap-or-sid)))
+        (db-sid (or (.id ^Session smap-or-sid) (.err-id ^Session smap-or-sid))))
     (nth (split-secure-sid smap-or-sid) 0 nil)))
 
 (defn db-sid-smap
   "Extracts a database session ID from a secure session object."
   ^String [^Session smap]
   (or (.db-id smap)
-      (nth (split-secure-sid (.id smap) 0 nil))))
+      (nth (split-secure-sid (or (.id smap) (.err-id smap)) 0 nil))))
 
 (defn db-sid-str
   "Extracts a database session ID from a secure session ID."
