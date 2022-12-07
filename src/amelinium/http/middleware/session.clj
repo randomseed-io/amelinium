@@ -771,7 +771,7 @@
                                              (get src :remote-ip))))))))
   ([^SessionControl ctrl ^Long user-id ^String user-email ip-address]
    (if user-id
-     (when-some [^SessionControl ctrl (p/control src)]
+     (when-some [^SessionControl ctrl (p/control ctrl)]
        (p/del-uvars ctrl user-id)
        (invalidate-multi ctrl (p/del-sessions ctrl user-id))
        (log/wrn "Cannot delete sessions because session control not available"
