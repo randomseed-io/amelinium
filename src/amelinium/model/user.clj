@@ -491,6 +491,127 @@
     (create-with-token db token)
     (create-with-code  db email code)))
 
+;; Identity management
+
+(def ^:const update-email-with-token-query
+  (str-squeeze-spc
+   "INSERT IGNORE INTO users (id,email)"
+   "SELECT requester_id,id FROM confirmations"
+   "WHERE token = ? AND confirmed = TRUE AND user_id IS NULL AND user_uid IS NULL"
+   "                AND reason = 'change' AND expires >= NOW()"
+   "ON DUPLICATE KEY UPDATE email = VALUE(email)"
+   "RETURNING id,uid,email,phone"))
+
+(def ^:const update-phone-with-token-query
+  (str-squeeze-spc
+   "INSERT IGNORE INTO users (id,phone)"
+   "SELECT requester_id,id FROM confirmations"
+   "WHERE token = ? AND confirmed = TRUE AND user_id IS NULL AND user_uid IS NULL"
+   "                AND reason = 'change' AND expires >= NOW()"
+   "ON DUPLICATE KEY UPDATE phone = VALUE(phone)"
+   "RETURNING id,uid,email,phone"))
+
+(defn update-email-with-token
+  [db token]
+  (let [token (some-str token)]
+    (if token
+      (if-some [r (jdbc/execute-one! db [update-email-with-token-query token] db/opts-simple-map)]
+        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)))
+        (let [errs (confirmation/report-errors db token "change" true)]
+          {:updated? false
+           :errors   errs})))))
+
+(defn update-phone-with-token
+  [db token]
+  (let [token (some-str token)]
+    (if token
+      (if-some [r (jdbc/execute-one! db [update-phone-with-token-query token] db/opts-simple-map)]
+        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)))
+        (let [errs (confirmation/report-errors db token "change" true)]
+          {:updated? false
+           :errors   errs})))))
+
+(def ^:const update-email-with-code-query
+  (str-squeeze-spc
+   "INSERT IGNORE INTO users (id,email)"
+   "SELECT requester_id,id FROM confirmations"
+   "WHERE code = ? AND id = ?"
+   "               AND confirmed = TRUE AND user_id IS NULL AND user_uid IS NULL"
+   "               AND reason = 'change' AND expires >= NOW()"
+   "ON DUPLICATE KEY UPDATE email = VALUE(email)"
+   "RETURNING id,uid,email,phone"))
+
+(def ^:const update-phone-with-code-query
+  (str-squeeze-spc
+   "INSERT IGNORE INTO users (id,phone)"
+   "SELECT requester_id,id FROM confirmations"
+   "WHERE code = ? AND id = ?"
+   "               AND confirmed = TRUE AND user_id IS NULL AND user_uid IS NULL"
+   "               AND reason = 'change' AND expires >= NOW()"
+   "ON DUPLICATE KEY UPDATE phone = VALUE(phone)"
+   "RETURNING id,uid,email,phone"))
+
+(defn update-email-with-code
+  [db email code]
+  (let [code  (some-str code)
+        email (some-str email)]
+    (if (and code email)
+      (if-some [r (jdbc/execute-one! db [update-email-with-code-query code email] db/opts-simple-map)]
+        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)))
+        (let [errs (confirmation/report-errors db email code "change" true)]
+          {:updated? false
+           :errors   errs})))))
+
+(defn update-phone-with-code
+  [db phone code]
+  (let [code  (some-str code)
+        phone (some-str phone)]
+    (if (and code phone)
+      (if-some [r (jdbc/execute-one! db [update-phone-with-code-query code phone] db/opts-simple-map)]
+        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)))
+        (let [errs (confirmation/report-errors db phone code "change" true)]
+          {:updated? false
+           :errors   errs})))))
+
+(defn update-email-with-token-or-code
+  [db email token code]
+  (if-some [token (some-str token)]
+    (update-email-with-token db token)
+    (update-email-with-code  db email code)))
+
+(defn update-phone-with-token-or-code
+  [db phone token code]
+  (if-some [token (some-str token)]
+    (update-phone-with-token db token)
+    (update-phone-with-code  db phone code)))
+
+(defn update-identity-with-token
+  [id-type db id token]
+  (case id-type
+    :user/email (update-email-with-token db token)
+    :user/phone (update-phone-with-token db token)
+    :email      (update-email-with-token db token)
+    :phone      (update-phone-with-token db token)
+    (update-email-with-token db token)))
+
+(defn update-identity-with-code
+  [id-type db id code]
+  (case id-type
+    :user/email (update-email-with-code db id code)
+    :user/phone (update-phone-with-code db id code)
+    :email      (update-email-with-code db id code)
+    :phone      (update-phone-with-code db id code)
+    (update-email-with-code db id code)))
+
+(defn update-identity-with-token-or-code
+  [id-type db id token code]
+  (case id-type
+    :user/email (update-email-with-token-or-code db id token code)
+    :user/phone (update-phone-with-token-or-code db id token code)
+    :email      (update-email-with-token-or-code db id token code)
+    :phone      (update-phone-with-token-or-code db id token code)
+    (update-email-with-token-or-code db id token code)))
+
 ;; Passwords and login data
 
 (def ^:const password-query
