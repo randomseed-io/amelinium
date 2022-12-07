@@ -65,7 +65,7 @@
 
 (defn gen-full-confirmation-query
   "Generates a confirmation query for an e-mail or a phone used during registration of
-  a new user."
+  a NEW USER."
   [id-column dec-att?]
   (str-squeeze-spc
    "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,user_uid,"
@@ -105,7 +105,7 @@
   (gen-full-confirmation-query :phone false))
 
 (defn gen-confirmation-query
-  "Generates a confirmation query for an e-mail or a phone updated by an existing
+  "Generates a confirmation query for an e-mail or a phone UPDATED by an existing
   user."
   [id-column dec-att?]
   (str-squeeze-spc
