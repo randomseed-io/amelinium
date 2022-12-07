@@ -458,7 +458,7 @@
   (let [token (some-str token)]
     (if token
       (if-some [r (jdbc/execute-one! db [create-with-token-query token] db/opts-simple-map)]
-        (qassoc r :created? true :uid (db/as-uuid (get r :uid)))
+        (qassoc r :created? true :uid (db/as-uuid (get r :uid)) :identity (get r :email))
         (let [errs (confirmation/report-errors db token "creation" true)]
           {:created? false
            :errors   errs})))))
@@ -480,7 +480,7 @@
         email (some-str email)]
     (if (and code email)
       (if-some [r (jdbc/execute-one! db [create-with-code-query code email] db/opts-simple-map)]
-        (qassoc r :created? true :uid (db/as-uuid (get r :uid)))
+        (qassoc r :created? true :uid (db/as-uuid (get r :uid)) :identity (get r :email))
         (let [errs (confirmation/report-errors db email code "creation" true)]
           {:created? false
            :errors   errs})))))
@@ -516,7 +516,7 @@
   (let [token (some-str token)]
     (if token
       (if-some [r (jdbc/execute-one! db [update-email-with-token-query token] db/opts-simple-map)]
-        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)))
+        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)) :identity (get r :email))
         (let [errs (confirmation/report-errors db token "change" true)]
           {:updated? false
            :errors   errs})))))
@@ -526,7 +526,7 @@
   (let [token (some-str token)]
     (if token
       (if-some [r (jdbc/execute-one! db [update-phone-with-token-query token] db/opts-simple-map)]
-        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)))
+        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)) :identity (get r :phone))
         (let [errs (confirmation/report-errors db token "change" true)]
           {:updated? false
            :errors   errs})))))
@@ -557,7 +557,7 @@
         email (some-str email)]
     (if (and code email)
       (if-some [r (jdbc/execute-one! db [update-email-with-code-query code email] db/opts-simple-map)]
-        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)))
+        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)) :identity (get r :email))
         (let [errs (confirmation/report-errors db email code "change" true)]
           {:updated? false
            :errors   errs})))))
@@ -568,7 +568,7 @@
         phone (some-str phone)]
     (if (and code phone)
       (if-some [r (jdbc/execute-one! db [update-phone-with-code-query code phone] db/opts-simple-map)]
-        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)))
+        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)) :identity (get r :phone))
         (let [errs (confirmation/report-errors db phone code "change" true)]
           {:updated? false
            :errors   errs})))))
