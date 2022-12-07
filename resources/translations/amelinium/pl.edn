@@ -76,6 +76,9 @@
                            :network-authentication-required "Wymagane uwierzytelnienie sieciowe"
                            :network-read-timeout            "Przekroczono czas odczytu z sieci"
                            :network-connect-timeout         "Przekroczono czas połączenia sieciowego"}
+   :identity              {:ok      "OK"
+                           :updated "Zaktualizowano informację o tożsamości."
+                           :not-updated "Nie dokonano zmian w informacji o tożsamości."}
    :session               {:ok                   "Sesja jest poprawna."
                            :unknown-id           "Odebrano nieznany identyfikator sesji."
                            :no-session-id        "Brak wymaganego identyfikatora sesji."
