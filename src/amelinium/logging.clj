@@ -10,11 +10,12 @@
             [amelinium.system                :as            system]
             [buddy.core.hash                 :as              hash]
             [buddy.core.codecs               :as            codecs]
+            [io.randomseed.utils.ip          :as                ip]
             [io.randomseed.utils.map         :as               map]
             [io.randomseed.utils.var         :as               var]
             [io.randomseed.utils.log         :as               log]
             [io.randomseed.utils             :refer [some-str-spc
-                                                         some-str]])
+                                                     some-str]])
 
   (:import  [logback_bundle.json                 FlatJsonLayout ValueDecoder]
             [ch.qos.logback.contrib.jackson      JacksonJsonFormatter]
@@ -57,6 +58,14 @@
 ;; Logging helpers
 ;;
 
+(defn- ip->str
+  [ip]
+  (cond
+    (ip/is-ip? ip) (ip/plain-ip-str ip)
+    (string? ip)   ip
+    (nil? ip)      nil
+    :else          (some-str ip)))
+
 (defn id-email
   ([user-id user-email]
    (some-str-spc user-email
@@ -64,7 +73,7 @@
   ([user-id user-email ip-addr]
    (some-str-spc user-email
                  (if user-id (str "(" user-id ")"))
-                 (if ip-addr (str "[" ip-addr "]")))))
+                 (if ip-addr (str "[" (ip->str ip-addr) "]")))))
 
 (defn for-user
   ([user-id user-email]
@@ -74,7 +83,7 @@
    (if (or user-id user-email ip-addr)
      (if (or user-id user-email)
        (str "for " (id-email user-id user-email ip-addr))
-       (str "for [" ip-addr "]")))))
+       (str "for [" (ip->str ip-addr) "]")))))
 
 ;;
 ;; System handlers
