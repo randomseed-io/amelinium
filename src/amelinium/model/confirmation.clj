@@ -110,19 +110,19 @@
   [id-column dec-att?]
   (str-squeeze-spc
    "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,attempts,requester_id,user_id,user_uid)"
-   (str "SELECT ?,?,?,?,?,0,?,?"
+   (str "SELECT ?,?,?,?,?,0,?,?,"
         "(SELECT users.id  FROM users WHERE users." (or (some-str id-column) "email") " = ?),"
-        "(SELECT users.uid FROM users WHERE users." (or (some-str id-column) "email") " = ?),"
+        "(SELECT users.uid FROM users WHERE users." (or (some-str id-column) "email") " = ?)"
         " FROM users"
         " WHERE users.id = ? AND users." (or (some-str id-column) "email") " <> ?")
    "ON DUPLICATE KEY UPDATE"
    "user_id      = IF(NOW()>expires, VALUE(user_id),      user_id),"
    "user_uid     = IF(NOW()>expires, VALUE(user_uid),     user_uid),"
-   "requester_id = IF(NOW()>expires, VALUE(requester),    requester),"
+   "requester_id = IF(NOW()>expires, VALUE(requester_id), requester_id),"
    "attempts     = IF(NOW()>expires, VALUE(attempts),"    (str (calc-attempts-query dec-att?) "),")
    "code         = IF(NOW()>expires, VALUE(code),         code),"
    "token        = IF(NOW()>expires, VALUE(token),        token),"
-   "created      = IF(NOW()>expires, NOW(),               created),"
+   "created      = IF(NOW()>expires, NOW(),               confirmations.created),"
    "confirmed    = IF(NOW()>expires, VALUE(confirmed),    confirmed),"
    "req_id       = IF(NOW()>expires, NULL,                req_id),"
    "expires      = IF(NOW()>expires, VALUE(expires),      expires)"
@@ -205,7 +205,7 @@
              reason (or (some-str reason) "change")
              exp    (or exp ten-minutes)
              exp    (if (t/duration? exp) (t/hence exp) exp)
-             qargs  (query id code token reason exp attempts user-id id id user-id id)]
+             qargs  [query id code token reason exp attempts user-id id id user-id id]]
          (if-some [r (jdbc/execute-one! db qargs db/opts-simple-map)]
            (let [user-id       (get r :user-id)
                  user-uid      (parse-uuid (str (get r :user-uid)))
