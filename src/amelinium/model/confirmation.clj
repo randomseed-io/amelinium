@@ -499,7 +499,7 @@
              {:confirmed? true}
              (let [errs (report-errors db token reason false)]
                (if (and (= 1 (count errs)) (contains? errs :verify/confirmed))
-                 {:confirmed true}
+                 {:confirmed? true}
                  {:confirmed? false
                   :token      token
                   :errors     errs})))))))))
