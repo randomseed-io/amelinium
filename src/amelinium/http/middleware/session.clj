@@ -154,6 +154,7 @@
     ([src] nil)
     ([src session-key] nil)))
 
+(declare db-sid-str)
 (declare db-sid-smap)
 
 (extend-protocol p/SessionControl
@@ -205,11 +206,13 @@
 
   (handle
     (^Session [s]
-     (p/handle (.control ^Session s) (p/identify ^Session s) (.ip ^Session s)))
+     (p/handle (.control ^Session s) (p/identify ^Session s) (db-sid-smap ^Session s) (.ip ^Session s)))
     (^Session [s ^String sid]
-     (p/handle (.control ^Session s) sid (.ip ^Session s)))
+     (p/handle (.control ^Session s) sid (db-sid-str sid) (.ip ^Session s)))
     (^Session [s ^String sid ^IPAddress ip]
-     (p/handle (.control ^Session s) sid ip)))
+     (p/handle (.control ^Session s) sid  (db-sid-str sid) ip))
+    (^Session [s ^String sid ^String db-sid ^IPAddress ip]
+     (p/handle (.control ^Session s) sid db-sid ip)))
 
   (mem-handler
     (^Fn [s]
@@ -219,11 +222,11 @@
 
   (invalidate
     ([s]
-     (p/invalidate (.control ^Session s) (p/identify ^Session s) (.ip ^Session s)))
-    ([s ^String sid]
-     (p/invalidate (.control ^Session s) sid (.ip ^Session s)))
-    ([s ^String sid ^IPAddress ip]
-     (p/invalidate (.control ^Session s) sid ip)))
+     (p/invalidate (.control ^Session s) (db-sid-smap ^Session s) (.ip ^Session s)))
+    ([s ^String db-sid]
+     (p/invalidate (.control ^Session s) db-sid (.ip ^Session s)))
+    ([s ^String db-sid ^IPAddress ip]
+     (p/invalidate (.control ^Session s) db-sid ip)))
 
   (get-active
     (^Instant [s]
@@ -235,15 +238,13 @@
 
   (set-active
     (^Long [s]
-     (p/set-active (.control ^Session s) (p/identify s) (db-sid-smap s) (.ip ^Session s)))
+     (p/set-active (.control ^Session s) (db-sid-smap s) (.ip ^Session s)))
     (^Long [s ^IPAddress ip]
-     (p/set-active (.control ^Session s) (p/identify s) (db-sid-smap s) ip))
+     (p/set-active (.control ^Session s) (db-sid-smap s) ip))
     (^Long [s ^IPAddress ip ^Instant t]
-     (p/set-active (.control ^Session s) (p/identify s) (db-sid-smap s) ip t))
-    (^Long [s ^String sid ^String db-sid ^IPAddress ip]
-     (p/set-active (.control ^Session s) sid db-sid ip))
-    (^Long [s ^String sid ^String db-sid ^IPAddress ip ^Instant t]
-     (p/set-active (.control ^Session s) sid db-sid ip t)))
+     (p/set-active (.control ^Session s) (db-sid-smap s) ip t))
+    (^Long [s ^String db-sid ^IPAddress ip ^Instant t]
+     (p/set-active (.control ^Session s) db-sid ip t)))
 
   (expired?      ^Boolean [s]     (p/expired?      (.control ^Session s) (.active ^Session s)))
   (hard-expired? ^Boolean [s]     (p/hard-expired? (.control ^Session s) (.active ^Session s)))
@@ -279,32 +280,31 @@
   (^Boolean expired?      [s] false)
   (^Boolean hard-expired? [s] false)
 
-  (to-db         [s]             nil)
-  (mem-atom      [s]             nil)
-  (mem-cache     [s]             nil)
-  (mem-handler  ([s]             nil) ([s s-k]       nil))
-  (empty        ([s]             nil) ([s s-k]       nil))
-  (config       ([s]             nil) ([s s-k]       nil))
-  (identify     ([s]             nil) ([s req]       nil))
-  (from-db      ([s db-sid ip]   nil) ([s db-sid]    nil) ([s]        nil))
-  (handle       ([s db-sid ip]   nil) ([s db-sid]    nil) ([s]        nil))
-  (invalidate   ([s db-sid ip]   nil) ([s db-sid]    nil) ([s]        nil))
-  (get-active   ([s db-sid ip]   nil  ([s db-sid]    nil) ([s]        nil)))
-  (get-var      ([s db-sid k]    nil) ([s k]         nil))
-  (get-vars     ([s db-sid ks]   nil) ([s ks]        nil))
-  (put-var      ([s db-sid k v]  nil) ([s k v]       nil))
-  (put-vars     ([s db-sid kvs]  nil) ([s kvs]       nil))
-  (del-var      ([s db-sid k]    nil) ([s k]         nil))
-  (del-vars     ([s db-sid ks]   nil) ([s ks]        nil))
-  (del-svars    ([s db-sid]      nil) ([s]           nil))
-  (del-uvars    ([s uid]         nil) ([s]           nil))
-  (del-session  ([s db-sid]      nil) ([s]           nil))
-  (del-sessions ([s user-id]    nil) ([s]           nil))
+  (to-db         [s]               nil)
+  (mem-atom      [s]               nil)
+  (mem-cache     [s]               nil)
+  (mem-handler  ([s]               nil) ([s s-k]       nil))
+  (empty        ([s]               nil) ([s s-k]       nil))
+  (config       ([s]               nil) ([s s-k]       nil))
+  (identify     ([s]               nil) ([s req]       nil))
+  (from-db      ([s db-sid ip]     nil) ([s db-sid]    nil) ([s] nil))
+  (invalidate   ([s db-sid ip]     nil) ([s db-sid]    nil) ([s] nil))
+  (get-active   ([s db-sid ip]     nil  ([s db-sid]    nil) ([s] nil)))
+  (get-var      ([s db-sid k]      nil) ([s k]         nil))
+  (get-vars     ([s db-sid ks]     nil) ([s ks]        nil))
+  (put-var      ([s db-sid k v]    nil) ([s k v]       nil))
+  (put-vars     ([s db-sid kvs]    nil) ([s kvs]       nil))
+  (del-var      ([s db-sid k]      nil) ([s k]         nil))
+  (del-vars     ([s db-sid ks]     nil) ([s ks]        nil))
+  (del-svars    ([s db-sid]        nil) ([s]           nil))
+  (del-uvars    ([s uid]           nil) ([s]           nil))
+  (del-session  ([s db-sid]        nil) ([s]           nil))
+  (del-sessions ([s user-id]       nil) ([s]           nil))
+  (handle       ([s sid db-sid ip] nil) ([s sid ip]    nil) ([s sid] nil) ([s] nil))
   (set-active
-    ([s sid db-sid ip t] nil)
-    ([s sid db-sid ip] nil)
-    ([s smap ip] nil)
-    ([s smap] nil)
+    ([s db-sid ip t] nil)
+    ([s ip t] nil)
+    ([s ip] nil)
     ([s] nil))
 
   Object
@@ -603,6 +603,7 @@
 ;; Logging
 
 (defn- for-user
+  "Wrapper for `amelinium.logging/for-user` which accepts session object as a source."
   ([^Session s]              (if s (log/for-user (.user-id s) (.user-email s) (.ip s))))
   ([user-id user-email]            (log/for-user user-id user-email))
   ([user-id user-email ip-address] (log/for-user user-id user-email ip-address)))
@@ -618,12 +619,16 @@
 (def ^:const salt-splitter  (re-pattern "\\$"))
 
 (defn- bytes->b64u
+  "Takes a byte array and returns its content encoded with Base64. If the object cannot
+  be converted, returns `nil`."
   ^String [^"[B" v]
   (try (if v (codecs/bytes->str (codecs/bytes->b64u v)))
        (catch Throwable _
          nil)))
 
 (defn- b64u->bytes
+  "Takes a Base64 string and decodes it into a byte array. If the object cannot be
+  converted, returns `nil`."
   ^"[B" [^String v]
   (try (if v (codecs/b64u->bytes (codecs/str->bytes v)))
        (catch Throwable _
@@ -653,6 +658,8 @@
                                        scrypt-options) :password)))))
 
 (defn- split-secure-sid
+  "Splits secure ID into a vector of 2 strings: session ID and password (a.k.a secure
+  token)."
   ^String [^String session-id]
   (str/split session-id token-splitter 2))
 
@@ -666,16 +673,11 @@
    (if-some [^Session s (p/session src session-key)]
      (.db-id s))))
 
-(defn db-sid
-  "Extracts a database session ID from a secure session object or session ID."
-  ^String [smap-or-sid]
-  (if (session? smap-or-sid)
-    (or (.db-id ^Session smap-or-sid)
-        (db-sid (or (.id ^Session smap-or-sid) (.err-id ^Session smap-or-sid))))
-    (nth (split-secure-sid smap-or-sid) 0 nil)))
-
 (defn db-sid-smap
-  "Extracts a database session ID from a secure session object."
+  "Extracts a database session ID from a secure session object. Tries `:db-id` field
+  and if that fails uses `:id` or `:err-id` field of a session object and parses its
+  string representation to obtain only its first part (if it consists of multiple
+  parts separated with a dash character)."
   ^String [^Session smap]
   (or (.db-id smap)
       (nth (split-secure-sid (or (.id smap) (.err-id smap)) 0 nil))))
@@ -684,6 +686,18 @@
   "Extracts a database session ID from a secure session ID."
   ^String [^String sid]
   (nth (split-secure-sid sid) 0 nil))
+
+(defn db-sid
+  "Extracts a database session ID from a secure session object, a map, or session
+  ID. Works with session objects, maps, strings and identifiers (symbols and
+  keywords)."
+  ^String [obj]
+  (cond
+    (session? obj) (db-sid-smap obj)
+    (map?     obj) (or (get obj :db-sid) (db-sid (or (get obj :sid) (get obj :err-id) (get obj :id))))
+    (string?  obj) (nth (split-secure-sid obj) 0 nil)
+    (ident?   obj) (db-sid (name obj))
+    :default       nil))
 
 ;; Session creation
 
@@ -710,14 +724,18 @@
 ;; Session deletion
 
 (defn invalidate-multi
+  "Invalidates cache for multiple sessions by extracting their database IDs from
+  maps. The `sessions` argument should be a sequence of maps or a sequence of
+  `Session` objects. If they are maps they should have `:id` keys with associated
+  database IDs. First argument should be a `SessionControl` object."
   [^SessionControl ctrl sessions]
   (if sessions
-    (doseq [sdata sessions]
-      (if-some [^String sid (:id sdata)]
+    (doseq [sdata (filter not-empty sessions)]
+      (if-some [^String db-sid (if sdata (or (:id sdata) (db-sid sdata)))]
         (when-some [^String ip (:ip sdata)]
-          (log/dbg "Invalidating session" sid
+          (log/dbg "Invalidating session" db-sid
                    (for-user (get sdata :user-id) (get sdata :user-email) ip))
-          (p/invalidate ctrl sid (ip/to-address ip)))))))
+          (p/invalidate ctrl db-sid (ip/to-address ip)))))))
 
 (defn delete!
   "Deletes a session from a database. The session is identified by a session object or
@@ -732,7 +750,7 @@
        (let [^SessionControl ctrl (.control s)]
          (p/del-svars   ctrl db-sid)
          (p/del-session ctrl db-sid)
-         (p/invalidate  ctrl (p/identify s) (.ip s)))
+         (p/invalidate  ctrl db-sid (.ip s)))
        (log/wrn "Cannot delete session because session ID is not valid" (for-user s))))))
 
 (defn delete-all!
@@ -742,11 +760,11 @@
   user ID given directly (`user-id`). In the last case session will only be used to
   obtain control object so it may be a default session without any valid identifiers
   in it. Session variables are also removed."
-  ^{:arglists '([^Sessionable src]
-                [^Sessionable src ^Keyword session-key]
-                [^Sessionable src ^Long user-id]
-                [^Sessionable src ^Keyword session-key ^Long user-id]
-                [^SessionControl ctrl ^Long user-id ^String user-email ip-address])}
+  {:arglists '([^Sessionable src]
+               [^Sessionable src ^Keyword session-key]
+               [^Sessionable src ^Long user-id]
+               [^Sessionable src ^Keyword session-key ^Long user-id]
+               [^SessionControl ctrl ^Long user-id ^String user-email ip-address])}
   ([^Sessionable src]
    (delete-all! src :session))
   ([^Sessionable src skey-or-user-id]
@@ -1156,12 +1174,16 @@
   (sql/get-by-id db table sid-db db/opts-simple-map))
 
 (defn get-last-active
+  "Returns last active time of a session identified with `sid-db` and selected from a
+  database `db`."
   ^Instant [^SessionConfig opts ^DataSource db ^String table ^String sid-db ^IPAddress remote-ip]
   (first (jdbc/execute-one! db
                             [(str "SELECT active FROM " table " WHERE id = ?") sid-db]
                             db/opts-simple-vec)))
 
 (defn update-last-active
+  "Updates session last active time on a database `db`. Returns the number of updated
+  rows in case of success."
   (^Long [^SessionConfig opts ^DataSource db ^String table ^String sid-db ^IPAddress remote-ip]
    (::jdbc/update-count
     (sql/update! db table {:active (t/now)} {:id sid-db} db/opts-simple-map)))
@@ -1170,6 +1192,8 @@
     (sql/update! db table {:active (t/instant t)} {:id sid-db} db/opts-simple-map))))
 
 (defn set-session
+  "Puts session data into a database `db`. Returns the number of updated rows in case
+  of success."
   ^Long [^SessionConfig opts ^DataSource db ^String table ^Session smap]
   (::jdbc/update-count
    (db/replace! db table
@@ -1179,32 +1203,49 @@
                 db/opts-simple-map)))
 
 (defn delete-user-vars
+  "Deletes session variables which belong to a user `user-id` from a database
+  `db`. Returns the number of affected rows in case of success."
   [^SessionConfig opts ^DataSource db ^String sessions-table ^String variables-table ^Long user-id]
-  (jdbc/execute-one! db [(str-spc "DELETE FROM" variables-table
-                                  "WHERE EXISTS (SELECT 1 FROM" sessions-table
-                                  (str "WHERE " sessions-table ".user_id = ?")
-                                  (str "AND " variables-table ".session_id = " sessions-table ".id)"))
-                         user-id]))
+  (::jdbc/update-count
+   (jdbc/execute-one! db [(str-spc "DELETE FROM" variables-table
+                                   "WHERE EXISTS (SELECT 1 FROM" sessions-table
+                                   (str "WHERE " sessions-table ".user_id = ?")
+                                   (str "AND " variables-table ".session_id = " sessions-table ".id)"))
+                          user-id])))
 
 (defn delete-session-vars
-  [^SessionConfig opts ^DataSource db ^String sessions-table ^String variables-table ^String db-id]
-  (jdbc/execute-one! db [(str-spc "DELETE FROM" variables-table
-                                  "WHERE EXISTS (SELECT 1 FROM" sessions-table
-                                  (str "WHERE " sessions-table ".id = ?")
-                                  (str "AND " variables-table ".session_id = " sessions-table ".id)"))
-                         db-id]))
+  "Deletes session variables of a session identified with `db-sid` from a database
+  `db`. Returns the number of affected rows in case of success."
+  [^SessionConfig opts ^DataSource db ^String sessions-table ^String variables-table ^String db-sid]
+  (::jdbc/update-count
+   (jdbc/execute-one! db [(str-spc "DELETE FROM" variables-table
+                                   "WHERE EXISTS (SELECT 1 FROM" sessions-table
+                                   (str "WHERE " sessions-table ".id = ?")
+                                   (str "AND " variables-table ".session_id = " sessions-table ".id)"))
+                          db-sid])))
 
 (defn delete-session-by-id
+  "Deletes session identified with `db-sid` from a database `db`. Returns a sequence a
+  map indicating deleted session properties, having keys `:id`, `:user-id`, `:user-email`
+  and `:ip`."
   [^SessionConfig opts ^DataSource db ^String table ^String db-sid]
-  (jdbc/execute! db [(str "DELETE FROM " table
-                          " WHERE id = ? RETURNING id,user_id,user_email,ip") db-sid]
-                 db/opts-simple-map))
+  (if-some [r (jdbc/execute-one! db [(str "DELETE FROM " table
+                                          " WHERE id = ? RETURNING id,user_id,user_email,ip") db-sid]
+                                 db/opts-simple-map)]
+    (if r (dissoc r ::jdbc/update-count))))
 
 (defn delete-sessions-by-uid
+  "Deletes sessions belonging to a used `user-id` from a database `db`. Returns a
+  sequence of maps indicating deleted session rows, having keys `:id`, `:user-id`,
+  `:user-email` and `:ip`."
   [^SessionConfig opts ^DataSource db ^String table ^Long user-id]
-  (jdbc/execute! db [(str "DELETE FROM " table " WHERE user_id = ?"
-                          " RETURNING id,user_id,user_email,ip") user-id]
-                 db/opts-simple-map))
+  (if-some [r (jdbc/execute! db [(str "DELETE FROM " table " WHERE user_id = ?"
+                                      " RETURNING id,user_id,user_email,ip") user-id]
+                             db/opts-simple-map)]
+    (if r
+      (if (= 1 (count r))
+        (map #(dissoc % ::jdbc/update-count) r)
+        r))))
 
 ;; Marking
 
@@ -1440,14 +1481,24 @@
 ;; Cache invalidation.
 
 (defn invalidate-cache!
-  "Invalidates cache for the specific session."
+  "Invalidates cache for the specific session. The `src` can be a session object, a
+  request (context) map with optional `session-key` as a second argument, or a
+  `SessionControl` object with a session ID (`sid`). Remote IP address (used to match
+  cache entries along with session database ID) will be obtained from the session
+  object if not given or `nil`."
+  {:arglists '([^Sessionable src]
+               [^Sessionable src ^Keyword session-key]
+               [^Sessionable src ^Keyword session-key ^IPAddress remote-ip]
+               [^SessionControl ctrl ^String sid ^IPAddress remote-ip])}
   ([^Sessionable src]
    (invalidate-cache! src :session nil))
   ([^Sessionable src ^Keyword session-key]
    (invalidate-cache! src session-key nil))
-  ([^Sessionable src ^Keyword session-key ^IPAddress remote-ip]
-   (if-some [^Session smap (p/session src session-key)]
-     (p/invalidate (.control smap) (p/identify smap) (or remote-ip (.ip smap))))))
+  ([^Sessionable src-or-ctrl session-key-or-sid ^IPAddress remote-ip]
+   (if (control? src-or-ctrl)
+     (p/invalidate src-or-ctrl (db-sid-str session-key-or-sid) remote-ip)
+     (if-some [^Session smap (p/session src-or-ctrl session-key-or-sid)]
+       (p/invalidate (.control smap) (db-sid-smap smap) (or remote-ip (.ip smap)))))))
 
 ;; Cache invalidation when time-sensitive value (last active time) exceeds TTL.
 
@@ -1512,24 +1563,23 @@
   The results of calling this function may be memoized to reduce database hits. Note
   that if the cache TTL is larger than the remaining expiration time for a session,
   it may be required to refresh the times and re-validate the session object."
-  (^Session [^Sessionable src ^String sid ^IPAddress remote-ip]
-   (handler src :session sid remote-ip))
+  (^Session [^Sessionable src ^String sid ^String db-sid ^IPAddress remote-ip]
+   (handler src :session sid db-sid remote-ip))
   (^Session [^Sessionable src ^Keyword session-key
-             ^String sid ^IPAddress remote-ip]
+             ^String sid ^String db-sid ^IPAddress remote-ip]
    (if-some [^SessionControl ctrl (p/control src session-key)]
      (let [^SessionConfig opts (p/config ^SessionControl ctrl)]
-       (handler ctrl (.session-key opts) (.id-field opts) sid remote-ip))))
+       (handler ctrl (.session-key opts) (.id-field opts) sid db-sid remote-ip))))
   (^Session [^SessionControl ctrl ^Keyword session-key
-             id-field ^String sid ^IPAddress remote-ip]
-   (let [[^String sid-db
-          ^String pass]     (split-secure-sid sid)
+             id-field ^String sid ^String db-sid ^IPAddress remote-ip]
+   (let [pass               (if (not= sid db-sid) (second (split-secure-sid sid)))
          secure?            (some? (not-empty pass))
-         smap-db            (p/from-db ctrl sid-db remote-ip)
+         smap-db            (p/from-db ctrl db-sid remote-ip)
          token-ok?          (if secure? (p/token-ok? ctrl pass (get smap-db :secure-token)) false)
          ^Session smap      (map/qassoc
                              (map->Session (dissoc smap-db :secure-token))
                              :id               sid
-                             :db-id            sid-db
+                             :db-id            db-sid
                              :ip               (ip/to-address (get smap-db :ip))
                              :secure?          secure?
                              :prolonged?       false
@@ -1564,21 +1614,21 @@
   changed. In such case the session data in will be updated (by refreshing just the
   last active time or by handling it again after cache eviction)."
   ^Session [^SessionControl ctrl ^Duration cache-margin ^Duration expires-in ^String sid ^IPAddress remote-ip]
-  (let [^Session smap       (p/handle ctrl sid remote-ip)
-        s-args              [sid remote-ip]
+  (let [^String db-sid      (db-sid-str sid)
+        ^Session smap       (p/handle ctrl sid db-sid remote-ip)
+        memo-args           [db-sid remote-ip]
         active              (.active   smap)
         expired?            (.expired? smap)
-        needs-refresh?      (needs-refresh? ctrl s-args cache-margin active expires-in expired?)
+        needs-refresh?      (needs-refresh? ctrl memo-args cache-margin active expires-in expired?)
         new-expired?        (and needs-refresh? (not expired?) (p/expired? smap))
-        ^Instant new-active (if (and needs-refresh? (not new-expired?))
-                              (let [db-sid (db-sid-smap smap)]
-                                (log/dbg "Getting last active time from a database for" db-sid)
-                                (if-some [t (p/get-active ctrl db-sid remote-ip)]
-                                  (if (= t active) nil t))))]
+        ^Instant new-active (when (and needs-refresh? (not new-expired?))
+                              (log/dbg "Getting last active time from a database for" db-sid)
+                              (if-some [t (p/get-active ctrl db-sid remote-ip)]
+                                (if (= t active) nil t)))]
     (if (nil? new-active)
       (if new-expired?
-        (do (log/dbg "Session expiry detected after recalculating times for" (.db-id smap))
-            (p/invalidate ctrl sid remote-ip)
+        (do (log/dbg "Session expiry detected after recalculating times for" db-sid)
+            (p/invalidate ctrl db-sid remote-ip)
             (mkbad smap :error (state smap remote-ip)))
         smap)
       (let [new-expired? (p/expired? ctrl new-active)]
@@ -1588,31 +1638,32 @@
           ;; (update active time in cache and in current session)
 
           (= expired? new-expired?)
-          (do (log/dbg "Updating active time of" (.db-id smap))
-              (db/mem-assoc-existing! (p/mem-handler ctrl) s-args :active new-active)
+          (do (log/dbg "Updating active time of" db-sid)
+              (db/mem-assoc-existing! (p/mem-handler ctrl) memo-args :active new-active)
               (map/qassoc smap :active new-active))
 
           ;; (was) expired -> (is) not expired
           ;; (possible cross-node change, clear the cache and re-run handling)
 
           expired?
-          (do (log/dbg "Session no longer expired, re-running handler for" (.db-id smap))
-              (p/invalidate ctrl sid remote-ip)
-              (p/handle ctrl sid remote-ip))
+          (do (log/dbg "Session no longer expired, re-running handler for" db-sid)
+              (p/invalidate ctrl db-sid remote-ip)
+              (p/handle ctrl sid db-sid remote-ip))
 
           ;; (was) not expired -> (is) expired
           ;; (duration margin, clear the cache, re-run validation and mark session as bad)
 
           new-expired?
           (let [^Session smap (map/qassoc smap :active new-active)]
-            (log/dbg "Session expired after syncing last active time for" (.db-id smap))
-            (p/invalidate ctrl sid remote-ip)
+            (log/dbg "Session expired after syncing last active time for" db-sid)
+            (p/invalidate ctrl db-sid remote-ip)
             (mkbad smap :error (state smap remote-ip))))))))
 
 (defn process
-  "Takes a session control object, functions, settings and a request map, and validates
-  session against a database or memoized session data. Returns a session map or dummy
-  session map if session was not obtained (session ID was not found in a database)."
+  "Takes a session control object, predefined session objects (for malformed and empty
+  session), expiration settings and a request map, and validates a session against
+  the database or memoized session data. Returns a session map or dummy session map
+  if session was not obtained (session ID was not found in a database)."
   ^Session [^SessionControl ctrl
             ^Session        malformed-session
             ^Session        empty-session
@@ -1626,7 +1677,7 @@
         (let [^Session smap (process-handler ctrl cache-margin expires-in sid remote-ip)]
           (if-not (.valid? smap)
             smap
-            (if (pos-int? (p/set-active ctrl sid (db-sid-smap smap) remote-ip))
+            (if (pos-int? (p/set-active ctrl (db-sid-smap smap) remote-ip))
               (mkgood smap)
               (mkbad smap :error (SessionError. :error :session/db-problem
                                                 (some-str-spc
@@ -1651,12 +1702,13 @@
              ^Instant     new-time (t/now)]
          (log/msg "Prolonging session" (for-user (.user-id smap) (.user-email smap) ip-address))
          (let [^Session      new-smap (map/qassoc smap :id sid :active new-time)
-               ^SessionError stat     (state new-smap ip-address)]
+               ^SessionError stat     (state new-smap ip-address)
+               ^String       db-sid   (or (db-sid-smap new-smap) (db-sid-str sid))]
            (if (correct-state? stat)
-             (do  (p/set-active ctrl sid (or (db-sid-smap new-smap) (db-sid-str sid)) ip-address new-time)
-                  (p/invalidate ctrl sid ip-address)
-                  (if (not= ip-address (.ip smap)) (p/invalidate ctrl sid (.ip smap)))
-                  (let [^Session smap (p/handle ctrl sid ip-address)]
+             (do  (p/set-active ctrl db-sid ip-address new-time)
+                  (p/invalidate ctrl db-sid ip-address)
+                  (if (not= ip-address (.ip smap)) (p/invalidate ctrl db-sid (.ip smap)))
+                  (let [^Session smap (p/handle ctrl sid db-sid ip-address)]
                     (if (.valid? smap)
                       (map/qassoc smap :prolonged? true)
                       smap)))
@@ -1687,13 +1739,14 @@
          (if-not (correct-state? stat)
            (do (log/err "Session incorrect after creation" (for-user user-id user-email ip))
                (mkbad sess :error stat))
-           (let [updated-count (p/to-db ctrl sess)
-                 ^Session sess (map/qassoc sess :db-token nil)]
-             (p/invalidate ctrl (p/identify sess) ip)
+           (let [updated-count  (p/to-db ctrl sess)
+                 ^Session  sess (map/qassoc sess :db-token nil)
+                 ^String db-sid (db-sid-smap sess)]
+             (p/invalidate ctrl db-sid ip)
              (if (pos-int? updated-count)
                (do (if (.single-session? opts)
                      (p/del-uvars ctrl user-id)
-                     (p/del-svars ctrl (db-sid-smap sess)))
+                     (p/del-svars ctrl db-sid))
                    (mkgood sess))
                (do (log/err "Problem saving session" (for-user user-id user-email ip))
                    (mkbad sess
@@ -1813,7 +1866,7 @@
         checker-fn               (setup-fn cfg :fn/checker check-encrypted)
         checker-fn-w             (db/memoizer checker-fn checker-config)
         ^SessionConfig cfg       (assoc cfg :fn/checker checker-fn-w)
-        pre-handler              ^{::mem/args-fn rest} #(handler %1 session-key session-id-field %2 %3)
+        pre-handler              ^{::mem/args-fn nnext} #(handler %1 session-key session-id-field %2 %3 %4)
         mem-handler              (db/memoizer pre-handler cfg)
         handler-fn-w             mem-handler
         mem-atom                 (get-mem-atom mem-handler)
@@ -1822,12 +1875,12 @@
         last-active-fn-w         #(last-active-fn cfg db sessions-table %1 %2)
         ^SessionConfig cfg       (assoc cfg :fn/last-active last-active-fn-w)
         update-active-fn-w       (fn
-                                   (^Long [sid db-sid remote-ip]
+                                   (^Long [db-sid remote-ip]
                                     (let [t (t/now)]
-                                      (db/mem-assoc-existing! mem-handler [sid remote-ip] :active t)
+                                      (db/mem-assoc-existing! mem-handler [db-sid remote-ip] :active t)
                                       (update-active-fn cfg db sessions-table db-sid remote-ip t)))
-                                   (^Long [sid db-sid remote-ip t]
-                                    (db/mem-assoc-existing! mem-handler [sid remote-ip] :active t)
+                                   (^Long [db-sid remote-ip t]
+                                    (db/mem-assoc-existing! mem-handler [db-sid remote-ip] :active t)
                                     (update-active-fn cfg db sessions-table db-sid remote-ip t)))
         ^SessionConfig cfg       (assoc cfg :fn/update-active update-active-fn-w)
         var-get-fn               (db/make-setting-getter  variables-table :session-id)
@@ -1867,22 +1920,23 @@
                                            nil nil)
         ^SessionConfig  cfg      (assoc cfg :fn/prolong prolong-fn)
         ^SessionControl ctrl     (reify p/SessionControl
-                                   (config        ^SessionConfig [_]           cfg)
-                                   (empty         ^Session [c]                 (map/qassoc empty-sess :control c))
-                                   (expired?      ^Boolean [_ t]               (expirer-fn t))
-                                   (hard-expired? ^Boolean [_ t]               (expirer-hard-fn t))
-                                   (token-ok?     ^Boolean [_ plain enc]       (checker-fn-w plain enc))
-                                   (from-db       ^Session [_ db-sid ip]       (getter-fn-w db-sid ip))
-                                   (handle        ^Session [c sid ip]          (handler-fn-w c sid ip))
-                                   (to-db         ^Long    [_ smap]            (setter-fn-w smap))
-                                   (set-active    ^Long    [_ sid db-sid ip]   (update-active-fn-w sid db-sid ip))
-                                   (set-active    ^Long    [_ sid db-sid ip t] (update-active-fn-w sid db-sid ip t))
-                                   (get-active    ^Instant [_ db-sid ip]       (last-active-fn-w db-sid ip))
-                                   (identify      ^String  [_ req]             (identifier-fn req))
+                                   (config        ^SessionConfig [_]         cfg)
+                                   (empty         ^Session [c]               (map/qassoc empty-sess :control c))
+                                   (expired?      ^Boolean [_ t]             (expirer-fn t))
+                                   (hard-expired? ^Boolean [_ t]             (expirer-hard-fn t))
+                                   (token-ok?     ^Boolean [_ plain enc]     (checker-fn-w plain enc))
+                                   (from-db       ^Session [_ db-sid ip]     (getter-fn-w db-sid ip))
+                                   (handle        ^Session [c sid ip]        (handler-fn-w c sid (db-sid-str sid) ip))
+                                   (handle        ^Session [c sid db-sid ip] (handler-fn-w c sid db-sid ip))
+                                   (to-db         ^Long    [_ smap]          (setter-fn-w smap))
+                                   (set-active    ^Long    [_ db-sid ip]     (update-active-fn-w db-sid ip))
+                                   (set-active    ^Long    [_ db-sid ip t]   (update-active-fn-w db-sid ip t))
+                                   (get-active    ^Instant [_ db-sid ip]     (last-active-fn-w   db-sid ip))
+                                   (identify      ^String  [_ req]           (identifier-fn req))
                                    (mem-handler   [_]            mem-handler)
                                    (mem-atom      [_]            mem-atom)
                                    (mem-cache     [_]            (if mem-atom (deref mem-atom)))
-                                   (invalidate    [_ sid ip]     (invalidator-fn sid ip))
+                                   (invalidate    [_ db-sid ip]  (invalidator-fn db-sid ip))
                                    (put-var       [_ db-sid k v] (var-put-fn  db db-sid k v))
                                    (get-var       [_ db-sid k]   (var-get-fn  db db-sid k))
                                    (del-var       [_ db-sid k]   (var-del-fn  db db-sid k))

@@ -53,11 +53,11 @@
 
   (^{:tag Session}
    handle
-   [c sid ip] [c sid] [c]
+   [c sid db-sid ip] [c sid ip] [c sid] [c]
    "Obtains a session from a database and creates its object.")
 
   (invalidate
-    [c sid ip] [c sid] [c]
+    [c db-sid ip] [c db-sid] [c]
     "Invalidates internal cache.")
 
   (^{:tag Session}
@@ -86,7 +86,7 @@
    "Gets the session last active time from a database.")
 
   (set-active
-    [c sid db-sid ip t] [c sid db-sid ip] [s ip t] [s ip] [s]
+    [c db-sid ip t] [c db-sid ip] [s ip] [s]
     "Sets the session last active time in a database.")
 
   (^{:tag Boolean}
