@@ -165,6 +165,8 @@
 ;; selecting subsystem(s) from a global configuration map
 
 (defn subsystems
+  "Selects subsystems from the given configuration map `config` by selecting 1st-level
+  branch keys. Returns a map."
   ([config]      config)
   ([config keys] (select-keys config keys)))
 

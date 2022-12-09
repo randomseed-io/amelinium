@@ -2,30 +2,95 @@
 
 **Opinionated Clojure Web Engine.**
 
+Welcome to Amelinium, yet another set of libraries and helper functions to serve
+a dynamic web content. It is quite opinionated since its primary purpose is to be the
+web and API engine for a bunch of projects run by *random:seed*, the author and
+associates.
+
+**Important features**
+
+* Configurable with **EDN files** loaded from specified directories.
+
+* **JSP model-2 architecture** with **models**, **controllers**, **views** and **layouts**.
+
+* [System management](https://randomseed.io/software/amelinium/amelinium.app)
+  functions, including **inspection** of its current state, **starting/stopping** and
+  **suspending**.
+
+* Database **connection pooling**.
+
+* **Abstract caches** around certain database operations (including incremental
+  updates of collections) and time consuming functions, with adjustable TTL and queue
+  size parameters.
+
+* **Internationalization** (i18n) with or without default messages and
+  **pluralization rules** for translations of countable items in different languages.
+
+* **Session handling** with configurable persistent storage accessors, polymorphic
+  interface, secure tokens and prolongation support.
+
+* **Cookie-less** session handling.
+
+* **Role-based access control** middleware with optional context detection.
+
+* **HTTP headers manipulation** middleware.
+
+* **Language detection** middleware with configurable detection chains.
+
+* **Generic populating functions** to enrich request map with dynamic data.
+
+* **Remote IP** middleware with proxy detection and proxy IP whitelisting.
+
+* **Lazy maps** to pass request data between middleware handlers and contextual data
+  to template rendering functions.
+
+* **URI** builders for **localized paths** with automatic detection and/or injection
+  of language parameter (route-name based or path based).
+
+* **URI** builders for other **parameterized paths**.
+
+* **Parameter coercion** and **error reporting** for both API and web channels.
+
+* **Twilio API** client (for SMS and e-mail messaging, including internationalized templates).
+
+* **API response building** macros and functions (including standardized translatable
+  statuses, sub-statuses, language parameters and errors).
+
+* **Web rendering** handlers and predefined template tags for translations,
+  language-parameterized path generation, session links (for cookie-less sessions),
+  form building and session data access.
+
+* **Flexible authentication engine** with pluggable encryption modules and ability to
+  build parameterized encryption chains stored in a database (and re-used where
+  possible).
+
+* **Authentication functions** for API and web, ready to be used in controllers.
+
+* **Identity management functions** for e-mails and phone numbers (with confirmation
+  via a link or code).
+
+* **Buffered events logging** to a database with async channels.
+
+* **Swagger** support for API and web.
+
+## Installation
+
 [![Amelinium on Clojars](https://img.shields.io/clojars/v/io.randomseed/amelinium.svg)](https://clojars.org/io.randomseed/amelinium)
 [![Amelinium on cljdoc](https://cljdoc.org/badge/io.randomseed/amelinium)](https://cljdoc.org/d/io.randomseed/amelinium/CURRENT)
 [![CircleCI](https://circleci.com/gh/randomseed-io/amelinium.svg?style=svg)](https://circleci.com/gh/randomseed-io/amelinium)
-
-Clojure library with helpful functions and macros.
-
-## Features
-
-TBW
-
-## Installation
 
 To use Amelinium in your project, add the following to dependencies section of
 `project.clj` or `build.boot`:
 
 ```clojure
-[io.randomseed/amelinium "1.0.0"]
+[io.randomseed/amelinium "1.0.1"]
 ```
 
 For `deps.edn` add the following as an element of a map under `:deps` or
 `:extra-deps` key:
 
 ```clojure
-io.randomseed/amelinium {:mvn/version "1.0.0"}
+io.randomseed/amelinium {:mvn/version "1.0.1"}
 ```
 
 Additionally, if you want to utilize specs and generators provided by the Amelinium

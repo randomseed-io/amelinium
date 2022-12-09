@@ -7,20 +7,21 @@ a dynamic web content. It is quite opinionated since its primary purpose is to 
 web and API engine for a bunch of projects run by *random:seed*, the author and
 associates.
 
-Important features:
+**Important features**
 
-* Configured with a bunch of **EDN files** loaded from specified directories.
-
-* Management functions, including **inspection** of current state,
-  **starting/stopping** and **suspending**.
+* Configurable with **EDN files** loaded from specified directories.
 
 * **JSP model-2 architecture** with **models**, **controllers**, **views** and **layouts**.
 
+* [System management](https://randomseed.io/software/amelinium/amelinium.app)
+  functions, including **inspection** of its current state, **starting/stopping** and
+  **suspending**.
+
 * Database **connection pooling**.
 
-* **Abstract in-memory caches** around database operations (including incremental
-  updates of collections) and time consuming functions (with adjustable TTL and queue
-  size parameters).
+* **Abstract caches** around certain database operations (including incremental
+  updates of collections) and time consuming functions, with adjustable TTL and queue
+  size parameters.
 
 * **Internationalization** (i18n) with or without default messages and
   **pluralization rules** for translations of countable items in different languages.
@@ -28,7 +29,7 @@ Important features:
 * **Session handling** with configurable persistent storage accessors, polymorphic
   interface, secure tokens and prolongation support.
 
-* **Cookie-less** session and state management.
+* **Cookie-less** session handling.
 
 * **Role-based access control** middleware with optional context detection.
 
@@ -44,7 +45,7 @@ Important features:
   to template rendering functions.
 
 * **URI** builders for **localized paths** with automatic detection and/or injection
-  of language parameter.
+  of language parameter (route-name based or path based).
 
 * **URI** builders for other **parameterized paths**.
 
@@ -63,9 +64,10 @@ Important features:
   build parameterized encryption chains stored in a database (and re-used where
   possible).
 
-* **Authentication functions**.
+* **Authentication functions** for API and web, ready to be used in controllers.
 
-* **Identity management functions** for e-mail and phone numbers.
+* **Identity management functions** for e-mails and phone numbers (with confirmation
+  via a link or code).
 
 * **Buffered events logging** to a database with async channels.
 
