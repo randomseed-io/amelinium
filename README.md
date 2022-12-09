@@ -9,47 +9,79 @@ associates.
 
 **Important features**
 
-* Configurable with **EDN files** loaded from specified directories.
+* Configurable with **[EDN
+  files](https://github.com/randomseed-io/amelinium/tree/main/resources/config/amelinium)**
+  loaded from specified directories.
 
-* **JSP model-2 architecture** with **models**, **controllers**, **views** and **layouts**.
+* **[JSP model-2](https://en.wikipedia.org/wiki/JSP_model_2_architecture)
+  architecture** with **models**, **controllers**, **views** and **layouts**.
 
 * [System management](https://randomseed.io/software/amelinium/amelinium.app)
-  functions, including **inspection** of its current state, **starting/stopping** and
+  functions, including **inspection** of current state, **starting/stopping** and
   **suspending**.
 
-* Database **connection pooling**.
+* Database **[connection
+  pooling](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L29)**
+  and **[migrations](https://github.com/randomseed-io/amelinium/tree/main/resources/migrations/amelinium)**.
 
-* **Abstract caches** around certain database operations (including incremental
-  updates of collections) and time consuming functions, with adjustable TTL and queue
-  size parameters.
+* **Abstract caches** around certain [database
+  operations](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L49)
+  (including incremental updates of collections) and time consuming functions, with
+  adjustable TTL and queue size parameters.
 
-* **Internationalization** (i18n) with or without default messages and
-  **pluralization rules** for translations of countable items in different languages.
+* **Internationalization** (i18n) based on
+  [maps](https://github.com/randomseed-io/amelinium/blob/main/resources/translations/amelinium/en.edn)
+  with or without missing key messages and **[pluralization
+  rules](https://github.com/randomseed-io/amelinium/blob/main/src/amelinium/i18n/pluralizers.clj)**
+  for translations of countable items in different languages.
 
-* **Session handling** with configurable persistent storage accessors, polymorphic
-  interface, secure tokens and prolongation support.
+* **[Session
+  handling](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L82)**
+  with configurable persistent storage accessors, polymorphic interface, secure
+  tokens and prolongation support.
 
 * **Cookie-less** session handling.
 
-* **Role-based access control** middleware with optional context detection.
+* **[Role-based access
+  control](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L96)**
+  middleware with optional context detection.
 
-* **HTTP headers manipulation** middleware.
+* **[HTTP headers
+  manipulation](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L78)**
+  middleware.
 
-* **Language detection** middleware with configurable detection chains.
+* **[Language
+  detection](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L143)**
+  middleware with configurable [detection
+  chains](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L124).
 
-* **Generic populating functions** to enrich request map with dynamic data.
+* **Generic [populating
+  functions](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L210)**
+  to enrich request map with dynamic data.
 
-* **Remote IP** middleware with proxy detection and proxy IP whitelisting.
+* **[Remote
+  IP](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L72)**
+  middleware with proxy detection and proxy IP
+  [whitelisting](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config-ip.edn).
 
 * **Lazy maps** to pass request data between middleware handlers and contextual data
   to template rendering functions.
 
-* **URI** builders for **localized paths** with automatic detection and/or injection
-  of language parameter (route-name based or path based).
+* **URI** builders for **[localized
+  paths](https://randomseed.io/software/amelinium/amelinium.common#var-localized-page)**
+  with automatic detection and/or injection of language parameter (route-name based
+  or path based).
 
-* **URI** builders for other **parameterized paths**.
+* **URI** builders for other **[parameterized
+  paths](https://randomseed.io/software/amelinium/amelinium.common#var-parameterized-page)**.
 
-* **Parameter coercion** and **error reporting** for both API and web channels.
+* **Parameter
+  [coercion](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L153)**
+  and **error handling** for both
+  [API](https://randomseed.io/software/amelinium/amelinium.api.controller#var-handle-coercion-error)
+  and
+  [web](https://randomseed.io/software/amelinium/amelinium.web.controller#var-handle-coercion-error)
+  channels.
 
 * **Twilio API** client (for SMS and e-mail messaging, including internationalized templates).
 
@@ -60,9 +92,11 @@ associates.
   language-parameterized path generation, session links (for cookie-less sessions),
   form building and session data access.
 
-* **Flexible authentication engine** with pluggable encryption modules and ability to
-  build parameterized encryption chains stored in a database (and re-used where
-  possible).
+* **Flexible authentication engine** with pluggable [encryption
+  modules](https://randomseed.io/software/amelinium/amelinium.auth.algo.scrypt) and
+  ability to build parameterized [password encryption
+  chains](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L341)
+  stored in a database (and re-used where possible).
 
 * **Authentication functions** for API and web, ready to be used in controllers.
 
