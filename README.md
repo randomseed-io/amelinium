@@ -2,10 +2,6 @@
 
 **Opinionated Clojure Web Engine.**
 
-[![Amelinium on Clojars](https://img.shields.io/clojars/v/io.randomseed/amelinium.svg)](https://clojars.org/io.randomseed/amelinium)
-[![Amelinium on cljdoc](https://cljdoc.org/badge/io.randomseed/amelinium)](https://cljdoc.org/d/io.randomseed/amelinium/CURRENT)
-[![CircleCI](https://circleci.com/gh/randomseed-io/amelinium.svg?style=svg)](https://circleci.com/gh/randomseed-io/amelinium)
-
 Welcome to Amelinium, yet another set of libraries and helper functions to serve
 a dynamic web content. It is quite opinionated since its primary purpose is to be the
 web and API engine for a bunch of projects run by *random:seed*, the author and
@@ -13,11 +9,11 @@ associates.
 
 Important features:
 
-* Configuration in **EDN files** loaded from specified directories.
+* Configured with a bunch of **EDN files** loaded from specified directories.
 
-* Software system management functions, including **state inspection** and **suspend** features.
+* Software system management functions, including **current state inspection**.
 
-* **Model-2** architecture with **models**, **controllers**, **views** and **layouts**.
+* **JSP model-2 architecture** with **models**, **controllers**, **views** and **layouts**.
 
 * Database **connection pooling**.
 
@@ -75,6 +71,10 @@ Important features:
 * **Swagger** support for API and web.
 
 ## Installation
+
+[![Amelinium on Clojars](https://img.shields.io/clojars/v/io.randomseed/amelinium.svg)](https://clojars.org/io.randomseed/amelinium)
+[![Amelinium on cljdoc](https://cljdoc.org/badge/io.randomseed/amelinium)](https://cljdoc.org/d/io.randomseed/amelinium/CURRENT)
+[![CircleCI](https://circleci.com/gh/randomseed-io/amelinium.svg?style=svg)](https://circleci.com/gh/randomseed-io/amelinium)
 
 To use Amelinium in your project, add the following to dependencies section of
 `project.clj` or `build.boot`:
