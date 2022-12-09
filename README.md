@@ -18,14 +18,14 @@ To use Amelinium in your project, add the following to dependencies section of
 `project.clj` or `build.boot`:
 
 ```clojure
-[io.randomseed/amelinium "1.0.0"]
+[io.randomseed/amelinium "1.0.1"]
 ```
 
 For `deps.edn` add the following as an element of a map under `:deps` or
 `:extra-deps` key:
 
 ```clojure
-io.randomseed/amelinium {:mvn/version "1.0.0"}
+io.randomseed/amelinium {:mvn/version "1.0.1"}
 ```
 
 Additionally, if you want to utilize specs and generators provided by the Amelinium
