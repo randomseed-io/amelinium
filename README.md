@@ -11,7 +11,8 @@ Important features:
 
 * Configured with a bunch of **EDN files** loaded from specified directories.
 
-* Software system management functions, including **current state inspection**.
+* Management functions, including **inspection** of current state,
+  **starting/stopping** and **suspending**.
 
 * **JSP model-2 architecture** with **models**, **controllers**, **views** and **layouts**.
 
