@@ -6,11 +6,73 @@
 [![Amelinium on cljdoc](https://cljdoc.org/badge/io.randomseed/amelinium)](https://cljdoc.org/d/io.randomseed/amelinium/CURRENT)
 [![CircleCI](https://circleci.com/gh/randomseed-io/amelinium.svg?style=svg)](https://circleci.com/gh/randomseed-io/amelinium)
 
-Clojure library with helpful functions and macros.
+Welcome to Amelinium, yet another set of libraries and helper functions to serve
+a dynamic web content. It is quite opinionated since its primary purpose is to be the
+web and API engine for a bunch of projects run by *random:seed*, the author and
+associates.
 
-## Features
+Important features:
 
-TBW
+* Configuration in **EDN files** loaded from specified directories.
+
+* Software system management functions, including **state inspection** and **suspend** features.
+
+* **Model-2** architecture with **models**, **controllers**, **views** and **layouts**.
+
+* Database **connection pooling**.
+
+* **Abstract in-memory caches** around database operations (including incremental
+  updates of collections) and time consuming functions (with adjustable TTL and queue
+  size parameters).
+
+* **Internationalization** (i18n) with or without default messages and
+  **pluralization rules** for translations of countable items in different languages.
+
+* **Session handling** with configurable persistent storage accessors, polymorphic
+  interface, secure tokens and prolongation support.
+
+* **Cookie-less** session and state management.
+
+* **Role-based access control** middleware with optional context detection.
+
+* **HTTP headers manipulation** middleware.
+
+* **Language detection** middleware with configurable detection chains.
+
+* **Generic populating functions** to enrich request map with dynamic data.
+
+* **Remote IP** middleware with proxy detection and proxy IP whitelisting.
+
+* **Lazy maps** to pass request data between middleware handlers and contextual data
+  to template rendering functions.
+
+* **URI** builders for **localized paths** with automatic detection and/or injection
+  of language parameter.
+
+* **URI** builders for other **parameterized paths**.
+
+* **Parameter coercion** and **error reporting** for both API and web channels.
+
+* **Twilio API** client (for SMS and e-mail messaging, including internationalized templates).
+
+* **API response building** macros and functions (including standardized translatable
+  statuses, sub-statuses, language parameters and errors).
+
+* **Web rendering** handlers and predefined template tags for translations,
+  language-parameterized path generation, session links (for cookie-less sessions),
+  form building and session data access.
+
+* **Flexible authentication engine** with pluggable encryption modules and ability to
+  build parameterized encryption chains stored in a database (and re-used where
+  possible).
+
+* **Authentication functions**.
+
+* **Identity management functions** for e-mail and phone numbers.
+
+* **Buffered events logging** to a database with async channels.
+
+* **Swagger** support for API and web.
 
 ## Installation
 
