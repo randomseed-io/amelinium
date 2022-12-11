@@ -7,7 +7,7 @@ a dynamic web content. It is quite opinionated since its primary purpose is to 
 web and API engine for a bunch of projects run by *random:seed*, the author and
 associates.
 
-**Important features**
+## Important features
 
 * Configurable with **[EDN
   files](https://github.com/randomseed-io/amelinium/tree/main/resources/config/amelinium)**
@@ -83,6 +83,14 @@ associates.
   [web](https://randomseed.io/software/amelinium/amelinium.web.controller#var-handle-coercion-error)
   channels.
 
+* Built-in coercion and validation schemas for common data types, including
+  **e-mail** addresses, **phone numbers**, **IP addresses** (IPv4, IPv6, mapped IPv4
+  and mixed), **passwords**, natural person **names**, **instant** values,
+  **duration**, **session IDs** and **MD5 strings**.
+
+* Built-in dynamic schemas for configurable data sets, including **supported
+  languages** and **account types**.
+
 * **Twilio API** client (for SMS and e-mail messaging, including internationalized templates).
 
 * **API response building** macros and functions (including standardized translatable
@@ -91,6 +99,9 @@ associates.
 * **Web rendering** handlers and predefined template tags for translations,
   language-parameterized path generation, session links (for cookie-less sessions),
   form building and session data access.
+
+* API and web **response handlers** (based on `:response/status` or `:response/fn`,
+  `:response/headers` or `:response/body`).
 
 * **Flexible authentication engine** with pluggable [encryption
   modules](https://randomseed.io/software/amelinium/amelinium.auth.algo.scrypt) and
@@ -106,6 +117,79 @@ associates.
 * **Buffered events logging** to a database with async channels.
 
 * **Swagger** support for API and web.
+
+## Tech stack
+
+Amelinium is based on the following Clojure and Java libraries:
+
+* Application management:
+      * [Integrant](https://github.com/weavejester/integrant) for building and managing
+        systems
+      * [Maailma](https://github.com/metosin/maailma) for reading EDN configuration files
+
+* HTTP:
+    * [Ring](https://github.com/ring-clojure/ring) for HTTP server abstraction
+    * [Reitit](https://github.com/metosin/reitit/) for HTTP routing
+    * [Undertow](https://github.com/undertow-io/undertow) and
+      [Jetty](https://github.com/eclipse/jetty.project) for serving HTTP traffic
+    * [hato](https://github.com/gnarroway/hato) for creating HTTP clients
+    * [Muuntaja](https://github.com/metosin/muuntaja) for HTTP format negotiation,
+      encoding and decoding
+
+* Logging:
+    * [Logback](https://github.com/qos-ch/logback) for logging abstraction
+    * [Cambium](https://github.com/cambium-clojure) for logging macros and JSON logging
+    * [Unilog](https://github.com/pyr/unilog) for logging management
+    * [core.async](https://github.com/clojure/core.async) for buffered operation logging
+    * [random:utils](https://github.com/randomseed-io/utils) for logging macros,
+      predefined encoders and appenders
+
+* I18n and l10n:
+    * [Tongue](https://github.com/tonsky/tongue) for translations
+    * [java-wrapper](https://github.com/trptr/java-wrapper) for locale support
+
+* Templates:
+    * [Selmer](https://github.com/yogthos/Selmer) for rendering HTML views and layouts
+
+* Parameters coercion and validation:
+    * [Malli](https://github.com/metosin/malli) for data-driven schemas support
+    * [Apache Commons Validator](https://github.com/apache/commons-validator) for
+      e-mail and domain name parameters
+    * [Bankster](https://github.com/randomseed-io/bankster) for monetary unit parameters
+    * [phone-number](https://github.com/randomseed-io/phone-number) for phone number parameters
+
+* Encryption:
+    * [buddy-core](https://github.com/funcool/buddy-core) for cryptographic operations
+    * [LambdaWorks Crypto](https://github.com/wg/crypto) for high-performance key derivation functions
+    * [crypto-equality](https://github.com/weavejester/crypto-equality) for secure comparisons
+
+* Data manipulation and data formats:
+    * [lazy-map](https://github.com/raxod502/lazy-map) for lazy maps
+    * [Meta-Merge](https://github.com/weavejester/meta-merge) for merging nested structures
+    * [jsonista](https://github.com/metosin/jsonista) for JSON handling
+    * [Cheshire](https://github.com/dakrone/cheshire) for JSON handling
+    * [Balagan](https://github.com/clojurewerkz/balagan) for nested structures matching
+    * [camel-snake-kebab](https://github.com/clj-commons/camel-snake-kebab) for word
+      case conversions
+    * [clj-uuid](https://github.com/danlentz/clj-uuid) for RFC4122 Unique Identifiers
+    * [smangler](https://github.com/randomseed-io/smangler) for string truncation
+    * [Bankster](https://github.com/randomseed-io/bankster) for money and currency
+      handling
+    * [phone-number](https://github.com/randomseed-io/phone-number) for phone numbers handling
+    * [random:utils](https://github.com/randomseed-io/utils) for fast operations on
+      maps and vectors
+
+* Databases:
+    * [next.jdbc](https://github.com/seancorfield/next-jdbc) for accessing SQL databases
+    * [HikariCP](https://github.com/brettwooldridge/HikariCP) for database connection pooling
+    * [Ragtime](https://github.com/weavejester/ragtime) for database migrations
+    * [Nippy](https://github.com/ptaoussanis/nippy) for fast serialization
+    * [core.cache](https://github.com/clojure/core.cache) and
+      [core.memoize](https://github.com/clojure/core.memoize) for function memoization
+    * [random:utils](https://github.com/randomseed-io/utils) for persistent property caching
+
+* Time:
+    * [Tick](https://github.com/juxt/tick) for dealing with time
 
 ## Installation
 
