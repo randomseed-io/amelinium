@@ -140,28 +140,32 @@ strings requested by clients and associating them with configured [controllers](
 [middleware
 chains](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L236).
 
-Middleware chains are sequences of functions called in a nested way to process
-request and/or response data. Controllers are handlers responsible for generating
-content by performing business logic operations, including those connecting to
-a database or other services.
+Middleware chains are sequences of functions composed into a single execution chain
+to process request and/or response data. Controllers in Amelinium are handlers
+responsible for generating content after performing business-logic operations which
+may involve interacting with a database (via models) or connecting to other services.
 
 Initial context created by the Ring handler is a map populated with basic
-information, like parameters received from client, remote IP address, requested path
-and so on. This **request map** is then passed as an argument to all functions in
-middleware chain and finally to the controller assigned in configuration to
-a specific HTTP path. Each middleware can alter the map in the process, same as the
-chosen controller. The last middleware (in our architecture) is responsible for
-generating a **response map** on a basis of some special keys left in the request map
-by the invoked controller (or, in some cases, by other processing functions from
-middleware which may short-circuit and directly generate responses).
+information, like parameters received from a client, remote IP address, requested
+path and so on. This **request map** is then passed as an argument to the first
+function of a middleware chain, and finally to a controller assigned in configuration
+to a specific HTTP path (route).
 
-Note that in regular setups you will most likely find the route handlers being the
-functions which are processing the request map and returning response map. The
-difference here is that controllers are suppose to add some keys (like
-`:response/status` and `:response/body`) to received map and the response generation
-is handled by the generic renderers (separate for web and API channels). Of course,
-if any controller will generate a response map, it will be detected and the rendering
-layer will be skipped. Same with any middleware request wrapper.
+Each middleware wrapper and controller can alter the request map. The last middleware
+(called *web renderer* on the diagram) is responsible for generating a **response
+map** on a basis of data found under some special keys in the request map. The
+entries identified by these keys should be set by the invoked controller (or, in rare
+cases by some middleware wrapper which may short-circuit the call chain and generate
+response).
+
+Note that in other middleware setups you will most likely find the route handlers
+being functions which used to process a request map and return a response map. The
+difference here (in Amelinium) is that controllers are suppose to add some keys (like
+`:response/status` and `:response/body`) to the received map and the response
+generation is handled later by the generic renderers (separate for web and API
+channels). Of course, if any controller will generate a response map, it will be
+honored and the rendering layer will be skipped. Same with any middleware request
+wrapper.
 
 When response map is returned it starts to "travel" through all middleware functions
 in chain to be processed before returning to a Ring handler. The difference between
