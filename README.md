@@ -123,9 +123,9 @@ associates.
 Amelinium is based on the following Clojure and Java libraries:
 
 * Application management:
-      * [Integrant](https://github.com/weavejester/integrant) for building and managing
-        systems
-      * [Maailma](https://github.com/metosin/maailma) for reading EDN configuration files
+    * [Integrant](https://github.com/weavejester/integrant) for building and managing
+      systems
+    * [Maailma](https://github.com/metosin/maailma) for reading EDN configuration files
 
 * HTTP:
     * [Ring](https://github.com/ring-clojure/ring) for HTTP server abstraction
