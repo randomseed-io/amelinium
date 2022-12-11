@@ -120,10 +120,105 @@ associates.
 
 ## Simplified request processing workflow
 
-Below is simplified request processing workflow for a web channel. Its purpose it to
-shed some light on the overall architecture.
+Below is the simplified request processing workflow for a web channel. It may shed
+some light on the overall architecture, especially when someone is new to Clojure way
+of handling HTTP with Ring abstraction.
 
 ![Web request processing in Amelinium](docs/img/amelinium-workflow-web.svg)
+
+The HTTP server handles incoming connections with TCP sockets and negotiates
+connection parameters. When the bi-directional stream is ready the control is passed
+to a specified [handler
+function](https://github.com/randomseed-io/amelinium/blob/main/src/amelinium/http/server/undertow.clj#L142)
+in Clojure, which in this case is [Reitit's Ring
+handler](https://github.com/randomseed-io/amelinium/blob/main/src/amelinium/http/handler.clj#L39)
+[configured](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L273)
+to use Reitit [HTTP
+router](https://github.com/randomseed-io/amelinium/blob/main/src/amelinium/http/router.clj#L28).
+
+As we can imagine, HTTP router is responsible for matching resource paths from URL
+strings requested by clients and associating them with configured [controllers]() and
+[middleware
+chains](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L236).
+
+Middleware chains are sequences of functions called in a nested way to process
+request and/or response data. Controllers are handlers responsible for generating
+content by performing business logic operations, including those connecting to
+a database or other services.
+
+Initial context created by the Ring handler is a map populated with basic
+information, like parameters received from client, remote IP address, requested path
+and so on. This **request map** is then passed as an argument to all functions in
+middleware chain and finally to the controller assigned in configuration to
+a specific HTTP path. Each middleware can alter the map in the process, same as the
+chosen controller. The last middleware (in our architecture) is responsible for
+generating a **response map** on a basis of some special keys left in the request map
+by the invoked controller (or, in some cases, by other processing functions from
+middleware which may short-circuit and directly generate responses).
+
+Note that in regular setups you will most likely find the route handlers being the
+functions which are processing the request map and returning response map. The
+difference here is that controllers are suppose to add some keys (like
+`:response/status` and `:response/body`) to received map and the response generation
+is handled by the generic renderers (separate for web and API channels). Of course,
+if any controller will generate a response map, it will be detected and the rendering
+layer will be skipped. Same with any middleware request wrapper.
+
+When response map is returned it starts to "travel" through all middleware functions
+in chain to be processed before returning to a Ring handler. The difference between
+middleware function which transforms a request map from the middleware function which
+transforms a response map is only in the place where the processing is done.
+Request-related wrappers will operate on a request argument **before** other
+middleware wrappers are to be called, and response-related wrappers will operate on a
+result of calling all other wrappers. This is possible because Ring architecture is
+based on higher-order functions wrapping the actual logic.
+
+Below is an example of a middleware wrapper which alter a request map by adding
+`:REQ` key to it, and does the same thing with a response map by adding a `:RESP` key
+to it. Note the `(handler request)` call which will call all other wrappers in
+a chain.
+
+```clojure
+(fn [handler]
+  (fn [request]
+    (let [request  (assoc request :REQ true)    ;; request processing
+          response (handler request)            ;; calling other handlers
+          response (assoc response :RESP true)] ;; response processing
+      response)))
+```
+
+Controllers and middleware wrappers sometimes need access to data other than
+initially set by the web server or a Ring handler. They may require to use another
+components (like database connections or caches) or some additional, configured data
+(like translations, data transformation schemas, and so on). One way to pass
+additional objects to request handling functions is to create a middleware which will
+then encapsulate configuration using a lexical closure and then inject it into
+a request map. The downside of this approach is frequent, unconditional calling of
+such wrapper (for each processed request) which is not perfect when data is going to
+be used on rare occasions. In such cases the Reitit router comes very handy since it
+allows to generate different middleware wrappers or the whole middleware chains for
+different paths/routes (or even route configurations). This is implemented with
+another layer of abstraction which requires compilation phase when routes are loaded
+and analyzed. In this process a middleware wrapper may be skipped or may use function
+closure to keep the configuration associated with the `:data` key of a particular
+route. Let's modify our previous example to show how it can be done:
+
+```clojure
+{:name :turbo-wrapper
+ :compile (fn [route-data _]
+            (if-some [rt? (:run-turbo? route-data)]           ;; will only exist
+              (fn [handler]                                   ;; if :run-turbo? was set
+                (fn [request]
+                  (let [request  (assoc request :REQ rt?)     ;; request processing
+                        response (handler request)            ;; calling other handlers
+                        response (assoc response :RESP rt?)]  ;; response processing
+                    response)))))}
+```
+
+In the example above the middleware will be installed only for routes having
+`:run-turbo?` set to a truthy value in their route data maps (under `:data`
+key). Moreover, a value associated to the `:run-turbo?` key will be used to
+do something with a request and with a response.
 
 ## Tech stack
 
@@ -274,7 +369,7 @@ make docs
 make jar
 ```
 
-### Rebuilding POM
+ ### Rebuilding POM
 
 ```bash
 make pom
