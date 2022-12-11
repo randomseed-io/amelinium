@@ -120,6 +120,9 @@ associates.
 
 ## Simplified request processing workflow
 
+Below is simplified request processing workflow for a web channel. Its purpose it to
+shed some light on the overall architecture.
+
 ![Web request processing in Amelinium](docs/img/amelinium-workflow-web.svg)
 
 ## Tech stack
