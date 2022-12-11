@@ -67,12 +67,10 @@
            org.mariadb.jdbc/mariadb-java-client {:mvn/version "3.0.4"}        ;; MariaDB driver
            net.java.dev.jna/jna                 {:mvn/version "5.11.0"}       ;; JNA for socket connections
            dev.weavejester/ragtime              {:mvn/version "0.9.1"}        ;; SQL abstractions and migrations
-           com.taoensso/encore                  {:mvn/version "3.22.0-RC2"}
            com.taoensso/nippy                   {:mvn/version "3.1.1"}        ;; data serialization
            potemkin/potemkin                    {:mvn/version "0.4.5"}        ;; abstractions with performance in mind
            crypto-equality/crypto-equality      {:mvn/version "1.0.0"}        ;; avoiding timing attacks when comparing
            com.lambdaworks/scrypt               {:mvn/version "1.4.0"}        ;; password encryption
-           digest/digest                        {:mvn/version "1.4.9"}        ;; password encryption
            buddy/buddy-core                     {:mvn/version "1.9.0"}        ;; encryption and HMAC calculation
            mvxcvi/alphabase                     {:mvn/version "2.1.0"}        ;; custom base encodings
            org.clojure/core.match               {:mvn/version "1.0.0"}}

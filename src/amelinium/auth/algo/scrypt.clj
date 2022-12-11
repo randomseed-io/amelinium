@@ -8,7 +8,7 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:import com.lambdaworks.crypto.SCrypt)
+  (:import [com.lambdaworks.crypto SCrypt])
 
   (:require [amelinium.auth.pwd       :as        pwd]
             [io.randomseed.utils.map :as         map]
