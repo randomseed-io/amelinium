@@ -33,12 +33,11 @@ associates.
   [maps](https://github.com/randomseed-io/amelinium/blob/main/resources/translations/amelinium/en.edn)
   with or without missing key messages and **[pluralization
   rules](https://github.com/randomseed-io/amelinium/blob/main/src/amelinium/i18n/pluralizers.clj)**
-  for translations of countable items in different languages.
+  for translations of countable items.
 
 * **[Session
   handling](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L82)**
-  with configurable persistent storage accessors, polymorphic interface, secure
-  tokens and prolongation support.
+  with configurable accessors, secure tokens and prolongation support.
 
 * **Cookie-less** session handling.
 
