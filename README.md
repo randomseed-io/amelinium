@@ -187,21 +187,36 @@ a chain.
       response)))
 ```
 
+Some middleware wrappers will never care about doing something with the response,
+therefore being much simpler:
+
+```clojure
+(fn [handler]
+  (fn [request]
+    (handler (assoc request :REQ true))))
+```
+
 Controllers and middleware wrappers sometimes need access to data other than
-initially set by the web server or a Ring handler. They may require to use another
-components (like database connections or caches) or some additional, configured data
-(like translations, data transformation schemas, and so on). One way to pass
-additional objects to request handling functions is to create a middleware which will
-then encapsulate configuration using a lexical closure and then inject it into
-a request map. The downside of this approach is frequent, unconditional calling of
-such wrapper (for each processed request) which is not perfect when data is going to
-be used on rare occasions. In such cases the Reitit router comes very handy since it
-allows to generate different middleware wrappers or the whole middleware chains for
-different paths/routes (or even route configurations). This is implemented with
-another layer of abstraction which requires compilation phase when routes are loaded
-and analyzed. In this process a middleware wrapper may be skipped or may use function
-closure to keep the configuration associated with the `:data` key of a particular
-route. Let's modify our previous example to show how it can be done:
+initially set by the web server. They may want to use another data sources (like
+database connections or caches) or some additional configuration structures (like
+translations, data transformation schemas, and so on). One way to make additional
+objects available to request handling functions is to create a middleware which will
+then encapsulate some data using a lexical closure and inject it into a request map
+(by associating with some key). Then, response generating handler can extract value
+under that key of a request map and continue processing.
+
+The downside of the above approach is quite frequent, unconditional calling of such
+wrapper (for each processed request) which is not perfect when the injected data were
+going to be used on rare occasions. In such cases the Reitit router comes very handy
+since it allows to generate different middleware wrappers or the whole middleware
+chains for different paths/routes (or even route configurations).
+
+The above is implemented with another layer of abstraction which requires compilation
+phase when routes are loaded and analyzed. In this process a middleware wrapper may
+use function closure to keep the configuration associated with the `:data` key of
+a particular route. It may even be skipped for certain routes.
+
+Let's modify our previous example to show how it can be done:
 
 ```clojure
 {:name :turbo-wrapper
@@ -215,10 +230,10 @@ route. Let's modify our previous example to show how it can be done:
                     response)))))}
 ```
 
-In the example above the middleware will be installed only for routes having
-`:run-turbo?` set to a truthy value in their route data maps (under `:data`
-key). Moreover, a value associated to the `:run-turbo?` key will be used to
-do something with a request and with a response.
+In this example the middleware will be installed only for routes having `:run-turbo?`
+set to a truthy value in their route data maps (under `:data` key). Moreover, a value
+associated to the `:run-turbo?` key will be used to do something with a request and
+with a response.
 
 ## Tech stack
 
