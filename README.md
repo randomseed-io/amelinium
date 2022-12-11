@@ -176,7 +176,7 @@ middleware wrappers are to be called, and response-related wrappers will operate
 result of calling all other wrappers. This is possible because Ring architecture is
 based on higher-order functions wrapping the actual logic.
 
-Below is an example of a middleware wrapper which alter a request map by adding
+Below is an example of a middleware wrapper which alters a request map by adding
 `:REQ` key to it, and does the same thing with a response map by adding a `:RESP` key
 to it. Note the `(handler request)` call which will call all other wrappers in
 a chain.
@@ -200,13 +200,13 @@ therefore being much simpler:
 ```
 
 Controllers and middleware wrappers sometimes need access to data other than
-initially set by the web server. They may want to use another data sources (like
-database connections or caches) or some additional configuration structures (like
-translations, data transformation schemas, and so on). One way to make additional
-objects available to request handling functions is to create a middleware which will
-then encapsulate some data using a lexical closure and inject it into a request map
-(by associating with some key). Then, response generating handler can extract value
-under that key of a request map and continue processing.
+initially set by the web server. They may want to use external or internal data
+sources (like database connections or caches) or some additional configuration
+structures (like translations, data transformation schemas, and so on). One way to
+make additional objects available to request handling functions is to create
+a middleware which will then encapsulate some data using a lexical closure and inject
+it into a request map (by associating with some key). Then, response generating
+handler can extract value under that key of a request map and continue processing.
 
 The downside of the above approach is quite frequent, unconditional calling of such
 wrapper (for each processed request) which is not perfect when the injected data were
