@@ -26,29 +26,33 @@
 (def ^:dynamic *ns-reload-watch-dirs*             ["src" "test"])
 (def ^:dynamic *local-config*                                nil)
 (def ^:dynamic *local-dev-config*                   "config.edn")
+
 (def ^:dynamic *resource-config-dirs* ["translations/amelinium"
                                        "config/amelinium"])
+
 (def ^:dynamic *resource-admin-dirs*  ["translations/amelinium"
                                        "config/amelinium"
                                        "config/amelinium-admin"])
 
 (defmacro with-config-dirs
-  "Sets the dynamic variable `*resource-config-dirs*` and executes body."
+  "Sets the dynamic variable `amelinium.app/*resource-config-dirs*` and executes body."
   [dirs & body]
   `(binding [*resource-config-dirs* ~dirs]
      ~@body))
 
 (defmacro with-local-config
-  "Sets the dynamic variable `*local-config*` and executes body."
+  "Sets the dynamic variable `amelinium.app/*local-config*` and executes body."
   [local-file & body]
   `(binding [*local-config* ~local-file]
      ~@body))
 
 (defmacro with-configs
-  "Sets the dynamic variables `*resource-config-dirs*`, `*resource-admin-dirs*` and
-  `*local-config*` to the given values and executes body. May be helpful in
-  overriding defaults when instantiating `app.clj` and creating custom wrappers
-  around common management functions (like `start!`, `stop!`, `reload!` and others)."
+  "Sets the dynamic variables `amelinium.app/*resource-config-dirs*`,
+  `amelinium.app/*resource-admin-dirs*` and `amelinium.app/*local-config*` to the
+  given values and executes body. May be helpful in overriding defaults when
+  instantiating `app.clj` and creating custom wrappers around common management
+  functions (like `amelinium.app/start!`, `amelinium.app/stop!`,
+  `amelinium.app/reload!` and others)."
   [local-file dirs admin-dirs & body]
   `(binding [*resource-config-dirs* ~dirs
              *resource-admin-dirs*  ~admin-dirs
@@ -56,16 +60,16 @@
      ~@body))
 
 (defmacro with-watch-dirs
-  "Sets the dynamic variable `*ns-reload-watch-dirs*` to the given value and executes
+  "Sets the dynamic variable `amelinium.app/*ns-reload-watch-dirs*` to the given value and executes
   body. May be helpful when creating custom namespace tracker (and setting
-  `*ns-tracker*` value) in instantiated `app.clj`."
+  `amelinium.app/*ns-tracker*` value) in instantiated `app.clj`."
   [watch-dirs & body]
   `(binding [*ns-reload-watch-dirs* ~watch-dirs]
      ~@body))
 
 (defmacro with-ns-tracker
-  "Sets `*ns-tracker*` to the given value and executes body. Helpful when creating
-  custom `reload!` function in instantiated `app.clj`."
+  "Sets `amelinium.app/*ns-tracker*` to the given value and executes body. Helpful when
+  creating custom `amelinium.app/reload!` function in instantiated `app.clj`."
   [ns-tracker & body]
   `(binding [*ns-tracker* ~ns-tracker]
      ~@body))
@@ -106,7 +110,7 @@
 
 (defn make-ns-tracker
   "Creates `ns-tracker` instance for tracking code changes in directories specified
-  with `*ns-reload-watch-dirs*`."
+  with `amelinium.app/*ns-reload-watch-dirs*`."
   []
   (if-some [wdirs *ns-reload-watch-dirs*]
     (if-some [wdirs (and (sequential? wdirs) (seq wdirs))]
@@ -117,7 +121,7 @@
 
 (defn reload-namespaces
   "Reloads code (using `clojure.core/require` with `:reload` flag) in namespaces found
-  in files listed in `*ns-reload-watch-dirs*`."
+  in files listed in `amelinium.app/*ns-reload-watch-dirs*`."
   []
   (if-some [nstracker *ns-tracker*]
     (doseq [ns-sym (nstracker)]
@@ -166,10 +170,10 @@
 (declare resume-app)
 
 (defn state-from-exception
-  "Takes an exception object and sets the global variable `state` to contain the
-  exception data extracted from it. Additionally sets the current value of global
-  variable `phase` to `:failed` and uses logging to notify about this event (with
-  the log level set to error)."
+  "Takes an exception object and sets the global variable `amelinium.app/state` to
+  contain the exception data extracted from it. Additionally sets the current value
+  of global variable `amelinium.app/phase` to `:failed` and uses logging to notify
+  about this event (with the log level set to error)."
   [ex]
   (locking lock
     (var/reset exception ex)
@@ -180,7 +184,19 @@
 (defn configure-app
   "Configures the application using `local-config-file` and `rc-dirs` (list of relative
   paths to be scanned for EDN files with configuration maps to be merged with
-  `meta-merge`)."
+  `meta-merge`).
+
+  Uses `amelinium.system/read-configs` to load EDN files and merge them, and then
+  sets the global variable `amelinium.app/config` to contain it. The next step is to
+  call `amelinium.system/prep` and update the global variable
+  `amelinium.app/post-config` with its result.
+
+  If `keys` are given then `amelinium.system/config` is only updated when it does not
+  yet have a truthy value, and after that the `amelinium.system/prep` is called with
+  `keys` passed to only prepare values for the specified keys. The result of this
+  call is stored in `amelinium.app/post-config`.
+
+  The function returns `:configured` keyword. See also `amelinium.app/configure!`."
   ([]
    (configure-app nil nil))
   ([local-config-file rc-dirs & keys]
@@ -197,6 +213,7 @@
    :configured))
 
 (defn start-app
+  ""
   ([]
    (start-app nil nil))
   ([local-config-file rc-dirs & keys]
@@ -289,8 +306,9 @@
 (defn start-admin!       [& k] (apply start-app  *local-config*     *resource-admin-dirs* k))
 
 (defn reload!
-  "When the application is stopped, reloads code (using `reload-namespaces`). Otherwise
-  stops the application, reloads namespaces and starts it again."
+  "When the application is stopped, reloads code (using
+  `amelinium.app/reload-namespaces`). Otherwise stops the application, reloads
+  namespaces and starts it again."
   [& k]
   (if (stopped?)
     (reload-namespaces)
@@ -344,100 +362,114 @@
 
 (defdoc! *ns-reload-watch-dirs*
   "A sequence of directories to be watched when reloading code. Used by
-  `reload-namespaces` and (indirectly) by `reload!` and `make-ns-tracker`. Can also
-  be set using `with-watch-dirs`.")
+  `amelinium.app/reload-namespaces` and (indirectly) by `amelinium.app/reload!` and
+  `amelinium.app/make-ns-tracker`. Can also be set using
+  `amelinium.app/with-watch-dirs`.")
 
 (defdoc! *local-config*
   "A local configuration file in EDN format which will be loaded after all other
   configuration files so its entries will replace any existing entries during
   merge. Be aware that `meta-merge` is used in the process so values of nested maps
-  are replaced not the whole branches. Used when `configure!` is called. Please be
-  aware that using this setting to override settings in certain environments may be
-  considered less elastic than creating a separate, local folder and putting local
-  configuration files there.")
+  are replaced not the whole branches. Used when `amelinium.app/configure!` is
+  called. Please be aware that using this setting to override settings in certain
+  environments may be considered less elastic than creating a separate, local folder
+  and putting local configuration files there.")
 
 (defdoc! *local-dev-config*
-  "Much like `*local-config*` but used when `configure-dev!` is called. Please be aware
-  that using this setting (and calling `configure-dev!`) to work in development
+  "Much like `amelinium.app/*local-config*` but used when
+  `amelinium.app/configure-dev!` is called. Please be aware that using this
+  setting (and calling `amelinium.app/configure-dev!`) to work in development
   environment may be considered less elastic than creating a separate, local folder
   for development configuration and changing the application profile property
-  there. See also `start-dev!` and `configure-dev!`.")
+  there. See also `amelinium.app/start-dev!` and `amelinium.app/configure-dev!`.")
 
 (defdoc! *resource-config-dirs*
-  "A sequence of paths (relative to `resources` directory) to be scanned for EDN
+  "A sequence of paths (relative to the `resources` directory) to be scanned for EDN
   configuration files. Loaded in the same order as they appear and used by
-  `configure!` and `configure-dev!`. Please note that when building your own instance
-  of application you still may refer to the original Amelinium configs since
-  `resource` directories are shared across loaded libraries. Therefore, it is
-  possible to load original files (for instance some basic translations) and override
-  some of them in your i18n configuration. See also `start!` and `configure!`.")
+  `amelinium.app/configure!` and `amelinium.app/configure-dev!`.
+
+  Please note that when building your own instance of application you still may refer
+  to the original Amelinium configs since resource directories are shared across
+  loaded libraries. Therefore, it is possible to load original files (for instance
+  some basic translations) and override some of them in your i18n configuration. See
+  also `amelinium.app/start!` and `amelinium.app/configure!`.")
 
 (defdoc! *resource-admin-dirs*
-  "The same as `*resource-config-dirs*` but loaded when application is run in
-  administrative mode (and configured with `configure-admin!`). Regular config
-  directories (from `*resource-config-dirs*`) are not scanned nor loaded. This is
-  useful when performing serious administrative tasks (like database migrations)
-  requiring different or additional setup (e.g. specially configured data sources
-  with different credentials used to create database connections). See also
-  `start-admin!` and `configure-admin!`.")
+  "The same as `amelinium.app/*resource-config-dirs*` but loaded when application is
+  run in administrative mode (and configured with `amelinium.app/configure-admin!`).
+
+  Regular config directories (from `amelinium.app/*resource-config-dirs*`) are not
+  scanned nor loaded. This is useful when performing serious administrative
+  tasks (like database migrations) requiring different or additional
+  setup (e.g. specially configured data sources with different credentials used to
+  create database connections). See also `amelinium.app/start-admin!` and
+  `amelinium.app/configure-admin!`.")
 
 (defdoc! *ns-tracker*
   "Instance of `ns-tracker` used to track directories for code changes. By default it
-  is initialized by calling `ns-tracker.core/ns-tracker` (from `make-ns-tracker`)
-  with a sequence of directories from `*ns-reload-watch-dirs*`.")
+  is initialized by calling `ns-tracker.core/ns-tracker` (from
+  `amelinium.app/make-ns-tracker`) with a sequence of directories from
+  `amelinium.app/*ns-reload-watch-dirs*`.")
 
 (defdoc! configure!
-  "Configures the application. Calls `configure-app` passing values of `*local-config*`
-  and `*resource-config-dirs*`. See also `start!`.")
+  "Configures the application. Calls `amelinium.app/configure-app` passing values of
+  `amelinium.app/*local-config*` and `amelinium.app/*resource-config-dirs*`. See also
+  `amelinium.app/start!`.")
 
 (defdoc! configure-dev!
-  "Configures the application in development mode. Calls `configure-app` passing it
-  values of `*local-dev-config*` and `*resource-config-dirs*`. Please be aware that
-  using this to work in development environment may be considered less elastic than
-  creating a separate, local folder for development configuration and changing the
-  application profile property there (a map identified with
-  `:amelinium.app/properties` key and its `:profile` key). See also `start-dev!`.")
+  "Configures the application in development mode. Calls `amelinium.app/configure-app`
+  passing it values of `amelinium.app/*local-dev-config*` and
+  `amelinium.app/*resource-config-dirs*`. Please be aware that using this to work in
+  development environment may be considered less elastic than creating a separate,
+  local folder for development configuration and changing the application profile
+  property there (a map identified with `:amelinium.app/properties` key and its
+  `:profile` key). See also `amelinium.app/start-dev!`.")
 
 (defdoc! configure-admin!
-  "Configures the application in administrative mode. Calls `configure-app` passing it
-  values of `*local-config*` and `*resource-admin-dirs*`. See also `start-admin!`.")
+  "Configures the application in administrative mode. Calls
+  `amelinium.app/configure-app` passing it values of `amelinium.app/*local-config*`
+  and `amelinium.app/*resource-admin-dirs*`. See also `amelinium.app/start-admin!`.")
 
 (defdoc! start!
-  "Starts or resumes the application. Calls `start-app` passing values of
-  `*local-config*`, `*resource-config-dirs*` and optional keys identifying components
-  which should be configured and started. If no components are given, all are
-  started. If the application is in suspended state, it is resumed (see `resume!`).")
+  "Starts or resumes the application. Calls `amelinium.app/start-app` passing values of
+  `amelinium.app/*local-config*`, `amelinium.app/*resource-config-dirs*` and optional
+  keys identifying components which should be configured and started. If no
+  components are given, all are started. If the application is in suspended state, it
+  is resumed (see `amelinium.app/resume!`).")
 
 (defdoc! restart!
-  "Restarts the application. Calls `stop-app` (passing it optional keys identifying
-  components which should be stopped) and the calls `start-app` passing values of
-  `*local-config*`, `*resource-config-dirs*` and optional keys identifying components
+  "Restarts the application. Calls `amelinium.app/stop-app` (passing it optional keys
+  identifying components which should be stopped) and the calls
+  `amelinium.app/start-app` passing values of `amelinium.app/*local-config*`,
+  `amelinium.app/*resource-config-dirs*` and optional keys identifying components
   which should be started. If no components are given then only those which were
   previously started are stopped and all are started. Application configuration is
   re-initialized during the process.")
 
 (defdoc! stop!
-  "Stops the application. Calls `stop-app` passing it optional keys identifying
-  components which should be stopped. If no components are given then only those
-  which were previously started are stopped. After successful stop, application
-  configuration is removed.")
+  "Stops the application. Calls `amelinium.app/stop-app` passing it optional keys
+  identifying components which should be stopped. If no components are given then
+  only those which were previously started are stopped. After successful stop,
+  application configuration is removed.")
 
 (defdoc! suspend!
-  "Suspends the application. Calls `suspend-app` passing it optional keys identifying
-  components which should be suspended. If no components are given then only those
-  which were previously started are suspended.")
+  "Suspends the application. Calls `amelinium.app/suspend-app` passing it optional keys
+  identifying components which should be suspended. If no components are given then
+  only those which were previously started are suspended.")
 
 (defdoc! resume!
-  "Resumes the application which was previously suspended. Calls `resume-app` passing
-  it optional keys identifying components which should be resumed. If no components
-  are given then only those which were previously suspended are resumed.")
+  "Resumes the application which was previously suspended. Calls
+  `amelinium.app/resume-app` passing it optional keys identifying components which
+  should be resumed. If no components are given then only those which were previously
+  suspended are resumed.")
 
 (defdoc! start-dev!
-  "Starts or resumes the application using development configuration. Calls `start-app`
-  passing values of `*local-dev-config*`, `*resource-config-dirs*` and optional keys
-  identifying components which should be configured and started. If no components are
-  given, all are started. If the application is in suspended state, it is
-  resumed (see `resume!`).
+  "Starts or resumes the application using development configuration. Calls
+  `amelinium.app/start-app` passing values of `amelinium.app/*local-dev-config*`,
+  `amelinium.app/*resource-config-dirs*` and optional keys identifying components
+  which should be configured and started. If no components are given, all are
+  started. If the application is in suspended state, it is resumed (see
+  `amelinium.app/resume!`).
 
   Please be aware that using this to work in development environment may be
   considered less elastic than creating a separate, local folder for development
@@ -446,10 +478,11 @@
 
 (defdoc! start-admin!
   "Starts or resumes the application using administrative configuration. Calls
-  `start-app` passing values of `*local-config*`, `*resource-admin-dirs*` and
-  optional keys identifying components which should be configured and started. If no
-  components are given, all are started. If the application is in suspended state, it
-  is resumed (see `resume!`).
+  `amelinium.app/start-app` passing values of `amelinium.app/*local-config*`,
+  `amelinium.app/*resource-admin-dirs*` and optional keys identifying components
+  which should be configured and started. If no components are given, all are
+  started. If the application is in suspended state, it is resumed (see
+  `amelinium.app/resume!`).
 
   This mode is intended to be used when performing administrative tasks (like
   database migrations) requiring different or additional setup (e.g. specially
