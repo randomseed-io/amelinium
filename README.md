@@ -100,8 +100,8 @@ associates.
   language-parameterized path generation, session links (for cookie-less sessions),
   form building and session data access.
 
-* API and web **response handlers** (based on `:response/status` or `:response/fn`,
-  `:response/headers` or `:response/body`).
+* API and web **response handlers** (controlled by `:response/status` or `:response/fn`,
+  `:response/headers` and `:response/body` request map entries).
 
 * **Flexible authentication engine** with pluggable [encryption
   modules](https://randomseed.io/software/amelinium/amelinium.auth.algo.scrypt) and
@@ -117,6 +117,10 @@ associates.
 * **Buffered events logging** to a database with async channels.
 
 * **Swagger** support for API and web.
+
+## Simplified request processing workflow
+
+![Web request processing in Amelinium](docs/img/amelinium-workflow-web.svg)
 
 ## Tech stack
 
@@ -171,7 +175,7 @@ Amelinium is based on the following Clojure and Java libraries:
     * [Balagan](https://github.com/clojurewerkz/balagan) for nested structures matching
     * [camel-snake-kebab](https://github.com/clj-commons/camel-snake-kebab) for word
       case conversions
-    * [clj-uuid](https://github.com/danlentz/clj-uuid) for RFC4122 Unique Identifiers
+    * [clj-uuid](https://github.com/danlentz/clj-uuid) for RFC4122 unique identifiers
     * [smangler](https://github.com/randomseed-io/smangler) for string truncation
     * [Bankster](https://github.com/randomseed-io/bankster) for money and currency
       handling
@@ -186,7 +190,7 @@ Amelinium is based on the following Clojure and Java libraries:
     * [Nippy](https://github.com/ptaoussanis/nippy) for fast serialization
     * [core.cache](https://github.com/clojure/core.cache) and
       [core.memoize](https://github.com/clojure/core.memoize) for function memoization
-    * [random:utils](https://github.com/randomseed-io/utils) for persistent property caching
+    * [random:utils](https://github.com/randomseed-io/utils) for property caching
 
 * Time:
     * [Tick](https://github.com/juxt/tick) for dealing with time
