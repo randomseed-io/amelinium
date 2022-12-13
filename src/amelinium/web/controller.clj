@@ -63,7 +63,7 @@
 
 (defn inject-goto
   "Injects go-to data (`gmap`) into a request map `req` (affected, form-related keys
-  are: `:form-params`, `:query-params` and `:params`. Form data is merged only if a
+  are: `:form-params`, `:query-params` and `:params`). Form data is merged only if a
   go-to URI (`:uri` key of `gmap`) matches the URI of a current page. Go-to URI is
   always injected. When the given `gmap` is broken, it will set `:goto-injected?` to
   `true` but `:goto-uri` and `:goto` to `false`."

@@ -36,7 +36,7 @@
 ;; Constants
 
 (def ^:const config-tag (re-pattern ":([a-zA-Z][a-zA-Z0-9_\\-]+)"))
-(def ^:const json-types #{:json :application/json "application/json" "json" "JSON"})
+(def ^:const json-types #{:json :JSON :application/json "application/json" "json" "JSON"})
 
 ;; Helpers
 
