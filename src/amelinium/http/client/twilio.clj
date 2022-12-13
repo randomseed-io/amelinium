@@ -15,12 +15,19 @@
             [amelinium.db                 :as              db]
             [amelinium.logging            :as             log]
             [amelinium.system             :as          system]
+            [amelinium.proto.twilio       :as               p]
+            [amelinium.types.twilio       :refer         :all]
+            [amelinium                    :refer         :all]
             [io.randomseed.utils          :refer         :all]
             [io.randomseed.utils.time     :as            time]
             [io.randomseed.utils.var      :as             var]
             [io.randomseed.utils.map      :as             map]
             [io.randomseed.utils.map      :refer     [qassoc]]
-            [potpuri.core                 :refer [deep-merge]]))
+            [potpuri.core                 :refer [deep-merge]])
+
+  (:import [clojure.lang            Keyword PersistentVector IPersistentMap IFn Fn]
+           [amelinium.proto.twilio  TwilioControl]
+           [amelinium               TwilioConfig]))
 
 (defonce sms    (constantly nil))
 (defonce email  (constantly nil))
@@ -33,23 +40,23 @@
 
 ;; Helpers
 
-(defn- get-template-id
-  [config template-group lang fallback-template]
+(defn- get-template-id-core
+  [localized-templates template-group lang fallback-template]
   (some-str
-   (or (-> (get config :localized-templates)
+   (or (-> localized-templates
            (get (some-keyword template-group))
            (get (some-keyword-simple lang)))
        fallback-template)))
 
 (defn- localize-sendmail-params
-  ([lang params template-group]
-   (localize-sendmail-params lang params template-group nil))
-  ([lang params template-group fallback-template]
+  ([^TwilioControl ctrl lang params template-group]
+   (localize-sendmail-params ctrl lang params template-group nil))
+  ([^TwilioControl ctrl lang params template-group fallback-template]
    (if lang
-     (if-some [template-id (get-template-id (email :config)
-                                            template-group
-                                            lang
-                                            fallback-template)]
+     (if-some [template-id (p/get-template-id ctrl
+                                              template-group
+                                              lang
+                                              fallback-template)]
        (qassoc params :template_id template-id)
        params)
      params)))
@@ -57,85 +64,107 @@
 ;; E-mail sending
 
 (defn sendmail-l10n-template
-  ([lang to template-group]
+  ([^TwilioControl ctrl lang to template-group]
    (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
-     (email (localize-sendmail-params
-             lang
-             {:personalizations [{:to to}]}
-             template-group
-             nil))))
-  ([lang to template-group fallback-template-id-or-template-data]
+     (p/request ctrl (localize-sendmail-params
+                      ctrl
+                      lang
+                      {:personalizations [{:to to}]}
+                      template-group
+                      nil))))
+  ([^TwilioControl ctrl lang to template-group fallback-template-id-or-template-data]
    (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
      (if (map? fallback-template-id-or-template-data)
-       (email (localize-sendmail-params
-               lang
-               {:personalizations
-                [{:to                    to
-                  :dynamic_template_data fallback-template-id-or-template-data}]}
-               template-group
-               nil))
-       (email (localize-sendmail-params
-               lang
-               {:personalizations [{:to to}]}
-               template-group
-               fallback-template-id-or-template-data)))))
-  ([lang to template-group fallback-template-id template-data]
+       (p/request ctrl (localize-sendmail-params
+                        ctrl
+                        lang
+                        {:personalizations
+                         [{:to                    to
+                           :dynamic_template_data fallback-template-id-or-template-data}]}
+                        template-group
+                        nil))
+       (p/request ctrl (localize-sendmail-params
+                        ctrl
+                        lang
+                        {:personalizations [{:to to}]}
+                        template-group
+                        fallback-template-id-or-template-data)))))
+  ([^TwilioControl ctrl lang to template-group fallback-template-id template-data]
    (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
-     (email (localize-sendmail-params
-             lang
-             {:personalizations
-              [{:to                    to
-                :dynamic_template_data template-data}]}
-             template-group
-             fallback-template-id)))))
+     (p/request ctrl (localize-sendmail-params
+                      ctrl
+                      lang
+                      {:personalizations
+                       [{:to                    to
+                         :dynamic_template_data template-data}]}
+                      template-group
+                      fallback-template-id)))))
 
 (defn sendmail-l10n-template-async
-  ([respond raise lang to template-group]
+  {:arglists '([respond raise lang to template-group]
+               [respond raise lang to template-group fallback-template-id]
+               [respond raise lang to template-group template-data]
+               [respond raise lang to template-group fallback-template-id template-data])}
+  ([^TwilioControl ctrl respond raise lang to template-group]
    (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
-     (email {:async? true} (localize-sendmail-params
-                            lang
-                            {:personalizations [{:to to}]}
-                            template-group
-                            nil)
-            respond raise)))
-  ([respond raise lang to template-group fallback-template-id-or-template-data]
+     (p/request ctrl {:async? true} (localize-sendmail-params
+                                     ctrl
+                                     lang
+                                     {:personalizations [{:to to}]}
+                                     template-group
+                                     nil)
+                respond raise)))
+  ([^TwilioControl ctrl respond raise lang to template-group fallback-template-id-or-template-data]
    (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
      (if (map? fallback-template-id-or-template-data)
-       (email {:async? true} (localize-sendmail-params
-                              lang
-                              {:personalizations
-                               [{:to                    to
-                                 :dynamic_template_data fallback-template-id-or-template-data}]}
-                              template-group
-                              nil)
-              respond raise)
-       (email {:async? true} (localize-sendmail-params
-                              lang
-                              {:personalizations [{:to to}]}
-                              template-group
-                              fallback-template-id-or-template-data)
-              respond raise))))
-  ([respond raise lang to template-group fallback-template-id template-data]
+       (p/request ctrl {:async? true} (localize-sendmail-params
+                                       ctrl
+                                       lang
+                                       {:personalizations
+                                        [{:to                    to
+                                          :dynamic_template_data fallback-template-id-or-template-data}]}
+                                       template-group
+                                       nil)
+                  respond raise)
+       (p/request ctrl {:async? true} (localize-sendmail-params
+                                       ctrl
+                                       lang
+                                       {:personalizations [{:to to}]}
+                                       template-group
+                                       fallback-template-id-or-template-data)
+                  respond raise))))
+  ([^TwilioControl ctrl respond raise lang to template-group fallback-template-id template-data]
    (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
-     (email {:async true} (localize-sendmail-params
-                           lang
-                           {:personalizations
-                            [{:to                    to
-                              :dynamic_template_data template-data}]}
-                           template-group
-                           fallback-template-id)
-            respond raise))))
+     (p/request ctrl {:async true} (localize-sendmail-params
+                                    ctrl
+                                    lang
+                                    {:personalizations
+                                     [{:to                    to
+                                       :dynamic_template_data template-data}]}
+                                    template-group
+                                    fallback-template-id)
+                respond raise))))
 
 (defn sendmail-template
-  ([to tpl-gr]                 (sendmail-l10n-template nil to tpl-gr))
-  ([to tpl-gr fb-tpl-or-tdata] (sendmail-l10n-template nil to tpl-gr fb-tpl-or-tdata))
-  ([to tpl-gr fb-tpl tdata]    (sendmail-l10n-template nil to tpl-gr fb-tpl tdata)))
+  {:arglists '([^TwilioControl ctrl to template-group]
+               [^TwilioControl ctrl to template-group fallback-template]
+               [^TwilioControl ctrl to template-group template-data]
+               [^TwilioControl ctrl to template-group fallback-template template-data])}
+  ([^TwilioControl ctrl to tpl-gr]                 (sendmail-l10n-template ctrl nil to tpl-gr))
+  ([^TwilioControl ctrl to tpl-gr fb-tpl-or-tdata] (sendmail-l10n-template ctrl nil to tpl-gr fb-tpl-or-tdata))
+  ([^TwilioControl ctrl to tpl-gr fb-tpl tdata]    (sendmail-l10n-template ctrl nil to tpl-gr fb-tpl tdata)))
 
 ;; SMS sending
 
 (defn sendsms
-  [to body]
-  (sms {:Body (str body) :To (str to)}))
+  [^TwilioControl ctrl to body]
+  (p/request ctrl {:Body (str body) :To (str to)}))
+
+(defn sendsms-async
+  [^TwilioControl ctrl respond raise to body]
+  (p/request ctrl {:async? true}
+             {:Body (str body) :To (str to)}
+             respond raise))
 
 ;; Initialization helpers
 
@@ -222,7 +251,7 @@
     (qassoc config :request-opts opts)))
 
 (defn prep-twilio
-  [{:keys [enabled? prepared?]
+  [{:keys [enabled? prepared? url]
     :or   {enabled? true prepared? false}
     :as   config}]
   (if (:prepared? config)
@@ -230,7 +259,8 @@
     (-> config
         (assoc  :prepared?    true)
         (assoc  :enabled?     (boolean enabled?))
-        (map/update-existing  :url           some-str)
+        (assoc  :url          (some-str url))
+        (assoc  :raw-url      (some-str url))
         (map/update-existing  :account-sid   some-str)
         (map/update-existing  :account-key   some-str)
         (map/update-existing  :account-token some-str)
@@ -251,68 +281,89 @@
   [p]
   (if p (map/map-keys some-str p)))
 
+(extend-protocol p/TwilioControl
+  nil
+  (config [ctrl] nil)
+  (get-template-id [ctrl tg lang fb-tpl] nil)
+  (request
+    ([ctrl] nil)
+    ([ctrl params] nil)
+    ([ctrl opts params] nil)
+    ([ctrl opts params respond] nil)
+    ([ctrl opts params respond raise] nil)))
+
 ;; Initialization
 
 (defn init-twilio
   [k config]
   (if-not (:enabled? config)
     (constantly nil)
-    (let [client   (hc/build-http-client (:client-opts config))
-          req-opts (qassoc (:request-opts config) :http-client client)]
+    (let [client               (hc/build-http-client (:client-opts config))
+          req-opts             (qassoc (:request-opts config) :http-client client)
+          localized-templates  (:localized-templates config)
+          ^TwilioConfig config (map->TwilioConfig config)]
       (log/msg "Registering Twilio client:" k)
       (if-some [default-params (:parameters config)]
-        (fn twilio-request
-          ([opts params & [respond raise]]
-           (if (= :config params)
-             config
-             (let [opts       (into req-opts opts)
-                   json?      (sending-json? opts)
-                   params     (if json? params (stringify-params params))
-                   fparams    (get opts :form-params)
-                   fparams    (if json? fparams (stringify-params fparams))
-                   all-params (if params
-                                (if fparams
-                                  (deep-merge :into default-params fparams params)
-                                  (deep-merge :into default-params params))
-                                (if fparams
-                                  (deep-merge :into default-params fparams)
-                                  default-params))]
-               (-> (qassoc opts :form-params all-params)
-                   (hc/request respond raise)))))
-          ([params]
-           (if (= :config params)
-             config
-             (let [params     (if (sending-json? req-opts) params (stringify-params params))
-                   all-params (if params (deep-merge :into default-params params) default-params)]
-               (-> (qassoc req-opts :form-params all-params)
-                   (hc/request)))))
-          ([]
-           (-> (qassoc req-opts :form-params default-params)
-               (hc/request))))
-        (fn twilio-request
-          ([opts params & [respond raise]]
-           (if (= :config params)
-             config
-             (let [opts       (conj req-opts opts)
-                   json?      (sending-json? opts)
-                   params     (if json? params (stringify-params params))
-                   fparams    (get opts :form-params)
-                   fparams    (if json? fparams (stringify-params fparams))
-                   all-params (if params
-                                (if fparams
-                                  (deep-merge :into fparams params)
-                                  params)
-                                fparams)]
-               (-> (qassoc opts :form-params (or all-params {}))
-                   (hc/request respond raise)))))
-          ([params]
-           (if (= :config params)
-             config
-             (let [params (if (sending-json? req-opts) params (stringify-params params))]
-               (-> (qassoc req-opts :form-params (or params {}))
-                   (hc/request)))))
-          ([]
-           (hc/request req-opts)))))))
+        (reify p/TwilioControl
+          (config  ^TwilioConfig [_] config)
+          (get-template-id [_ tg lang fb-tpl] (get-template-id-core localized-templates tg lang fb-tpl))
+          (request [_ opts params respond raise]
+            (let [opts       (into req-opts opts)
+                  json?      (sending-json? opts)
+                  params     (if json? params (stringify-params params))
+                  fparams    (get opts :form-params)
+                  fparams    (if json? fparams (stringify-params fparams))
+                  all-params (if params
+                               (if fparams
+                                 (deep-merge :into default-params fparams params)
+                                 (deep-merge :into default-params params))
+                               (if fparams
+                                 (deep-merge :into default-params fparams)
+                                 default-params))
+                  opts       (qassoc opts :form-params all-params)]
+              (if (or respond raise)
+                (hc/request opts respond raise)
+                (hc/request opts))))
+          (request [c opts params respond]
+            (p/request c opts params respond nil))
+          (request [c opts params]
+            (p/request c opts params nil nil))
+          (request [_ params]
+            (let [params     (if (sending-json? req-opts) params (stringify-params params))
+                  all-params (if params (deep-merge :into default-params params) default-params)]
+              (-> (qassoc req-opts :form-params all-params)
+                  (hc/request))))
+          (request [_]
+            (-> (qassoc req-opts :form-params default-params)
+                (hc/request))))
+        (reify p/TwilioControl
+          (config  ^TwilioConfig [_] config)
+          (get-template-id [_ tg lang fb-tpl] (get-template-id-core localized-templates tg lang fb-tpl))
+          (request [_ opts params respond raise]
+            (let [opts       (conj req-opts opts)
+                  json?      (sending-json? opts)
+                  params     (if json? params (stringify-params params))
+                  fparams    (get opts :form-params)
+                  fparams    (if json? fparams (stringify-params fparams))
+                  all-params (if params
+                               (if fparams
+                                 (deep-merge :into fparams params)
+                                 params)
+                               fparams)
+                  opts       (qassoc opts :form-params (or all-params {}))]
+              (if (or respond raise)
+                (hc/request opts respond raise)
+                (hc/request opts))))
+          (request [c opts params respond]
+            (p/request c opts params respond nil))
+          (request [c opts params]
+            (p/request c opts params nil nil))
+          (request [_ params]
+            (let [params (if (sending-json? req-opts) params (stringify-params params))]
+              (-> (qassoc req-opts :form-params (or params {}))
+                  (hc/request))))
+          (request [_]
+            (hc/request req-opts)))))))
 
 (system/add-init  ::default [k config] (var/make k (init-twilio k (prep-twilio config))))
 (system/add-prep  ::default [_ config] (prep-twilio config))
