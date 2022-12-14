@@ -121,7 +121,8 @@
 
 (defn gen-confirmation-query
   "Generates a confirmation query for an e-mail or a phone UPDATED by an existing
-  user."
+  user. Note: it may return an empty result set if there is no requesting user in a
+  database."
   [id-column dec-att?]
   (str-squeeze-spc
    "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,attempts,requester_id,user_id,user_uid)"
@@ -129,7 +130,7 @@
         "(SELECT users.id  FROM users WHERE users." (or (some-str id-column) "email") " = ?),"
         "(SELECT users.uid FROM users WHERE users." (or (some-str id-column) "email") " = ?)"
         " FROM users"
-        " WHERE users.id = ? AND NOT users." (or (some-str id-column) "email") " <=> ?")
+        " WHERE users.id = ?")
    "ON DUPLICATE KEY UPDATE"
    "user_id      = IF(NOW()>expires, VALUE(user_id),      user_id),"
    "user_uid     = IF(NOW()>expires, VALUE(user_uid),     user_uid),"
@@ -220,7 +221,7 @@
              reason (or (some-str reason) "change")
              exp    (or exp ten-minutes)
              exp    (if (t/duration? exp) (t/hence exp) exp)
-             qargs  [query id code token reason exp attempts user-id id id user-id id]]
+             qargs  [query id code token reason exp attempts user-id id id user-id]]
          (if-some [r (jdbc/execute-one! db qargs db/opts-simple-map)]
            (let [user-id       (get r :user-id)
                  user-uid      (parse-uuid (str (get r :user-uid)))
