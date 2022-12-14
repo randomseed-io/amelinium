@@ -18,6 +18,7 @@
             [buddy.core.codecs        :as        codecs]
             [clj-uuid                 :as          uuid]
             [amelinium.db             :as            db]
+            [phone-number.core        :as         phone]
             [io.randomseed.utils.time :as          time]
             [io.randomseed.utils.ip   :as            ip]
             [io.randomseed.utils.map  :as           map]
@@ -41,10 +42,16 @@
   []
   (-> (random-uuid) uuid/to-byte-array hash/md5 codecs/bytes->hex))
 
+(defn some-id
+  [id]
+  (if (phone/native? id)
+    (phone/format id :phone-number.format/e164)
+    (some-str id)))
+
 (defn phone-exists?
   [db phone]
   (if db
-    (if-some [phone (some-str phone)]
+    (if-some [phone (some-id phone)]
       (-> (jdbc/execute-one! db [phone-exists-query phone] db/opts-simple-vec)
           first some?))))
 
@@ -54,6 +61,14 @@
     (if-some [email (some-str email)]
       (-> (jdbc/execute-one! db [email-exists-query email] db/opts-simple-vec)
           first some?))))
+
+(def ^:const ^:private
+  phone-id-types
+  #{:phone :user/phone "phone" "user/phone"})
+
+(defn- phone?
+  ^Boolean [id-type]
+  (contains? phone-id-types id-type))
 
 ;; Generation of confirmation tokens and codes
 
@@ -114,7 +129,7 @@
         "(SELECT users.id  FROM users WHERE users." (or (some-str id-column) "email") " = ?),"
         "(SELECT users.uid FROM users WHERE users." (or (some-str id-column) "email") " = ?)"
         " FROM users"
-        " WHERE users.id = ? AND users." (or (some-str id-column) "email") " <> ?")
+        " WHERE users.id = ? AND NOT users." (or (some-str id-column) "email") " <=> ?")
    "ON DUPLICATE KEY UPDATE"
    "user_id      = IF(NOW()>expires, VALUE(user_id),      user_id),"
    "user_uid     = IF(NOW()>expires, VALUE(user_uid),     user_uid),"
@@ -235,15 +250,13 @@
   ([udata]
    (create-for-registration-without-attempt (get udata :db) udata))
   ([db udata]
-   (gen-full-confirmation-core db
-                               new-email-confirmation-query-without-attempt
+   (gen-full-confirmation-core db new-email-confirmation-query-without-attempt
                                (get udata :email)
                                (get udata :expires-in)
                                udata
                                (or (get udata :reason) "creation")))
   ([db udata reason]
-   (gen-full-confirmation-core db
-                               new-email-confirmation-query-without-attempt
+   (gen-full-confirmation-core db new-email-confirmation-query-without-attempt
                                (get udata :email)
                                (get udata :expires-in)
                                udata
@@ -264,15 +277,13 @@
   ([udata]
    (create-for-registration (get udata :db) udata))
   ([db udata]
-   (gen-full-confirmation-core db
-                               new-email-confirmation-query
+   (gen-full-confirmation-core db new-email-confirmation-query
                                (get udata :email)
                                (get udata :expires-in)
                                udata
                                (or (get udata :reason) "creation")))
   ([db udata reason]
-   (gen-full-confirmation-core db
-                               new-email-confirmation-query
+   (gen-full-confirmation-core db new-email-confirmation-query
                                (get udata :email)
                                (get udata :expires-in)
                                udata
@@ -292,21 +303,20 @@
   given reason (as a keyword or `nil` if not given). Attempts counter is increased
   each time this function is called."
   ([db id user-id exp attempts]
-   (gen-confirmation-core db
-                          email-confirmation-query-without-attempt
+   (gen-confirmation-core db email-confirmation-query-without-attempt
                           id user-id exp attempts "change"))
   ([db id user-id exp attempts id-type]
-   (gen-confirmation-core db
-                          (if (= id-type :phone)
-                            phone-confirmation-query-without-attempt
-                            email-confirmation-query-without-attempt)
-                          id user-id exp attempts "change"))
+   (if (phone? id-type)
+     (gen-confirmation-core db phone-confirmation-query-without-attempt
+                            (some-id id) user-id exp attempts "change")
+     (gen-confirmation-core db email-confirmation-query-without-attempt
+                            id user-id exp attempts "change")))
   ([db id user-id exp attempts id-type reason]
-   (gen-confirmation-core db
-                          (if (= id-type :phone)
-                            phone-confirmation-query-without-attempt
-                            email-confirmation-query-without-attempt)
-                          id user-id exp attempts reason)))
+   (if (phone? id-type)
+     (gen-confirmation-core db phone-confirmation-query-without-attempt
+                            (some-id id) user-id exp attempts reason)
+     (gen-confirmation-core db email-confirmation-query-without-attempt
+                            id user-id exp attempts reason))))
 
 (defn create-for-change
   "Creates a confirmation code for an existing user identified by the given user
@@ -322,21 +332,20 @@
   given reason (as a keyword or `nil` if not given). Attempts counter is increased
   each time this function is called."
   ([db id user-id exp attempts]
-   (gen-confirmation-core db
-                          email-confirmation-query
+   (gen-confirmation-core db email-confirmation-query
                           id user-id exp attempts "change"))
   ([db id user-id exp attempts id-type]
-   (gen-confirmation-core db
-                          (if (= :phone (name id-type))
-                            phone-confirmation-query
-                            email-confirmation-query)
-                          id user-id exp attempts "change"))
+   (if (phone? id-type)
+     (gen-confirmation-core db phone-confirmation-query
+                            (some-id id) user-id exp attempts "change")
+     (gen-confirmation-core db email-confirmation-query
+                            id user-id exp attempts "change")))
   ([db id user-id exp attempts id-type reason]
-   (gen-confirmation-core db
-                          (if (= :phone (name id-type))
-                            phone-confirmation-query
-                            email-confirmation-query)
-                          id user-id exp attempts reason)))
+   (if (phone? id-type)
+     (gen-confirmation-core db phone-confirmation-query
+                            (some-id id) user-id exp attempts reason)
+     (gen-confirmation-core db email-confirmation-query
+                            id user-id exp attempts reason))))
 
 ;; Confirming identity with a token or code
 
@@ -394,7 +403,7 @@
      (or (process-errors (jdbc/execute-one! db qargs db/opts-simple-map) should-be-confirmed?)
          verify-bad-token-set)))
   ([db id code reason should-be-confirmed?]
-   (let [id     (some-str id)
+   (let [id     (some-id id)
          reason (or (some-str reason) "creation")
          qargs  (cond code          [report-errors-code-query      reason id code]
                       (false? code) [report-errors-simple-id-query reason id]
@@ -412,7 +421,7 @@
   ([errs id src-id email-id phone-id]
    (if errs
      (if (contains? errs src-id)
-       (if-some [id (some-str id)]
+       (if-some [id (some-id id)]
          (if-some [dst-id (cond (str/index-of id \@ 1) email-id
                                 (= (first id) \+)      phone-id)]
            (conj (disj errs src-id) dst-id)
@@ -469,7 +478,7 @@
   not yet expired), it will also return a map with `:confirmed?` set to `true`."
   ([db id code exp-inc reason]
    (let [reason (or (some-str reason) "creation")
-         id     (some-str id)
+         id     (some-id id)
          code   (some-str code)]
      (if (and id code (pos-int? exp-inc))
        (if-some [r (::jdbc/update-count
@@ -528,7 +537,7 @@
 (defn- decrease-attempts-core
   [db id reason]
   (if db
-    (if-some [id (some-str id)]
+    (if-some [id (some-id id)]
       (let [reason (or (some-str reason) "creation")]
         (if-some [r (jdbc/execute-one! db [decrease-attempts-query id reason] db/opts-simple-map)]
           (-> r
@@ -573,7 +582,7 @@
    (if db
      (if-some [request-id (some-str request-id)]
        (if-some [code (some-str code)]
-         (if-some [id (some-str id)]
+         (if-some [id (some-id id)]
            (sql/update! db :confirmations
                         {:req-id request-id}
                         {:id id :code code}

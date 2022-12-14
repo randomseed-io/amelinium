@@ -12,6 +12,7 @@
             [clojure.string               :as             str]
             [tick.core                    :as               t]
             [hato.client                  :as              hc]
+            [phone-number.core            :as           phone]
             [amelinium.db                 :as              db]
             [amelinium.logging            :as             log]
             [amelinium.system             :as          system]
@@ -156,14 +157,20 @@
 
 ;; SMS sending
 
+(defn- some-phone
+  [id]
+  (if (phone/native? id)
+    (phone/format id :phone-number.format/e164)
+    (some-str id)))
+
 (defn sendsms
   [^TwilioControl ctrl to body]
-  (p/request ctrl {:Body (str body) :To (str to)}))
+  (p/request ctrl {:Body (str body) :To (some-phone to)}))
 
 (defn sendsms-async
   [^TwilioControl ctrl respond raise to body]
   (p/request ctrl {:async? true}
-             {:Body (str body) :To (str to)}
+             {:Body (str body) :To (some-phone to)}
              respond raise))
 
 ;; Initialization helpers
