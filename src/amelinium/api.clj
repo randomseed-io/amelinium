@@ -937,7 +937,7 @@
 
 (defmacro add-body
   "Adds response body to a request map `req` under its key `:response/body` using
-  `clojure.core/assoc`. The body is a result of evaluating expressions passed as
+  `qassoc`. The body is a result of evaluating expressions passed as
   additional arguments (`body`). Returns updated `req`. Assumes that `req` is always
   a map."
   [req & body]
@@ -955,14 +955,14 @@
   `(map/qupdate ~req :response/body ~f ~@args))
 
 (defmacro assoc-body
-  "Adds keys with associated values to `:response/body` map of the `req` using built-in
-  function `clojure.core/assoc`. If any key argument is a literal identifier (keyword
-  or symbol), a character, or a literal string, it will be converted to a keyword
-  literal and placed as an `assoc` argument. Otherwise it will be left as is and
-  wrapped into a call to `io.randomseed.utils/some-keyword` to ensure the result is a
-  keyword run-time. Missing last value, if any, will be padded with `nil`. If there
-  is no body or the body is empty, it will initialize it with a map expression,
-  otherwise it will use `assoc`. Assumes that `req` is always a map."
+  "Adds keys with associated values to `:response/body` map of the `req` using
+  `qassoc`. If any key argument is a literal identifier (keyword or symbol), a
+  character, or a literal string, it will be converted to a keyword literal and
+  placed as `qassoc` argument. Otherwise it will be left as is and wrapped into a
+  call to `io.randomseed.utils/some-keyword` to ensure the result is a keyword
+  run-time. Missing last value, if any, will be padded with `nil`. If there is no
+  body or the body is empty, it will initialize it with a map expression, otherwise
+  it will use `assoc`. Assumes that `req` is always a map."
   ([req k v]
    (let [k (if (or (ident? k) (string? k) (char? k))
              (some-keyword k)
@@ -995,8 +995,8 @@
 
 (defmacro add-status
   "Adds response status to a request map `req` under its key `:response/status` using
-  `clojure.core/assoc`. The status is a result of evaluating expressions passed as
-  additional arguments. Returns updated `req`. Assumes that `req` is always a map."
+  `qassoc`. The status is a result of evaluating expressions passed as additional
+  arguments. Returns updated `req`. Assumes that `req` is always a map."
   [req & body]
   (if (and (seq? body) (> (count body) 1))
     `(qassoc ~req :response/status (do ~@body))
@@ -1009,12 +1009,12 @@
 
 (defmacro add-header
   "Adds a header `header` to `:response/headers` map of the `req` using built-in
-  function `clojure.core/assoc`. If a header name argument is a literal
-  identifier (keyword or symbol), a character, a number, or a literal string, it will
-  be converted to a string literal and placed as an `assoc` argument. Otherwise it
-  will be left as is and wrapped into a call to `io.randomseed.utils/some-str` to
-  ensure the result is a string run-time. All arguments of the body are used to
-  calculate a value of the header. Assumes that `req` is always a map."
+  function `qassoc`. If a header name argument is a literal identifier (keyword or
+  symbol), a character, a number, or a literal string, it will be converted to a
+  string literal and placed as `qassoc` argument. Otherwise it will be left as is and
+  wrapped into a call to `io.randomseed.utils/some-str` to ensure the result is a
+  string run-time. All arguments of the body are used to calculate a value of the
+  header. Assumes that `req` is always a map."
   [req header-name & body]
   (let [header-name (if (or (ident?  header-name)
                             (string? header-name)
@@ -1031,12 +1031,12 @@
 
 (defmacro add-headers
   "Adds headers with associated values to `:response/headers` map of the `req` using
-  built-in function `clojure.core/assoc`. If any header name argument is a literal
-  identifier (keyword or symbol), a character, a number, or a literal string, it will
-  be converted to a string literal and placed as an `assoc` argument. Otherwise it
-  will be left as is and wrapped into a call to `io.randomseed.utils/some-str` to
-  ensure the result is a string run-time. Missing header value, if any, will be
-  padded with `nil`."
+  built-in function `qassoc`. If any header name argument is a literal identifier
+  (a keyword or a symbol), a character, a number, or a literal string, it will be
+  converted to a string literal and placed as `qassoc` argument. Otherwise it will be
+  left as is and wrapped into a call to `io.randomseed.utils/some-str` to ensure the
+  result is a string run-time. Missing header value, if any, will be padded with
+  `nil`."
   ([req header-name header-value]
    (let [header-name (if (or (ident?  header-name)
                              (string? header-name)
