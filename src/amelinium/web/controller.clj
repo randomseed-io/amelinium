@@ -39,12 +39,15 @@
   resulting map has, among form data, `:session-id` entry removed (if found) but
   `:ref-uri`, `:page` and other entries kept."
   ([req gmap]
-   (saved-params req gmap nil))
+   (saved-params req gmap nil nil))
   ([req gmap ^Session smap]
+   (saved-params req gmap smap (session/session-key smap)))
+  ([req gmap ^Session smap session-key]
    (if (and gmap (= (get req :uri) (get gmap :uri)))
      (if-some [gmap (valuable (select-keys gmap [:form-params :query-params
                                                  :session-id :ref-uri :page]))]
-       (let [^Session smap     (or (session/of smap) (session/of req))
+       (let [^Session smap     (or (session/of smap)
+                                   (session/of req (or session-key (http/get-route-data req :session-key))))
              ^String sid-field (or (session/id-field smap) "session-id")]
          (if (and (= (session/db-id smap) (get gmap :session-id false)))
            (-> gmap
@@ -63,10 +66,11 @@
 
 (defn inject-goto
   "Injects go-to data (`gmap`) into a request map `req` (affected, form-related keys
-  are: `:form-params`, `:query-params` and `:params`). Form data is merged only if a
-  go-to URI (`:uri` key of `gmap`) matches the URI of a current page. Go-to URI is
-  always injected. When the given `gmap` is broken, it will set `:goto-injected?` to
-  `true` but `:goto-uri` and `:goto` to `false`."
+  are: `:form-params`, `:query-params` and `:params`; affected, header-related key
+  is `referer`). Form data is merged only if a go-to URI (`:uri` key of `gmap`)
+  matches the URI of a current page. Go-to URI is always injected. When the given
+  `gmap` is broken, it will set `:goto-injected?` to `true` but `:goto-uri`
+  and `:goto` to `false`."
   ([req gmap]
    (inject-goto req gmap nil))
   ([req gmap ^Session smap]
@@ -115,17 +119,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions
 
-(defn get-goto
-  "Gets go-to map from a session variable even if the session is not valid."
-  [^Session smap]
-  (session/get-var smap :goto))
-
-(defn get-goto-for-valid
-  "Gets go-to map from session variable if the session is valid (and not expired)."
-  [^Session smap]
-  (if (and smap (session/valid? smap))
-    (get-goto smap)))
-
 (defn populate-goto
   "Gets a go-to data from a session variable if it does not yet exist in the `req`
   context. Works also for the expired session and only if a go-to URI (`:uri` key of
@@ -142,221 +135,136 @@
     (let [smap-ok (session/allow-soft-expired smap)]
       (if (nil? (session/id smap-ok))
         req
-        (inject-goto req (get-goto smap-ok) smap)))
+        (inject-goto req (super/get-goto smap-ok) smap)))
     req))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
 
-(defn auth-user-with-password!
-  "Authentication helper. Used by other controllers. Short-circuits on certain
-  conditions and may emit a redirect or render a response."
-  [req user-email password sess route-data lang]
-  (let [req (super/auth-user-with-password! req user-email password sess route-data)]
-    (if (web/response? req)
-      req
-      (case (get req :response/status)
-        :auth/ok            (language/force req (or lang (web/pick-language-str req)))
-        :auth/locked        (common/move-to req (get route-data :auth/locked        :login/account-locked))
-        :auth/soft-locked   (common/move-to req (get route-data :auth/soft-locked   :login/account-soft-locked))
-        :auth/bad-password  (common/move-to req (get route-data :auth/bad-password  :login/bad-password))
-        :auth/session-error (common/go-to   req (get route-data :auth/session-error :login/session-error))
-        (common/go-to req (get route-data :auth/error :login/error))))))
-
-(defn authenticate!
-  "Logs user in when user e-mail and password are given, or checks if the session is
-  valid to serve a current page.
-
-  Takes a request map and obtains a database connection, a client IP address and an
-  authentication configuration from it. Also gets user's e-mail and a password from a
-  map associated with the `:form-params` key of the `req`. Calls
-  `auth-user-with-password!` to get the result or perform a redirect if the
-  authentication was not successful.
-
-  If there is no e-mail nor password given (the value is `nil`, `false` or an empty
-  string) then the authentication is not performed but instead the validity of a
-  session is tested. If the session is invalid a redirect to the login page is
-  performed; the destination URL is obtained by looking up the route data key
-  `:auth/login` and taking a route name associated with it, or by visiting an URL
-  associated with the `:login` route name (as default, when the previous lookup was
-  not successful). If the destination path is parameterized with a language, the
-  redirect will set this path parameter to a value obtained by calling the
-  `web/pick-language-str`, using language detection chain identified by the `:user`
-  key. The same language will be passed to the `auth-user-with-password!` call.
-
-  If the session is valid then the given request map is returned with the
-  `:authenticated!` key set to `true`."
-  [req]
-  (let [form-params        (get req :form-params)
-        ^String user-email (some-str (get form-params "login"))
-        ^String password   (if user-email (some-str (get form-params "password")))
-        ^Session sess      (session/of req)
-        lang               (delay (web/pick-language-str req :user))
-        route-data         (delay (http/get-route-data req))
-        valid-session?     (delay (session/valid? sess))]
-    (cond
-      password          (auth-user-with-password! req user-email password sess @route-data @lang)
-      @valid-session?   (if (some? (language/from-path req))
-                          ;; Render the contents in a language specified by the current path.
-                          req
-                          ;; Redirect to a proper language version of this very page.
-                          (web/move-to req (or (get @route-data :name) (get req :uri)) @lang))
-      :invalid-session! (web/move-to req (or (get @route-data :auth/login) :auth/login) @lang))))
-
-(defn login!
-  "Prepares response data to be displayed on a login page."
-  [req]
-  (let [^Session sess (session/of req)
-        app-data      (get req :app/data web/empty-lazy-map)
-        rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))]
-    (qassoc req :app/data (qassoc app-data :lock-remains rem-mins))))
-
-(defn prolong!
-  "Prepares response data to be displayed on a prolongation page."
-  [req]
-  (let [^Session sess (session/of req)]
-    (cond
-
-      (and (session/soft-expired? sess) (some? (get-goto sess)))
-      (let [app-data      (get req :app/data web/empty-lazy-map)
-            sess-key      (or (session/session-key sess) :session)
-            ^Session sess (session/allow-soft-expired sess)
-            rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))]
-        (qassoc req
-                sess-key  (qassoc sess :prolonged? true)
-                :app/data (qassoc app-data :lock-remains rem-mins)))
-
-      (and sess (session/hard-expired? sess))
-      (web/move-to req (or (http/get-route-data req :auth/session-expired)
-                           :login/session-expired))
-
-      :bad-prolongation
-      (web/move-to req (or (http/get-route-data req :auth/session-error)
-                           :login/session-error)))))
-
 (defn prep-request!
   "Prepares a request before any web controller is called."
-  [req]
-  (let [req           (qassoc req :app/data-required [] :app/data web/empty-lazy-map)
-        ^Session sess (session/not-empty-of req)
-        route-data    (http/get-route-data req)
-        auth-state    (delay (common/login-auth-state req :login-page? :auth-page?))
-        login-data?   (delay (login-data? req))
-        auth-db       (delay (auth/db req))]
+  ([req] (prep-request! req nil))
+  ([req session-key]
+   (let [req           (qassoc req :app/data-required [] :app/data web/empty-lazy-map)
+         route-data    (http/get-route-data req)
+         ^Session sess (session/not-empty-of req (or session-key (get route-data :session-key)))
+         auth-state    (delay (common/login-auth-state req :login-page? :auth-page?))
+         login-data?   (delay (login-data? req))
+         auth-db       (delay (auth/db req))]
 
-    (cond
+     (cond
 
-      ;; Request is invalid.
+       ;; Request is invalid.
 
-      (not (get req :validators/params-valid?))
-      (web/render-bad-params req nil ["error" "bad-params"] "error")
+       (not (get req :validators/params-valid?))
+       (web/render-bad-params req nil ["error" "bad-params"] "error")
 
-      ;; There is no real session. Short-circuit.
+       ;; There is no real session. Short-circuit.
 
-      (not sess)
-      (-> req (cleanup-req @auth-state))
+       (not sess)
+       (-> req (cleanup-req @auth-state))
 
-      ;; Account is manually hard-locked.
+       ;; Account is manually hard-locked.
 
-      (super/account-locked? req sess @auth-db)
-      (let [user-id  (session/user-id    sess)
-            email    (session/user-email sess)
-            ip-addr  (get req :remote-ip/str)
-            for-user (log/for-user user-id email ip-addr)
-            for-mail (log/for-user nil email ip-addr)]
-        (log/wrn "Hard-locked account access attempt" for-user)
-        (common/oplog req
-                      :user-id user-id
-                      :op      :access-denied
-                      :level   :warning
-                      :msg     (str "Permanent lock " for-mail))
-        (web/go-to req (or (get route-data :auth/account-locked) :login/account-locked)))
+       (super/account-locked? req sess @auth-db)
+       (let [user-id  (session/user-id    sess)
+             email    (session/user-email sess)
+             ip-addr  (get req :remote-ip/str)
+             for-user (log/for-user user-id email ip-addr)
+             for-mail (log/for-user nil email ip-addr)]
+         (log/wrn "Hard-locked account access attempt" for-user)
+         (common/oplog req
+                       :user-id user-id
+                       :op      :access-denied
+                       :level   :warning
+                       :msg     (str "Permanent lock " for-mail))
+         (web/go-to req (or (get route-data :auth/account-locked) :login/account-locked)))
 
-      ;; Session expired and the time for prolongation has passed.
+       ;; Session expired and the time for prolongation has passed.
 
-      (super/hard-expiry? req sess route-data)
-      (let [user-id  (session/user-id    sess)
-            email    (session/user-email sess)
-            ip-addr  (get req :remote-ip/str)
-            for-user (log/for-user user-id email ip-addr)
-            for-mail (log/for-user nil email ip-addr)]
-        (log/msg "Session expired (hard)" for-user)
-        (common/oplog req
-                      :user-id user-id
-                      :op      :session
-                      :ok?     false
-                      :msg     (str "Hard-expired " for-mail))
-        (web/go-to req (or (get route-data :auth/session-expired) :login/session-expired)))
+       (super/hard-expiry? req sess route-data)
+       (let [user-id  (session/user-id    sess)
+             email    (session/user-email sess)
+             ip-addr  (get req :remote-ip/str)
+             for-user (log/for-user user-id email ip-addr)
+             for-mail (log/for-user nil email ip-addr)]
+         (log/msg "Session expired (hard)" for-user)
+         (common/oplog req
+                       :user-id user-id
+                       :op      :session
+                       :ok?     false
+                       :msg     (str "Hard-expired " for-mail))
+         (web/go-to req (or (get route-data :auth/session-expired) :login/session-expired)))
 
-      ;; Session expired and we are not reaching an authentication page nor a login page.
-      ;; User can re-validate session using a login page.
-      ;; We have to preserve form data and original, destination URI in a session variable.
+       ;; Session expired and we are not reaching an authentication page nor a login page.
+       ;; User can re-validate session using a login page.
+       ;; We have to preserve form data and original, destination URI in a session variable.
 
-      (super/prolongation? sess @auth-state @login-data?)
-      (let [req           (cleanup-req req @auth-state)
-            ^Session sess (session/allow-soft-expired sess)
-            session-field (or (session/id-field sess) "session-id")
-            req-to-save   (common/remove-form-params req session-field)]
-        (session/put-var! sess
-                          :goto {:ts           (t/now)
-                                 :uri          (get req :uri)
-                                 :ref-uri      (some-str (get (get req :headers) "referer"))
-                                 :page         (get route-data :name)
-                                 :session-id   (session/db-id sess)
-                                 :form-params  (get req-to-save :form-params)
-                                 :query-params (get req-to-save :query-params)
-                                 :params       (get req-to-save :params)})
-        (web/move-to req (or (get route-data :auth/prolongate) :login/prolongate)))
+       (super/prolongation? sess @auth-state @login-data?)
+       (let [req           (cleanup-req req @auth-state)
+             ^Session sess (session/allow-soft-expired sess)
+             session-field (or (session/id-field sess) "session-id")
+             req-to-save   (common/remove-form-params req session-field)]
+         (session/put-var! sess
+                           :goto {:ts           (t/now)
+                                  :uri          (get req :uri)
+                                  :ref-uri      (some-str (get (get req :headers) "referer"))
+                                  :page         (get route-data :name)
+                                  :session-id   (session/db-id sess)
+                                  :form-params  (get req-to-save :form-params)
+                                  :query-params (get req-to-save :query-params)
+                                  :params       (get req-to-save :params)})
+         (web/move-to req (or (get route-data :auth/prolongate) :login/prolongate)))
 
-      :----pass
+       :----pass
 
-      (let [valid-session? (session/valid? sess)
-            auth?          (nth @auth-state 1 false)
-            req            (if auth? req (populate-goto req sess))
-            goto-uri       (if auth? nil (get req :goto-uri))
-            req            (cleanup-req req @auth-state)]
+       (let [valid-session? (session/valid? sess)
+             auth?          (nth @auth-state 1 false)
+             req            (if auth? req (populate-goto req sess))
+             goto-uri       (if auth? nil (get req :goto-uri))
+             req            (cleanup-req req @auth-state)]
 
-        ;; Session is invalid (or just expired without prolongation).
-        ;; Notice the fact and go with rendering the content.
-        ;; Checking for a valid session is the responsibility of each controller.
+         ;; Session is invalid (or just expired without prolongation).
+         ;; Notice the fact and go with rendering the content.
+         ;; Checking for a valid session is the responsibility of each controller.
 
-        (if (and (not valid-session?) (not (and auth? @login-data?)))
-          (if (session/expired? sess)
-            (let [user-id  (session/user-id sess)
-                  email    (session/user-email sess)
-                  ip-addr  (:remote-ip/str req)
-                  for-user (log/for-user user-id email ip-addr)
-                  for-mail (log/for-user nil email ip-addr)]
-              (log/msg "Session expired" for-user)
-              (common/oplog req
-                            :user-id user-id
-                            :op      :session
-                            :ok?     false
-                            :msg     (str "Expired " for-mail)))
-            (when-some [sess-err (session/error sess)]
-              (common/oplog req
-                            :user-id (session/user-id sess)
-                            :op      :session
-                            :ok?     false
-                            :level   (:severity sess-err)
-                            :msg     (:cause    sess-err "Unknown session error"))
-              (log/log (:severity sess-err :warn) (:cause sess-err "Unknown session error")))))
+         (if (and (not valid-session?) (not (and auth? @login-data?)))
+           (if (session/expired? sess)
+             (let [user-id  (session/user-id sess)
+                   email    (session/user-email sess)
+                   ip-addr  (:remote-ip/str req)
+                   for-user (log/for-user user-id email ip-addr)
+                   for-mail (log/for-user nil email ip-addr)]
+               (log/msg "Session expired" for-user)
+               (common/oplog req
+                             :user-id user-id
+                             :op      :session
+                             :ok?     false
+                             :msg     (str "Expired " for-mail)))
+             (when-some [sess-err (session/error sess)]
+               (common/oplog req
+                             :user-id (session/user-id sess)
+                             :op      :session
+                             :ok?     false
+                             :level   (:severity sess-err)
+                             :msg     (:cause    sess-err "Unknown session error"))
+               (log/log (:severity sess-err :warn) (:cause sess-err "Unknown session error")))))
 
-        ;; Remove goto session variable as we already injected it into a response.
-        ;; Remove goto session variable if it seems broken.
-        ;; Condition: not applicable in prolonging mode.
+         ;; Remove goto session variable as we already injected it into a response.
+         ;; Remove goto session variable if it seems broken.
+         ;; Condition: not applicable in prolonging mode.
 
-        (if goto-uri
-          (if (false? goto-uri)
-            ;; Take care of broken go-to.
-            (do (session/del-var! sess :goto)
-                (web/move-to req (or (get route-data :auth/session-error) :login/session-error)))
-            ;; Remove utilized go-to.
-            (if valid-session?
-              (do (session/del-var! sess :goto)
-                  req)
-              req))
-          req)))))
+         (if goto-uri
+           (if (false? goto-uri)
+             ;; Take care of broken go-to.
+             (do (session/del-var! sess :goto)
+                 (web/move-to req (or (get route-data :auth/session-error) :login/session-error)))
+             ;; Remove utilized go-to.
+             (if valid-session?
+               (do (session/del-var! sess :goto)
+                   req)
+               req))
+           req))))))
 
 (defn render!
   "Renders page after a specific web controller was called. The `:app/view` and
@@ -438,65 +346,67 @@
 
   Please note that if error is detected in a nested structure of parameter's value,
   the whole parameter will be reported as bad."
-  [e respond raise]
-  (let [data  (ex-data e)
-        req   (get data :request)
-        ctype (get data :type)
-        data  (dissoc data :request :response)]
-    (case ctype
+  ([e respond raise]
+   (handle-coercion-error e respond raise nil))
+  ([e respond raise session-key]
+   (let [data  (ex-data e)
+         req   (get data :request)
+         ctype (get data :type)
+         data  (dissoc data :request :response)]
+     (case ctype
 
-      :reitit.coercion/request-coercion
-      (let [goto-page              (if-let [goto (get req :goto)] (get goto :page))
-            orig-from-goto         (if goto-page (http/route-data-param req goto-page))
-            orig-page              (or orig-from-goto (http/get-route-data req :form-errors/page))
-            referer                (if (nil? orig-page) (some-str (get (get req :headers) "referer")))
-            [orig-uri orig-params] (if referer (common/url->uri+params req referer))
-            handling-previous?     (contains? (get req :query-params) "form-errors")]
-        (respond
-         (if (and (or (valuable? orig-page) (valuable? orig-uri) referer)
-                  (not handling-previous?))
-           ;; redirect to a form-submission page allowing user to correct errors
-           ;; transfer form errors using query params or form params (if a session is present)
-           (let [errors        (coercion/map-errors-simple data)
-                 orig-uri      (if orig-uri (some-str orig-uri))
-                 orig-params   (if orig-uri orig-params)
-                 destination   (or orig-page orig-uri)
-                 dest-uri      (if (keyword? destination) (common/page req destination) destination)
-                 dest-uri      (some-str dest-uri)
-                 ^Session smap (session/not-empty-of req)
-                 stored?       (if (and smap (session/valid? smap))
-                                 (session/put-var!
-                                  smap :form-errors
-                                  {:dest   dest-uri
-                                   :errors errors
-                                   :params (->> (keys (get data :transformed))
-                                                (select-keys (get data :value)))}))
-                 error-params  (if stored? "" (coercion/join-errors errors))
-                 joint-params  (qassoc orig-params "form-errors" error-params)]
-             (if dest-uri
-               (common/temporary-redirect req dest-uri nil joint-params)
-               (resp/temporary-redirect
-                (str referer (if (str/includes? referer "?") "&" "?")
-                     (common/query-string-encode joint-params)))))
-           ;; render a separate page describing invalid parameters
-           ;; instead of current page
-           (let [translate-sub (i18n/no-default (common/translator-sub req))]
-             (-> req
-                 (map/assoc-missing :app/data common/empty-lazy-map)
-                 (qassoc
-                  :app/data
-                  (-> (get req :app/data web/empty-lazy-map)
-                      (qassoc :title           (delay (translate-sub :parameters/error))
-                              :coercion/errors (delay (coercion/explain-errors-simple data translate-sub))
-                              :form/errors     (delay {:errors (coercion/map-errors-simple data)
-                                                       :dest   (:uri req)
-                                                       :params (->> (keys (get data :transformed))
-                                                                    (select-keys (get data :value)))}))))
-                 web/render-bad-params)))))
+       :reitit.coercion/request-coercion
+       (let [route-data             (http/get-route-data req)
+             forced-orig-page       (get route-data :form-errors/page)
+             orig-page              (or forced-orig-page (:page (get req :goto)))
+             referer                (if (nil? orig-page) (some-str (get (get req :headers) "referer")))
+             [orig-uri orig-params] (if referer (common/url->uri+params req referer))
+             handling-previous?     (contains? (get req :query-params) "form-errors")]
+         (respond
+          (if (and (or (valuable? orig-page) (valuable? orig-uri) referer)
+                   (not handling-previous?))
+            ;; redirect to a form-submission page allowing user to correct errors
+            ;; transfer form errors using query params or form params (if a session is present)
+            (let [errors        (coercion/map-errors-simple data)
+                  orig-uri      (if orig-uri (some-str orig-uri))
+                  orig-params   (if orig-uri orig-params)
+                  destination   (or orig-page orig-uri)
+                  dest-uri      (if (keyword? destination) (common/page req destination) destination)
+                  dest-uri      (some-str dest-uri)
+                  ^Session smap (session/not-empty-of req (or session-key (get route-data :session-key)))
+                  stored?       (if (and smap (session/valid? smap))
+                                  (session/put-var!
+                                   smap :form-errors
+                                   {:dest   dest-uri
+                                    :errors errors
+                                    :params (->> (keys (get data :transformed))
+                                                 (select-keys (get data :value)))}))
+                  error-params  (if stored? "" (coercion/join-errors errors))
+                  joint-params  (qassoc orig-params "form-errors" error-params)]
+              (if dest-uri
+                (common/temporary-redirect req dest-uri nil joint-params)
+                (resp/temporary-redirect
+                 (str referer (if (str/includes? referer "?") "&" "?")
+                      (common/query-string-encode joint-params)))))
+            ;; render a separate page describing invalid parameters
+            ;; instead of current page
+            (let [translate-sub (i18n/no-default (common/translator-sub req))]
+              (-> req
+                  (map/assoc-missing :app/data common/empty-lazy-map)
+                  (qassoc
+                   :app/data
+                   (-> (get req :app/data web/empty-lazy-map)
+                       (qassoc :title           (delay (translate-sub :parameters/error))
+                               :coercion/errors (delay (coercion/explain-errors-simple data translate-sub))
+                               :form/errors     (delay {:errors (coercion/map-errors-simple data)
+                                                        :dest   (:uri req)
+                                                        :params (->> (keys (get data :transformed))
+                                                                     (select-keys (get data :value)))}))))
+                  web/render-bad-params)))))
 
-      :reitit.coercion/response-coercion
-      (let [error-list (coercion/list-errors-simple data)]
-        (log/err "Response coercion error:" (coercion/join-errors-with-values error-list))
-        (respond (web/render-error req :output/error)))
+       :reitit.coercion/response-coercion
+       (let [error-list (coercion/list-errors-simple data)]
+         (log/err "Response coercion error:" (coercion/join-errors-with-values error-list))
+         (respond (web/render-error req :output/error)))
 
-      (raise e))))
+       (raise e)))))

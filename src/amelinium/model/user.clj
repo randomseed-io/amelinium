@@ -51,28 +51,28 @@
   "Creates user data record by getting values from the given authentication settings
   and parameters map. If `:password` parameter is present it will make JSON password
   suite."
-  [auth-settings params]
-  (let [email         (some-str (or (get params :user/email) (get params :login) (get params :email)))
-        phone         (or (get params :user/phone) (get params :phone))
-        password      (some-str (or (get params :user/password) (get params :password)))
-        account-type  (or (get params :user/account-type) (get params :account-type))
-        account-type  (if (keyword? account-type) account-type (some-keyword account-type))
-        account-type  (or account-type (.default-type ^AuthSettings auth-settings))
-        auth-config   (or (get (.types ^AuthSettings auth-settings) account-type)
-                          (.default ^AuthSettings auth-settings))
-        auth-cfrm     (.confirmation ^AuthConfig auth-config)
-        db            (or (.db ^AuthConfig auth-config) (.db ^AuthSettings auth-settings))
-        pwd-chains    (if password (auth/make-password-json password auth-config))
-        pwd-intrinsic (if pwd-chains (.intrinsic ^SuitesJSON pwd-chains))
-        pwd-shared    (if pwd-chains (.shared    ^SuitesJSON pwd-chains))
-        pwd-shared-id (if (and db pwd-shared) (create-or-get-shared-suite-id db pwd-shared))]
+  [^AuthSettings auth-settings params]
+  (let [email                       (some-str (or (get params :user/email) (get params :login) (get params :email)))
+        phone                       (or (get params :user/phone) (get params :phone))
+        password                    (some-str (or (get params :user/password) (get params :password)))
+        account-type                (or (get params :user/account-type) (get params :account-type))
+        account-type                (if (keyword? account-type) account-type (some-keyword account-type))
+        account-type                (or account-type (.default-type auth-settings))
+        ^AuthConfig auth-config     (or (get (.types auth-settings) account-type)
+                                        (.default auth-settings))
+        ^AuthConfirmation auth-cfrm (.confirmation auth-config)
+        db                          (or (.db auth-config) (.db auth-settings))
+        pwd-chains                  (if password (auth/make-password-json password auth-config))
+        ^SuitesJSON pwd-intrinsic   (if pwd-chains (.intrinsic pwd-chains))
+        pwd-shared                  (if pwd-chains (.shared    pwd-chains))
+        pwd-shared-id               (if (and db pwd-shared) (create-or-get-shared-suite-id db pwd-shared))]
     (->UserData email phone (name account-type) auth-config db
                 pwd-intrinsic pwd-shared pwd-shared-id
                 (some-str (or (get params :user/first-name)  (get params :first-name)))
                 (some-str (or (get params :user/middle-name) (get params :middle-name)))
                 (some-str (or (get params :user/last-name)   (get params :last-name)))
-                (or (.expires      ^AuthConfirmation auth-cfrm) auth/confirmation-expires-default)
-                (or (.max-attempts ^AuthConfirmation auth-cfrm) 3))))
+                (or (.expires      auth-cfrm) auth/confirmation-expires-default)
+                (or (.max-attempts auth-cfrm) 3))))
 
 (defn make-user-data-simple
   "Creates simple user data record (only db, phone and email) by getting values from

@@ -1373,7 +1373,7 @@
    (del-user-vars! src :session)))
 
 (defn del-session-vars!
-  "Deletes all session variables which belong to a user."
+  "Deletes all session variables."
   ([^Sessionable src ^Keyword session-key]
    (if-some [^Session smap (p/session src session-key)]
      (if-some [db-sid (db-sid-smap smap)]

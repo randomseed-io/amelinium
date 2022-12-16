@@ -8,30 +8,26 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [potemkin.namespaces                :as              p]
-            [tick.core                          :as              t]
-            [clojure.string                     :as            str]
-            [amelinium.logging                  :as            log]
-            [amelinium.common                   :as         common]
-            [amelinium.common.controller        :as          super]
-            [io.randomseed.utils.map            :as            map]
-            [io.randomseed.utils.map            :refer    [qassoc]]
-            [io.randomseed.utils                :refer        :all]
-            [amelinium.i18n                     :as           i18n]
-            [amelinium.api                      :as            api]
-            [amelinium.auth                     :as           auth]
-            [amelinium.http                     :as           http]
-            [amelinium.http.middleware.session  :as        session]
-            [amelinium.http.middleware.language :as       language]
-            [amelinium.http.middleware.coercion :as       coercion]
-            [amelinium.types.session            :refer        :all])
+  (:require [potemkin.namespaces                :as               p]
+            [tick.core                          :as               t]
+            [clojure.string                     :as             str]
+            [amelinium.logging                  :as             log]
+            [amelinium.common                   :as          common]
+            [amelinium.common.controller        :as           super]
+            [io.randomseed.utils.map            :as             map]
+            [io.randomseed.utils.map            :refer     [qassoc]]
+            [io.randomseed.utils                :refer         :all]
+            [amelinium.i18n                     :as            i18n]
+            [amelinium.api                      :as             api]
+            [amelinium.auth                     :as            auth]
+            [amelinium.http                     :as            http]
+            [amelinium.http.middleware.session  :as         session]
+            [amelinium.http.middleware.coercion :as        coercion]
+            [amelinium.types.session            :refer         :all]
+            [amelinium                          :refer         :all]
+            [puget.printer                      :refer     [cprint]])
 
   (:import [amelinium Session]))
-
-(p/import-vars [amelinium.common.controller
-                check-password lock-remaining-mins
-                account-locked? prolongation? prolongation-auth?
-                regular-auth? hard-expiry? keywordize-params? kw-form-data])
 
 ;; Helpers
 
@@ -57,185 +53,104 @@
     (and (contains? bparams :password)
          (contains? bparams :login))))
 
-(defn auth-user-with-password!
-  "Authentication helper. Used by other controllers. Short-circuits on certain
-  conditions and may render a response. Initial session `sess` will serve as a
-  configuration source to create a new session and inject it into a request map `req`
-  under configured session key."
-  ([req user-email password ^Session sess route-data lang]
-   (auth-user-with-password! req user-email password sess route-data lang false))
-  ([req user-email password ^Session sess route-data lang auth-only-mode]
-   (let [req (super/auth-user-with-password! req user-email password sess route-data auth-only-mode)]
-     (if (api/response? req)
-       req
-       (let [lang   (or lang (common/pick-language req))
-             tr-sub (i18n/no-default (common/translator-sub req lang))]
-         (-> req
-             (language/force lang)
-             (api/body-add-session-status (session/session-key sess) tr-sub)))))))
-
-;; Controllers
-
-(defn authenticate!
-  "Logs user in when user e-mail and password are given, or checks if the session is
-  valid to serve a current page.
-
-  Takes a request map and obtains database connection, client IP address and
-  authentication configuration from it. Also gets a user e-mail and a password from a
-  map associated with the `:body-params` key of the `req`. Calls
-  `auth-user-with-password!` to get a result or a redirect if authentication was not
-  successful.
-
-  If there is no e-mail nor password given (the value is `nil`, `false` or an empty
-  string) then authentication is not performed but instead the validity of a session
-  is tested. If the session is invalid then a redirect to a login page is
-  performed. Its destination URL is obtained via a route name taken from the
-  `:auth/info` key of a route data, or from the `:auth/info` route identifier (as a
-  default fallback).
-
-  If the session is valid then the given request map is returned as is."
-  [req]
-  (let [body-params        (get req :body-params)
-        ^String user-email (some-str (get body-params :login))
-        ^String password   (if user-email (some-str (get body-params :password)))
-        ^Session sess      (session/of req :utoken)
-        route-data         (delay (http/get-route-data req))
-        valid-session?     (delay (session/valid? sess))]
-    (cond
-      password        (auth-user-with-password! req user-email password sess @route-data nil false)
-      @valid-session? req
-      :invalid!       (api/move-to req (get @route-data :auth/info :auth/info)))))
-
-(defn authenticate-only!
-  "Logs user in when user e-mail and password are given.
-
-  Takes a request map and obtains database connection, client IP address and
-  authentication configuration from it. Also gets a user e-mail and a password from a
-  map associated with the `:body-params` key of the `req`. Calls
-  `auth-user-with-password!` to get a result.
-
-  If there is no e-mail nor password given (the value is `nil`, `false` or an empty
-  string) then authentication is not performed."
-  [req]
-  (let [body-params        (get req :body-params)
-        ^String user-email (some-str (get body-params :login))
-        ^String password   (if user-email (some-str (get body-params :password)))
-        ^Session sess      (session/of req :utoken)
-        route-data         (http/get-route-data req)]
-    (auth-user-with-password! req user-email password sess route-data nil true)))
-
-(defn info!
-  "Returns login information."
-  [req]
-  (let [auth-db       (auth/db req)
-        ^Session sess (session/of req :utoken)
-        sess-key      (session/session-key sess)
-        prolonged?    (some? (and (session/expired? sess) (get req :goto-uri)))
-        remaining     (lock-remaining-mins req auth-db (if prolonged? sess) t/now)
-        body          (qassoc (get req :response/body) :lock-remains remaining)]
-    (qassoc req
-            :response/body body
-            sess-key       (delay
-                             (if @prolonged?
-                               (qassoc sess :id (or (session/id sess) (session/err-id sess)) :prolonged? true)
-                               (qassoc sess :prolonged? false))))))
-
 ;; Request preparation handler
 
 (defn prep-request!
   "Prepares a request before any controller is called. Checks if parameters are
   valid (if validators are configured). If there is a session present, checks for its
   validity and tests if an account is locked."
-  [req]
-  (let [^Session sess (session/of req :utoken)
-        auth-state    (delay (common/login-auth-state req :login-page? :auth-page?))
-        auth?         (delay (nth @auth-state 1 false))
-        login-data?   (delay (login-data? req))
-        auth-db       (delay (auth/db req))
-        session-error (session/error sess)
-        authorized?   (get req :user/authorized?)]
+  ([req]
+   (prep-request! req nil))
+  ([req session-key]
+   (let [^Session sess (session/of req (or session-key (http/get-route-data req :session-key)))
+         auth-state    (delay (common/login-auth-state req :login-page? :auth-page?))
+         auth?         (delay (nth @auth-state 1 false))
+         login-data?   (delay (login-data? req))
+         auth-db       (delay (auth/db req))
+         session-error (session/error sess)
+         authorized?   (get req :user/authorized?)]
 
-    (cond
+     (cond
 
-      ;; Authorization failed.
+       ;; Authorization failed.
 
-      (not (or session-error authorized?))
-      (-> req (cleanup-req @auth-state) (api/render-error :auth/access-denied))
+       (not (or session-error authorized?))
+       (-> req (cleanup-req @auth-state) (api/render-error :auth/access-denied))
 
-      ;; There is no session. Short-circuit.
+       ;; There is no session. Short-circuit.
 
-      (session/empty? sess)
-      (-> req (cleanup-req @auth-state))
+       (session/empty? sess)
+       (-> req (cleanup-req @auth-state))
 
-      ;; Account is manually hard-locked.
+       ;; Account is manually hard-locked.
 
-      (account-locked? req sess @auth-db)
-      (let [user-id   (session/id         sess)
-            email     (session/user-email sess)
-            ip-addr   (get req :remote-ip/str)
-            for-user  (log/for-user user-id email ip-addr)
-            for-mail  (log/for-user nil email ip-addr)
-            translate (common/translator req)]
-        (log/wrn "Hard-locked account access attempt" for-user)
-        (api/oplog req
-                   :user-id user-id
-                   :op      :access-denied
-                   :level   :warning
-                   :msg     (str "Permanent lock " for-mail))
-        (api/render-error req :auth/locked))
+       (super/account-locked? req sess @auth-db)
+       (let [user-id   (session/id         sess)
+             email     (session/user-email sess)
+             ip-addr   (get req :remote-ip/str)
+             for-user  (log/for-user user-id email ip-addr)
+             for-mail  (log/for-user nil email ip-addr)
+             translate (common/translator req)]
+         (log/wrn "Hard-locked account access attempt" for-user)
+         (api/oplog req
+                    :user-id user-id
+                    :op      :access-denied
+                    :level   :warning
+                    :msg     (str "Permanent lock " for-mail))
+         (api/render-error req :auth/locked))
 
-      ;; Session is not valid.
+       ;; Session is not valid.
 
-      (and (not (session/valid? sess)) (not (and @auth? @login-data?)))
-      (let [req           (cleanup-req req @auth-state)
-            expired?      (session/expired?   sess)
-            user-id       (session/user-id    sess)
-            email         (session/user-email sess)
-            error-id      (get session-error :id)
-            error-cause   (get session-error :cause)
-            ip-addr       (:remote-ip/str req)
-            for-user      (log/for-user user-id email ip-addr)
-            for-mail      (log/for-user nil email ip-addr)
-            translate-sub (common/translator-sub req)]
+       (and (not (session/valid? sess)) (not (and @auth? @login-data?)))
+       (let [req           (cleanup-req req @auth-state)
+             expired?      (session/expired?   sess)
+             user-id       (session/user-id    sess)
+             email         (session/user-email sess)
+             error-id      (get session-error :id)
+             error-cause   (get session-error :cause)
+             ip-addr       (:remote-ip/str req)
+             for-user      (log/for-user user-id email ip-addr)
+             for-mail      (log/for-user nil email ip-addr)
+             translate-sub (common/translator-sub req)]
 
-        ;; Log the event.
+         ;; Log the event.
 
-        (if expired?
-          ;; Session expired.
-          (do (log/msg "Session expired" for-user)
-              (api/oplog req
-                         :user-id user-id
-                         :op      :session
-                         :ok?     false
-                         :msg     (str "Expired " for-mail)))
-          ;; Session invalid in another way.
-          (when (some? error-id)
-            (api/oplog req
-                       :user-id user-id
-                       :op      :session
-                       :ok?     false
-                       :level   (:severity session-error)
-                       :msg     error-cause)
-            (log/log (:severity session-error :warn) error-cause)))
+         (if expired?
+           ;; Session expired.
+           (do (log/msg "Session expired" for-user)
+               (api/oplog req
+                          :user-id user-id
+                          :op      :session
+                          :ok?     false
+                          :msg     (str "Expired " for-mail)))
+           ;; Session invalid in another way.
+           (when (some? error-id)
+             (api/oplog req
+                        :user-id user-id
+                        :op      :session
+                        :ok?     false
+                        :level   (:severity session-error)
+                        :msg     error-cause)
+             (log/log (:severity session-error :warn) error-cause)))
 
-        ;; Generate a response describing an invalid session.
-        (-> req
-            (api/add-missing-sub-status error-id :session-status :response/body translate-sub)
-            (api/render-error :auth/session-error)))
+         ;; Generate a response describing an invalid session.
+         (-> req
+             (api/add-missing-sub-status error-id :session-status :response/body translate-sub)
+             (api/render-error :auth/session-error)))
 
-      ;; Authorization failed but session error was not handled for some strange reason.
+       ;; Authorization failed but session error was not handled for some strange reason.
 
-      (not authorized?)
-      (-> req (cleanup-req @auth-state) (api/render-error :auth/access-denied))
+       (not authorized?)
+       (-> req (cleanup-req @auth-state) (api/render-error :auth/access-denied))
 
-      :----pass
+       :----pass
 
-      ;; We have a valid session and authorization.
-      ;;
-      ;; Remove login data from the request if we are not authenticating a user.
-      ;; Take care about broken go-to (move to a login page in such case).
+       ;; We have a valid session and authorization.
+       ;;
+       ;; Remove login data from the request if we are not authenticating a user.
+       ;; Take care about broken go-to (move to a login page in such case).
 
-      (cleanup-req req [nil @auth?]))))
+       (cleanup-req req [nil @auth?])))))
 
 ;; Response rendering handlers
 

@@ -129,18 +129,35 @@
         false
         (:uri g)))))
 
+(defn get-goto
+  "Gets go-to map from a session variable even if the session is not valid."
+  [^Session smap]
+  (session/get-var smap :goto))
+
+(defn get-goto-for-valid
+  "Gets go-to map from session variable if the session is valid (and not expired)."
+  [^Session smap]
+  (if (and smap (session/valid? smap))
+    (get-goto smap)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions
 
 (defn auth-user-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
-  conditions and may emit a redirect or set the `:response/status`. The last
+  conditions and may emit a redirect or set the `:response/status`. The last,
   `auth-only-mode` argument, when set to `true` (default is `false` when not given)
   causes session creation and prolongation to be skipped if the authentication is
   successful."
+  ([req user-email password]
+   (auth-user-with-password! req user-email password nil nil false nil))
+  ([req user-email password sess]
+   (auth-user-with-password! req user-email password sess nil false nil))
   ([req user-email password sess route-data]
-   (auth-user-with-password! req user-email password sess route-data false))
+   (auth-user-with-password! req user-email password sess route-data false nil))
   ([req user-email password sess route-data auth-only-mode]
+   (auth-user-with-password! req user-email password sess route-data auth-only-mode nil))
+  ([req user-email password sess route-data auth-only-mode session-key]
    (let [route-data    (or route-data (http/get-route-data req))
          ipaddr        (get req :remote-ip)
          ipplain       (get req :remote-ip/str)
@@ -188,7 +205,9 @@
        :authenticate! (do (log/msg "Login successful" for-user)
                           (oplog true :info "Login OK" for-mail)
                           (user/update-login-ok auth-db user-id ipaddr)
-                          (let [^Session sess (or sess (session/of req))
+                          (let [^Session sess (or sess
+                                                  (session/of req (or session-key
+                                                                      (get route-data :session-key))))
                                 goto-uri      (get-goto-uri req sess)
                                 goto?         (boolean goto-uri)
                                 ^Session sess (if goto?
@@ -230,25 +249,27 @@
   destination URL is obtained via a route name taken from the `:auth/info` key of a
   route data, or from `:login` route identifier (as default). If the session is valid
   then the given request map is returned as-is."
-  [req user-email user-password]
-  (let [^String  user-email    (some-str user-email)
-        ^String  user-password (if user-email (some-str user-password))
-        ^Session sess          (session/of req)
-        route-data             (delay (http/get-route-data req))]
+  ([req user-email user-password]
+   (authenticate! req user-email user-password nil))
+  ([req user-email user-password session-key]
+   (let [route-data             (delay (http/get-route-data req))
+         ^String  user-email    (some-str user-email)
+         ^String  user-password (if user-email (some-str user-password))
+         ^Session sess          (session/of req (or session-key (get @route-data :session-key)))]
 
-    (if user-password
+     (if user-password
 
-      ;; Authenticate using email and password.
-      (auth-user-with-password! req user-email user-password sess @route-data)
+       ;; Authenticate using email and password.
+       (auth-user-with-password! req user-email user-password sess @route-data)
 
-      ;; Check session.
-      (if (session/invalid? sess)
+       ;; Check session.
+       (if (session/invalid? sess)
 
-        ;; Invalid session causes a redirect to a login page.
-        (common/move-to req (get @route-data :auth/info :auth/info))
+         ;; Invalid session causes a redirect to a login page.
+         (common/move-to req (get @route-data :auth/info :auth/info))
 
-        ;; Valid session causes page to be served.
-        req))))
+         ;; Valid session causes page to be served.
+         req)))))
 
 ;; Coercion error handler
 

@@ -38,9 +38,11 @@
             [io.randomseed.utils.map              :refer     [qassoc]]
             [io.randomseed.utils                  :refer         :all])
 
-  (:import [amelinium Session]
-           [lazy_map.core LazyMapEntry LazyMap]
-           [reitit.core Match]))
+  (:import [java.time        Duration]
+           [java.time.format DateTimeFormatter]
+           [amelinium        Session]
+           [lazy_map.core    LazyMapEntry LazyMap]
+           [reitit.core      Match]))
 
 ;; Operations logging
 
@@ -1927,3 +1929,27 @@
   [req]
   (if-some [ua (get (get req :headers) "user-agent")]
     (some? (re-find #"\b(iPhone|iPad|iPod|Android|Windows Phone|webOS|IEMobile|BlackBerry)\b" ua))))
+
+;; Date and time
+
+(defn rfc1123-date-time
+  "Returns a date and time formatted according to the RFC 1123."
+  [t]
+  (when t
+    (some-str
+     (t/format DateTimeFormatter/RFC_1123_DATE_TIME (t/zoned-date-time t)))))
+
+(defn duration-nanos
+  "Calculates the duration in nanoseconds between the time of calling the function (or
+  the given time `begin`) till the given time `end`."
+  ([end]       (when end (.withNanos ^Duration (t/between (t/now) end) 0)))
+  ([begin end] (when end (.withNanos ^Duration (t/between (or begin (t/now)) end) 0))))
+
+(defn retry-in-mins
+  "Calculates minutes of duration on a basis of `Duration` object. Returns an integer
+  number (or `nil` when there was no duration given) which is never less than 1 and
+  always incremented by one. Used to calculate retry times to report them to a user."
+  [duration]
+  (when duration
+    (let [mins (inc (t/minutes duration))]
+      (if (pos-int? mins) mins 1))))
