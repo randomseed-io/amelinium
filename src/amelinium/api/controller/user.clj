@@ -177,7 +177,7 @@
 (defn verify!
   "Finishes identity confirmation verification and sends an e-mail or SMS with a URL to
   complete account registration or identity change."
-  [req {:keys [no-data result reason db id id-type lang translator route-data ]
+  [req {:keys [no-data result reason db id id-type lang translator route-data]
         :as   opts}]
   (let [lang              (or lang       (common/pick-language req :registration) (common/lang-id req))
         tr                (or translator (i18n/no-default (common/translator req lang)))
@@ -275,6 +275,7 @@
              result      (f db id reason)]
          (verify! req {:db      db
                        :id      id
+                       :lang    (common/lang-id req)
                        :id-type id-type
                        :no-data no-data
                        :reason  reason
