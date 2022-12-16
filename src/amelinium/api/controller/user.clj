@@ -82,10 +82,12 @@
      (if (api/response? req)
        req
        (let [lang   (or lang (common/pick-language req))
-             tr-sub (i18n/no-default (common/translator-sub req lang))]
-         (-> req
-             (language/force lang)
-             (api/body-add-session-status (session/session-key sess) tr-sub)))))))
+             tr-sub (i18n/no-default (common/translator-sub req lang))
+             req    (language/force req lang)
+             req    (api/body-add-session-status req (session/session-key sess) tr-sub)]
+         (if (= :auth/ok (get req :response/status))
+           (api/add-status req :session/created)
+           req))))))
 
 ;; Controllers
 
