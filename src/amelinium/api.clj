@@ -909,15 +909,9 @@
                [req smap translate-sub]
                [req session-key translate-sub])}
   ([req]
-   (body-add-session-status req nil))
+   (body-add-session-status req nil nil))
   ([req smap]
-   (let [rstatus (get req :response/status)
-         smap    (if (keyword? smap) (session/of req smap) (session/of smap))]
-     (if (or (= rstatus :auth/session-error)
-             (= rstatus :error/session)
-             (session/error? smap))
-       (add-missing-sub-status req (session-status smap) :session-status :response/body)
-       (body-add-session-id req smap))))
+   (body-add-session-status req smap nil))
   ([req smap translate-sub]
    (let [rstatus (get req :response/status)
          smap    (if (keyword? smap) (session/of req smap) (session/of smap))]
@@ -925,7 +919,11 @@
              (= rstatus :error/session)
              (session/error? smap))
        (add-missing-sub-status req (session-status smap) :session-status :response/body translate-sub)
-       (body-add-session-id req smap)))))
+       (if (= rstatus :auth/ok)
+         (-> req
+             (add-missing-sub-status :session/created :session-status :response/body translate-sub)
+             (body-add-session-id smap))
+         (body-add-session-id smap))))))
 
 (defmacro response
   "Creates a response block. If the given `req` is already a response then it is simply
