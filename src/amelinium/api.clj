@@ -660,7 +660,7 @@
          sub-title-key (keyword sub-ns "title")
          sub-desc-key  (keyword sub-ns "description")]
      (add-missing-sub-status-to-response req out sub-status sub-key main-key
-                                         sub-title-key sub-desc-key :status/see-also nil)))
+                                         sub-title-key sub-desc-key :status/see-also tr-sub)))
   ([req out sub-status sub-key main-key sub-title-key sub-desc-key see-also-key]
    (add-missing-sub-status-to-response req out sub-status sub-key main-key
                                        sub-title-key sub-desc-key see-also-key nil))
