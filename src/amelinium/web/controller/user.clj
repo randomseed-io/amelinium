@@ -131,8 +131,8 @@
        (web/move-to req (or (get route-data :auth/session-error) :login/session-error))))))
 
 (defn create!
-  "Verifies confirmation token against a database and if it matches issues a redirect
-  allowing user to continue with registration."
+  "Verifies confirmation token against a database and if it matches creates the
+  account."
   [req]
   (let [auth-config  (auth/config req)
         db           (auth/db auth-config)

@@ -76,10 +76,12 @@
                            :network-authentication-required "Wymagane uwierzytelnienie sieciowe"
                            :network-read-timeout            "Przekroczono czas odczytu z sieci"
                            :network-connect-timeout         "Przekroczono czas połączenia sieciowego"}
-   :identity              {:ok      "OK"
-                           :updated "Zaktualizowano informację o tożsamości."
+   :identity              {:ok          "OK"
+                           :created     "Utworzono tożsamość."
+                           :updated     "Zaktualizowano informację o tożsamości."
                            :not-updated "Nie dokonano zmian w informacji o tożsamości."}
    :session               {:ok                   "Sesja jest poprawna."
+                           :created              "Utworzono sesję użytkownika."
                            :unknown-id           "Odebrano nieznany identyfikator sesji."
                            :no-session-id        "Brak wymaganego identyfikatora sesji."
                            :malformed-session-id "Identyfikator sesji jest uszkodzony."
@@ -193,6 +195,8 @@
                            :session-id                     :type-should/session-id
                            :language                       :type-should/language
                            :lang                           :type-should/language}
+   :user                  {:created "Utworzono konto użytkownika."
+                           :deleted "Usunięto konto użytkownika."}
    :forms                 {:logging       "Logowanie"
                            :login         "Zaloguj!"
                            :email         :parameter/email
