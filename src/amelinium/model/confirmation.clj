@@ -478,10 +478,11 @@
   If the identity is already confirmed and there is no error (i.e. confirmation has
   not yet expired), it will also return a map with `:confirmed?` set to `true`."
   ([db id code exp-inc reason]
-   (let [reason (or (some-str reason) "creation")
-         id     (some-id id)
-         code   (some-str code)]
-     (if (and id code (pos-int? exp-inc))
+   (let [reason  (or (some-str reason) "creation")
+         id      (some-id id)
+         code    (some-str code)
+         exp-inc (time/minutes exp-inc 1)]
+     (if (and id code)
        (if-some [r (::jdbc/update-count
                     (jdbc/execute-one! db [confirm-code-query exp-inc id code reason]
                                        db/opts-simple-map))]
