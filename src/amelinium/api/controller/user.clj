@@ -33,6 +33,8 @@
   (:import [amelinium Session AuthSettings AuthConfig AuthConfirmation]
            [amelinium UserData Suites SuitesJSON]))
 
+(def one-minute (t/new-duration 1 :minutes))
+
 ;; Helpers
 
 (defn- try-lower-case
@@ -390,3 +392,34 @@
                                 :tpl/phone-verify :verify/sms
                                 :tpl/email-exists :update/exists
                                 :tpl/email-verify :update/verify})))))))))))
+
+;; User creation
+
+(defn create!
+  "Verifies confirmation code against a database, and if it matches, creates a new
+  user."
+  [req]
+  (api/response
+   req
+   (let [auth-config  (auth/config req)
+         db           (auth/db auth-config)
+         all-params   (get req :parameters)
+         params       (get all-params :form)
+         code         (get params :code)
+         login        (or (get params :user/email) (get params :login) (get params :email))
+         confirmation (confirmation/establish db login code one-minute "creation")
+         confirmed?   (get confirmation :confirmed?)
+         creation     (if confirmed? (user/create-with-token-or-code db login nil code))
+         created?     (if creation (get creation :created?))
+         bad-result?  (or (nil? confirmation) (and confirmed? (nil? creation)))]
+     (cond
+       bad-result?      (api/render-error req :verify/bad-result)
+       created?         (let [login (or (some-str login) (get creation :email))]
+                          (confirmation/delete db login)
+                          (-> req
+                              (api/add-body {:user/email login :user/login login})
+                              (api/add-status :identity/created)))
+       (not confirmed?) (api/render-error req (:errors confirmation))
+       (not created?)   (api/render-error req (:errors creation))
+       :error!          (api/render-error req (or (not-empty (:errors confirmation))
+                                                  (not-empty (:errors creation))))))))
