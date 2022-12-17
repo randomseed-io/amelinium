@@ -395,8 +395,8 @@
 ;; User creation
 
 (defn create!
-  "Verifies confirmation code against a database, and if it matches, creates a new
-  user."
+  "Verifies confirmation code or token against a database, and if it matches, creates a
+  new user."
   [req]
   (api/response
    req
@@ -405,10 +405,11 @@
          all-params   (get req :parameters)
          params       (get all-params :form)
          code         (get params :code)
+         token        (get params :token)
          login        (or (get params :user/email) (get params :login) (get params :email))
-         confirmation (confirmation/establish db login code one-minute "creation")
+         confirmation (confirmation/establish db login code token one-minute "creation")
          confirmed?   (get confirmation :confirmed?)
-         creation     (if confirmed? (user/create-with-token-or-code db login nil code))
+         creation     (if confirmed? (user/create-with-token-or-code db login token code))
          created?     (if creation (get creation :created?))
          bad-result?  (or (nil? confirmation) (and confirmed? (nil? creation)))]
      (cond
@@ -417,7 +418,7 @@
                           (confirmation/delete db login)
                           (-> req
                               (api/add-body {:user/email login :user/login login})
-                              (api/add-status :identity/created)))
+                              (api/add-status :user/created)))
        (not confirmed?) (api/render-error req (:errors confirmation))
        (not created?)   (api/render-error req (:errors creation))
        :error!          (api/render-error req (or (not-empty (:errors confirmation))
