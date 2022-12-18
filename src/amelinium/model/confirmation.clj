@@ -157,6 +157,18 @@
 (def ^:const phone-confirmation-query-without-attempt
   (gen-confirmation-query :phone false))
 
+(defn- parse-id-type
+  [id id-type]
+  (if id-type
+    (if (ident? id-type)
+      (name id-type)
+      (if-some [id-type (some-str id-type)]
+        (name (symbol id-type))
+        "email"))
+    (if-some [id-type (if id (common/guess-identity-type id))]
+      (name id-type)
+      "email")))
+
 (defn- gen-full-confirmation-core
   "Creates a confirmation code for the given identity (an e-mail address or a
   phone).
