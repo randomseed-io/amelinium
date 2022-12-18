@@ -384,7 +384,7 @@
   the `Sessionable` protocol and can be converted to a session. Optional
   `session-key` can be given when passing a request map."
   (^SessionControl [^Sessionable src] (p/control src))
-  (^SessionControl [^Sessionable src ^Keyword session-key] (p/control src)))
+  (^SessionControl [^Sessionable src ^Keyword session-key] (p/control src session-key)))
 
 (defn config
   "Returns a `SessionConfig` object from the given source and optional session key. The
