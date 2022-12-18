@@ -178,8 +178,8 @@
      :url/update-email))
 
 (defn verify!
-  "Finishes identity confirmation verification and sends an e-mail or SMS with a URL to
-  complete account registration or identity change."
+  "Performs the identity confirmation verification by sending an e-mail or SMS with a
+  URL to complete account registration or identity change."
   [req {:keys [no-data result reason db id id-type lang translator route-data]
         :as   opts}]
   (let [lang              (or lang       (common/pick-language req :registration) (common/lang-id req))
