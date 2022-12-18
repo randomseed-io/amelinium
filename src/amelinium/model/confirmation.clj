@@ -18,6 +18,7 @@
             [buddy.core.codecs        :as        codecs]
             [clj-uuid                 :as          uuid]
             [amelinium.db             :as            db]
+            [amelinium.common         :as        common]
             [phone-number.core        :as         phone]
             [io.randomseed.utils.time :as          time]
             [io.randomseed.utils.ip   :as            ip]
@@ -42,7 +43,7 @@
   []
   (-> (random-uuid) uuid/to-byte-array hash/md5 codecs/bytes->hex))
 
-(defn some-id
+(defn identity->str
   [id]
   (if (phone/native? id)
     (phone/format id :phone-number.format/e164)
@@ -51,7 +52,7 @@
 (defn phone-exists?
   [db phone]
   (if db
-    (if-some [phone (some-id phone)]
+    (if-some [phone (identity->str phone)]
       (-> (jdbc/execute-one! db [phone-exists-query phone] db/opts-simple-vec)
           first some?))))
 
@@ -404,7 +405,7 @@
      (or (process-errors (jdbc/execute-one! db qargs db/opts-simple-map) should-be-confirmed?)
          verify-bad-token-set)))
   ([db id code reason should-be-confirmed?]
-   (let [id     (some-id id)
+   (let [id     (identity->str id)
          reason (or (some-str reason) "creation")
          qargs  (cond code          [report-errors-code-query      reason id code]
                       (false? code) [report-errors-simple-id-query reason id]
@@ -422,7 +423,7 @@
   ([errs id src-id email-id phone-id]
    (if errs
      (if (contains? errs src-id)
-       (if-some [id (some-id id)]
+       (if-some [id (identity->str id)]
          (if-some [dst-id (cond (str/index-of id \@ 1) email-id
                                 (= (first id) \+)      phone-id)]
            (conj (disj errs src-id) dst-id)
@@ -539,7 +540,7 @@
 (defn- decrease-attempts-core
   [db id reason]
   (if db
-    (if-some [id (some-id id)]
+    (if-some [id (identity->str id)]
       (let [reason (or (some-str reason) "creation")]
         (if-some [r (jdbc/execute-one! db [decrease-attempts-query id reason] db/opts-simple-map)]
           (-> r
@@ -584,7 +585,7 @@
    (if db
      (if-some [request-id (some-str request-id)]
        (if-some [code (some-str code)]
-         (if-some [id (some-id id)]
+         (if-some [id (identity->str id)]
            (sql/update! db :confirmations
                         {:req-id request-id}
                         {:id id :code code}

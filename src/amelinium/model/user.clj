@@ -565,7 +565,7 @@
 (defn update-phone-with-code
   [db phone code]
   (let [code  (some-str code)
-        phone (some-str phone)]
+        phone (confirmation/identity->str phone)]
     (if (and code phone)
       (if-some [r (jdbc/execute-one! db [update-phone-with-code-query code phone] db/opts-simple-map)]
         (qassoc r :updated? true :uid (db/as-uuid (get r :uid)) :identity (get r :phone))
