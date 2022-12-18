@@ -340,10 +340,10 @@
         (api/add-body req (common/pick-params props :user [:uid :email :phone]))
         (api/render-error req :verify/bad-result))))))
 
-(defn edit-identity!
-  "Change user's identity (e-mail or phone)."
+(defn identity-edit!
+  "Initiates process of changing user's identity (e-mail or phone)."
   ([req]
-   (edit-identity! req nil))
+   (identity-edit! req nil))
   ([req session-key]
    (api/response
     req
