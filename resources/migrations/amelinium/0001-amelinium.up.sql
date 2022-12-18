@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS confirmations (
   code              CHAR(16) NULL,
   token             CHAR(128) NULL,
   reason            ENUM('creation', 'recovery', 'unlock', 'change') NOT NULL,
+  id_type           ENUM('email', 'phone') NULL,
   attempts          SMALLINT UNSIGNED NOT NULL DEFAULT 0,
   created           TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(),
   expires           TIMESTAMP(6) NOT NULL,
