@@ -404,7 +404,6 @@
   ([req]
    (identity-create! req super/invalidate-user-sessions!))
   ([req session-invalidator]
-   (println (session/control req :utoken))
    (api/response
     req
     (let [form-params  (get (get req :parameters) :form)
