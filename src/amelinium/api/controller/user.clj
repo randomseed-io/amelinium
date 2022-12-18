@@ -392,6 +392,12 @@
                                 :tpl/email-exists :update/exists
                                 :tpl/email-verify :update/verify})))))))))))
 
+(defn guess-identity-type
+  [db-result]
+  (if db-result
+    (or (get db-result :id-type)
+        (common/guess-identity-type (get db-result :identity)))))
+
 ;; User creation
 
 (defn create!
