@@ -613,31 +613,28 @@
    (common/render resp/created))
   ([req]
    (if-some [resp (common/created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created nil nil nil nil nil))))
+     (qassoc resp :body (render req :ok/created nil nil nil nil))))
   ([req data]
    (if-some [resp (common/created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created data nil nil nil nil))))
+     (qassoc resp :body (render req :ok/created data nil nil nil))))
   ([req data view]
    (if-some [resp (common/created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created data view nil nil nil))))
+     (qassoc resp :body (render req :ok/created data view nil nil))))
   ([req data view layout]
    (if-some [resp (common/created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created data view layout nil nil))))
+     (qassoc resp :body (render req :ok/created data view layout nil))))
   ([req data view layout lang]
    (if-some [resp (common/created req (get req :response/location) lang)]
-     (qassoc resp :body (render req :ok/created data view layout lang nil))))
-  ([req data view layout lang smap]
-   (if-some [resp (common/created req (get req :response/location) lang)]
-     (qassoc resp :body (render req :ok/created data view layout lang smap))))
-  ([req data view layout lang smap name-or-path]
+     (qassoc resp :body (render req :ok/created data view layout lang))))
+  ([req data view layout lang name-or-path]
    (if-some [resp (common/created req name-or-path lang)]
-     (qassoc resp :body (render req :ok/created data view layout lang smap))))
-  ([req data view layout lang smap name-or-path params]
+     (qassoc resp :body (render req :ok/created data view layout lang))))
+  ([req data view layout lang name-or-path params]
    (if-some [resp (common/created req name-or-path lang params)]
-     (qassoc resp :body (render req :ok/created data view layout lang smap))))
-  ([req data view layout lang smap name-or-path params query-params]
+     (qassoc resp :body (render req :ok/created data view layout lang))))
+  ([req data view layout lang name-or-path params query-params]
    (if-some [resp (common/created req name-or-path lang params query-params)]
-     (qassoc resp :body (render req :ok/created data view layout lang smap)))))
+     (qassoc resp :body (render req :ok/created data view layout lang)))))
 
 (defn localized-render-created
   "Renders 201 response with a redirect (possibly localized if a destination path is
@@ -649,31 +646,28 @@
    (common/render resp/created))
   ([req]
    (if-some [resp (common/localized-created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created nil nil nil nil nil))))
+     (qassoc resp :body (render req :ok/created nil nil nil nil))))
   ([req data]
    (if-some [resp (common/localized-created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created data nil nil nil nil))))
+     (qassoc resp :body (render req :ok/created data nil nil nil))))
   ([req data view]
    (if-some [resp (common/localized-created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created data view nil nil nil))))
+     (qassoc resp :body (render req :ok/created data view nil nil))))
   ([req data view layout]
    (if-some [resp (common/localized-created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created data view layout nil nil))))
+     (qassoc resp :body (render req :ok/created data view layout nil))))
   ([req data view layout lang]
    (if-some [resp (common/localized-created req (get req :response/location) lang)]
-     (qassoc resp :body (render req :ok/created data view layout lang nil))))
-  ([req data view layout lang smap]
-   (if-some [resp (common/localized-created req (get req :response/location) lang)]
-     (qassoc resp :body (render req :ok/created data view layout lang smap))))
-  ([req data view layout lang smap name-or-path]
+     (qassoc resp :body (render req :ok/created data view layout lang))))
+  ([req data view layout lang name-or-path]
    (if-some [resp (common/localized-created req name-or-path lang)]
-     (qassoc resp :body (render req :ok/created data view layout lang smap))))
-  ([req data view layout lang smap name-or-path params]
+     (qassoc resp :body (render req :ok/created data view layout lang))))
+  ([req data view layout lang name-or-path params]
    (if-some [resp (common/localized-created req name-or-path lang params)]
-     (qassoc resp :body (render req :ok/created data view layout lang smap))))
-  ([req data view layout lang smap name-or-path params query-params]
+     (qassoc resp :body (render req :ok/created data view layout lang))))
+  ([req data view layout lang name-or-path params query-params]
    (if-some [resp (common/localized-created req name-or-path lang params query-params)]
-     (qassoc resp :body (render req :ok/created data view layout lang smap)))))
+     (qassoc resp :body (render req :ok/created data view layout lang)))))
 
 ;; Responses without bodies
 
