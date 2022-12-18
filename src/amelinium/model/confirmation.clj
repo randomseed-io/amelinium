@@ -84,9 +84,9 @@
   a NEW USER."
   [id-column dec-att?]
   (str-squeeze-spc
-   "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,user_id,user_uid,"
+   "INSERT INTO confirmations(id,code,token,reason,id_type,expires,confirmed,user_id,user_uid,"
    "attempts,account_type,first_name,middle_name,last_name,password,password_suite_id)"
-   (str "SELECT ?,?,?,?,?,0,"
+   (str "SELECT ?,?,?,?,?,?,0,"
         " (SELECT users.id  FROM users WHERE users." (or (some-str id-column) "email") " = ?),"
         " (SELECT users.uid FROM users WHERE users." (or (some-str id-column) "email") " = ?),"
         "?,?,?,?,?,?,?")
@@ -96,6 +96,8 @@
    "attempts          = IF(NOW()>expires, VALUE(attempts),"    (str (calc-attempts-query dec-att?) "),")
    "code              = IF(NOW()>expires, VALUE(code),         code),"
    "token             = IF(NOW()>expires, VALUE(token),        token),"
+   "reason            = IF(NOW()>expires, VALUE(reason),       reason),"
+   "id_type           = IF(NOW()>expires, VALUE(id_type),      id_type),"
    "created           = IF(NOW()>expires, NOW(),               created),"
    "confirmed         = IF(NOW()>expires, VALUE(confirmed),    confirmed),"
    "account_type      = IF(NOW()>expires, VALUE(account_type), account_type),"
@@ -106,7 +108,7 @@
    "password_suite_id = IF(NOW()>expires, VALUE(password_suite_id), password_suite_id),"
    "req_id            = IF(NOW()>expires, NULL,                req_id),"
    "expires           = IF(NOW()>expires, VALUE(expires),      expires)"
-   "RETURNING user_id,user_uid,account_type,attempts,code,token,created,confirmed,expires"))
+   "RETURNING user_id,user_uid,account_type,attempts,code,token,id_type,created,confirmed,expires"))
 
 (def ^:const new-email-confirmation-query
   (gen-full-confirmation-query :email true))
@@ -126,8 +128,8 @@
   database."
   [id-column dec-att?]
   (str-squeeze-spc
-   "INSERT INTO confirmations(id,code,token,reason,expires,confirmed,attempts,requester_id,user_id,user_uid)"
-   (str "SELECT ?,?,?,?,?,0,?,?,"
+   "INSERT INTO confirmations(id,code,token,reason,id_type,expires,confirmed,attempts,requester_id,user_id,user_uid)"
+   (str "SELECT ?,?,?,?,?,?,0,?,?,"
         "(SELECT users.id  FROM users WHERE users." (or (some-str id-column) "email") " = ?),"
         "(SELECT users.uid FROM users WHERE users." (or (some-str id-column) "email") " = ?)"
         " FROM users"
@@ -139,11 +141,13 @@
    "attempts     = IF(NOW()>expires, VALUE(attempts),"    (str (calc-attempts-query dec-att?) "),")
    "code         = IF(NOW()>expires, VALUE(code),         code),"
    "token        = IF(NOW()>expires, VALUE(token),        token),"
+   "reason       = IF(NOW()>expires, VALUE(reason),       reason),"
+   "id_type      = IF(NOW()>expires, VALUE(id_type),      id_type),"
    "created      = IF(NOW()>expires, NOW(),               confirmations.created),"
    "confirmed    = IF(NOW()>expires, VALUE(confirmed),    confirmed),"
    "req_id       = IF(NOW()>expires, NULL,                req_id),"
    "expires      = IF(NOW()>expires, VALUE(expires),      expires)"
-   "RETURNING requester_id,user_id,user_uid,attempts,code,token,created,confirmed,expires"))
+   "RETURNING requester_id,user_id,user_uid,attempts,code,token,id_type,created,confirmed,expires"))
 
 (def ^:const email-confirmation-query
   (gen-confirmation-query :email true))
@@ -181,19 +185,22 @@
   existing user, `:id` set to the given identity (as a string) and `:reason` set to
   the given reason (as a keyword or `nil` if not given)."
   ([db query id exp udata]
-   (gen-full-confirmation-core db query id exp udata (get udata :reason)))
-  ([db query id exp udata reason]
+   (gen-full-confirmation-core db query id exp udata nil (get udata :reason)))
+  ([db query id exp udata id-type]
+   (gen-full-confirmation-core db query id exp udata id-type (get udata :reason)))
+  ([db query id exp udata id-type reason]
    (if db
      (if-some [id (some-str id)]
-       (let [code   (if exp (gen-code))
-             token  (if exp (gen-token))
-             reason (or (some-str reason) "creation")
-             exp    (or exp ten-minutes)
-             exp    (if (t/duration? exp) (t/hence exp) exp)
-             udata  (mapv #(get udata %) [:max-attempts :account-type
-                                          :first-name :middle-name :last-name
-                                          :password :password-suite-id])
-             qargs  (list* query id code token reason exp id id udata)]
+       (let [code    (if exp (gen-code))
+             token   (if exp (gen-token))
+             reason  (or (some-str reason) "creation")
+             exp     (or exp ten-minutes)
+             exp     (if (t/duration? exp) (t/hence exp) exp)
+             udata   (mapv #(get udata %) [:max-attempts :account-type
+                                           :first-name :middle-name :last-name
+                                           :password :password-suite-id])
+             id-type (parse-id-type id id-type)
+             qargs   (list* query id code token reason id-type exp id id udata)]
          (if-some [r (jdbc/execute-one! db qargs db/opts-simple-map)]
            (let [user-id       (get r :user-id)
                  user-uid      (parse-uuid (str (get r :user-uid)))
@@ -206,9 +213,10 @@
                  (map/assoc-if user-uid?     :user/uid     user-uid)
                  (map/assoc-if requester-id? :requester/id requester-id)
                  (qassoc :exists? user-id? :confirmed? (pos-int? (get r :confirmed)))
-                 (dissoc :confirmed :user-id :user-uuid :requester-id)
+                 (dissoc :confirmed :user-id :user-uid :requester-id)
                  (map/update-existing :account-type some-keyword)
-                 (map/update-existing :reason some-keyword)))))))))
+                 (map/update-existing :reason       some-keyword)
+                 (map/update-existing :id-type      some-keyword)))))))))
 
 (defn- gen-confirmation-core
   "Creates a confirmation code for the given identity (an e-mail address or a
@@ -225,16 +233,19 @@
   The query will return no result when the given identity (`id`) is already assigned
   to the requesting user (identified by `user-id`)."
   ([db query id user-id exp attempts]
-   (gen-confirmation-core db query id exp "change"))
-  ([db query id user-id exp attempts reason]
+   (gen-confirmation-core db query id exp nil "change"))
+  ([db query id user-id exp attempts id-type]
+   (gen-confirmation-core db query id exp id-type "change"))
+  ([db query id user-id exp attempts id-type reason]
    (if db
      (if-some [id (some-str id)]
-       (let [code   (if exp (gen-code))
-             token  (if exp (gen-token))
-             reason (or (some-str reason) "change")
-             exp    (or exp ten-minutes)
-             exp    (if (t/duration? exp) (t/hence exp) exp)
-             qargs  [query id code token reason exp attempts user-id id id user-id]]
+       (let [code    (if exp (gen-code))
+             token   (if exp (gen-token))
+             reason  (or (some-str reason) "change")
+             exp     (or exp ten-minutes)
+             exp     (if (t/duration? exp) (t/hence exp) exp)
+             id-type (parse-id-type id id-type)
+             qargs   [query id code token reason id-type exp attempts user-id id id user-id]]
          (if-some [r (jdbc/execute-one! db qargs db/opts-simple-map)]
            (let [user-id       (get r :user-id)
                  user-uid      (parse-uuid (str (get r :user-uid)))
@@ -247,8 +258,9 @@
                  (map/assoc-if user-id?      :user/id      user-id)
                  (map/assoc-if user-uid?     :user/uid     user-uid)
                  (qassoc :exists? user-id? :confirmed? (pos-int? (get r :confirmed)))
-                 (dissoc :confirmed :user-id :user-uuid :requester-id)
-                 (map/update-existing :reason some-keyword)))))))))
+                 (dissoc :confirmed :user-id :user-uid :requester-id)
+                 (map/update-existing :reason  some-keyword)
+                 (map/update-existing :id-type some-keyword)))))))))
 
 (defn create-for-registration-without-attempt
   "Creates a confirmation code for a new user identified by the given e-mail
@@ -268,12 +280,14 @@
                                (get udata :email)
                                (get udata :expires-in)
                                udata
+                               :email
                                (or (get udata :reason) "creation")))
   ([db udata reason]
    (gen-full-confirmation-core db new-email-confirmation-query-without-attempt
                                (get udata :email)
                                (get udata :expires-in)
                                udata
+                               :email
                                reason)))
 
 (defn create-for-registration
@@ -295,12 +309,14 @@
                                (get udata :email)
                                (get udata :expires-in)
                                udata
+                               :email
                                (or (get udata :reason) "creation")))
   ([db udata reason]
    (gen-full-confirmation-core db new-email-confirmation-query
                                (get udata :email)
                                (get udata :expires-in)
                                udata
+                               :email
                                reason)))
 
 (defn create-for-change-without-attempt
@@ -318,19 +334,19 @@
   each time this function is called."
   ([db id user-id exp attempts]
    (gen-confirmation-core db email-confirmation-query-without-attempt
-                          id user-id exp attempts "change"))
+                          id user-id exp attempts nil "change"))
   ([db id user-id exp attempts id-type]
    (if (phone? id-type)
      (gen-confirmation-core db phone-confirmation-query-without-attempt
-                            (some-id id) user-id exp attempts "change")
+                            (identity->str id) user-id exp attempts :phone "change")
      (gen-confirmation-core db email-confirmation-query-without-attempt
-                            id user-id exp attempts "change")))
+                            id user-id exp attempts :email "change")))
   ([db id user-id exp attempts id-type reason]
    (if (phone? id-type)
      (gen-confirmation-core db phone-confirmation-query-without-attempt
-                            (some-id id) user-id exp attempts reason)
+                            (identity->str id) user-id exp attempts :phone reason)
      (gen-confirmation-core db email-confirmation-query-without-attempt
-                            id user-id exp attempts reason))))
+                            id user-id exp attempts :email reason))))
 
 (defn create-for-change
   "Creates a confirmation code for an existing user identified by the given user
@@ -347,19 +363,19 @@
   each time this function is called."
   ([db id user-id exp attempts]
    (gen-confirmation-core db email-confirmation-query
-                          id user-id exp attempts "change"))
+                          id user-id exp attempts nil "change"))
   ([db id user-id exp attempts id-type]
    (if (phone? id-type)
      (gen-confirmation-core db phone-confirmation-query
-                            (some-id id) user-id exp attempts "change")
+                            (identity->str id) user-id exp attempts :phone "change")
      (gen-confirmation-core db email-confirmation-query
-                            id user-id exp attempts "change")))
+                            id user-id exp attempts :email "change")))
   ([db id user-id exp attempts id-type reason]
    (if (phone? id-type)
      (gen-confirmation-core db phone-confirmation-query
-                            (some-id id) user-id exp attempts reason)
+                            (identity->str id) user-id exp attempts :phone reason)
      (gen-confirmation-core db email-confirmation-query
-                            id user-id exp attempts reason))))
+                            id user-id exp attempts :email reason))))
 
 ;; Confirming identity with a token or code
 
@@ -462,15 +478,23 @@
 
 (def confirm-token-query
   (str-squeeze-spc
-   "UPDATE confirmations"
-   "SET expires = DATE_ADD(expires, INTERVAL ? MINUTE), confirmed = TRUE"
-   "WHERE token = ? AND confirmed <> TRUE AND reason = ? AND expires >= NOW()"))
+   "INSERT IGNORE INTO confirmations(id,reason,expires,confirmed)"
+   "SELECT id,reason,expires,confirmed from confirmations"
+   "WHERE token = ? AND reason = ? AND expires >= NOW()"
+   "ON DUPLICATE KEY UPDATE"
+   "expires   = IF(VALUE(confirmed) = TRUE, VALUE(expires), DATE_ADD(VALUE(expires), INTERVAL ? MINUTE)),"
+   "confirmed = TRUE"
+   "RETURNING id AS identity,id_type,reason,confirmed,token,code,requester_id"))
 
 (def confirm-code-query
   (str-squeeze-spc
-   "UPDATE confirmations"
-   "SET expires = DATE_ADD(expires, INTERVAL ? MINUTE), confirmed = TRUE"
-   "WHERE id = ? AND code = ? AND confirmed <> TRUE AND reason = ? AND expires >= NOW()"))
+   "INSERT IGNORE INTO confirmations(id,reason,expires,confirmed)"
+   "SELECT id,reason,expires,confirmed from confirmations"
+   "WHERE id = ? AND code = ? AND reason = ? AND expires >= NOW()"
+   "ON DUPLICATE KEY UPDATE"
+   "expires   = IF(VALUE(confirmed) = TRUE, VALUE(expires), DATE_ADD(VALUE(expires), INTERVAL ? MINUTE)),"
+   "confirmed = TRUE"
+   "RETURNING id AS identity,id_type,reason,confirmed,token,code,requester_id"))
 
 (defn establish
   "Confirms an identity (`id`), which may be an e-mail or a phone number, using a token
@@ -492,20 +516,26 @@
   not yet expired), it will also return a map with `:confirmed?` set to `true`."
   ([db id code exp-inc reason]
    (let [reason  (or (some-str reason) "creation")
-         id      (some-id id)
+         id      (identity->str id)
          code    (some-str code)
          exp-inc (time/minutes exp-inc 1)]
      (if (and id code)
-       (if-some [r (::jdbc/update-count
-                    (jdbc/execute-one! db [confirm-code-query exp-inc id code reason]
-                                       db/opts-simple-map))]
-         (if (pos-int? r)
-           {:confirmed? true}
+       (let [r          (jdbc/execute-one! db [confirm-code-query id code reason exp-inc]
+                                           db/opts-simple-map)
+             confirmed? (if r (pos-int? (get r :confirmed)))]
+         (if confirmed?
+           (qassoc r :confirmed? true :id-type (some-keyword (get r :id-type)))
            (let [errs (report-errors db id code reason false)
                  errs (specific-id errs id :verify/bad-id :verify/bad-email :verify/bad-phone)]
-             (if (and (= 1 (count errs)) (contains? errs :verify/confirmed))
-               {:confirmed? true}
+             (if r
                {:confirmed? false
+                :id-type    (some-keyword (get r :id-type))
+                :identity   id
+                :code       code
+                :errors     errs}
+               {:confirmed? false
+                :identity   id
+                :code       code
                 :errors     errs})))))))
   ([db id code token exp-inc reason]
    (if-some [token (some-str token)]
@@ -515,18 +545,21 @@
    (if-some [token (some-str token)]
      (let [reason  (or (some-str reason) "creation")
            exp-inc (time/minutes exp-inc 1)]
-       (if-some [r (::jdbc/update-count
-                    (jdbc/execute-one! db [confirm-token-query exp-inc token reason]
-                                       db/opts-simple-map))]
-         (if (int? r)
-           (if (pos-int? r)
-             {:confirmed? true}
-             (let [errs (report-errors db token reason false)]
-               (if (and (= 1 (count errs)) (contains? errs :verify/confirmed))
-                 {:confirmed? true}
-                 {:confirmed? false
-                  :token      token
-                  :errors     errs})))))))))
+       (let [r          (jdbc/execute-one! db [confirm-token-query token reason exp-inc]
+                                           db/opts-simple-map)
+             confirmed? (if r (pos-int? (get r :confirmed)))]
+         (if confirmed?
+           (qassoc r :confirmed? true :id-type (some-keyword (get r :id-type)))
+           (let [errs (report-errors db token reason false)]
+             (if r
+               {:confirmed? false
+                :identity   (get r :identity)
+                :id-type    (some-keyword (get r :id-type))
+                :token      token
+                :errors     errs}
+               {:confirmed? false
+                :token      token
+                :errors     errs}))))))))
 
 (defn delete
   "Deletes confirmation identified with an `id` from a database."
