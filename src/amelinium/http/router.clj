@@ -10,6 +10,7 @@
             [reitit.ring               :as   ring]
             [ring.middleware.cors      :as   cors]
             [amelinium.system          :as system]
+            [io.randomseed.utils       :as  utils]
             [io.randomseed.utils.map   :as    map]
             [io.randomseed.utils.var   :as    var]
             [clojurewerkz.balagan.core :as      b]))
@@ -43,13 +44,28 @@
   [v]
   (apply-with-meta set v))
 
+(defn- reduce-sets-with-meta
+  [v keyz]
+  (reduce #(map/update-existing %1 %2 set-with-meta) v keyz))
+
+(defn- descriptive?
+  [v]
+  (and (map? v)
+       (or (contains? v :description)
+           (contains? v :summary))))
+
+(defn- prep-descriptions
+  [m]
+  (-> m
+      (map/update-existing :description #(if (sequential? %) (apply utils/str-spc %) %))
+      (map/update-existing :summary     #(if (sequential? %) (apply utils/str-spc %) %))))
+
 (defn routes-parse
   [v keyz]
-  (if (symbol? v)
-    (var/deref-symbol v)
-    (if (and keyz (map? v))
-      (reduce #(map/update-existing %1 %2 set-with-meta) v keyz)
-      v)))
+  (cond-> v
+    (symbol? v)         var/deref-symbol
+    (descriptive? v)    prep-descriptions
+    (and (map? v) keyz) (reduce-sets-with-meta keyz)))
 
 (defn deref-symbols
   [config keyz]
