@@ -199,7 +199,7 @@
                               destination   (str app-uri "?" qs)]
                           (if session-invalidator (session-invalidator req route-data id-type id user-id))
                           (confirmation/delete db id "change")
-                          (web/render-status req :verify/done nil
+                          (web/render-status req :identity/created nil
                                              {:app.url            app-uri
                                               :app.url/login      destination
                                               :confirmation/token token
