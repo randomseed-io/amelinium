@@ -8,35 +8,35 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [clojure.set                          :as             set]
-            [clojure.string                       :as             str]
-            [clojure.core.memoize                 :as             mem]
-            [clojure.java.io                      :as              io]
-            [tick.core                            :as               t]
-            [reitit.core                          :as               r]
-            [reitit.coercion                      :as        coercion]
+  (:require [clojure.set                           :as             set]
+            [clojure.string                        :as             str]
+            [clojure.core.memoize                  :as             mem]
+            [clojure.java.io                       :as              io]
+            [tick.core                             :as               t]
+            [reitit.core                           :as               r]
+            [reitit.coercion                       :as        coercion]
             [ring.util.response]
-            [ring.util.codec                      :as           codec]
-            [ring.util.http-response              :as            resp]
-            [ring.util.request                    :as             req]
-            [amelinium                            :as               p]
-            [amelinium.types.session              :refer         :all]
-            [amelinium.auth                       :as            auth]
-            [amelinium.http                       :as            http]
-            [amelinium.http.middleware.roles      :as           roles]
-            [amelinium.http.middleware.language   :as        language]
-            [amelinium.http.middleware.session    :as         session]
-            [amelinium.http.middleware.db         :as          mid-db]
-            [amelinium.common.oplog.auth          :as      oplog-auth]
-            [amelinium.i18n                       :as            i18n]
-            [amelinium.model.user                 :as            user]
-            [amelinium.logging                    :as             log]
-            [amelinium.db                         :as              db]
-            [io.randomseed.utils.time             :as            time]
-            [io.randomseed.utils.vec              :as             vec]
-            [io.randomseed.utils.map              :as             map]
-            [io.randomseed.utils.map              :refer     [qassoc]]
-            [io.randomseed.utils                  :refer         :all])
+            [ring.util.codec                       :as           codec]
+            [ring.util.http-response               :as            resp]
+            [ring.util.request                     :as             req]
+            [amelinium                             :as               p]
+            [amelinium.types.session               :refer         :all]
+            [amelinium.auth                        :as            auth]
+            [amelinium.http                        :as            http]
+            [amelinium.http.middleware.roles       :as           roles]
+            [amelinium.http.middleware.language    :as        language]
+            [amelinium.http.middleware.session     :as         session]
+            [amelinium.http.middleware.db          :as          mid-db]
+            [amelinium.common.oplog.auth           :as      oplog-auth]
+            [amelinium.i18n                        :as            i18n]
+            [amelinium.logging                     :as             log]
+            [amelinium.db                          :as              db]
+            [phone-number.core                     :as           phone]
+            [io.randomseed.utils.time              :as            time]
+            [io.randomseed.utils.vec               :as             vec]
+            [io.randomseed.utils.map               :as             map]
+            [io.randomseed.utils.map               :refer     [qassoc]]
+            [io.randomseed.utils                   :refer         :all])
 
   (:import [java.time        Duration]
            [java.time.format DateTimeFormatter]
@@ -1929,6 +1929,21 @@
   [req]
   (if-some [ua (get (get req :headers) "user-agent")]
     (some? (re-find #"\b(iPhone|iPad|iPod|Android|Windows Phone|webOS|IEMobile|BlackBerry)\b" ua))))
+
+;; Phone numbers
+
+(defn guess-identity-type
+  [v]
+  (cond
+
+    (and (string? v) (pos? (count v)))
+    (if (and (= (.charAt v 0) \+) (phone/valid? v))
+      :user/phone
+      (if (some? (str/index-of v \@ 1))
+        :user/email))
+
+    (phone/native? v)
+    :user/phone))
 
 ;; Date and time
 
