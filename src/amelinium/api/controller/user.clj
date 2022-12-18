@@ -423,8 +423,6 @@
                 updated      (if confirmed? (user/update-identity-with-token-or-code id-type db id token code))
                 updated?     (:updated? updated)
                 bad-result?  (or (nil? confirmation) (and confirmed? (nil? updated)))]
-            (println "updated" updated)
-            (println "id-type" id-type)
             (cond
               bad-result?      (api/render-error req :verify/bad-result)
               updated?         (let [user-id    (get updated :id)
