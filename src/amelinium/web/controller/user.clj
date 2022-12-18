@@ -166,18 +166,11 @@
       :error!          (web/render-error req (or (not-empty (:errors confirmation))
                                                  (not-empty (:errors creation)))))))
 
-(defn invalidate-user-sessions!
-  ([req route-data id-type id user-id]
-   (invalidate-user-sessions! req route-data id-type id user-id nil))
-  ([req route-data id-type id user-id session-key]
-   (if (= :email id-type)
-     (session/del-user-vars! req (or session-key (get route-data :session-key))))))
-
-(defn id-update!
+(defn identity-create!
   "Verifies confirmation token against a database and if it matches, updates the
-  identity."
+  identity (phone or e-mail)."
   ([req]
-   (id-update! req invalidate-user-sessions!))
+   (identity-create! req super/invalidate-user-sessions!))
   ([req session-invalidator]
    (let [auth-config  (auth/config req)
          db           (auth/db auth-config)
