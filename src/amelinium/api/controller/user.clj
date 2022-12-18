@@ -398,6 +398,49 @@
     (or (get db-result :id-type)
         (common/guess-identity-type (get db-result :identity)))))
 
+(defn identity-create!
+  "Verifies confirmation code or token against a database and if it matches, creates
+  new identity."
+  ([req]
+   (identity-create! req super/invalidate-user-sessions!))
+  ([req session-invalidator]
+   (println (session/control req :utoken))
+   (api/response
+    req
+    (let [form-params  (get (get req :parameters) :form)
+          to-change    (select-keys form-params [:user/email :user/phone])
+          token        (get form-params :token)
+          code         (get form-params :code)
+          [id-type id] (first to-change)]
+      (if-not (or token (and code id))
+        (api/render-error req :parameters/error)
+        (if (> (count to-change) 1)
+          (api/render-error req :verify/multiple-ids)
+          (let [auth-config  (auth/config req)
+                db           (auth/db auth-config)
+                confirmation (confirmation/establish db id code token one-minute "change")
+                confirmed?   (get confirmation :confirmed?)
+                id-type      (or id-type (guess-identity-type confirmation))
+                updated      (if confirmed? (user/update-identity-with-token-or-code id-type db id token code))
+                updated?     (:updated? updated)
+                bad-result?  (or (nil? confirmation) (and confirmed? (nil? updated)))]
+            (println "updated" updated)
+            (println "id-type" id-type)
+            (cond
+              bad-result?      (api/render-error req :verify/bad-result)
+              updated?         (let [user-id    (get updated :id)
+                                     id         (get updated :identity)
+                                     route-data (http/get-route-data req)]
+                                 (if session-invalidator (session-invalidator req route-data id-type id user-id))
+                                 ;;(confirmation/delete db id "change")
+                                 (-> req
+                                     (api/add-body {:user/uid (get updated :uid) id-type id})
+                                     (api/render-status :identity/created)))
+              (not confirmed?) (api/render-error req (:errors confirmation))
+              (not updated?)   (api/render-error req (:errors updated))
+              :error!          (api/render-error req (or (not-empty (:errors confirmation))
+                                                         (not-empty (:errors updated))))))))))))
+
 ;; User creation
 
 (defn create!
