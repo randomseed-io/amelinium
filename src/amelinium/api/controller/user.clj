@@ -431,7 +431,7 @@
                                      id         (get updated :identity)
                                      route-data (http/get-route-data req)]
                                  (if session-invalidator (session-invalidator req route-data id-type id user-id))
-                                 ;;(confirmation/delete db id "change")
+                                 (confirmation/delete db id "change")
                                  (-> req
                                      (api/add-body {:user/uid (get updated :uid) id-type id})
                                      (api/render-status :identity/created)))
