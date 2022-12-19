@@ -155,10 +155,12 @@
 
 (defn auth-user-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
-  conditions and may emit a redirect or set the `:response/status`. The last,
-  `auth-only-mode` argument, when set to `true` (default is `false` when not given)
-  causes session creation and prolongation to be skipped if the authentication is
-  successful."
+  conditions and may emit a redirect (if go-to was detected) or set the
+  `:response/status` in the returned request map (but not the response map!).
+
+  The last, `auth-only-mode` argument, when set to `true` (default is `false` when
+  not given) causes session creation and prolongation to be skipped if the
+  authentication is successful."
   ([req user-email password]
    (auth-user-with-password! req user-email password nil nil false nil))
   ([req user-email password sess]

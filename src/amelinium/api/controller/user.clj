@@ -80,15 +80,18 @@
   ([req user-email password ^Session sess route-data lang]
    (auth-with-password! req user-email password sess route-data lang false))
   ([req user-email password ^Session sess route-data lang auth-only-mode]
-   (let [req (super/auth-user-with-password! req user-email password sess route-data auth-only-mode)]
+   (auth-with-password! req user-email password sess route-data lang auth-only-mode nil))
+  ([req user-email password ^Session sess route-data lang auth-only-mode session-key]
+   (let [sk  (or session-key (session/session-key sess) (get route-data :session-key))
+         req (super/auth-user-with-password! req user-email password sess route-data auth-only-mode session-key)]
      (if (api/response? req)
        req
-       (let [lang        (or lang (common/pick-language req))
-             tr-sub      (i18n/no-default (common/translator-sub req lang))
-             session-key (session/session-key sess)]
-         (-> req
-             (language/force lang)
-             (api/body-add-session-status session-key tr-sub)))))))
+       (let [lang   (or lang (common/pick-language req))
+             tr-sub (i18n/no-default (common/translator-sub req lang))]
+         (do
+           (-> req
+               (language/force lang)
+               (api/body-add-session-status session-key tr-sub))))))))
 
 ;; Controllers
 
@@ -125,7 +128,7 @@
           lang           (delay (common/pick-language req :user))
           valid-session? (delay (session/valid? sess))]
       (cond
-        password          (auth-with-password! req user-email password sess @route-data @lang false)
+        password          (auth-with-password! req user-email password sess @route-data @lang false session-key)
         @valid-session?   req
         :invalid-session! (api/move-to req (or (get @route-data :auth/info) :auth/info) @lang))))))
 
