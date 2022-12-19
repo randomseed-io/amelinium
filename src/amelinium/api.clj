@@ -923,7 +923,7 @@
          (-> req
              (add-missing-sub-status :session/created :session-status :response/body translate-sub)
              (body-add-session-id smap))
-         (body-add-session-id smap))))))
+         (body-add-session-id req smap))))))
 
 (defmacro response
   "Creates a response block. If the given `req` is already a response then it is simply
