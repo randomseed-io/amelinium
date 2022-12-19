@@ -19,7 +19,8 @@
             [amelinium.i18n                       :as            i18n]
             [amelinium.http.middleware.validators :as      validators]
             [amelinium.http.middleware.session    :as         session]
-            [io.randomseed.utils.map              :refer     [qassoc]]
+            [io.randomseed.utils.map              :refer    [qassoc
+                                                             qupdate]]
             [io.randomseed.utils                  :refer         :all])
 
   (:import [reitit.core Match]
@@ -86,8 +87,8 @@
 ;; Response rendering
 
 (defn render
-  "Returns response body on a basis of a value associated with the `:response/body` key
-  of the `req`.
+  "Returns response body on a basis of a value associated with the `:response/body`
+  key of the `req`.
 
   If `status` is given and `:response/body` is a map, it adds the following
   associations to it: `:status` (with a keyword describing status as value),
@@ -866,6 +867,8 @@
              (qassoc body k v)))))
 
 (defn body-add-session-id
+  "Adds session ID field to the response body (`:response/body`) of the given request
+  map `req`. Works only on a valid sessions, having `:id` field set."
   {:arglists '([req]
                [req smap]
                [req session-key]
@@ -876,19 +879,19 @@
      (body-add-session-id req smap)
      req))
   ([req smap]
-   (qassoc req :response/body
-           (let [smap (if (keyword? smap) (session/of req smap) (session/of smap))
-                 body (get req :response/body)
-                 k    (or (session/id-field smap) :session-id)
-                 v    (session/id smap)]
-             (qassoc body k v))))
+   (let [smap (if (keyword? smap) (session/of req smap) (session/of smap))
+         k    (or (session/id-field smap) :session-id)
+         sid  (session/id smap)]
+     (if sid
+       (qupdate req :response/body qassoc k sid)
+       req)))
   ([req smap field]
-   (qassoc req :response/body
-           (let [smap (if (keyword? smap) (session/of req smap) (session/of smap))
-                 body (get req :response/body)
-                 k    (or field (session/id-field smap) :session-id)
-                 v    (session/id smap)]
-             (qassoc body k v)))))
+   (let [smap (if (keyword? smap) (session/of req smap) (session/of smap))
+         k    (or field (session/id-field smap) :session-id)
+         sid  (session/id smap)]
+     (if sid
+       (qupdate req :response/body qassoc k sid)
+       req))))
 
 (defn session-status
   "Returns session status for the given session map `smap`."
