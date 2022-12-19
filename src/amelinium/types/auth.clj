@@ -73,6 +73,10 @@
                              ^Duration         expires-in
                              ^Long             max-attempts])
 
+(defrecord PasswordData     [^String           shared
+                             ^String           intrinsic
+                             ^Long             suite-id])
+
 ;; AuthQueries record is used to pass a set of SQL queries in some structured form.
 
 (defrecord AuthQueries      [^String           generic

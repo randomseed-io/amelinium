@@ -33,7 +33,8 @@
             [io.randomseed.utils               :refer       :all])
 
   (:import [amelinium.proto.auth Authorizable]
-           [amelinium            Suites SuitesJSON]
+           [phone_number.core    Phoneable]
+           [amelinium            Suites SuitesJSON PasswordData]
            [amelinium            UserData AuthQueries DBPassword]
            [amelinium            AuthConfig AuthSettings AuthLocking AuthConfirmation AccountTypes]
            [javax.sql            DataSource]
@@ -47,27 +48,51 @@
 
 (declare create-or-get-shared-suite-id)
 
+(defn- make-user-password-core
+  ^PasswordData [^AuthConfig auth-config ^String password ^DataSource db]
+  (let [^SuitesJSON pwd-chains (if password (auth/make-password-json password auth-config))
+        ^String     pwd-shared (if pwd-chains (.shared    pwd-chains))
+        ^Long       suite-id   (if (and db pwd-shared) (create-or-get-shared-suite-id db pwd-shared))]
+    (if suite-id
+      (->PasswordData pwd-shared (.intrinsic pwd-chains) suite-id)
+      (->PasswordData nil nil nil))))
+
+(defn make-user-password
+  {:arglists '([^AuthSettings auth-settings ^String password account-type]
+               [^AuthSettings auth-settings params]
+               [^AuthConfig   auth-config   params])}
+  (^PasswordData [auth params]
+   (if (auth/settings? auth)
+     (make-user-password auth
+                         (some-str     (or (get params :user/password)
+                                           (get params :password)))
+                         (some-keyword (or (get params :user/account-type)
+                                           (get params :account-type))))
+     (make-user-password-core ^AuthConfig auth
+                              (some-str (or (get params :user/password) (get params :password)))
+                              (or (.db ^AuthConfig auth) (get params :auth/db)))))
+  (^PasswordData [^AuthSettings auth-settings password account-type]
+   (let [account-type            (or account-type (.default-type auth-settings))
+         ^AuthConfig auth-config (or (get (.types auth-settings) account-type) (.default auth-settings))
+         ^DataSource db          (or (.db auth-config) (.db auth-settings))]
+     (make-user-password-core auth-config password db))))
+
 (defn make-user-data
   "Creates user data record by getting values from the given authentication settings
   and parameters map. If `:password` parameter is present it will make JSON password
   suite."
   [^AuthSettings auth-settings params]
-  (let [email                       (some-str (or (get params :user/email) (get params :login) (get params :email)))
-        phone                       (or (get params :user/phone) (get params :phone))
-        password                    (some-str (or (get params :user/password) (get params :password)))
-        account-type                (or (get params :user/account-type) (get params :account-type))
-        account-type                (if (keyword? account-type) account-type (some-keyword account-type))
-        account-type                (or account-type (.default-type auth-settings))
-        ^AuthConfig auth-config     (or (get (.types auth-settings) account-type)
-                                        (.default auth-settings))
-        ^AuthConfirmation auth-cfrm (.confirmation auth-config)
-        db                          (or (.db auth-config) (.db auth-settings))
-        pwd-chains                  (if password (auth/make-password-json password auth-config))
-        ^SuitesJSON pwd-intrinsic   (if pwd-chains (.intrinsic pwd-chains))
-        pwd-shared                  (if pwd-chains (.shared    pwd-chains))
-        pwd-shared-id               (if (and db pwd-shared) (create-or-get-shared-suite-id db pwd-shared))]
+  (let [^String           email       (some-str (or (get params :user/email) (get params :login) (get params :email)))
+        ^Phoneable        phone       (or (get params :user/phone) (get params :phone))
+        ^String           password    (some-str     (or (get params :user/password) (get params :password)))
+        account-type                  (some-keyword (or (get params :user/account-type) (get params :account-type)))
+        account-type                  (or account-type (.default-type auth-settings))
+        ^AuthConfig       auth-config (or (get (.types auth-settings) account-type) (.default auth-settings))
+        ^AuthConfirmation auth-cfrm   (.confirmation auth-config)
+        ^DataSource       db          (or (.db auth-config) (.db auth-settings))
+        ^PasswordData     pwd-data    (make-user-password-core auth-config password db)]
     (->UserData email phone (name account-type) auth-config db
-                pwd-intrinsic pwd-shared pwd-shared-id
+                (.intrinsic pwd-data) (.shared pwd-data) (.suite-id pwd-data)
                 (some-str (or (get params :user/first-name)  (get params :first-name)))
                 (some-str (or (get params :user/middle-name) (get params :middle-name)))
                 (some-str (or (get params :user/last-name)   (get params :last-name)))
@@ -788,31 +813,32 @@
 (defn generate-password
   "Creates a password for the given authentication config. Returns a map of shared part
   ID and an intrinsic part as two keys: `password-suite-id` and `:password`."
-  [auth-config password]
-  (if-some [db (.db ^AuthConfig auth-config)]
-    (if-some [suites (auth/make-password-json password auth-config)]
-      (let [shared-suite    (.shared    ^SuitesJSON suites)
-            intrinsic-suite (.intrinsic ^SuitesJSON suites)]
+  [^AuthConfig auth-config password]
+  (if-some [db (.db auth-config)]
+    (if-some [^SuitesJSON suites (auth/make-password-json password auth-config)]
+      (let [shared-suite    (.shared    suites)
+            intrinsic-suite (.intrinsic suites)]
         (if-some [shared-id (create-or-get-shared-suite-id db shared-suite)]
           (->DBPassword shared-id intrinsic-suite))))))
 
 (defn update-password
   "Updates password information for the given user by updating suite ID and intrinsic
-  password in an authorization database. Additionally last_attempt and last_failed_ip
-  properties are deleted and login_attempts is set to 0."
+  password in an authorization database. Additionally `:last_attempt` and
+  `:last_failed_ip` properties are deleted and `:login_attempts` is set to 0."
   ([db id ^Suites suites]
    (if suites
-     (update-password db id (.shared ^Suites suites) (.intrinsic ^Suites suites))))
+     (update-password db id (.shared suites) (.intrinsic suites))))
   ([db id shared-suite user-suite]
    (if (and db id shared-suite user-suite)
      (if-some [shared-id (create-or-get-shared-suite-id db shared-suite)]
-       (sql/update! db :users
-                    {:password_suite_id shared-id
-                     :password          user-suite
-                     :last_attempt      nil
-                     :last_failed_ip    nil
-                     :login_attempts    0}
-                    {:id id})))))
+       (::jdbc/update-count
+        (sql/update! db :users
+                     {:password_suite_id shared-id
+                      :password          user-suite
+                      :last_attempt      nil
+                      :last_failed_ip    nil
+                      :login_attempts    0}
+                     {:id id}))))))
 
 (defn update-login-ok
   [db id ip]

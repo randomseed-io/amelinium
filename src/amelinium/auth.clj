@@ -39,6 +39,11 @@
   `src`."
   ^AuthSettings [src] (p/settings src))
 
+(defn settings?
+  "Returns `true` if the given object is an instance of `AuthSettings`."
+  [v]
+  (instance? AuthSettings v))
+
 (defn config
   "Returns an authentication configuration for the given account type `account-type`
   using authentication settings source `src`. If the second argument is not given it

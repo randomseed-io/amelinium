@@ -82,10 +82,9 @@
                            ", chosen auth model is " auth-model "." \newline))
              (if-some [plain-password (or (some-str plain-password) (crypto/ask-pass))]
                (if-some [chains (auth/make-password-json plain-password auth-config)]
-                 (let [ret (user/update-password db user-id chains)
-                       cnt (or (::jdbc/update-count ret) 0)]
-                   (if (pos-int? cnt) (println "Password changed successfully."))
-                   (println (str "Updated rows: " cnt)))
+                 (let [ret (or (user/update-password db user-id chains) 0)]
+                   (if (pos-int? ret) (println "Password changed successfully."))
+                   (println (str "Updated rows: " ret)))
                  (println "Authentication engine could not produce password chains."))
                (println "Password is empty or blank.")))
            (println "Cannot retrieve user properties."))
