@@ -297,9 +297,9 @@
          ^AuthSettings auth-settings (auth/settings req)
          ^UserData     udata         (user/make-user-data auth-settings params)
          result                      (confirmation/create-for-registration (.db udata) udata)]
-     (verify! req {:id      (.email udata)
+     (verify! req {:db      (.db udata)
+                   :id      (.email udata)
                    :id-type :user/email
-                   :db      (.db udata)
                    :result  result}))))
 
 ;; Profile editing

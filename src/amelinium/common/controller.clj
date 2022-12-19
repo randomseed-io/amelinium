@@ -283,6 +283,23 @@
          ;; Valid session causes page to be served.
          req)))))
 
+(defn set-password!
+  "Sets user password for the given user ID. Returns `:pwd/updated` if operation
+  succeeded. May return error statuses: `:pwd/bad-user`, `:pwd/db-error`,
+  `:pwd/bad-password`."
+  ([req user-id]
+   (let [form-params   (get (get req :parameters) :form)
+         auth-settings (auth/settings req)
+         auth-db       (auth/db auth-settings)
+         pwd-data      (user/make-user-password auth-settings form-params)]
+     (if-some [pwd-suite-id (get pwd-data :suite-id)]
+       (if-some [result (user/update-password auth-db user-id pwd-suite-id (get pwd-data :intrinsic))]
+         (if (pos-int? result)
+           :pwd/updated
+           :pwd/bad-user)
+         :pwd/db-error)
+       :pwd/bad-password))))
+
 ;; Coercion error handler
 
 (defn handle-coercion-error
