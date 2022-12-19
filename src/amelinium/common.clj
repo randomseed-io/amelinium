@@ -1870,15 +1870,18 @@
 (defn translator
   "Generates a translation function using populated values from `:i18n/translator` or
   `:i18n/translator-nd` (variant which returns `nil` for missing keys, used when
-  `i18n/*handle-missing-keys*` is set to a falsy value). Falls back to
-  `i18n/translator` if predefined functions are not found or if a language was
-  specified as an optional `lang` argument."
+  `i18n/*handle-missing-keys*` is set to a falsy value).
+
+  Falls back to `i18n/translator` if predefined functions are not populated in the
+  request map or if a language was specified as an optional `lang` argument and it
+  differs from the language stored in `req` under `:language/id` (or
+  `:language/default`)."
   ([req]
    (or (get req (if i18n/*handle-missing-keys* :i18n/translator :i18n/translator-nd))
        (i18n/translator req)))
-  ([req lang]
-   (if (and lang (not= lang (i18n/lang req)))
-     (i18n/translator req lang)
+  ([req lang-id]
+   (if (and lang-id (not= lang-id (i18n/lang req)))
+     (i18n/translator req lang-id)
      (or (get req (if i18n/*handle-missing-keys* :i18n/translator :i18n/translator-nd))
          (i18n/translator req)))))
 
@@ -1886,9 +1889,9 @@
   ([req]
    (or (get req (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd))
        (i18n/translator-sub req)))
-  ([req lang]
-   (if (and lang (not= lang (i18n/lang req)))
-     (i18n/translator-sub req lang)
+  ([req lang-id]
+   (if (and lang-id (not= lang-id (i18n/lang req)))
+     (i18n/translator-sub req lang-id)
      (or (get req (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd))
          (i18n/translator-sub req)))))
 
