@@ -47,15 +47,7 @@
 ;; User data initialization
 
 (declare create-or-get-shared-suite-id)
-
-(defn- make-user-password-core
-  ^PasswordData [^AuthConfig auth-config ^String password ^DataSource db]
-  (let [^SuitesJSON pwd-chains (if password (auth/make-password-json password auth-config))
-        ^String     pwd-shared (if pwd-chains (.shared    pwd-chains))
-        ^Long       suite-id   (if (and db pwd-shared) (create-or-get-shared-suite-id db pwd-shared))]
-    (if suite-id
-      (->PasswordData pwd-shared (.intrinsic pwd-chains) suite-id)
-      (->PasswordData nil nil nil))))
+(declare prop)
 
 (defn auth-config
   "Returns authentication configuration (of type `AuthConfig`) for the given
@@ -73,24 +65,41 @@
        (auth/config auth-settings ac-type)))))
 
 (defn make-user-password
-  {:arglists '([^AuthSettings auth-settings ^String password account-type]
-               [^AuthSettings auth-settings params]
-               [^AuthConfig   auth-config   params])}
-  (^PasswordData [auth params]
-   (if (auth/settings? auth)
-     (make-user-password auth
-                         (some-str     (or (get params :user/password)
-                                           (get params :password)))
-                         (some-keyword (or (get params :user/account-type)
-                                           (get params :account-type))))
-     (make-user-password-core ^AuthConfig auth
-                              (some-str (or (get params :user/password) (get params :password)))
-                              (or (.db ^AuthConfig auth) (get params :auth/db)))))
-  (^PasswordData [^AuthSettings auth-settings password account-type]
-   (let [account-type            (or account-type (.default-type auth-settings))
-         ^AuthConfig auth-config (or (get (.types auth-settings) account-type) (.default auth-settings))
-         ^DataSource db          (or (.db auth-config) (.db auth-settings))]
-     (make-user-password-core auth-config password db))))
+  "Creates user password (of type `PasswordData`) on a basis of authentication source
+  `auth-src`, a plain password string `password` and optional account type
+  `account-type`.
+
+  Authentication source can be a request map, `AuthSettings` record or `AuthConfig`
+  record. If this is a request map then authentication settings are looked up under
+  the `:auth/setup` key.
+
+  The `account-type` argument is used to select authentication configuration (of type
+  `AuthConfig`) specific to a user from the given or obtained authentication
+  settings.
+
+  If `account-type` argument is not given and the given authentication source is not
+  of type `AuthConfig` then the default authentication configuration associated with
+  detected authentication settings is used.
+
+  If `account-type` argument is not given or is set to `nil` or `false`, and the
+  given authentication source is already of type `AuthConfig` then it has no impact
+  on the authentication configuration being used.
+
+  If `account-type` argument is given and is not `nil` or `false`, and the given
+  authentication source is already of type `AuthConfig` then it will be used only if
+  it is configured to handle the given account type. If it is does not, password data
+  record with `nil` values associated with each field is returned."
+  (^PasswordData [auth-src ^String password]
+   (make-user-password (auth/config auth-src) password nil))
+  (^PasswordData [auth-src ^String password account-type]
+   (let [^AuthConfig auth-config (auth/config auth-src account-type)
+         ^SuitesJSON pwd-chains  (if password (auth/make-password-json password auth-config))
+         ^String     pwd-shared  (if pwd-chains (.shared pwd-chains))
+         ^DataSource db          (if auth-config (.db auth-config))
+         ^Long       suite-id    (if (and db pwd-shared) (create-or-get-shared-suite-id db pwd-shared))]
+     (if suite-id
+       (->PasswordData pwd-shared (.intrinsic pwd-chains) suite-id)
+       (->PasswordData nil nil nil)))))
 
 (defn make-user-data
   "Creates user data record by getting values from the given authentication settings
@@ -105,7 +114,7 @@
         ^AuthConfig       auth-config (or (get (.types auth-settings) account-type) (.default auth-settings))
         ^AuthConfirmation auth-cfrm   (.confirmation auth-config)
         ^DataSource       db          (or (.db auth-config) (.db auth-settings))
-        ^PasswordData     pwd-data    (make-user-password-core auth-config password db)]
+        ^PasswordData     pwd-data    (make-user-password auth-config password account-type)]
     (->UserData email phone (name account-type) auth-config db
                 (.intrinsic pwd-data) (.shared pwd-data) (.suite-id pwd-data)
                 (some-str (or (get params :user/first-name)  (get params :first-name)))
