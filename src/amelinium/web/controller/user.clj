@@ -36,19 +36,22 @@
   "Authentication helper. Used by other controllers. Short-circuits on certain
   conditions and may emit a redirect or render a response."
   ([req user-email password]
-   (auth-with-password! req user-email password nil nil nil nil))
+   (auth-with-password! req user-email password nil nil nil false nil))
   ([req user-email password sess]
-   (auth-with-password! req user-email password sess nil nil nil))
+   (auth-with-password! req user-email password sess nil nil false nil))
   ([req user-email password sess route-data]
-   (auth-with-password! req user-email password sess route-data nil nil))
+   (auth-with-password! req user-email password sess route-data nil false nil))
   ([req user-email password sess route-data lang]
-   (auth-with-password! req user-email password sess route-data lang nil))
-  ([req user-email password sess route-data lang session-key]
-   (let [req (super/auth-user-with-password! req user-email password sess route-data false session-key)]
+   (auth-with-password! req user-email password sess route-data lang false nil))
+  ([req user-email password sess route-data lang auth-only?]
+   (auth-with-password! req user-email password sess route-data lang auth-only? nil))
+  ([req user-email password sess route-data lang auth-only? session-key]
+   (let [route-data (or route-data (http/get-route-data req))
+         req        (super/auth-user-with-password! req user-email password sess route-data auth-only? session-key)]
      (if (web/response? req)
        req
        (case (get req :response/status)
-         :auth/ok            (language/force req (or lang (web/pick-language-str req)))
+         :auth/ok            (if auth-only? req (language/force req (or lang (web/pick-language-str req))))
          :auth/locked        (common/move-to req (get route-data :auth/locked        :login/account-locked))
          :auth/soft-locked   (common/move-to req (get route-data :auth/soft-locked   :login/account-soft-locked))
          :auth/bad-password  (common/move-to req (get route-data :auth/bad-password  :login/bad-password))
@@ -89,7 +92,7 @@
          lang               (delay (web/pick-language-str req :user))
          valid-session?     (delay (session/valid? sess))]
      (cond
-       password          (auth-with-password! req user-email password sess @route-data @lang session-key)
+       password          (auth-with-password! req user-email password sess @route-data @lang false session-key)
        @valid-session?   (if (some? (language/from-path req))
                            ;; Render the contents in a language specified by the current path.
                            req
