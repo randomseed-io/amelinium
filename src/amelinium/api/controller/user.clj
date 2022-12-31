@@ -280,13 +280,17 @@
                            [phone :user/phone :verify/bad-phone confirmation/retry-phone]
                            [email :user/email :verify/bad-email confirmation/retry-email])
              result      (f db id reason)]
-         (verify! req {:db      db
-                       :id      id
-                       :lang    (common/lang-id req)
-                       :id-type id-type
-                       :no-data no-data
-                       :reason  reason
-                       :result  result}))))))
+         (verify! req {:db               db
+                       :id               id
+                       :lang             (common/lang-id req)
+                       :id-type          id-type
+                       :no-data          no-data
+                       :reason           reason
+                       :result           result
+                       :tpl/email-exists :registration/exists
+                       :tpl/email-verify :registration/verify
+                       :tpl/phone-exists :verify/sms-exists
+                       :tpl/phone-verify :verify/sms}))))))
 
 ;; Registration
 
@@ -297,11 +301,16 @@
    (let [params                      (get (get req :parameters) :form)
          ^AuthSettings auth-settings (auth/settings req)
          ^UserData     udata         (user/make-user-data auth-settings params)
-         result                      (confirmation/create-for-registration (.db udata) udata)]
-     (verify! req {:db      (.db udata)
-                   :id      (.email udata)
-                   :id-type :user/email
-                   :result  result}))))
+         db                          (if udata (.db udata))
+         result                      (confirmation/create-for-registration db udata)]
+     (verify! req {:db               db
+                   :id               (if udata (.email udata))
+                   :id-type          :user/email
+                   :result           result
+                   :tpl/email-exists :registration/exists
+                   :tpl/email-verify :registration/verify
+                   :tpl/phone-exists :verify/sms-exists
+                   :tpl/phone-verify :verify/sms}))))
 
 ;; Profile editing
 
