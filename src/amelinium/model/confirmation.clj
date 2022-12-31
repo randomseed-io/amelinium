@@ -435,6 +435,44 @@
   ([db id user-id exp attempts id-type]
    (create db id user-id exp attempts id-type true "change")))
 
+;; Password recovery
+
+(defn create-for-recovery-without-attempt
+  "Creates a recovery code for an existing user identified by the given user
+  ID (`user-id`). The identity to be confirmed (`id`) can be an e-mail address or a
+  phone number (if the `id-type` is set to `:phone`).
+
+  When the confirmation was already generated and it hasn't expired, it is returned
+  with an existing code and token.
+
+  When the given e-mail is assigned to the given user the returned map will contain 4
+  keys: `:exists?` set to `true`, `:user/id` set to ID of existing user, `:id` set to
+  the given e-mail (as a string) and `:reason` set to the given reason (as a keyword,
+  or `nil` if not given)."
+  ([db id user-id exp attempts]
+   (create-without-attempt db id user-id exp attempts false "recovery"))
+  ([db id user-id exp attempts id-type]
+   (create-without-attempt db id user-id exp attempts false id-type "recovery")))
+
+(defn create-for-recovery
+  "Creates a recovery code for an existing user identified by the given user
+  ID (`user-id`). The identity to be confirmed (`id`) can be an e-mail address or a
+  phone number (if the `id-type` is set to `:phone`).
+
+  When the confirmation was already generated and it hasn't expired, it is returned
+  with an existing code and token.
+
+  When the given e-mail is assigned to the given user the returned map will contain 4
+  keys: `:exists?` set to `true`, `:user/id` set to ID of existing user, `:id` set to
+  the given e-mail (as a string) and `:reason` set to the given reason (as a keyword,
+  or `nil` if not given).
+
+  Attempts counter is increased each time this function is called."
+  ([db id user-id exp attempts]
+   (create db id user-id exp attempts false "recovery"))
+  ([db id user-id exp attempts id-type]
+   (create db id user-id exp attempts false id-type "recovery")))
+
 ;; Confirming identity with a token or code
 
 (defn gen-report-errors-query
