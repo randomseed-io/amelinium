@@ -181,8 +181,8 @@
      :url/update-email))
 
 (defn verify!
-  "Performs the identity confirmation verification by sending an e-mail or SMS with a
-  URL to complete account registration or identity change."
+  "Performs the identity verification by sending an e-mail or SMS with a URL to
+  complete confirmation."
   [req {:keys [no-data result reason db id id-type lang translator route-data]
         :as   opts}]
   (let [lang              (or lang       (common/pick-language req :registration) (common/lang-id req))
@@ -233,29 +233,29 @@
                                                :verify/retry-unit    :minutes
                                                :verify/retry-dur     @retry-dur
                                                :verify/attempts-left attempts-left))
-                          template-params   {:serviceName      (tr :verify/app-name)
-                                             :expiresInMinutes (tr :in-mins @retry-in)
-                                             :remoteAddress    remote-ip
-                                             :verifyCode       (str code)
-                                             :verifyLink       verify-link
-                                             :recoveryLink     recovery-link}]
+                          template-params   (delay {:serviceName      (tr :verify/app-name)
+                                                    :expiresInMinutes (tr :in-mins @retry-in)
+                                                    :remoteAddress    remote-ip
+                                                    :verifyCode       (str code)
+                                                    :verifyLink       verify-link
+                                                    :recoveryLink     recovery-link})]
                       (case id-type
-                        :user/email (twilio/sendmail-l10n-template-async
-                                     (get rdata :twilio/email)
-                                     req-updater exc-handler
-                                     lang id
-                                     (if exists?
-                                       (get opts :tpl/email-exists :registration/exists)
-                                       (get opts :tpl/email-verify :registration/verify))
-                                     template-params)
-                        :user/phone (let [smst (if exists?
-                                                 (get opts :tpl/phone-exists :verify/sms-exists)
-                                                 (get opts :tpl/phone-verify :verify/sms))
-                                          smsb (tr smst template-params)]
+                        :user/email (if-some [template (get opts (if exists?
+                                                                   :tpl/email-exists
+                                                                   :tpl/email-verify))]
+                                      (twilio/sendmail-l10n-template-async
+                                       (get rdata :twilio/email)
+                                       req-updater exc-handler
+                                       lang id
+                                       template
+                                       @template-params))
+                        :user/phone (if-some [sms-tr-key (get opts (if exists?
+                                                                     :tpl/phone-exists
+                                                                     :tpl/phone-verify))]
                                       (twilio/sendsms-async
                                        (get rdata :twilio/sms)
                                        req-updater exc-handler
-                                       id smsb)))
+                                       id (tr sms-tr-key @template-params))))
                       (-> req
                           (api/add-status :verify/sent)
                           (add-retry-fields))))))
