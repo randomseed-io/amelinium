@@ -346,26 +346,26 @@
 (defn get-user-id-by-email
   "Returns user ID for the given e-mail (not cached)."
   ([db email]
-   (db/get-id-by-email db email-id-query email))
+   (db/get-user-id-by-identity db email-id-query email))
   ([db _ email]
-   (db/get-id-by-email db email-id-query email)))
+   (db/get-user-id-by-identity db email-id-query email)))
 
 (defn get-user-ids-by-emails
   "Returns user IDs for the given e-mails (not cached)."
   ([db emails]
-   (db/get-ids-by-emails db emails-ids-query emails))
+   (db/get-user-ids-by-identities db emails-ids-query emails))
   ([db _ emails]
-   (db/get-ids-by-emails db emails-ids-query emails)))
+   (db/get-user-ids-by-identities db emails-ids-query emails)))
 
 (defn email-to-id
   "Returns user ID for the given e-mail (cached)."
   [db email]
-  (db/email-to-id db ids-cache get-user-id-by-email email))
+  (db/identity-to-user-id db ids-cache get-user-id-by-email email))
 
 (defn emails-to-ids
   "Returns user IDs for the given e-mails (cached)."
   [db emails]
-  (db/emails-to-ids db ids-cache get-user-ids-by-emails emails))
+  (db/identities-to-user-ids db ids-cache get-user-ids-by-emails emails))
 
 (defn props-by-email
   "Returns user properties for the given e-mail (cached)."
@@ -388,8 +388,9 @@
 
 (defn ids-to-emails
   "Returns user e-mails for the given user IDs (cached)."
-  ([db ids]
-   (db/get-cached-coll-prop props-cache info-getter-coll db :email ids)))
+  [db ids]
+  (db/get-cached-coll-prop props-cache info-getter-coll db :email ids))
+
 
 ;; UID to ID mapping
 

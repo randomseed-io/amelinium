@@ -230,20 +230,8 @@
           (reduce #(qassoc %1 %2 (cwr/lookup-or-miss cache %2 db-ids))
                   present missing))))))
 
-;; Email mapping
+;; Email/phone mapping
 
-(defn get-id-by-email
-  [db query email]
-  (let [email (some-str email)]
-    (if (and db email)
-      (first (jdbc/execute-one! db [query email] opts-simple-vec)))))
-
-(defn get-ids-by-emails
-  [db query emails]
-  (if (and db emails)
-    (let [emails (map some-str emails)
-          query  (str query " " (braced-join-? emails))]
-      (->> (sql/query db (cons query emails) opts-simple-vec)
 (defn identity->str
   [id]
   (cond
@@ -255,36 +243,50 @@
   [id]
   (when-some [id (identity->str id)]
     (keyword id)))
+
+(defn get-user-id-by-identity
+  [db query identity]
+  (let [identity (identity->str identity)]
+    (if (and db identity)
+      (first (jdbc/execute-one! db [query identity] opts-simple-vec)))))
+
+(defn get-user-ids-by-identities
+  [db query identities]
+  (if (and db identities)
+    (let [identities (map identity->str identities)
+          query      (str query " " (braced-join-? identities))]
+      (->> (sql/query db (cons query identities) opts-simple-vec)
            next
            (map #(vector (keyword (nth % 0)) (nth % 1)))
            (into {})))))
 
-;; Email caching
+;; Email/phone caching
 
-(defn cache-lookup-email
-  [cache db id-getter email]
-  (if (and db (valuable? email))
-    (cwr/lookup-or-miss cache (keyword email) #(id-getter db %))))
+(defn cache-lookup-user-id
+  [cache db id-getter user-identity]
+  (let [user-identity (identity->str user-identity)]
+    (if (and db user-identity)
+      (cwr/lookup-or-miss cache (keyword user-identity) #(id-getter db %)))))
 
-(defn cache-lookup-emails
-  [cache emails]
-  (if (seq emails)
-    (let [emails (map #(when-valuable % (keyword %)) emails)]
-      (reduce (fn [m email]
-                (let [id (cwr/lookup cache email false)]
+(defn cache-lookup-user-ids
+  [cache identities]
+  (if (seq identities)
+    (let [identities (map identity->kw identities)]
+      (reduce (fn [m user-identity]
+                (let [id (cwr/lookup cache user-identity false)]
                   (if (false? id)
-                    (qassoc m false (conj (get m false) email))
-                    (qassoc m email id))))
-              {} emails))))
+                    (qassoc m false (conj (get m false) user-identity))
+                    (qassoc m user-identity id))))
+              {} identities))))
 
-(defn email-to-id
-  ([db cache getter email]
-   (cache-lookup-email cache db getter email)))
+(defn identity-to-user-id
+  ([db cache getter user-identity]
+   (cache-lookup-user-id cache db getter user-identity)))
 
-(defn emails-to-ids
-  [db cache getter emails]
-  (if (and db emails)
-    (let [looked-up (cache-lookup-emails cache emails)
+(defn identities-to-user-ids
+  [db cache getter identities]
+  (if (and db identities)
+    (let [looked-up (cache-lookup-user-ids cache identities)
           missing   (seq (get looked-up false))]
       (if-not missing
         looked-up
