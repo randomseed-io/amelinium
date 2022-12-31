@@ -371,7 +371,7 @@
               user-email    (session/user-email smap)
               password      (if user-email (some-str (get form-params :password)))
               form-params   (dissoc form-params :password)
-              auth-result   (super/auth-user-with-password! req user-email password smap route-data nil true)
+              auth-result   (super/auth-user-with-password! req user-email password smap route-data true nil)
               auth-bad?     (not= :auth/ok (:response/status auth-result))
               auth-settings (if-not auth-bad? (auth/settings req))
               auth-db       (auth/db auth-settings)
