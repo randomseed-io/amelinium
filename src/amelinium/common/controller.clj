@@ -68,13 +68,14 @@
   user properties."
   ([req auth-db smap time-fn]
    (lock-remaining-mins req auth-db smap time-fn :login))
-  ([req auth-db smap time-fn id-form-field]
+  ([req auth-db smap time-fn id-field]
    (if auth-db
-     (if-some [user (or (and smap (user/props-by-session auth-db smap))
-                        (user/props-by-email auth-db (get (get (get req :parameters) :form) id-form-field)))]
-       (if-some [auth-config (auth/config req (get user :account-type))]
-         (if-some [mins (time/minutes (common/soft-lock-remains user auth-config (time-fn)))]
-           (if (zero? mins) 1 mins)))))))
+     (let [user (and smap (user/props-by-session auth-db smap))
+           user (or user (user/props-by-email auth-db (get-in req [:parameters :form id-field])))]
+       (if (some? user)
+         (if-some [auth-config (auth/config req (get user :account-type))]
+           (if-some [mins (time/minutes (common/soft-lock-remains user auth-config (time-fn)))]
+             (if (zero? mins) 1 mins))))))))
 
 (defn prolongation?
   "Returns `true` if the given session `sess` is expired (but not hard expired),
