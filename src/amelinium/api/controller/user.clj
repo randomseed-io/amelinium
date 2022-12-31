@@ -429,8 +429,7 @@
         (api/render-error req :parameters/error)
         (if (> (count to-change) 1)
           (api/render-error req :verify/multiple-ids)
-          (let [auth-config  (auth/config req)
-                db           (auth/db auth-config)
+          (let [db           (auth/db req)
                 confirmation (confirmation/establish db id code token one-minute "change")
                 confirmed?   (get confirmation :confirmed?)
                 id-type      (or id-type (guess-identity-type confirmation))
@@ -460,13 +459,12 @@
   [req]
   (api/response
    req
-   (let [auth-config (auth/config req)
-         db          (auth/db auth-config)
-         all-params  (get req :parameters)
-         params      (get all-params :form)
-         code        (get params :code)
-         token       (get params :token)
-         login       (or (get params :user/email) (get params :login) (get params :email))]
+   (let [db         (auth/db req)
+         all-params (get req :parameters)
+         params     (get all-params :form)
+         code       (get params :code)
+         token      (get params :token)
+         login      (or (get params :user/email) (get params :login) (get params :email))]
      (if-not (or token (and code login))
        (api/render-error req :parameters/error)
        (let [confirmation (confirmation/establish db login code token one-minute "creation")
