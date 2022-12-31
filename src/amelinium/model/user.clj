@@ -391,6 +391,68 @@
   [db ids]
   (db/get-cached-coll-prop props-cache info-getter-coll db :email ids))
 
+;; Phone to ID mapping
+
+(def ^:const phone-id-query
+  "SELECT id FROM users WHERE phone = ?")
+
+(def ^:const phones-ids-query
+  "SELECT phone, id FROM users WHERE phone IN")
+
+(defn get-user-id-by-phone
+  "Returns user ID for the given phone (not cached)."
+  ([db phone]
+   (db/get-user-id-by-identity db phone-id-query phone))
+  ([db _ phone]
+   (db/get-user-id-by-identity db phone-id-query phone)))
+
+(defn get-user-ids-by-phones
+  "Returns user IDs for the given phones (not cached)."
+  ([db phones]
+   (db/get-user-ids-by-identities db phones-ids-query phones))
+  ([db _ phones]
+   (db/get-user-ids-by-identities db phones-ids-query phones)))
+
+(defn phone-to-id
+  "Returns user ID for the given phone (cached)."
+  [db phone]
+  (db/identity-to-user-id db ids-cache get-user-id-by-phone phone))
+
+(defn phones-to-ids
+  "Returns user IDs for the given phones (cached)."
+  [db phones]
+  (db/identities-to-user-ids db ids-cache get-user-ids-by-phones phones))
+
+(defn props-by-phone
+  "Returns user properties for the given phone (cached)."
+  [db phone]
+  (props db (phone-to-id db phone)))
+
+(defn prop-by-phone
+  "Returns user property identified by `prop-id` for the given phone (cached)."
+  ([db prop-id phone]
+   (prop db prop-id (phone-to-id db phone)))
+  ([db prop-id phone & phones]
+   (apply prop db prop-id (phones-to-ids db (cons phone phones)))))
+
+(defn id-to-phone
+  "Returns user phone for the given user ID (cached)."
+  ([db id]
+   (prop db :phone id))
+  ([db id & ids]
+   (apply prop db :phone id ids)))
+
+(defn ids-to-phones
+  "Returns user phones for the given user IDs (cached)."
+  [db ids]
+  (db/get-cached-coll-prop props-cache info-getter-coll db :phone ids))
+
+(defn phone-to-email
+  "Returns user e-mail for the given phone number (cached)."
+  ([db phone]
+   (prop db :email (phone-to-id db phone)))
+  ([db phone & phones]
+   (apply prop db :email (phones-to-ids db (cons phone phones)))))
 
 ;; UID to ID mapping
 
