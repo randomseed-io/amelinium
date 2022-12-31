@@ -46,16 +46,10 @@
   []
   (-> (random-uuid) uuid/to-byte-array hash/md5 codecs/bytes->hex))
 
-(defn identity->str
-  [id]
-  (if (phone/native? id)
-    (phone/format id :phone-number.format/e164)
-    (some-str id)))
-
 (defn phone-exists?
   [db phone]
   (if db
-    (if-some [phone (identity->str phone)]
+    (if-some [phone (db/identity->str phone)]
       (-> (jdbc/execute-one! db [phone-exists-query phone] db/opts-simple-vec)
           first some?))))
 
@@ -436,7 +430,7 @@
      (or (process-errors (jdbc/execute-one! db qargs db/opts-simple-map) should-be-confirmed?)
          verify-bad-token-set)))
   ([db id code reason should-be-confirmed?]
-   (let [id     (identity->str id)
+   (let [id     (db/identity->str id)
          reason (or (some-str reason) "creation")
          qargs  (cond code          [report-errors-code-query      reason id code]
                       (false? code) [report-errors-simple-id-query reason id]
@@ -454,7 +448,7 @@
   ([errs id src-id email-id phone-id]
    (if errs
      (if (contains? errs src-id)
-       (if-some [id (identity->str id)]
+       (if-some [id (db/identity->str id)]
          (if-some [dst-id (cond (str/index-of id \@ 1) email-id
                                 (= (first id) \+)      phone-id)]
            (conj (disj errs src-id) dst-id)
@@ -519,7 +513,7 @@
   not yet expired), it will also return a map with `:confirmed?` set to `true`."
   ([db id code exp-inc reason]
    (let [reason  (or (some-str reason) "creation")
-         id      (identity->str id)
+         id      (db/identity->str id)
          code    (some-str code)
          exp-inc (time/minutes exp-inc 1)]
      (if (and id code)
@@ -588,7 +582,7 @@
 (defn- decrease-attempts-core
   [db id reason]
   (if db
-    (if-some [id (identity->str id)]
+    (if-some [id (db/identity->str id)]
       (let [reason (or (some-str reason) "creation")]
         (if-some [r (jdbc/execute-one! db [decrease-attempts-query id reason] db/opts-simple-map)]
           (-> r
@@ -601,6 +595,8 @@
                 errs (specific-id errs id :verify/bad-id :verify/bad-email :verify/bad-phone)]
             {:confirmed? false
              :errors     errs}))))))
+
+;; Retries
 
 (defn retry-email
   ([udata]
@@ -633,7 +629,7 @@
    (if db
      (if-some [request-id (some-str request-id)]
        (if-some [code (some-str code)]
-         (if-some [id (identity->str id)]
+         (if-some [id (db/identity->str id)]
            (sql/update! db :confirmations
                         {:req-id request-id}
                         {:id id :code code}

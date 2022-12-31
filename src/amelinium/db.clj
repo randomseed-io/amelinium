@@ -244,6 +244,17 @@
     (let [emails (map some-str emails)
           query  (str query " " (braced-join-? emails))]
       (->> (sql/query db (cons query emails) opts-simple-vec)
+(defn identity->str
+  [id]
+  (cond
+    (string? id)       (some-str id)
+    (phone/native? id) (phone/format id nil :phone-number.format/e164)
+    :else              (some-str id)))
+
+(defn identity->kw
+  [id]
+  (when-some [id (identity->str id)]
+    (keyword id)))
            next
            (map #(vector (keyword (nth % 0)) (nth % 1)))
            (into {})))))
