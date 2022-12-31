@@ -57,6 +57,21 @@
       (->PasswordData pwd-shared (.intrinsic pwd-chains) suite-id)
       (->PasswordData nil nil nil))))
 
+(defn auth-config
+  "Returns authentication configuration (of type `AuthConfig`) for the given
+  `user-id`. Uses `:account-type` property of a registered user to obtain
+  user-specific authentication configuration.
+
+  If user ID is given but it is `nil` or `false`, or the specified user is not found,
+  `nil` is returned. If user ID is not given (unary variant is called) then generic
+  authentication configuration is returned (based on a default account type)."
+  ([req]
+   (auth/config req))
+  ([req ^Long user-id]
+   (if-some [^AuthSettings auth-settings (auth/settings req)]
+     (if-some [ac-type (prop (.db ^AuthSettings auth-settings) :account-type user-id)]
+       (auth/config auth-settings ac-type)))))
+
 (defn make-user-password
   {:arglists '([^AuthSettings auth-settings ^String password account-type]
                [^AuthSettings auth-settings params]
