@@ -261,7 +261,8 @@
                           (add-retry-fields))))))
 
 (defn resend!
-  "Re-sends verification e-mail or SMS to confirm the given identity."
+  "Re-sends verification e-mail or SMS to confirm the given identity when creating new
+  account."
   [req reason]
   (api/response
    req
@@ -272,7 +273,7 @@
          email           (.email udata)]
      (if (and phone email)
        (api/render-error req :verify/multiple-ids)
-       (let [db          (.db udata)
+       (let [db          (if udata (.db udata))
              reason      (or (some-str reason) "creation")
              [id id-type
               no-data f] (if phone
@@ -381,6 +382,7 @@
                 (let [lang                        (common/lang-id req)
                       ^AuthConfig auth-config     (auth/config auth-settings (get props :account-type))
                       ^AuthConfirmation auth-cfrm (if auth-config (.confirmation auth-config))
+                      auth-db                     (if auth-config (.db auth-config) auth-db)
                       attempts                    (if auth-cfrm   (.max-attempts auth-cfrm))
                       exp                         (if auth-cfrm   (.expires      auth-cfrm))
                       result                      (confirmation/create-for-change auth-db id user-id exp attempts id-type)]
