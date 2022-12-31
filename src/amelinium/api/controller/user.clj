@@ -101,9 +101,9 @@
 
   Takes a request map and obtains database connection, client IP address and
   authentication configuration from it. Also gets a user e-mail and a password from a
-  map associated with the `:form-params` key of the `req`. Calls
-  `auth-with-password!` to get the result or a redirect if authentication was not
-  successful.
+  map associated with the `:parameters` key and then with `:form` key of the
+  `req`. Calls `auth-with-password!` to get the result or a redirect if
+  authentication was not successful.
 
   If there is no e-mail nor password given (the value is `nil`, `false` or an empty
   string) then the password authentication is not performed but instead the validity
@@ -119,9 +119,9 @@
   ([req session-key]
    (api/response
     req
-    (let [form-params    (get req :form-params)
-          user-email     (some-str (get form-params "login"))
-          password       (if user-email (some-str (get form-params "password")))
+    (let [form-params    (get (get req :parameters) :form)
+          user-email     (some-str (get form-params :login))
+          password       (if user-email (some-str (get form-params :password)))
           route-data     (delay (http/get-route-data req))
           session-key    (or session-key (get @route-data :session-key))
           sess           (session/of req session-key)
@@ -137,8 +137,8 @@
 
   Takes a request map and obtains a database connection, client IP address and
   authentication configuration from it. Also gets user's e-mail and a password from a
-  map associated with the `:form-params` key of the `req`. Calls
-  `amelinium.common.controller/auth-with-password!` to get the authentication result
+  map associated with the `:parameters` key and then `:form` key of the `req`. Calls
+  `amelinium.common.controller/auth-user-with-password!` to get the authentication result
   with `auth-only-mode` argument set to `true`.
 
   If there is no e-mail nor password given (the value is `nil`, `false` or an empty
