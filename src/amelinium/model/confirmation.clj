@@ -476,6 +476,12 @@
 ;; Confirming identity with a token or code
 
 (defn gen-report-errors-query
+  "Generates SQL query for reporting errors found during confirmation process. When
+  executed the query returns a map with boolean values and the following keys:
+  `:confirmed` (already confirmed), `:attempts` (attempts exceeded),
+  `:reason` (reason for the given token or code is different from the reason for
+  which the confirmation had been created for), `:expires` (confirmation expired),
+  `:present` (an e-mail or a phone number is already assigned to an existing user). "
   [where]
   (str-squeeze-spc
    "SELECT (confirmed = TRUE) AS confirmed,"
