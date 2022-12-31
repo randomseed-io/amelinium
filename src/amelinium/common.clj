@@ -21,6 +21,7 @@
             [ring.util.request                     :as             req]
             [amelinium                             :as               p]
             [amelinium.types.session               :refer         :all]
+            [amelinium.types.auth                  :refer         :all]
             [amelinium.auth                        :as            auth]
             [amelinium.http                        :as            http]
             [amelinium.http.middleware.roles       :as           roles]
@@ -40,7 +41,7 @@
 
   (:import [java.time        Duration]
            [java.time.format DateTimeFormatter]
-           [amelinium        Session]
+           [amelinium        Session AuthSettings AuthConfig]
            [lazy_map.core    LazyMapEntry LazyMap]
            [reitit.core      Match]))
 
