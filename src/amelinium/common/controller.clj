@@ -196,11 +196,13 @@
        (hard-locked?) (do (log/wrn "Account locked permanently" for-user)
                           (oplog false :info "Permanent lock" for-mail)
                           (qassoc req :user/authorized? false :user/authenticated? false
+                                  :user/id user-id :user/account-type ac-type
                                   :auth/ok? false :response/status :auth/locked))
 
        (soft-locked?) (do (log/msg "Account locked temporarily" for-user)
                           (oplog false :info "Temporary lock" for-mail)
                           (qassoc req :user/authenticated? false :user/authorized? false
+                                  :user/id user-id :user/account-type ac-type
                                   :auth/ok? false :response/status :auth/soft-locked))
 
        (invalid-pwd?) (do (log/wrn "Incorrect password or user not found" for-user)
@@ -208,12 +210,15 @@
                             (oplog false :warn "Bad password" for-mail)
                             (user/update-login-failed @auth-config user-id ipaddr))
                           (qassoc req :user/authorized? false :user/authenticated? false
+                                  :user/id user-id :user/account-type ac-type
                                   :auth/ok? false :response/status :auth/bad-password))
 
        auth-only-mode (do (log/msg "Authentication successful" for-user)
                           (oplog true :info "Authentication OK" for-mail)
                           (user/update-login-ok auth-db user-id ipaddr)
-                          (qassoc req :auth/ok? true :response/status :auth/ok))
+                          (qassoc req :auth/ok? true :response/status :auth/ok
+                                  :user/id user-id :user/account-type ac-type
+                                  :user/authenticated? true))
 
        :authenticate! (do (log/msg "Login successful" for-user)
                           (oplog true :info "Login OK" for-mail)
@@ -235,12 +240,14 @@
                                   (log/log (or s :warn) c)
                                   (oplog-fn :level s :user-id user-id :op :session :ok? false :msg c))
                                 (qassoc req :user/authenticated? false :user/authorized? false
+                                        :user/id user-id :user/account-type ac-type
                                         :auth/ok? false :response/status :auth/session-error))
 
                               (if goto?
                                 (resp/temporary-redirect goto-uri)
                                 (-> req
-                                    (qassoc :auth/ok? true :response/status :auth/ok)
+                                    (qassoc :auth/ok? true :response/status :auth/ok
+                                            :user/id user-id :user/account-type ac-type)
                                     (session/inject sess)
                                     (common/roles-refresh))))))))))
 
