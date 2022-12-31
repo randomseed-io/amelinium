@@ -144,10 +144,22 @@
   AuthConfig
 
   (config
-    (^AuthConfig [config-source] config-source))
+    (^AuthConfig [config-source] config-source)
+    (^AuthConfig [config-source account-type]
+     (if (or (not account-type)
+             (contains?
+              (.ids ^AccountTypes (.account-types ^AuthConfig config-source))
+              (if (keyword? account-type) account-type (keyword account-type))))
+       config-source)))
   (db
     (^DataSource [settings-src]
-     (.db ^AuthConfig settings-src)))
+     (.db ^AuthConfig settings-src))
+    (^DataSource [settings-src account-type]
+     (if (or (not account-type)
+             (contains?
+              (.ids ^AccountTypes (.account-types ^AuthConfig settings-src))
+              (if (keyword? account-type) account-type (keyword account-type))))
+       (.db ^AuthConfig settings-src))))
 
   DataSource
 
