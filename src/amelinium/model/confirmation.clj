@@ -239,11 +239,13 @@
   returned map will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of
   existing user, `:id` set to the given identity (as a string) and `:reason` set to
   the given reason (as a keyword, or `nil` if not given)."
-  ([db query id user-id exp attempts user-required?]
-   (gen-confirmation-core db query id user-id exp attempts user-required? nil "change"))
-  ([db query id user-id exp attempts user-required? id-type]
-   (gen-confirmation-core db query id user-id exp attempts user-required? id-type "change"))
-  ([db query id user-id exp attempts user-required? id-type reason]
+  ([db query id user-id exp attempts]
+   (gen-confirmation-core db query id user-id exp attempts nil true "change"))
+  ([db query id user-id exp attempts id-type]
+   (gen-confirmation-core db query id user-id exp attempts id-type true "change"))
+  ([db query id user-id exp attempts id-type user-required?]
+   (gen-confirmation-core db query id user-id exp attempts id-type user-required? "change"))
+  ([db query id user-id exp attempts id-type user-required? reason]
    (if db
      (if-some [id (some-str id)]
        (let [need-gen? (or user-required? (some? user-id))
@@ -354,21 +356,21 @@
     (if user-required?
       email-confirmation-query-without-attempt
       email-confirmation-query-without-attempt-nouser)
-    id user-id exp attempts :email reason))
-  ([db id user-id exp attempts user-required? id-type reason]
+    id user-id exp attempts :email user-required? reason))
+  ([db id user-id exp attempts id-type user-required? reason]
    (if (phone? id-type)
      (gen-confirmation-core
       db
       (if user-required?
         phone-confirmation-query-without-attempt
         phone-confirmation-query-without-attempt-nouser)
-      (db/identity->str id) user-id exp attempts user-required? :phone reason)
+      (db/identity->str id) user-id exp attempts :phone user-required? reason)
      (gen-confirmation-core
       db
       (if user-required?
         email-confirmation-query-without-attempt
         email-confirmation-query-without-attempt-nouser)
-      id user-id exp attempts user-required? :email reason))))
+      id user-id exp attempts :email user-required? reason))))
 
 (defn create
   "Creates a confirmation code for an existing user identified by the given user
@@ -387,15 +389,22 @@
   ([db id user-id exp attempts user-required? reason]
    (gen-confirmation-core
     db (if user-required? email-confirmation-query email-confirmation-query-nouser)
-    id user-id exp attempts user-required? :email reason))
-  ([db id user-id exp attempts user-required? id-type reason]
+    id user-id exp attempts :email user-required? :reason))
+  ([db id user-id exp attempts id-type user-required? reason]
    (if (phone? id-type)
-     (gen-confirmation-core
-      db (if user-required? phone-confirmation-query phone-confirmation-query-nouser)
-      (db/identity->str id) user-id exp attempts user-required? :phone reason)
-     (gen-confirmation-core
-      db (if user-required? email-confirmation-query email-confirmation-query-nouser)
-      id user-id exp attempts user-required? :email reason))))
+     (do
+       (println "pre-phone" id)
+       (println "phone=" (db/identity->str id))
+       (gen-confirmation-core
+        db (if user-required? phone-confirmation-query phone-confirmation-query-nouser)
+        (db/identity->str id) user-id exp attempts :phone user-required? reason))
+     (do
+       (println id-type)
+       (println "pre-email" id)
+       (println "email=" (db/identity->str id))
+       (gen-confirmation-core
+        db (if user-required? email-confirmation-query email-confirmation-query-nouser)
+        id user-id exp attempts :email user-required? reason)))))
 
 ;; E-mail/phone change
 
@@ -414,7 +423,7 @@
   ([db id user-id exp attempts]
    (create-without-attempt db id user-id exp attempts true "change"))
   ([db id user-id exp attempts id-type]
-   (create-without-attempt db id user-id exp attempts true id-type "change")))
+   (create-without-attempt db id user-id exp attempts id-type true "change")))
 
 (defn create-for-change
   "Creates a confirmation code for an existing user identified by the given user
@@ -452,7 +461,7 @@
   ([db id user-id exp attempts]
    (create-without-attempt db id user-id exp attempts false "recovery"))
   ([db id user-id exp attempts id-type]
-   (create-without-attempt db id user-id exp attempts false id-type "recovery")))
+   (create-without-attempt db id user-id exp attempts id-type false "recovery")))
 
 (defn create-for-recovery
   "Creates a recovery code for an existing user identified by the given user
@@ -471,7 +480,7 @@
   ([db id user-id exp attempts]
    (create db id user-id exp attempts false "recovery"))
   ([db id user-id exp attempts id-type]
-   (create db id user-id exp attempts false id-type "recovery")))
+   (create db id user-id exp attempts id-type false "recovery")))
 
 ;; Confirming identity with a token or code
 
