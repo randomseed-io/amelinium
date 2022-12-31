@@ -295,18 +295,24 @@
   "Sets user password for the given user ID. Returns `:pwd/updated` if operation
   succeeded. May return error statuses: `:pwd/bad-user`, `:pwd/db-error`,
   `:pwd/bad-password`."
-  ([req user-id]
-   (let [form-params   (get (get req :parameters) :form)
-         auth-settings (auth/settings req)
-         auth-db       (auth/db auth-settings)
-         pwd-data      (user/make-user-password auth-settings form-params)]
-     (if-some [pwd-suite-id (get pwd-data :suite-id)]
-       (if-some [result (user/update-password auth-db user-id pwd-suite-id (get pwd-data :intrinsic))]
-         (if (pos-int? result)
-           :pwd/updated
-           :pwd/bad-user)
-         :pwd/db-error)
-       :pwd/bad-password))))
+  [req user-id password]
+  (qassoc
+   req :response/status
+   (let [auth-settings (auth/settings req)]
+     (if-some [ac-type (user/prop (auth/db auth-settings) :account-type user-id)]
+       (let [auth-config (auth/config auth-settings ac-type)
+             pwd-data    (user/make-user-password auth-config password)]
+         (if-some [pwd-suite-id (get pwd-data :suite-id)]
+           (if-some [result (user/update-password (auth/db auth-config)
+                                                  user-id
+                                                  pwd-suite-id
+                                                  (get pwd-data :intrinsic))]
+             (if (pos-int? result)
+               :pwd/updated
+               :pwd/bad-user)
+             :pwd/db-error)
+           :pwd/bad-password))
+       :pwd/bad-user))))
 
 ;; Coercion error handler
 
