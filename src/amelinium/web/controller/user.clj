@@ -217,3 +217,54 @@
        (not updated?)   (web/render-error req (:errors updated))
        :error!          (web/render-error req (or (not-empty (:errors confirmation))
                                                   (not-empty (:errors updated))))))))
+
+;; Password setting
+
+(defn- pwd-status
+  ([req]
+   (pwd-status req (http/get-route-data req)))
+  ([req route-data]
+   (case (get req :response/status)
+     :pwd/updated      req
+     :pwd/bad-password (common/move-to req (get route-data :auth/bad-password :login/bad-password))
+     :pwd/bad-user     (common/move-to req (get route-data :auth/bad-password :login/bad-password))
+     (common/go-to req (get route-data :auth/error :login/error)))))
+
+(defn change-password!
+  "Changes password for the user authenticated with an old password and e-mail or sets
+  the password for the given `user-id`."
+  ([req]
+   (let [form-params  (get (get req :parameters) :form)
+         user-email   (some-str (get form-params :login))
+         old-password (if user-email (some-str (get form-params :password)))
+         route-data   (http/get-route-data req)
+         req          (auth-with-password! req user-email old-password nil route-data nil true nil)]
+     (if (web/response? req)
+       req
+       (let [req (if (= :auth/ok (get req :response/status))
+                   (super/set-password!
+                    req
+                    (or (get req :user/id) (user/email-to-id (auth/db req) user-email))
+                    (get form-params :password/new))
+                   req)]
+         (pwd-status req route-data)))))
+  ([req user-id]
+   (pwd-status
+    (super/set-password! req user-id (get (get req :parameters) :password/new))))
+  ([req user-id password]
+   (pwd-status
+    (super/set-password! req user-id password))))
+
+(defn set-password!
+  "Sets password for a user specified by UID (form parameter `user/uid`) or
+  e-mail (form parameter `user/email)."
+  [req]
+  (let [form-params  (get (get req :parameters) :form)
+        user-email   (some-str (get form-params :user/email))
+        user-uid     (some-str (get form-params :user/uid))
+        new-password (if (or user-email user-uid) (get form-params :user/password))
+        user-id      (if user-email
+                       (user/email-to-id (auth/db req) user-email)
+                       (user/uid-to-id   (auth/db req) user-uid))]
+    (pwd-status
+     (super/set-password! req user-id new-password))))

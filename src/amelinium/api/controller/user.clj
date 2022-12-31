@@ -484,3 +484,86 @@
            (not created?)   (api/render-error req (:errors creation))
            :error!          (api/render-error req (or (not-empty (:errors confirmation))
                                                       (not-empty (:errors creation))))))))))
+
+;; Password setting
+
+(defn change-password!
+  "Changes password for the user authenticated with an old password and e-mail or sets
+  the password for the given `user-id`."
+  ([req]
+   (api/response
+    req
+    (let [form-params  (get (get req :parameters) :form)
+          user-email   (some-str (get form-params :login))
+          old-password (if user-email (some-str (get form-params :password)))
+          route-data   (http/get-route-data req)
+          req          (super/auth-user-with-password! req user-email old-password nil route-data true nil)]
+      (if (= :auth/ok (get req :response/status))
+        (super/set-password! req
+                             (or (get req :user/id) (user/email-to-id (auth/db req) user-email))
+                             (get form-params :password/new))
+        req))))
+  ([req user-id]
+   (super/set-password! req user-id (get (get req :parameters) :password/new)))
+  ([req user-id password]
+   (super/set-password! req user-id password)))
+
+(defn set-password!
+  "Sets password for a user specified by UID (form parameter `user/uid`) or
+  e-mail (form parameter `user/email)."
+  [req]
+  (api/response
+   req
+   (let [form-params  (get (get req :parameters) :form)
+         user-email   (some-str (get form-params :user/email))
+         user-uid     (some-str (get form-params :user/uid))
+         new-password (if (or user-email user-uid) (get form-params :user/password))
+         user-id      (if user-email
+                        (user/email-to-id (auth/db req) user-email)
+                        (user/uid-to-id   (auth/db req) user-uid))]
+     (super/set-password! req user-id new-password))))
+
+(defn reset-password!
+  "Sets password for a user if the given recovery key or code exists."
+  [req]
+  (let [form-params  (get (get req :parameters) :form)
+        user-email   (some-str (get form-params :user/email))
+        user-uid     (some-str (get form-params :user/uid))
+        new-password (if (or user-email user-uid) (get form-params :user/password))]
+    req)) ;; FIXME: finish this
+
+(defn recovery-create!
+  [req]
+  "Generates password recovery link and code, and sends it to a user via e-mail or
+  SMS."
+  (api/response
+   req
+   (let [form-params (get (get req :parameters) :form)
+         password    (some-str (get form-params :password))
+         channel     (select-keys form-params [:user/email :user/phone])
+         phone       (get channel :user/phone)
+         email       (get channel :user/email)
+         phone?      (some? phone)]
+     (if (and email phone?)
+       (api/render-error req :verify/multiple-ids)
+       (let [auth-settings               (auth/settings req)
+             auth-db                     (auth/db auth-settings)
+             [id props id-type]          (if phone?
+                                           [phone (user/props-by-phone auth-db phone) :user/phone]
+                                           [email (user/props-by-email auth-db email) :user/email])
+             user-id                     (get props :id)
+             ^AuthConfig auth-config     (auth/config auth-settings (get props :account-type))
+             ^AuthConfig auth-config     (or auth-config (auth/config auth-settings))
+             ^AuthConfirmation auth-cfrm (if auth-config (.confirmation auth-config))
+             auth-db                     (if auth-config (.db auth-config) auth-db)
+             attempts                    (if auth-cfrm   (.max-attempts auth-cfrm))
+             exp                         (if auth-cfrm   (.expires      auth-cfrm))
+             result                      (confirmation/create-for-recovery auth-db id user-id exp attempts id-type)]
+         (verify! req {:id               id
+                       :db               auth-db
+                       :lang             (common/lang-id req)
+                       :id-type          id-type
+                       :reason           "recovery"
+                       :result           result
+                       :tpl/phone-exists :verify/sms-recovery
+                       :tpl/email-exists :recovery/verify}))))))
