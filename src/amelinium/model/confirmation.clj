@@ -626,19 +626,24 @@
      (if (and id code)
        (let [r          (jdbc/execute-one! db [confirm-code-query id code reason exp-inc]
                                            db/opts-simple-map)
-             confirmed? (if r (pos-int? (get r :confirmed)))]
+             confirmed? (if r (pos-int? (get r :confirmed)))
+             user-id    (if r (get r :requester-id))]
          (if confirmed?
-           (qassoc r :confirmed? true :id-type (some-keyword (get r :id-type)))
+           (qassoc r :confirmed? true
+                   :id-type     (some-keyword (get r :id-type))
+                   :user/id     user-id)
            (let [errs (report-errors db id code reason false)
                  errs (specific-id errs id :verify/bad-id :verify/bad-email :verify/bad-phone)]
              (if r
                {:confirmed? false
                 :id-type    (some-keyword (get r :id-type))
                 :identity   id
+                :user/id    user-id
                 :code       code
                 :errors     errs}
                {:confirmed? false
                 :identity   id
+                :user/id    nil
                 :code       code
                 :errors     errs})))))))
   ([db id code token exp-inc reason]
@@ -651,17 +656,23 @@
            exp-inc (time/minutes exp-inc 1)]
        (let [r          (jdbc/execute-one! db [confirm-token-query token reason exp-inc]
                                            db/opts-simple-map)
-             confirmed? (if r (pos-int? (get r :confirmed)))]
+             confirmed? (if r (pos-int? (get r :confirmed)))
+             user-id    (if r (get r :requester-id))]
          (if confirmed?
-           (qassoc r :confirmed? true :id-type (some-keyword (get r :id-type)))
+           (qassoc r
+                   :confirmed? true
+                   :id-type   (some-keyword (get r :id-type))
+                   :user/id   user-id)
            (let [errs (report-errors db token reason false)]
              (if r
                {:confirmed? false
                 :identity   (get r :identity)
                 :id-type    (some-keyword (get r :id-type))
+                :user/id    user-id
                 :token      token
                 :errors     errs}
                {:confirmed? false
+                :user/id    nil
                 :token      token
                 :errors     errs}))))))))
 
