@@ -392,19 +392,12 @@
     id user-id exp attempts :email user-required? :reason))
   ([db id user-id exp attempts id-type user-required? reason]
    (if (phone? id-type)
-     (do
-       (println "pre-phone" id)
-       (println "phone=" (db/identity->str id))
-       (gen-confirmation-core
-        db (if user-required? phone-confirmation-query phone-confirmation-query-nouser)
-        (db/identity->str id) user-id exp attempts :phone user-required? reason))
-     (do
-       (println id-type)
-       (println "pre-email" id)
-       (println "email=" (db/identity->str id))
-       (gen-confirmation-core
-        db (if user-required? email-confirmation-query email-confirmation-query-nouser)
-        id user-id exp attempts :email user-required? reason)))))
+     (gen-confirmation-core
+      db (if user-required? phone-confirmation-query phone-confirmation-query-nouser)
+      (db/identity->str id) user-id exp attempts :phone user-required? reason)
+     (gen-confirmation-core
+      db (if user-required? email-confirmation-query email-confirmation-query-nouser)
+      id user-id exp attempts :email user-required? reason))))
 
 ;; E-mail/phone change
 
