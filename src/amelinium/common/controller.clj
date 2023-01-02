@@ -292,7 +292,7 @@
          req)))))
 
 (defn set-password!
-  "Sets user password for the given user ID. Returns `:pwd/updated` if operation
+  "Sets user password for the given user ID. Returns `:pwd/created` if operation
   succeeded. May return error statuses: `:pwd/bad-user`, `:pwd/db-error`,
   `:pwd/bad-password`."
   [req user-id password]
@@ -308,7 +308,7 @@
                                                   pwd-suite-id
                                                   (get pwd-data :intrinsic))]
              (if (pos-int? result)
-               :pwd/updated
+               :pwd/created
                :pwd/bad-user)
              :pwd/db-error)
            :pwd/bad-password))

@@ -225,6 +225,7 @@
    (pwd-status req (http/get-route-data req)))
   ([req route-data]
    (case (get req :response/status)
+     :pwd/created      req
      :pwd/updated      req
      :pwd/bad-password (common/move-to req (get route-data :auth/bad-password :login/bad-password))
      :pwd/bad-user     (common/move-to req (get route-data :auth/bad-password :login/bad-password))
