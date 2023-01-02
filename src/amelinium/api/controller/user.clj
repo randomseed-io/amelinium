@@ -33,7 +33,8 @@
   (:import [amelinium Session AuthSettings AuthConfig AuthConfirmation]
            [amelinium UserData Suites SuitesJSON]))
 
-(def one-minute (t/new-duration 1 :minutes))
+(def one-minute   (t/new-duration 1 :minutes))
+(def five-minutes (t/new-duration 5 :minutes))
 
 ;; Helpers
 
@@ -487,50 +488,65 @@
 
 ;; Password setting
 
-(defn change-password!
-  "Changes password for the user authenticated with an old password and e-mail or sets
-  the password for the given `user-id`."
+(defn password-change!
+  "Changes a password for the user authenticated with an old password and a session
+  token."
   ([req]
+   (password-change! req nil super/invalidate-user-sessions!))
+  ([req session-key]
+   (password-change! req session-key super/invalidate-user-sessions!))
+  ([req session-key session-invalidator]
    (api/response
     req
     (let [form-params  (get (get req :parameters) :form)
-          user-email   (some-str (get form-params :login))
-          old-password (if user-email (some-str (get form-params :password)))
+          old-password (some-str (get form-params :password))
+          new-password (get form-params :user/password)
           route-data   (http/get-route-data req)
+          session-key  (or session-key (get route-data :session-key))
+          session      (session/valid-of req session-key)
+          user-email   (session/user-email session)
           req          (super/auth-user-with-password! req user-email old-password nil route-data true nil)]
       (if (= :auth/ok (get req :response/status))
-        (super/set-password! req
-                             (or (get req :user/id) (user/email-to-id (auth/db req) user-email))
-                             (get form-params :password/new))
-        req))))
-  ([req user-id]
-   (super/set-password! req user-id (get (get req :parameters) :password/new)))
-  ([req user-id password]
-   (super/set-password! req user-id password)))
+        (let [user-id (or (get req :user/id)
+                          (session/user-email session)
+                          (user/email-to-id (auth/db req) user-email))
+              req     (super/set-password! req user-id new-password)]
+          (if (and session-invalidator (= :pwd/created (get req :response/status)))
+            (session-invalidator req nil :user/email user-email user-id))
+          req)
+        req)))))
 
-(defn set-password!
-  "Sets password for a user specified by UID (form parameter `user/uid`) or
-  e-mail (form parameter `user/email)."
-  [req]
-  (api/response
-   req
-   (let [form-params  (get (get req :parameters) :form)
-         user-email   (some-str (get form-params :user/email))
-         user-uid     (some-str (get form-params :user/uid))
-         new-password (if (or user-email user-uid) (get form-params :user/password))
-         user-id      (if user-email
-                        (user/email-to-id (auth/db req) user-email)
-                        (user/uid-to-id   (auth/db req) user-uid))]
-     (super/set-password! req user-id new-password))))
-
-(defn reset-password!
-  "Sets password for a user if the given recovery key or code exists."
-  [req]
-  (let [form-params  (get (get req :parameters) :form)
-        user-email   (some-str (get form-params :user/email))
-        user-uid     (some-str (get form-params :user/uid))
-        new-password (if (or user-email user-uid) (get form-params :user/password))]
-    req)) ;; FIXME: finish this
+(defn password-recover!
+  "Sets password for a user authenticated with the given recovery key or code and
+  identity (an e-mail or a phone number)."
+  ([req]
+   (password-recover! req super/invalidate-user-sessions!))
+  ([req session-invalidator]
+   (api/response
+    req
+    (let [form-params  (get (get req :parameters) :form)
+          to-change    (select-keys form-params [:user/email :user/phone])
+          new-password (get form-params :user/password)
+          token        (get form-params :token)
+          code         (get form-params :code)
+          [id-type id] (first to-change)]
+      (if (and token code)
+        (api/render-error req :parameters/error)
+        (let [db           (auth/db req)
+              confirmation (confirmation/establish db id code token one-minute "recovery")
+              confirmed?   (boolean (if confirmation (get confirmation :confirmed?)))
+              user-id      (if confirmation (get confirmation :user/id))
+              req          (if confirmed? (super/set-password! req user-id new-password) req)
+              updated?     (if confirmed? (= (get req :response/status) :pwd/created))]
+          (cond
+            (nil? confirmation) (api/render-error req :verify/bad-result)
+            updated?            (do (if session-invalidator
+                                      (session-invalidator req nil :user/email (user/id-to-email db user-id) user-id))
+                                    (confirmation/delete db id "recovery")
+                                    req)
+            (not confirmed?)    (api/render-error req (:errors confirmation))
+            (not updated?)      req
+            :error!             (api/render-error req (not-empty (:errors confirmation))))))))))
 
 (defn recovery-create!
   [req]
