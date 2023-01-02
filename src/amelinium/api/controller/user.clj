@@ -567,3 +567,17 @@
                        :result           result
                        :tpl/phone-exists :verify/sms-recovery
                        :tpl/email-exists :recovery/verify}))))))
+
+(defn password-create!
+  "Sets new user password using a valid session and a current password OR recovery
+  token or code and identity."
+  ([req]
+   (password-create! req nil super/invalidate-user-sessions!))
+  ([req session-key]
+   (password-create! req session-key super/invalidate-user-sessions!))
+  ([req session-key session-invalidator]
+   (let [form-params (get (get req :parameters) :form)]
+     (if (or (some? (get form-params :token))
+             (some? (get form-params :code)))
+       (password-recover! req session-invalidator)
+       (password-change!  req session-key session-invalidator)))))
