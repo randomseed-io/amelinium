@@ -274,6 +274,7 @@
               type
               value
               placeholder
+              autocomplete
               input-type]} field
             value?         (contains? params id-kw)
             error?         (contains? errors id-kw)
@@ -281,6 +282,7 @@
             name           (common/string-from-param name)
             type           (common/string-from-param type)
             itype          (common/string-from-param input-type)
+            autoc          (common/string-from-param autocomplete)
             label          (param-try-tr tr-sub :forms label id)
             phold          (param-try-tr tr-sub :forms placeholder id)
             value          (valuable (if value? (get params id-kw) value))
@@ -294,9 +296,10 @@
             html-label     (if label    (html-esc label))
             html-name      (if name     (html-esc name)  html-id)
             html-itype     (if itype    (html-esc itype) "text")
-            html-ptcls     (if type     (strb " param-type-"    (html-esc type)))
-            html-value     (if value    (strb " value=\""       (html-esc value) "\""))
-            html-phold     (if phold    (strb " placeholder=\"" (html-esc phold) "\""))
+            html-ptcls     (if type     (strb " param-type-"     (html-esc type)))
+            html-value     (if value    (strb " value=\""        (html-esc value) "\""))
+            html-phold     (if phold    (strb " placeholder=\""  (html-esc phold) "\""))
+            html-autoc     (if autoc    (strb " autocomplete=\"" (html-esc autoc) "\""))
             html-esumm     (if err-summ (strb "      <p class=\"error-summary\">"     (html-esc err-summ) "</p>\n"))
             html-edesc     (if err-desc (strb "      <p class=\"error-description\">" (html-esc err-desc) "</p>\n"))
             html-error     (if error?   (strb "    <div class=\"form-error\">\n" html-esumm html-edesc "</div>\n"))
@@ -304,7 +307,7 @@
         (strs "<div class=\"field param-" html-id html-ptcls "\">\n"
               html-label
               "    <input type=\"" html-itype "\" name=\"" html-name "\" id=\"" html-id "\""
-              html-phold html-value " />\n"
+              html-phold html-value html-autoc " />\n"
               html-error
               "  </div>\n")))))
 
