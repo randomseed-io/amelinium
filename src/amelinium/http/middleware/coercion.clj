@@ -8,31 +8,37 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid compile])
 
-  (:require [clojure.string          :as             str]
-            [amelinium.system        :as          system]
-            [amelinium.logging       :as             log]
-            [amelinium.i18n          :as            i18n]
-            [amelinium.schemas       :as         schemas]
-            [amelinium.common        :as          common]
-            [reitit.coercion         :as        coercion]
-            [reitit.ring.coercion    :as             rrc]
-            [malli.core              :as               m]
-            [malli.registry          :as       mregistry]
-            [io.randomseed.utils.var :as             var]
-            [io.randomseed.utils.map :as             map]
-            [io.randomseed.utils.map :refer     [qassoc]]
-            [io.randomseed.utils     :refer         :all]))
+  (:require [clojure.string                    :as             str]
+            [amelinium.system                  :as          system]
+            [amelinium.logging                 :as             log]
+            [amelinium.i18n                    :as            i18n]
+            [amelinium.schemas                 :as         schemas]
+            [amelinium.common                  :as          common]
+            [amelinium.http.middleware.session :as         session]
+            [reitit.coercion                   :as        coercion]
+            [reitit.ring.coercion              :as             rrc]
+            [malli.core                        :as               m]
+            [malli.registry                    :as       mregistry]
+            [io.randomseed.utils.var           :as             var]
+            [io.randomseed.utils.map           :as             map]
+            [io.randomseed.utils.map           :refer     [qassoc]]
+            [io.randomseed.utils               :refer         :all]))
 
 ;; Common functions
 
 (defn param-type
   "Takes a coercion error expressed as a map `e` and returns a string with parameter
   type if the type can easily be obtained (is a simple name expressed as a string or
-  a string representation of keyword). For complex schemas it returns `nil`."
+  a string representation of keyword). For very complex schemas (which do not consist
+  of a keyword or a vector with keyword at their first position) it returns `nil`."
   [e]
-  (if-some [s (some-str (get e :schema))]
-    (if (some? (re-find #"^\:?[a-zA-Z0-9\-_\+\?\!]+$" s))
-      (some-str (if (= \: (.charAt ^String s 0)) (subs s 1))))))
+  (if-some [^String s (some-str (get e :schema))]
+    (if-some [^String found (re-find #"^\[?\:?[a-zA-Z0-9\-_\+\?\!]+" s)]
+      (some-str
+       (if (= \: (.charAt found 0))
+         (subs found 1)
+         (if (and (= \[ (.charAt found 0)) (= \: (.charAt found 1)))
+           (subs found 2)))))))
 
 (defn translate-error
   "Takes a translation function with already applied language ID or a request map,
@@ -281,6 +287,48 @@
   [req errors]
   (qassoc req :form/errors (delay {:errors (parse-errors errors) :dest (get req :uri)})))
 
+;; Form-errors handling
+
+(defn- remove-params
+  [req]
+  (if-some [to-remove (seq (concat (keys (get req :form-params))
+                                   (keys (get req :body-params))))]
+    (if-some [params (not-empty (get req :params))]
+      (->> (concat to-remove (map keyword to-remove))
+           (apply dissoc params)
+           delay
+           (qassoc req :form-params {} :body-params {} :params))
+      req)
+    req))
+
+(defn handle-form-errors
+  "Tries to obtain form errors from a previously visited page, saved as a session
+  variable `:form-errors` or as a query parameter `form-errors`. The result is a map
+  of at least 3 keys: `:errors` (parsed errors), `:dest` (destination URI, matching
+  current URI if using a session variable), `:params` (map of other parameters and
+  their values, only when session variable is a source). The resulting map is then
+  added to a request map under the `:form/errors` key."
+  [req session-key]
+  (if-some [qp (get req :query-params)]
+    (if-let [query-params-errors (get qp "form-errors")]
+      (-> req remove-params
+          (qassoc
+           :form/errors
+           (delay
+             (or (if-let [smap (session/valid-of req session-key)]
+                   (let [sess-var (session/fetch-var! smap :form-errors)]
+                     (let [expected-uri    (:dest sess-var)
+                           sess-var-errors (:errors sess-var)]
+                       (if (and (map? sess-var-errors) (not-empty sess-var-errors)
+                                (or (not expected-uri) (= expected-uri (get req :uri))))
+                         (map/qassoc sess-var :errors (parse-errors sess-var-errors))))))
+                 (if (valuable? query-params-errors)
+                   {:errors (parse-errors query-params-errors)
+                    :dest   (get req :uri)
+                    :params nil})))))
+      req)
+    req))
+
 ;; Default exception handler
 
 (defn default-exception-handler
@@ -314,23 +362,36 @@
                          responder         identity
                          raiser            #(throw %)}}]
   {:name    k
-   :compile (fn [{:keys [coercion parameters responses]} _]
+   :compile (fn [{:keys [session-key form-errors? coercion parameters responses]} _]
               (if (and enabled? coercion (or parameters responses))
                 (let [exception-handler (var/deref-symbol exception-handler)
                       responder         (var/deref-symbol responder)
                       raiser            (var/deref-symbol raiser)]
-                  (fn [handler]
-                    (fn coercion-exception-handler
-                      ([req]
-                       (try
-                         (handler req)
-                         (catch Exception e
-                           (exception-handler e responder raiser))))
-                      ([req respond raise]
-                       (try
-                         (handler req respond #(exception-handler % respond raise))
-                         (catch Exception e
-                           (exception-handler e respond raise)))))))))})
+                  (if form-errors?
+                    (fn [handler]
+                      (fn coercion-exception-handler
+                        ([req]
+                         (try
+                           (handler (handle-form-errors req session-key))
+                           (catch Exception e
+                             (exception-handler e responder raiser))))
+                        ([req respond raise]
+                         (try
+                           (handler (handle-form-errors req session-key) respond #(exception-handler % respond raise))
+                           (catch Exception e
+                             (exception-handler e respond raise))))))
+                    (fn [handler]
+                      (fn coercion-exception-handler
+                        ([req]
+                         (try
+                           (handler req)
+                           (catch Exception e
+                             (exception-handler e responder raiser))))
+                        ([req respond raise]
+                         (try
+                           (handler req respond #(exception-handler % respond raise))
+                           (catch Exception e
+                             (exception-handler e respond raise))))))))))})
 
 (defn init-coercer
   [k {:keys [init initializer config enabled?] :or {enabled? true}}]
