@@ -367,6 +367,7 @@
                    (not handling-previous?))
             ;; redirect to a form-submission page allowing user to correct errors
             ;; transfer form errors using query params or form params (if a session is present)
+            ;; if session is present, use POST method, otherwise use GET
             (let [errors        (coercion/map-errors-simple data)
                   orig-uri      (if orig-uri (some-str orig-uri))
                   orig-params   (if orig-uri orig-params)
