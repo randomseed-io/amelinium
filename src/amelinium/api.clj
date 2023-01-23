@@ -44,7 +44,7 @@
                 split-query-params-simple split-query-params has-param?
                 req-param-path path-template-with-param template-path
                 parameterized-page parameterized-page-core
-                page localized-page localized-or-regular-page
+                page localized-page strictly-localized-page
                 current-page current-page-id current-page-id-or-path login-page auth-page
                 temporary-redirect localized-temporary-redirect
                 move-to see-other localized-see-other go-to])
@@ -1034,10 +1034,10 @@
   "Adds headers with associated values to `:response/headers` map of the `req` using
   built-in function `qassoc`. If any header name argument is a literal identifier
   (a keyword or a symbol), a character, a number, or a literal string, it will be
-  converted to a string literal and placed as `qassoc` argument. Otherwise it will be
-  left as is and wrapped into a call to `io.randomseed.utils/some-str` to ensure the
-  result is a string run-time. Missing header value, if any, will be padded with
-  `nil`."
+  converted to a string literal and placed as an argument passed to `qassoc`.
+  Otherwise it will be left as is and wrapped in a call to `io.randomseed.utils/some-str`
+  to ensure at run-time that the result will be a string. Missing header value, if any,
+  will be padded with `nil`."
   ([req header-name header-value]
    (let [header-name (if (or (ident?  header-name)
                              (string? header-name)

@@ -73,7 +73,7 @@
                 split-query-params-simple split-query-params req-param-path
                 path-template-with-param template-path
                 parameterized-page parameterized-page-core
-                page localized-page localized-or-regular-page
+                page localized-page strictly-localized-page
                 current-page current-page-id current-page-id-or-path login-page auth-page
                 temporary-redirect localized-temporary-redirect move-to
                 see-other localized-see-other go-to])

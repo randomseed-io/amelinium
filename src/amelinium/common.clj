@@ -508,15 +508,15 @@
                      (get req :language/str)
                      (or (get req :path-params) (get m :path-params))
                      (get req :query-params)
-                     true false)))
+                     false false)))
   ([req name-or-path]
    (localized-page req name-or-path
                    (get req :language/str)
-                   nil nil true false))
+                   nil nil false false))
   ([req name-or-path lang]
    (localized-page req name-or-path
                    (or lang (get req :language/str))
-                   nil nil true false))
+                   nil nil false false))
   ([req name-or-path lang params-or-lang-required?]
    (if-some [rtr (get req ::r/router)]
      (if (boolean? params-or-lang-required?)
@@ -530,7 +530,7 @@
                                rtr name-or-path
                                (or lang (get req :language/str))
                                params-or-lang-required?
-                               nil true false))))
+                               nil false false))))
   ([req name-or-path lang params query-params-or-lang-required?]
    (if-some [rtr (get req ::r/router)]
      (if (boolean? query-params-or-lang-required?)
@@ -544,7 +544,7 @@
                                rtr name-or-path
                                (or lang (get req :language/str))
                                params query-params-or-lang-required?
-                               true false))))
+                               false false))))
   ([req name-or-path lang params query-params lang-required?]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
@@ -576,12 +576,10 @@
                              lang-required?
                              name-path-fallback?))))
 
-(defn localized-or-regular-page
-  "Same as localized-page with lang-required? always set to false and with less arities
-  supported. When the language version of a page identified by its name is not
-  present it will fallback to a regular version, without using language
-  parameter. The regular page must exist too. If the path is given, it does not have
-  to exist but the resulting page (identified by a localized path) has to."
+(defn strictly-localized-page
+  "Same as `localized-page` with `lang-required?` always set to `true` and with less
+  arities supported. When the language version of a page identified by its name is
+  not present it will return `nil`."
   ([req]
    (let [m (get req ::r/match)]
      (localized-page req
@@ -589,31 +587,36 @@
                      (get req :language/str)
                      (or (get req :path-params) (get m :path-params))
                      (get req :query-params)
-                     false false)))
+                     true false)))
   ([req name-or-path]
    (localized-page req
                    name-or-path
                    (get req :language/str)
-                   nil nil false false))
+                   nil nil true false))
   ([req name-or-path lang]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
-                             nil nil false false)))
+                             nil nil true false)))
   ([req name-or-path lang params]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
-                             params nil false false)))
+                             params nil true false)))
   ([req name-or-path lang params query-params]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
                              params query-params
-                             false false))))
+                             true false)))
+  ([name-or-path lang params query-params router lang-param]
+   (parameterized-page-mem lang-param
+                           router name-or-path
+                           lang params query-params
+                           true false)))
 
 (defn- page-core
   ([rtr id]
@@ -652,9 +655,9 @@
   as an identifier, usually a keyword) and requiring a language parameter to be
   found (so it cannot be looked up using just a name alone) then it will use
   currently detected language obtained from the given request
-  map (key :language/str), and use it.
+  map (key `:language/str`), and use it.
 
-  When invoked with a language parameter, it calls localized-page to handle it.  The
+  When invoked with a language parameter, it calls localized-page to handle it. The
   lang-required? parameter is used when localized-page is called to check if the
   route which was matched is parameterized with the language parameter. This is to
   ensure that a localized route is used.
@@ -672,7 +675,7 @@
   they will be replaced.
 
   When having a language and a path given, the failed matching causes internally
-  called localized-page to fall back into brute-force mode where the given language
+  called `localized-page` to fall back into brute-force mode where the given language
   parameter is injected into every possible segment of a path to check if it exists."
   {:arglists '([req]
                [req name-or-path]
@@ -715,7 +718,7 @@
                   lang-or-params
                   nil nil))
      ;; language specified
-     (localized-page req name-or-path lang-or-params nil nil true false)))
+     (localized-page req name-or-path lang-or-params nil nil false false)))
   ([req name-or-path lang-or-params params-or-query-params-or-required?]
    (if (or (nil? lang-or-params) (map? lang-or-params))
      ;; no language specified
@@ -745,7 +748,7 @@
                        lang-or-params
                        params-or-query-params-or-required?
                        nil
-                       true
+                       false
                        false))))
   ([req name-or-path lang-or-params params-or-query-params query-params-or-require-param?]
    (if (or (nil? lang-or-params) (map? lang-or-params))
@@ -776,7 +779,7 @@
                        lang-or-params
                        nil
                        query-params-or-require-param?
-                       true
+                       false
                        false))))
   ([req name-or-path lang params query-params require-param?]
    ;; language specified
@@ -1096,7 +1099,7 @@
    (#'def-localized-redirect &form &env name f nil nil))
   ([name f code _]
    (#'def-localized-redirect &form &env name
-                             (str "Uses the localized-page function to calculate the destination path on a basis of
+                             (str "Uses the `localized-page` function to calculate the destination path on a basis of
   page name (identifier) or a path (a string) and performs a redirect"
                                   (if code (str " with code " code)) " to
   it using `" f "`. If the language is given it uses the `localized-page` function.
@@ -1524,24 +1527,26 @@
    (page req name-or-path))
   ([req name-or-path lang]
    (localized-page nil name-or-path lang
-                   nil nil true false
+                   nil nil false false
                    (get req ::r/router)
                    (lang-param req)))
   ([req name-or-path lang params]
    (localized-page nil name-or-path lang
-                   params nil true false
+                   params nil false false
                    (get req ::r/router)
                    (lang-param req)))
   ([req name-or-path lang params query-params]
    (localized-page nil name-or-path lang
-                   params query-params true false
+                   params query-params false false
                    (get req ::r/router)
                    (lang-param req)))
   ([name-or-path lang params query-params router language-settings-or-param]
    (localized-page nil name-or-path lang
                    params query-params
-                   true false router
+                   false false router
                    language-settings-or-param)))
+
+;;  (amelinium.common/localized-page nil :user/password-recover "pl" {:id-type "email"} nil false true rtr nil)
 
 (defn localized-path
   "Creates a URL on a basis of route name or a path. Uses very optimistic matching
@@ -1554,28 +1559,28 @@
   ([req name-or-path]
    (localized-page nil name-or-path
                    (or (get req :language/id) (pick-language-str req :default))
-                   nil nil true true
+                   nil nil false true
                    (get req ::r/router)
                    (lang-param req)))
   ([req name-or-path lang]
    (localized-page nil name-or-path lang
-                   nil nil true true
+                   nil nil false true
                    (get req ::r/router)
                    (lang-param req)))
   ([req name-or-path lang params]
    (localized-page nil name-or-path lang
-                   params nil true true
+                   params nil false true
                    (get req ::r/router)
                    (lang-param req)))
   ([req name-or-path lang params query-params]
    (localized-page nil name-or-path lang
-                   params query-params true true
+                   params query-params false true
                    (get req ::r/router)
                    (lang-param req)))
   ([name-or-path lang params query-params router language-settings-or-param]
    (localized-page nil name-or-path lang
                    params query-params
-                   true true
+                   false true
                    router language-settings-or-param)))
 
 ;; Anti-spam
@@ -1587,7 +1592,6 @@
    (if (zero? (get-rand-int 2 rng))
      (random-uuid)
      "")))
-
 
 ;; Parameters
 
