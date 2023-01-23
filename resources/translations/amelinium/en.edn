@@ -152,17 +152,18 @@
                            :session-id        "Session identifier"
                            :secure-session-id "Secure session identifier"
                            :language          "Language identifier"}
-   :type-should           {:phone             "Phone number should contain a country code with a plus sign."
-                           :regular-phone     "Phone number should contain a country code with a plus sign and be a regular (non-special) number."
-                           :email             "E-mail address should have a local part and a valid domain name."
-                           :password          "Password should have at least 8 characters, big and small letters, a digit and a special character."
-                           :password-relaxed  "Password must be present."
-                           :name              "Name should consist of regular characters with optional hyphen and cannot have blanks (like space)."
-                           :token             "Token should be a string expressing hexadecimal number."
-                           :session-id        "Session ID should be a string consisting of one or two hexadecimal numbers."
-                           :secure-session-id "Secure session ID should be a string consisting two hexadecimal numbers separated by hyphen."
-                           :language          "Language ID should express a correct, supported language code."
-                           :lang              "Language ID should express a correct, supported language code."}
+   :type-should           {:phone              "Phone number should contain a country code with a plus sign."
+                           :regular-phone      "Phone number should contain a country code with a plus sign and be a regular (non-special) number."
+                           :email              "E-mail address should have a local part and a valid domain name."
+                           :password           "Password should have at least 8 characters, big and small letters, a digit and a special character."
+                           :password-relaxed   "Password must be present."
+                           :name               "Name should consist of regular characters with optional hyphen and cannot have blanks (like space)."
+                           :token              "Token should be a string expressing hexadecimal number."
+                           :session-id         "Session ID should be a string consisting of one or two hexadecimal numbers."
+                           :secure-session-id  "Secure session ID should be a string consisting two hexadecimal numbers separated by hyphen."
+                           :language           "Language ID should express a correct, supported language code."
+                           :lang               "Language ID should express a correct, supported language code."
+                           :passwords-no-match "Repeated password must be the same."}
    :parameter-should      {:phone                          :type-should/phone
                            :regular-phone                  :type-should/regular-phone
                            :email                          :type-should/email
@@ -199,6 +200,8 @@
    :user                  {:created "User account created."
                            :deleted "User account deleted."}
    :forms                 {:logging       "Signing in"
+                           :recovery      "Password recovery"
+                           :recover       "Recover!"
                            :login         "Login!"
                            :email         :parameter/email
                            :password      :parameter/password

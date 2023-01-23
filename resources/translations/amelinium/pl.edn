@@ -156,16 +156,17 @@
                            :session-id        "Identyfikator sesji"
                            :secure-session-id "Bezpieczny identyfikator sesji"
                            :language          "Identyfikator języka"}
-   :type-should           {:phone             "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa."
-                           :regular-phone     "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa i nie być numerem specjalnym."
-                           :email             "Adres e-mailowy powinien zawierać część lokalną i poprawną domenę."
-                           :password          "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
-                           :password-relaxed  "Należy podać hasło."
-                           :name              "Imię powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
-                           :token             "Token powinien być łańcuchem znakowym reprezentującym liczbę w zapisie szesnastkowym."
-                           :session-id        "Identyfikator sesji powinien być jednym lub dwoma łańcuchami znakowymi w zapisie szesnastkowym."
-                           :secure-session-id "Bezpieczny identyfikator sesji powinien być jedną lub dwoma liczbami szesnastkowymi oddzielonymi dywizem."
-                           :language          "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."}
+   :type-should           {:phone              "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa."
+                           :regular-phone      "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa i nie być numerem specjalnym."
+                           :email              "Adres e-mailowy powinien zawierać część lokalną i poprawną domenę."
+                           :password           "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
+                           :password-relaxed   "Należy podać hasło."
+                           :name               "Imię powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
+                           :token              "Token powinien być łańcuchem znakowym reprezentującym liczbę w zapisie szesnastkowym."
+                           :session-id         "Identyfikator sesji powinien być jednym lub dwoma łańcuchami znakowymi w zapisie szesnastkowym."
+                           :secure-session-id  "Bezpieczny identyfikator sesji powinien być jedną lub dwoma liczbami szesnastkowymi oddzielonymi dywizem."
+                           :language           "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."
+                           :passwords-no-match "Powtórzone hasło musi być takie same."}
    :parameter-should      {:phone                          :type-should/phone
                            :regular-phone                  :type-should/regular-phone
                            :email                          :type-should/email
@@ -197,16 +198,20 @@
                            :lang                           :type-should/language}
    :user                  {:created "Utworzono konto użytkownika."
                            :deleted "Usunięto konto użytkownika."}
-   :forms                 {:logging       "Logowanie"
-                           :login         "Zaloguj!"
-                           :email         :parameter/email
-                           :password      :parameter/password
-                           :name          :parameter/name
-                           :first-name    :parameter/first-name
-                           :second-name   :parameter/second-name
-                           :last-name     :parameter/last-name
-                           :middle-name   :parameter/middle-name
-                           :phone         :parameter/phone
-                           :regular-phone :parameter/regular-phone}
+   :forms                 {:logging         "Logowanie"
+                           :recovery        "Odzyskiwanie hasła"
+                           :login           "Zaloguj!"
+                           :recover         "Odzyskaj!"
+                           :email           :parameter/email
+                           :password        :parameter/password
+                           :new-password    :parameter/password
+                           :repeat-password :parameter/password
+                           :name            :parameter/name
+                           :first-name      :parameter/first-name
+                           :second-name     :parameter/second-name
+                           :last-name       :parameter/last-name
+                           :middle-name     :parameter/middle-name
+                           :phone           :parameter/phone
+                           :regular-phone   :parameter/regular-phone}
 
    :tongue/pluralizer amelinium.i18n.pluralizers/pl}}}
