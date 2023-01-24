@@ -246,35 +246,35 @@
            (= \: (.charAt ^String v 0)))))
 
 (defn param-try-tr
-  ([tr-sub v]
+  ([tr-sub-fn v]
    (if v
      (if (kw-param? v)
        (if-some [v (common/keyword-from-param v)]
-         ((force tr-sub) v))
+         ((force tr-sub-fn) v))
        (not-empty (str v)))))
-  ([tr-sub k v]
+  ([tr-sub-fn k v]
    (if v
      (if (kw-param? v)
        (if-some [v (common/string-from-param v)]
-         ((force tr-sub) (some-str k) v))
+         ((force tr-sub-fn) (some-str k) v))
        (not-empty (str v)))))
-  ([tr-sub k v a]
+  ([tr-sub-fn k v a]
    (if v
      (if (kw-param? v)
        (if-some [v (common/string-from-param v)]
-         ((force tr-sub) (some-str k) v a))
+         ((force tr-sub-fn) (some-str k) v a))
        (not-empty (str v)))))
-  ([tr-sub k v a b]
+  ([tr-sub-fn k v a b]
    (if v
      (if (kw-param? v)
        (if-some [v (common/string-from-param v)]
-         ((force tr-sub) (some-str k) v a b))
+         ((force tr-sub-fn) (some-str k) v a b))
        (not-empty (str v)))))
-  ([tr-sub k v a b & more]
+  ([tr-sub-fn k v a b & more]
    (if v
      (if (kw-param? v)
        (if-some [v (common/string-from-param v)]
-         (apply (force tr-sub) (some-str k) v a b more))
+         (apply (force tr-sub-fn) (some-str k) v a b more))
        (not-empty (str v))))))
 
 (defn form-field
@@ -491,37 +491,39 @@
     (selmer/add-tag!
      :form
      (fn [args ctx content]
-       (let [args        (args->map (parse-args args))
-             smap        (session/of ctx)
-             sfld        (session/id-field smap)
-             sid         (session/id smap)
-             id-str      (common/string-from-param (get args :id))
-             tr-sub      (delay (i18n/no-default (translator-sub ctx translations-fn)))
-             lang        (get args :lang)
-             action      (get args :action)
-             method      (get args :method)
-             label       (get args :label)
-             label       (if label (param-try-tr tr-sub :forms label id-str))
-             method      (if method (common/string-from-param method))
-             lang        (if lang   (common/string-from-param lang))
-             action-lang (or (common/string-from-param (get args :action-lang)) lang)
-             form-props  {:tr-sub tr-sub :id id-str :session-id sid :session-id-field sfld}
-             action      (if action
-                           (lang-url router ctx action
-                                     action-lang
-                                     false
-                                     (assignments->kw-map (get args :path-params))
-                                     (assignments->map    (get args :query-params))
-                                     lang-param))
-             html-method (strb " method=\"" (if method (html-esc method) "post") "\"")
-             html-lang   (if lang   (strb " lang=\"" (html-esc lang) "\""))
-             html-action (if action (strb " action=\"" action "\""))
-             html-label  (if label  (html-esc label))
-             html-label  (if label  (strb "<label for=\"" id-str "\""
-                                          html-lang
-                                          " class=\"label\">"
-                                          html-label "</label>\n"))]
+       (let [args         (args->map (parse-args args))
+             smap         (session/of ctx)
+             sfld         (session/id-field smap)
+             sid          (session/id smap)
+             lang         (get args :lang)
+             action       (get args :action)
+             method       (get args :method)
+             label        (get args :label)
+             id-str       (common/string-from-param (get args :id))
+             tr-sub-fn    (delay (i18n/no-default (translator-sub ctx translations-fn)))
+             label        (if label (param-try-tr tr-sub-fn :forms label id-str))
+             label?       (some? label)
+             method       (if method (common/string-from-param method))
+             lang         (if lang   (common/string-from-param lang))
+             action?      (some? action)
+             action-lang  (if action? (or (common/string-from-param (get args :action-lang)) lang))
+             path-params  (if action? (assignments->kw-map (get args :path-params)))
+             query-params (if action? (assignments->map (get args :query-params)))
              id-str       (or id-str (if label? (ad-hoc-id action method label path-params query-params)))
+             action       (if action?
+                            (lang-url router ctx action action-lang false
+                                      path-params query-params lang-param))
+             form-props   (if id-str
+                            {:tr-sub tr-sub-fn :session-id sid :session-id-field sfld :id id-str}
+                            {:tr-sub tr-sub-fn :session-id sid :session-id-field sfld})
+             html-method  (strb " method=\"" (if method (html-esc method) "post") "\"")
+             html-lang    (if lang   (strb " lang=\"" (html-esc lang) "\""))
+             html-action  (if action (strb " action=\"" action "\""))
+             html-label   (if label? (html-esc label))
+             html-label   (if label? (strb "<label for=\"" id-str "\""
+                                           html-lang
+                                           " class=\"label\">"
+                                           html-label "</label>\n"))]
          (strs
           html-label
           "<form id=\"" id-str "\" class=\"familiar medium\"" html-lang html-method html-action ">"
