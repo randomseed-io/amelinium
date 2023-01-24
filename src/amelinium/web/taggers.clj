@@ -144,6 +144,20 @@
                                "\"/>\n")
                         r))))))
 
+(defn- pos-str
+  ^String [^Integer n]
+  (Integer/toUnsignedString n))
+
+(defn ad-hoc-id
+  "Generated ad-hoc ID on a basis of values passed as arguments."
+  (^String [a]         (pos-str (hash a)))
+  (^String [a b]       (pos-str (hash-ordered-coll [a b])))
+  (^String [a b c]     (pos-str (hash-ordered-coll [a b c])))
+  (^String [a b c d]   (pos-str (hash-ordered-coll [a b c d])))
+  (^String [a b c d e] (pos-str (hash-ordered-coll [a b c d e])))
+  (^String [a b c d e & more]
+   (pos-str (hash-ordered-coll (list* a b c d e more)))))
+
 (defn get-lang
   [ctx]
   (or (get ctx :language/str)
@@ -482,7 +496,6 @@
              sfld        (session/id-field smap)
              sid         (session/id smap)
              id-str      (common/string-from-param (get args :id))
-             id-str      (or id-str (str (random-uuid)))
              tr-sub      (delay (i18n/no-default (translator-sub ctx translations-fn)))
              lang        (get args :lang)
              action      (get args :action)
@@ -508,6 +521,7 @@
                                           html-lang
                                           " class=\"label\">"
                                           html-label "</label>\n"))]
+             id-str       (or id-str (if label? (ad-hoc-id action method label path-params query-params)))
          (strs
           html-label
           "<form id=\"" id-str "\" class=\"familiar medium\"" html-lang html-method html-action ">"
