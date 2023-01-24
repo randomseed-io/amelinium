@@ -30,10 +30,13 @@
 ;; Template helpers
 
 (defn url-enc
+  "Encodes URL given as a string `s` using Java's `URLEncoder/encode`."
   ^String [^String s]
   (URLEncoder/encode s))
 
 (defn url-esc
+  "Escapes certain characters (`<`, `>`, `\"` and `'`) in the given string `s` by
+  replacing them with character codes prefixed with `%` symbol."
   ^String [^String s]
   (let [slen              (unchecked-int (count s))
         ^StringBuilder sb (StringBuilder. slen)]
@@ -51,10 +54,14 @@
   s)
 
 (defn html-esc
-  [v]
-  (fp/escape-html* v))
+  "Escapes string `s` to be used in HTML using Selmer's
+  `selmer.filter-parser/escape-html*` function."
+  [s]
+  (fp/escape-html* s))
 
 (defn assignments->map
+  "Parses a string `s` with key=value assignments and returns a map with keys as
+  strings."
   [^String s]
   (if (and s (seq s))
     (->> (str/split s #"\,")
@@ -63,6 +70,8 @@
          (not-empty))))
 
 (defn assignments->kw-map
+  "Parses a string `s` with key=value assignments and returns a map with keys as
+  keywords."
   [^String s]
   (if (and s (seq s))
     (->> (str/split s #"\,")
@@ -72,15 +81,22 @@
          (not-empty))))
 
 (defn parse-args
+  "Parses arguments using `selmer.filter-parser/fix-filter-args` function."
   [args]
   (fp/fix-filter-args args))
 
 (defn args->map
+  "Transforms the given sequence of arguments `args` to a map by taking each
+  consecutive pair and changing its first element into a keyword (using
+  `amelinium.common/keyword-from-param`) to become a key associated with its paired
+  value."
   [args]
   (if (seq args)
     (apply array-map (map #(%1 %2) (cycle [common/keyword-from-param identity]) args))))
 
 (defn strb
+  "Like `clojure.core/str` but faster. Be aware that all arguments except first must be
+  of type `String` or `nil`."
   (^String [^Object a]
    (if a (.toString ^Object a) ""))
   (^String [^String a ^String b]
@@ -113,6 +129,8 @@
                      (.append (apply strb more))))))
 
 (defmacro strs
+  "Converts all arguments to strings and concatenates them. Neighbouring literal
+  strings will be concatenated at compile time."
   ([]
    "")
   ([a]
@@ -145,6 +163,7 @@
                         r))))))
 
 (defn- pos-str
+  "Calls Java's `Integer/toUnsignedString` on an integer number."
   ^String [^Integer n]
   (Integer/toUnsignedString n))
 
@@ -159,6 +178,8 @@
    (pos-str (hash-ordered-coll (list* a b c d e more)))))
 
 (defn get-lang
+  "Obtains a language string from a context map `ctx` by trying the following keys:
+  `:language/str`, `:lang`, `:language` and `:language/default`."
   [ctx]
   (or (get ctx :language/str)
       (some-str (get ctx :lang))
@@ -166,6 +187,8 @@
       (get ctx :language/default)))
 
 (defn get-lang-id
+  "Obtains a language identifier (as keyword) from a context map `ctx` by trying the
+  following keys: `:language/str`, `:lang`, `:language` and `:language/default`."
   [ctx]
   (or (get ctx :language/id)
       (some-keyword-simple (get ctx :lang))
@@ -173,6 +196,10 @@
       (get ctx :language/default)))
 
 (defn lang-url
+  "Transforms the given URI (a path expressed as a string) or a route name (a keyword)
+  to a localized path using the detected (or given) language. Calls
+  `amelinium.common/lang-url`. Tries to be very optimistic: if a path was given and
+  there was no success in transforming it into localized variant, it will return it."
   ([router ctx path-or-name lang localized? path-params query-params]
    (lang-url router ctx path-or-name lang localized? path-params query-params nil))
   ([router ctx path-or-name lang localized? path-params]
@@ -193,6 +220,15 @@
        (url-esc out-path)))))
 
 (defn translator
+  "For the given context map `ctx` and optional translation function `translations-fn`
+  it returns a translation function with predefined language, taking a translation
+  key `k` and optional arguments.
+
+  The value of `translations-fn` argument is used as fallback when there is no
+  `:i18n/translator` nor `:i18n/translator-nd` key found in a context map. It should
+  be a function returned by the `amelinium.i18n/translation-fn`. If `translations-fn`
+  is `nil` or `false`, it will fall back to a generic, globally initialized
+  `amelinium.i18n/translations`."
   ([ctx]
    (translator ctx nil))
   ([ctx translations-fn]
@@ -207,6 +243,17 @@
            ([k a b c & more] (apply i18n/translate-with tf lang k a b c more)))))))
 
 (defn translator-sub
+  "For the given context map `ctx` and optional translation function `translations-fn`
+  it returns a translation function with predefined language, taking a translation
+  key `k` and optional arguments. If the first optional argument is present and it is
+  not `nil` nor `false` then its value will become a name and the value of `k` will
+  become a namespace for a translation key.
+
+  The value of `translations-fn` argument is used as fallback when there is no
+  `:i18n/translator-sub` nor `:i18n/translator-sub-nd` key found in a context map. It
+  should be a function returned by the `amelinium.i18n/translation-fn`. If
+  `translations-fn` is `nil` or `false`, it will fall back to a generic, globally
+  initialized `amelinium.i18n/translations`."
   ([ctx]
    (translator-sub ctx nil))
   ([ctx translations-fn]
@@ -222,6 +269,9 @@
            ([k a b c d & more] (apply i18n/translate-sub-with tf lang k a b c d more)))))))
 
 (defn tr
+  "Translation function. Creates a translator by calling `translator` and prepares
+  arguments from a template tag to be passed to it (the first being converted to a
+  keyword). Returns a string or `nil`."
   ([args ctx]
    (tr args ctx nil))
   ([args ctx translations-fn]
@@ -229,6 +279,9 @@
      (apply translator (common/keyword-from-param (first args)) (next args)))))
 
 (defn tr-sub
+  "Translation function. Creates a translator by calling `translator-sub` and prepares
+  arguments from a template tag to be passed to it (the first and second being
+  converted to keywords). Returns a string or `nil`."
   ([args ctx]
    (tr-sub args ctx nil))
   ([args ctx translations-fn]
@@ -239,6 +292,8 @@
             (nnext args)))))
 
 (defn kw-param?
+  "Returns `true` if the given value is a keyword or a string expressing a
+  keyword (with `:` symbol as its first character)."
   [v]
   (or (keyword? v)
       (and (string? v)
@@ -246,6 +301,12 @@
            (= \: (.charAt ^String v 0)))))
 
 (defn param-try-tr
+  "Tries to translate tag parameters `k` and `v` using the given `tr-sub-fn`
+  function (which should be a result of calling `translator-sub`). If the value of
+  `v` is not a keyword or keyworded string (`kw-param?` applied to `v` does not
+  return `true`) then a string of `v` is returned without calling a translation
+  function. Any additional arguments are passed to a translation function as
+  additional arguments."
   ([tr-sub-fn v]
    (if v
      (if (kw-param? v)
@@ -278,6 +339,7 @@
        (not-empty (str v))))))
 
 (defn form-field
+  "Helper to generate HTML for the `form-field` tag."
   [args tr-sub errors params]
   (let [field (args->map args)
         id    (get field :id)]
@@ -326,6 +388,7 @@
               "  </div>\n")))))
 
 (defn form-fields
+  "Helper to generate HTML for the `form-fields` tag."
   [args tr-sub errors params]
   (str/join
    "\n"
@@ -333,6 +396,7 @@
      (form-field field tr-sub errors params))))
 
 (defn form-submit
+  "Helper to generate HTML for the `form-submit` tag."
   [label tr-sub session-field session-id validators]
   (let [label (param-try-tr tr-sub :forms (or label :submit))
         label (if label (html-esc label) "OK!")
@@ -343,6 +407,7 @@
           "  </div>\n")))
 
 (defn add-taggers
+  "Registers taggers in a global repository. To be changed to a pure fn some day."
   [router language translations-fn validators]
 
   (let [lang-settings (or (get language :config) language)
