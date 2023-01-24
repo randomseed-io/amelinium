@@ -33,12 +33,11 @@ associates.
   [maps](https://github.com/randomseed-io/amelinium/blob/main/resources/translations/amelinium/en.edn)
   with or without missing key messages and **[pluralization
   rules](https://github.com/randomseed-io/amelinium/blob/main/src/amelinium/i18n/pluralizers.clj)**
-  for translations of countable items in different languages.
+  for translations of countable items.
 
 * **[Session
   handling](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L82)**
-  with configurable persistent storage accessors, polymorphic interface, secure
-  tokens and prolongation support.
+  with configurable accessors, secure tokens and prolongation support.
 
 * **Cookie-less** session handling.
 
@@ -120,10 +119,124 @@ associates.
 
 ## Simplified request processing workflow
 
-Below is simplified request processing workflow for a web channel. Its purpose it to
-shed some light on the overall architecture.
+Below is the simplified request processing workflow for a web channel. It may shed
+some light on the overall architecture, especially when someone is new to Clojure way
+of handling HTTP with Ring abstraction.
 
 ![Web request processing in Amelinium](docs/img/amelinium-workflow-web.svg)
+
+The HTTP server handles incoming connections with TCP sockets and negotiates
+connection parameters. When the bi-directional stream is ready the control is passed
+to a specified [handler
+function](https://github.com/randomseed-io/amelinium/blob/main/src/amelinium/http/server/undertow.clj#L142)
+in Clojure, which in this case is [Reitit's Ring
+handler](https://github.com/randomseed-io/amelinium/blob/main/src/amelinium/http/handler.clj#L39)
+[configured](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L273)
+to use Reitit [HTTP
+router](https://github.com/randomseed-io/amelinium/blob/main/src/amelinium/http/router.clj#L28).
+
+As we can imagine, HTTP router is responsible for matching resource paths from URL
+strings requested by clients and associating them with configured [controllers]() and
+[middleware
+chains](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L236).
+
+Middleware chains are sequences of functions composed into a single execution chain
+to process request and/or response data. Controllers in Amelinium are handlers
+responsible for generating content after performing business-logic operations which
+may involve interacting with a database (via models) or connecting to other services.
+
+Initial context created by the Ring handler is a map populated with basic
+information, like parameters received from a client, remote IP address, requested
+path and so on. This **request map** is then passed as an argument to the first
+function of a middleware chain, and finally to a controller assigned in configuration
+to a specific HTTP path (route).
+
+Each middleware wrapper and controller can alter the request map. The last middleware
+(called *web renderer* on the diagram) is responsible for generating a **response
+map** on a basis of data found under some special keys in the request map. The
+entries identified by these keys should be set by the invoked controller (or, in rare
+cases by some middleware wrapper which may short-circuit the call chain and generate
+response).
+
+Note that in other middleware setups you will most likely find the route handlers
+being functions which used to process a request map and return a response map. The
+difference here (in Amelinium) is that controllers are suppose to add some keys (like
+`:response/status` and `:response/body`) to the received map and the response
+generation is handled later by the generic renderers (separate for web and API
+channels). Of course, if any controller will generate a response map, it will be
+honored and the rendering layer will be skipped. Same with any middleware request
+wrapper.
+
+When response map is returned it starts to "travel" through all middleware functions
+in chain to be processed before returning to a Ring handler. The difference between
+middleware function which transforms a request map from the middleware function which
+transforms a response map is only in the place where the processing is done.
+Request-related wrappers will operate on a request argument **before** other
+middleware wrappers are to be called, and response-related wrappers will operate on a
+result of calling all other wrappers. This is possible because Ring architecture is
+based on higher-order functions wrapping the actual logic.
+
+Below is an example of a middleware wrapper which alters a request map by adding
+`:REQ` key to it, and does the same thing with a response map by adding a `:RESP` key
+to it. Note the `(handler request)` call which will call all other wrappers in
+a chain.
+
+```clojure
+(fn [handler]
+  (fn [request]
+    (let [request  (assoc request :REQ true)    ;; request processing
+          response (handler request)            ;; calling other handlers
+          response (assoc response :RESP true)] ;; response processing
+      response)))
+```
+
+Some middleware wrappers will never care about doing something with the response,
+therefore being much simpler:
+
+```clojure
+(fn [handler]
+  (fn [request]
+    (handler (assoc request :REQ true))))
+```
+
+Controllers and middleware wrappers sometimes need access to data other than
+initially set by the web server. They may want to use external or internal data
+sources (like database connections or caches) or some additional configuration
+structures (like translations, data transformation schemas, and so on). One way to
+make additional objects available to request handling functions is to create
+a middleware which will then encapsulate some data using a lexical closure and inject
+it into a request map (by associating with some key). Then, response generating
+handler can extract value under that key of a request map and continue processing.
+
+The downside of the above approach is quite frequent, unconditional calling of such
+wrapper (for each processed request) which is not perfect when the injected data were
+going to be used on rare occasions. In such cases the Reitit router comes very handy
+since it allows to generate different middleware wrappers or the whole middleware
+chains for different paths/routes (or even route configurations).
+
+The above is implemented with another layer of abstraction which requires compilation
+phase when routes are loaded and analyzed. In this process a middleware wrapper may
+use function closure to keep the configuration associated with the `:data` key of
+a particular route. It may even be skipped for certain routes.
+
+Let's modify our previous example to show how it can be done:
+
+```clojure
+{:name :turbo-wrapper
+ :compile (fn [route-data _]
+            (if-some [rt? (:run-turbo? route-data)]           ;; will only exist
+              (fn [handler]                                   ;; if :run-turbo? was set
+                (fn [request]
+                  (let [request  (assoc request :REQ rt?)     ;; request processing
+                        response (handler request)            ;; calling other handlers
+                        response (assoc response :RESP rt?)]  ;; response processing
+                    response)))))}
+```
+
+In this example the middleware will be installed only for routes having `:run-turbo?`
+set to a truthy value in their route data maps (under `:data` key). Moreover, a value
+associated to the `:run-turbo?` key will be used to do something with a request and
+with a response.
 
 ## Tech stack
 
@@ -274,7 +387,7 @@ make docs
 make jar
 ```
 
-### Rebuilding POM
+ ### Rebuilding POM
 
 ```bash
 make pom
