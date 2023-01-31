@@ -340,41 +340,150 @@
      :pwd/bad-user     (common/move-to req (get route-data :auth/bad-password :login/bad-password))
      (common/go-to req (get route-data :auth/error :login/error)))))
 
-(defn change-password!
+(defn password-change!
   "Changes password for the user authenticated with an old password and e-mail or sets
   the password for the given `user-id`."
-  ([req]
-   (let [form-params  (get (get req :parameters) :form)
-         user-email   (some-str (get form-params :login))
-         old-password (if user-email (some-str (get form-params :password)))
-         route-data   (http/get-route-data req)
-         req          (auth-with-password! req user-email old-password nil route-data nil true nil)]
-     (if (web/response? req)
-       req
-       (let [req (if (= :auth/ok (get req :response/status))
-                   (super/set-password!
-                    req
-                    (or (get req :user/id) (user/email-to-id (auth/db req) user-email))
-                    (get form-params :password/new))
-                   req)]
-         (pwd-status req route-data)))))
-  ([req user-id]
-   (pwd-status
-    (super/set-password! req user-id (get (get req :parameters) :password/new))))
-  ([req user-id password]
-   (pwd-status
-    (super/set-password! req user-id password))))
-
-(defn set-password!
-  "Sets password for a user specified by UID (form parameter `user/uid`) or
-  e-mail (form parameter `user/email)."
   [req]
   (let [form-params  (get (get req :parameters) :form)
-        user-email   (some-str (get form-params :user/email))
-        user-uid     (some-str (get form-params :user/uid))
-        new-password (if (or user-email user-uid) (get form-params :user/password))
-        user-id      (if user-email
-                       (user/email-to-id (auth/db req) user-email)
-                       (user/uid-to-id   (auth/db req) user-uid))]
-    (pwd-status
-     (super/set-password! req user-id new-password))))
+        user-email   (some-str (get form-params :login))
+        new-password (get form-params :new-password)
+        new-repeated (get form-params :new-password-confirm)
+        old-password (if user-email (some-str (get form-params :password)))
+        route-data   (http/get-route-data req)
+        req          (auth-with-password! req user-email old-password nil route-data nil true nil)]
+    (if (web/response? req)
+      req
+      (if (= :auth/ok (get req :response/status))
+        (if (= new-password new-repeated)
+          (super/set-password!
+           req
+           (or (get req :user/id) (user/email-to-id (auth/db req) user-email))
+           new-password)
+          (super/throw-bad-param req :new-password-confirm new-repeated :passwords-no-match))
+        req))))
+
+(defn password-recover!
+  "Displays password recovery form and initiates password recovery by sending an e-mail
+  or SMS message with a verification code or token."
+  [req]
+  (let [params (get req :parameters)]
+    (if-some [id-type (some-keyword (get (get params :path) :id-type))]
+      (let [phone? (or (= :phone id-type) (= :user/phone id-type))
+            email? (not phone?)
+            req    (web/assoc-app-data req :identity/type id-type :phone? phone? :email? email?)]
+        (if-some [id (get (get params :form) id-type)]
+
+          ;; initiate recovery
+          ;; by generating a verification code and token
+          ;; associated with the given identity
+          ;; and sending e-mail or SMS message
+
+          (let [auth-settings               (auth/settings req)
+                auth-db                     (auth/db auth-settings)
+                [props id-type]             (if phone?
+                                              [(user/props-by-phone auth-db id) :phone]
+                                              [(user/props-by-email auth-db id) :email])
+                user-id                     (get props :id)
+                ^AuthConfig auth-config     (auth/config auth-settings (get props :account-type))
+                ^AuthConfig auth-config     (or auth-config (auth/config auth-settings))
+                ^AuthConfirmation auth-cfrm (if auth-config (.confirmation auth-config))
+                auth-db                     (if auth-config (.db auth-config) auth-db)
+                attempts                    (if auth-cfrm   (.max-attempts auth-cfrm))
+                exp                         (if auth-cfrm   (.expires      auth-cfrm))
+                result                      (confirmation/create-for-recovery auth-db id user-id exp attempts id-type)
+                req                         (verify! req {:id               id
+                                                          :db               auth-db
+                                                          :lang             (common/lang-id req)
+                                                          :id-type          id-type
+                                                          :reason           "recovery"
+                                                          :result           result
+                                                          :tpl/phone-exists :verify/sms-recovery
+                                                          :tpl/email-exists :recovery/verify})]
+            (web/response
+             req
+             (qassoc req :app/view :user/password-recover-sent)))
+
+          ;; display initial password recovery form
+
+          req))
+      req)))
+
+(defn password-update!
+  "Displays password setting form and changes password for a user authenticated with a
+  token or code."
+  [req]
+  (let [params        (get req :parameters)
+        form-params   (get params :form)
+        query-params  (get params :query)
+        path-params   (get params :path)
+        token         (or (get path-params :token) (get form-params :token))
+        code          (get form-params :code)
+        login         (get form-params :login)
+        email         (get form-params :email)
+        phone         (if-not email (get form-params :phone))
+        id-type       (if email :email (if phone :phone))
+        id            (or email phone)
+        password      (some-str (get form-params :password))
+        password-2    (some-str (get form-params :password-confirm))
+        set-password? (some? (or password password-2))]
+    (cond
+
+      ;; password present, token or code received
+      ;; validates confirmation and creates a new password
+
+      (and set-password? (some? (or token (code id))))
+      (if (not= password password-2)
+        (super/throw-bad-param req :password-confirm password-2 :passwords-no-match)
+        (let [db   (auth/db req)
+              cfrm (confirmation/establish db id code token one-minute "recovery")]
+          (if (get cfrm :confirmed?)
+            (do
+              (confirmation/delete db id "recovery")
+              (super/set-password! req (get cfrm :user/id) password))
+            (web/render-error req (or (:errors cfrm) :verify/bad-result)))))
+
+      ;; password not present, token or code received
+      ;;
+      ;; validates confirmation and displays a form for creating new password;
+      ;; token is extracted from a database response to use it later instead of a code
+      ;;
+      ;; if mobile is detected and mobile application URL is defined,
+      ;; renders a link or button to go back to the app and enter password there
+
+      (and (not set-password?) (or token (and code id)))
+      (let [db   (auth/db req)
+            cfrm (confirmation/establish db id code token one-minute "recovery")]
+        (if-not (get cfrm :confirmed?)
+          (web/render-error req (or (:errors cfrm) :verify/bad-result))
+          (let [id         (get cfrm :identity)
+                id-type    (get cfrm :id-type)
+                user-id    (get cfrm :user/id)
+                id-str     (db/identity->str id)
+                token      (some-str (or token (get cfrm :token)))
+                user-email (db/identity->str (user/id-to-email db user-id))
+                user-phone (delay (db/identity->str (user/id-to-phone db user-id)))
+                phone?     (= id-type :phone)
+                email?     (and (not phone?) (= id-type :email))
+                mobile?    (delay (common/mobile-agent? req))
+                app-url    (delay (if @mobile? (http/get-route-data req :app.url/recover)))
+                app-link   (delay (if @app-url (str app-url "?"
+                                                    (common/query-string-encode
+                                                     {"login" user-email
+                                                      "token" token}))))]
+            (web/assoc-app-data
+             req
+             :user/login              user-email
+             :user/email              user-email
+             :user/phone              user-phone
+             :user/identity           id-str
+             :identity/type           id-type
+             :identity/email?         email?
+             :identity/phone?         phone?
+             :confirmation/token      token
+             :confirmation/code       code
+             :confirmation/confirmed? true
+             :agent/mobile?           mobile?
+             :app.url/recover         app-link))))
+
+      ;; no token nor code
+      :else req)))
