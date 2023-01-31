@@ -207,6 +207,8 @@
                                               :app.url/login      destination
                                               :confirmation/token token
                                               :confirmation/code  code
+                                              :identity/email?    (= id-type :email)
+                                              :identity/phone?    (= id-type :phone)
                                               :identity/type      id-type
                                               :user/identity      id
                                               :user/login         login

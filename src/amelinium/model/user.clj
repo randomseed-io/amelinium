@@ -700,28 +700,28 @@
 (defn update-identity-with-token
   [id-type db id token]
   (case id-type
-    :user/email (update-email-with-token db token)
-    :user/phone (update-phone-with-token db token)
     :email      (update-email-with-token db token)
     :phone      (update-phone-with-token db token)
+    :user/email (update-email-with-token db token)
+    :user/phone (update-phone-with-token db token)
     (update-email-with-token db token)))
 
 (defn update-identity-with-code
   [id-type db id code]
   (case id-type
-    :user/email (update-email-with-code db id code)
-    :user/phone (update-phone-with-code db id code)
     :email      (update-email-with-code db id code)
     :phone      (update-phone-with-code db id code)
+    :user/email (update-email-with-code db id code)
+    :user/phone (update-phone-with-code db id code)
     (update-email-with-code db id code)))
 
 (defn update-identity-with-token-or-code
   [id-type db id token code]
   (case id-type
-    :user/email (update-email-with-token-or-code db id token code)
-    :user/phone (update-phone-with-token-or-code db id token code)
     :email      (update-email-with-token-or-code db id token code)
     :phone      (update-phone-with-token-or-code db id token code)
+    :user/email (update-email-with-token-or-code db id token code)
+    :user/phone (update-phone-with-token-or-code db id token code)
     (update-email-with-token-or-code db id token code)))
 
 ;; Passwords and login data

@@ -2045,12 +2045,12 @@
 
     (and (string? v) (pos? (count v)))
     (if (and (= (.charAt v 0) \+) (phone/valid? v))
-      :user/phone
+      :phone
       (if (some? (str/index-of v \@ 1))
-        :user/email))
+        :email))
 
     (phone/native? v)
-    :user/phone))
+    :phone))
 
 ;; Date and time
 

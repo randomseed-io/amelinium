@@ -181,11 +181,11 @@
         :as   opts}]
   (let [lang              (or lang       (common/pick-language req :registration) (common/lang-id req))
         tr                (or translator (i18n/no-default (common/translator req lang)))
-        id-type           (or id-type    :user/email)
         {:keys [confirmed?
                 errors
                 attempts
                 expires]} result
+        id-type           (or id-type (get :id-type result) :email)
         errors?           (some? (seq errors))
         attempts?         (and (not errors?) (int? attempts))
         attempts-left     (if attempts? (if (neg? attempts) 0 attempts))
@@ -271,8 +271,8 @@
              reason      (or (some-str reason) "creation")
              [id id-type
               no-data f] (if phone
-                           [phone :user/phone :verify/bad-phone confirmation/retry-phone]
-                           [email :user/email :verify/bad-email confirmation/retry-email])
+                           [phone :phone :verify/bad-phone confirmation/retry-phone]
+                           [email :email :verify/bad-email confirmation/retry-email])
              result      (f db id reason)]
          (verify! req {:db               db
                        :id               id
@@ -299,7 +299,7 @@
          result                      (confirmation/create-for-registration db udata)]
      (verify! req {:db               db
                    :id               (if udata (.email udata))
-                   :id-type          :user/email
+                   :id-type          :email
                    :result           result
                    :tpl/email-exists :registration/exists
                    :tpl/email-verify :registration/verify
@@ -375,6 +375,7 @@
             (let [user-id      (session/user-id smap)
                   props        (user/props-by-id auth-db user-id)
                   [id-type id] (first to-change)
+                  id-type      (if (= id-type :user/email) :email (if (= id-type :user/phone) :phone id-type))
                   to-change?   (some? id)
                   body         (common/pick-params props :user [:uid :email :phone])
                   req          (api/add-body req body)]
@@ -522,7 +523,8 @@
           new-password (get form-params :user/password)
           token        (get form-params :token)
           code         (get form-params :code)
-          [id-type id] (first to-change)]
+          [id-type id] (first to-change)
+          id-type      (if (= id-type :user/email) :email (if (= id-type :user/phone) :phone id-type))]
       (if (and token code)
         (api/render-error req :parameters/error)
         (let [db           (auth/db req)
@@ -558,8 +560,8 @@
        (let [auth-settings               (auth/settings req)
              auth-db                     (auth/db auth-settings)
              [id props id-type]          (if phone?
-                                           [phone (user/props-by-phone auth-db phone) :user/phone]
-                                           [email (user/props-by-email auth-db email) :user/email])
+                                           [phone (user/props-by-phone auth-db phone) :phone]
+                                           [email (user/props-by-email auth-db email) :email])
              user-id                     (get props :id)
              ^AuthConfig auth-config     (auth/config auth-settings (get props :account-type))
              ^AuthConfig auth-config     (or auth-config (auth/config auth-settings))
