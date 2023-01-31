@@ -144,6 +144,21 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions
 
+(defn verify-request-id-update
+  "Default confirmation request ID field updater for asynchronous identity
+  confirmation."
+  [db id-type id code token response]
+  (if-some [headers (:headers response)]
+    (if-some [req-id (if (map? headers)
+                       (or (get headers "twilio-request-id")
+                           (get headers "x-message-id")))]
+      (confirmation/update-request-id db id code token req-id))))
+
+(defn verify-process-error
+  "Default error processor for asynchronous e-mail or SMS sending."
+  [db id-type id code token exception]
+  (cprint exception))
+
 (defn invalidate-user-sessions!
   "Invalidates user sessions if `id-type` is an e-mail."
   ([req route-data id-type id user-id]

@@ -47,21 +47,6 @@
   [expires]
   (common/rfc1123-date-time expires))
 
-(defn verify-request-id-update
-  "Default confirmation request ID field updater for asynchronous identity
-  confirmation."
-  [db id-type id code token response]
-  (if-some [headers (:headers response)]
-    (if-some [req-id (if (map? headers)
-                       (or (get headers "twilio-request-id")
-                           (get headers "x-message-id")))]
-      (confirmation/update-request-id db id code token req-id))))
-
-(defn verify-process-error
-  "Default error processor for asynchronous e-mail or SMS sending."
-  [db id-type id code token exception]
-  (cprint exception))
-
 (defn auth-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
   conditions and may render a response.
@@ -216,8 +201,8 @@
                           url-type          (common/id-type->url-type id-type reason)
                           verify-link       (str (get rdata url-type) token "/?" lang-qs)
                           recovery-link     (if uid (str (get rdata :url/recover) uid "/?" lang-qs))
-                          req-updater       (get opts :async/responder verify-request-id-update)
-                          exc-handler       (get opts :async/raiser verify-process-error)
+                          req-updater       (get opts :async/responder super/verify-request-id-update)
+                          exc-handler       (get opts :async/raiser super/verify-process-error)
                           req-updater       #(req-updater db id-type id code token %)
                           exc-handler       #(exc-handler db id-type id code token %)
                           add-retry-fields  (fn [req]
