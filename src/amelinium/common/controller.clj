@@ -351,3 +351,21 @@
       (if raise
         (raise e)
         (throw e)))))
+
+(defn throw-bad-param
+  "Generates bad parameter exception which should trigger coercion error."
+  [req param value param-type]
+  (if-some [param (some-keyword param)]
+    (let [param-type (some-keyword param-type)]
+      (throw
+       (ex-info
+        "Parameter error"
+        {:type        :reitit.coercion/request-coercion
+         :request     req
+         :response    nil
+         :coercion    (http/get-route-data req :coercion)
+         :in          [:request :form-params]
+         :schema      [:map {:closed true} [param param-type]]
+         :errors      (list {:path [param] :in [param] :schema param-type :value nil})
+         :value       {param value}
+         :transformed {param nil}})))))
