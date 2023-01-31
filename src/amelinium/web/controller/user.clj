@@ -259,7 +259,7 @@
     (cond
       bad-result?      (web/render-error req :verify/bad-result)
       created?         (let [mobile-agent? (common/mobile-agent? req)
-                             app-uri       (http/get-route-data req :url/login)
+                             app-uri       (http/get-route-data req :app.url/login)
                              login         (or (some-str login) (get creation :email))
                              qs            (common/query-string-encode {"login" login})
                              destination   (str app-uri "?" qs)]
@@ -304,7 +304,7 @@
                               id            (get updated :identity)
                               mobile-agent? (common/mobile-agent? req)
                               route-data    (http/get-route-data req)
-                              app-uri       (get route-data :url/login)
+                              app-uri       (get route-data :app.url/login)
                               qs            (common/query-string-encode {"login" login})
                               destination   (str app-uri "?" qs)]
                           (if session-invalidator (session-invalidator req route-data id-type id user-id))
