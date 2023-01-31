@@ -8,21 +8,23 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [potemkin.namespaces                :as           p]
-            [reitit.coercion                    :as    coercion]
-            [ring.middleware.keyword-params     :as     ring-kw]
-            [ring.util.http-response            :as        resp]
-            [tick.core                          :as           t]
-            [amelinium.logging                  :as         log]
-            [amelinium.model.user               :as        user]
-            [amelinium.common                   :as      common]
-            [io.randomseed.utils.time           :as        time]
-            [io.randomseed.utils.map            :refer [qassoc]]
-            [io.randomseed.utils                :refer     :all]
-            [amelinium.auth                     :as        auth]
-            [amelinium.http                     :as        http]
-            [amelinium.http.middleware.session  :as     session]
-            [amelinium.types.session            :refer     :all])
+  (:require [potemkin.namespaces                :as            p]
+            [reitit.coercion                    :as     coercion]
+            [ring.middleware.keyword-params     :as      ring-kw]
+            [ring.util.http-response            :as         resp]
+            [tick.core                          :as            t]
+            [amelinium.logging                  :as          log]
+            [amelinium.model.user               :as         user]
+            [amelinium.model.confirmation       :as confirmation]
+            [amelinium.common                   :as       common]
+            [io.randomseed.utils.time           :as         time]
+            [io.randomseed.utils.map            :refer  [qassoc]]
+            [io.randomseed.utils                :refer      :all]
+            [amelinium.auth                     :as         auth]
+            [amelinium.http                     :as         http]
+            [amelinium.http.middleware.session  :as      session]
+            [amelinium.types.session            :refer      :all]
+            [puget.printer                      :refer  [cprint]])
 
   (:import [amelinium Session]))
 
@@ -332,6 +334,10 @@
 ;; Coercion error handler
 
 (defn handle-coercion-error
+  "Generic coercion error handler. Takes an exception object `e` and two functions:
+  `respond` which will receive the response and should pre-process it (defaults to
+  `clojure.core/identity` if falsy), `raise` which should handle the exception if its
+  type is unusual and (possibly) re-throw it (defaults to `throw`)."
   [e respond raise]
   (let [data  (ex-data e)
         ctype (get data :type)]
@@ -339,7 +345,9 @@
                       ::coercion/request-coercion  422
                       ::coercion/response-coercion 500
                       nil)]
-      (respond
-       {:status status
-        :body   (coercion/encode-error data)})
-      (raise e))))
+      (if respond
+        (respond {:status status :body (coercion/encode-error data)})
+        {:status status :body (coercion/encode-error data)})
+      (if raise
+        (raise e)
+        (throw e)))))
