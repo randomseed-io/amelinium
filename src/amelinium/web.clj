@@ -28,7 +28,8 @@
             [io.randomseed.utils.map              :refer     [qassoc]]
             [io.randomseed.utils                  :refer         :all]
             [hiccup.core                          :refer         :all]
-            [hiccup.table                         :as           table])
+            [hiccup.table                         :as           table]
+            [lazy-map.core                        :as        lazy-map])
 
   (:import [reitit.core Match]
            [lazy_map.core LazyMapEntry LazyMap]))
@@ -126,7 +127,25 @@
      (if (and data labels)
        (html (table/to-table1d data labels))))))
 
-;; HTML rendering
+;; HTML rendering and :app/data
+
+(defn map-to-lazy
+  "Ensures that the given argument `m` is a lazy map. If it is not a map, it is
+  returned as is. If it is `nil`, empty lazy map is returned."
+  [m]
+  (if (map? m)
+    (map/to-lazy m)
+    (if (nil? m)
+      empty-lazy-map
+      m)))
+
+(defmacro response
+  "Creates a response block. If the given `req` is already a response then it is simply
+  returned. Otherwise the expressions from `code` are evaluated."
+  [req & code]
+  (if (and (seq? code) (> (count code) 1))
+    `(let [req# ~req] (if (response? req#) req# (do ~@code)))
+    `(let [req# ~req] (if (response? req#) req# ~@code))))
 
 (defn get-missing-app-data-from-req
   "Associates missing data identified with keys listed in `keyz` with values taken from
@@ -146,6 +165,20 @@
   associating it with the `false` value."
   [req]
   (qassoc req :app/data false))
+
+(defn no-app-data?
+  [req]
+  "Returns `true` when the value associated with `:app/data` in `req` is `false`."
+  (false? (get req :app/data)))
+
+(defn app-data
+  "Gets the value of `:app/data` for the current request. If it does not exist or it is
+  `nil`, returns an empty lazy map. Otherwise it returns the unmodified value. If it
+  is a map but not a lazy map, converts it to a lazy map."
+  [req]
+  (if-some [m (get req :app/data)]
+    (map-to-lazy m)
+    empty-lazy-map))
 
 (defn prep-app-data
   "Prepares data for the rendering functions by copying the given values associated
@@ -171,11 +204,90 @@
              (get-missing-app-data-from-req data req keyz)
              (map/select-keys-lazy req keyz))))))))
 
-(defn get-app-data
-  "Gets the value of `:app/data` for the current request. If it does not exist, returns
-  an empty map."
-  [req]
-  (if-let [ad (get req :app/data empty-lazy-map)] ad))
+(defmacro add-app-data
+  "Adds a lazy map to a request map `req` under its key `:app/data` using
+  `qassoc`. Overwrites previous value. The body is a result of evaluating expressions
+  passed as additional arguments (`body`). Returns updated `req`. Assumes that `req`
+  is always a map. Ensures that the resulting map is lazy. Ensures that the result is
+  not `nil` (if it is, empty lazy map is returned).
+
+  Associating `:app/data` with `false` will prevent it from further processing."
+  [req & body]
+  (if (and (seq? body) (> (count body) 1))
+    `(qassoc ~req :app/data (map-to-lazy (do ~@body)))
+    `(qassoc ~req :app/data (map-to-lazy ~@body))))
+
+(defn update-app-data
+  "Updates the `:app/data` in a request map `req` with a result of calling the function
+  `f` on the previous value and optional arguments. Uses
+  `io.randomseed.utils.map/qassoc`. Returns updated `req` with a lazy map under
+  `:add/data` key. Ensures that the result of calling `f` is a lazy map and if it is
+  not, tries to convert it to a lazy map (if it is `nil`). When the current value of
+  `:app/data` is `false` it will short-circuit and skip updating."
+  ([req]
+   (add-app-data req))
+  ([req f]
+   (let [ad (app-data req)]
+     (if (false? ad) req (qassoc req :app/data (map-to-lazy (f ad))))))
+  ([req f a]
+   (let [ad (app-data req)]
+     (if (false? ad) req (qassoc req :app/data (map-to-lazy (f ad a))))))
+  ([req f a b]
+   (let [ad (app-data req)]
+     (if (false? ad) req (qassoc req :app/data (map-to-lazy (f ad a b))))))
+  ([req f a b c]
+   (let [ad (app-data req)]
+     (if (false? ad) req (qassoc req :app/data (map-to-lazy (f ad a b c))))))
+  ([req f a b c d]
+   (let [ad (app-data req)]
+     (if (false? ad) req (qassoc req :app/data (map-to-lazy (f ad a b c d))))))
+  ([req f a b c d & more]
+   (let [ad (app-data req)]
+     (if (false? ad) req (qassoc req :app/data (map-to-lazy (apply f ad a b c d more)))))))
+
+(defmacro assoc-app-data
+  "Adds keys with associated values to `:app/data` map of the `req` using `qassoc`. If
+  any key argument is a literal identifier (keyword or symbol), a character, or a
+  literal string, it will be converted to a keyword literal and placed as `qassoc`
+  argument. Otherwise it will be left as is and wrapped into a call to
+  `io.randomseed.utils/some-keyword` to ensure the result is a keyword
+  run-time. Missing last value, if any, will be padded with `nil`. If there is no
+  body or the body is empty, it will initialize it with a map expression, otherwise
+  it will use `assoc`. Assumes that `req` is always a map. If the current value of
+  `:app/data` is `false`, it will skip the processing."
+  ([req k v]
+   (let [k (if (or (ident? k) (string? k) (char? k))
+             (some-keyword k)
+             (cons `some-keyword (cons k nil)))]
+     `(let [req# ~req
+            apd# (app-data req#)]
+        (if (false? apd#) req# (qassoc req# :app/data (qassoc apd# ~k ~v))))))
+  ([req k v & more]
+   (let [pairs  (cons k (cons v more))
+         names  (take-nth 2 pairs)
+         values (concat (take-nth 2 (rest pairs)) '(nil))
+         pairs  (map #(cons (if (or (ident?  %1)
+                                    (string? %1)
+                                    (char?   %1))
+                              (some-keyword %1)
+                              (cons `some-keyword (cons %1 nil)))
+                            (cons %2 nil))
+                     names values)
+         pairs  (apply concat pairs)
+         names  (take-nth 2 pairs)
+         dups?  (not= (count names) (count (distinct names)))]
+     (if dups?
+       `(let [req# ~req
+              apd# (app-data req#)]
+          (if (false? apd#) req# (qassoc req# :app/data (qassoc apd# ~@pairs))))
+       `(let [req# ~req
+              apd# (app-data req#)]
+          (if (false? apd#)
+            req#
+            (qassoc req# :app/data
+                    (if (pos? (count apd#))
+                      (qassoc apd# ~@pairs)
+                      (lazy-map/->LazyMap {~@pairs ~@[]})))))))))
 
 ;; Layouts and views
 
@@ -265,7 +377,7 @@
 (defn update-status
   ([req status lang status-key title-key description-key]
    (if status
-     (->> (update-status (get req :app/data) req status lang status-key title-key description-key)
+     (->> (update-status (get req :app/data empty-lazy-map) req status lang status-key title-key description-key)
           (qassoc req :app/data))
      req))
   ([data req status lang status-key title-key description-key]
