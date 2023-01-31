@@ -141,6 +141,13 @@
 (derive ::http-middleware   ::system/var-make)
 
 ;;
+;; url
+;;
+
+(system/add-init  ::url [k url] (var/make k (some-str url)))
+(system/add-halt! ::url [k url] (var/make k nil))
+
+;;
 ;; application state management
 ;;
 
