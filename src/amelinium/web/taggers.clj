@@ -583,23 +583,25 @@
              path-params  (if action? (assignments->kw-map (get args :path-params)))
              query-params (if action? (assignments->map (get args :query-params)))
              id-str       (or id-str (if label? (ad-hoc-id action method label path-params query-params)))
+             id-str?      (some? id-str)
              action       (if action?
                             (lang-url router ctx action action-lang false
                                       path-params query-params lang-param))
-             form-props   (if id-str
+             form-props   (if id-str?
                             {:tr-sub tr-sub-fn :session-id sid :session-id-field sfld :id id-str}
                             {:tr-sub tr-sub-fn :session-id sid :session-id-field sfld})
              html-method  (strb " method=\"" (if method (html-esc method) "post") "\"")
-             html-lang    (if lang   (strb " lang=\"" (html-esc lang) "\""))
-             html-action  (if action (strb " action=\"" action "\""))
-             html-label   (if label? (html-esc label))
-             html-label   (if label? (strb "<label for=\"" id-str "\""
-                                           html-lang
-                                           " class=\"label\">"
-                                           html-label "</label>\n"))]
+             html-lang    (if lang    (strb " lang=\"" (html-esc lang) "\""))
+             html-action  (if action  (strb " action=\"" action "\""))
+             html-id      (if id-str? (strb " id=\"" id-str "\""))
+             html-label   (if label?  (html-esc label))
+             html-label   (if label?  (strb "<label for=\"" id-str "\""
+                                            html-lang
+                                            " class=\"label\">"
+                                            html-label "</label>\n"))]
          (strs
           html-label
-          "<form id=\"" id-str "\" class=\"familiar medium\"" html-lang html-method html-action ">"
+          "<form" html-id " class=\"familiar medium\"" html-lang html-method html-action ">"
           (selmer/render (get (get content :form) :content) (map/qassoc ctx :form-props form-props) {:tag-second \-})
           "</form>")))
      :end-form)
