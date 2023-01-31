@@ -218,22 +218,22 @@
                                                     :verifyLink       verify-link
                                                     :recoveryLink     recovery-link})]
                       (case id-type
-                        :user/email (if-some [template (get opts (if exists?
-                                                                   :tpl/email-exists
-                                                                   :tpl/email-verify))]
-                                      (twilio/sendmail-l10n-template-async
-                                       (get rdata :twilio/email)
-                                       req-updater exc-handler
-                                       lang id
-                                       template
-                                       @template-params))
-                        :user/phone (if-some [sms-tr-key (get opts (if exists?
-                                                                     :tpl/phone-exists
-                                                                     :tpl/phone-verify))]
-                                      (twilio/sendsms-async
-                                       (get rdata :twilio/sms)
-                                       req-updater exc-handler
-                                       id (tr sms-tr-key @template-params))))
+                        :email (if-some [template (get opts (if exists?
+                                                              :tpl/email-exists
+                                                              :tpl/email-verify))]
+                                 (twilio/sendmail-l10n-template-async
+                                  (get rdata :twilio/email)
+                                  req-updater exc-handler
+                                  lang id
+                                  template
+                                  @template-params))
+                        :phone (if-some [sms-tr-key (get opts (if exists?
+                                                                :tpl/phone-exists
+                                                                :tpl/phone-verify))]
+                                 (twilio/sendsms-async
+                                  (get rdata :twilio/sms)
+                                  req-updater exc-handler
+                                  id (tr sms-tr-key @template-params))))
                       (-> req
                           (api/add-status :verify/sent)
                           (add-retry-fields))))))
