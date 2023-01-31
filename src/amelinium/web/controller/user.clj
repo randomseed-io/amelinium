@@ -317,10 +317,10 @@
                                               :identity/email?    (= id-type :email)
                                               :identity/phone?    (= id-type :phone)
                                               :identity/type      id-type
-                                              :user/identity      id
+                                              :user/identity      (db/identity->str id)
                                               :user/login         login
-                                              :user/email         login
-                                              :user/phone         phone
+                                              :user/email         (db/identity->str login)
+                                              :user/phone         (db/identity->str phone)
                                               :agent/mobile?      mobile-agent?}))
        (not confirmed?) (web/render-error req (:errors confirmation))
        (not updated?)   (web/render-error req (:errors updated))
