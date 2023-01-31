@@ -354,7 +354,6 @@
          ctype (get data :type)
          data  (dissoc data :request :response)]
      (case ctype
-
        :reitit.coercion/request-coercion
        (let [route-data             (http/get-route-data req)
              forced-orig-page       (get route-data :form-errors/page)

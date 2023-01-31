@@ -191,9 +191,9 @@
   with an existing code and token.
 
   When the given identity (`id`) is already assigned to a registered user the
-  returned map will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of
-  existing user, `:id` set to the given identity (as a string) and `:reason` set to
-  the given reason (as a keyword, or `nil` if not given)."
+  returned map will contain 4 keys: `:exists?` set to `true`, `:existing-user/id` set
+  to ID of existing user, `:id` set to the given identity (as a string) and `:reason`
+  set to the given reason (as a keyword, or `nil` if not given)."
   ([db query id exp udata]
    (gen-full-confirmation-core db query id exp udata nil (get udata :reason)))
   ([db query id exp udata id-type]
@@ -219,9 +219,9 @@
                  user-uid?     (uuid? user-uid)
                  requester-id? (pos-int? requester-id)]
              (-> r
-                 (map/assoc-if user-id?      :user/id      user-id)
-                 (map/assoc-if user-uid?     :user/uid     user-uid)
-                 (map/assoc-if requester-id? :requester/id requester-id)
+                 (map/assoc-if user-id?      :existing-user/id   user-id)
+                 (map/assoc-if user-uid?     :existing-user/uid user-uid)
+                 (map/assoc-if requester-id? :user/id       requester-id)
                  (qassoc :exists? user-id? :confirmed? (pos-int? (get r :confirmed)))
                  (dissoc :confirmed :user-id :user-uid :requester-id)
                  (map/update-existing :account-type some-keyword)
@@ -236,9 +236,9 @@
   with an existing code and token.
 
   When the given identity (`id`) is already assigned to a registered user the
-  returned map will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of
-  existing user, `:id` set to the given identity (as a string) and `:reason` set to
-  the given reason (as a keyword, or `nil` if not given)."
+  returned map will contain 4 keys: `:exists?` set to `true`, `:existing-user/id`
+  set to ID of existing user, `:id` set to the given identity (as a string) and
+  `:reason` set to the given reason (as a keyword, or `nil` if not given)."
   ([db query id user-id exp attempts]
    (gen-confirmation-core db query id user-id exp attempts nil true "change"))
   ([db query id user-id exp attempts id-type]
@@ -266,9 +266,9 @@
                  user-uid?     (uuid? user-uid)
                  requester-id? (pos-int? requester-id)]
              (-> r
-                 (map/assoc-if requester-id? :requester/id requester-id)
-                 (map/assoc-if user-id?      :user/id      user-id)
-                 (map/assoc-if user-uid?     :user/uid     user-uid)
+                 (map/assoc-if user-id?      :existing-user/id     user-id)
+                 (map/assoc-if user-uid?     :existing-user/uid   user-uid)
+                 (map/assoc-if requester-id? :user/id         requester-id)
                  (qassoc :user/required? user-required?
                          :exists?        user-id?
                          :confirmed?     (pos-int? (get r :confirmed)))
@@ -286,9 +286,9 @@
   with an existing code and token.
 
   When the given e-mail is already assigned to a registered user the returned map
-  will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of existing
-  user, `:id` set to the given e-mail (as a string) and `:reason` set to the given
-  reason (as a keyword, or `nil` if not given)."
+  will contain 4 keys: `:exists?` set to `true`, `:existing-user/id` set to ID
+  of existing user, `:id` set to the given e-mail (as a string) and `:reason`
+  set to the given reason (as a keyword, or `nil` if not given)."
   ([udata]
    (create-for-registration-without-attempt (get udata :db) udata))
   ([db udata]
@@ -314,9 +314,9 @@
   with an existing code and token.
 
   When the given e-mail is already assigned to a registered user the returned map
-  will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of existing
-  user, `:id` set to the given e-mail (as a string) and `:reason` set to the given
-  reason (as a keyword, or `nil` if not given).
+  will contain 4 keys: `:exists?` set to `true`, `:existing-user/id` set to ID
+  of existing user, `:id` set to the given e-mail (as a string) and `:reason`
+  set to the given reason (as a keyword, or `nil` if not given).
 
   Attempts counter is increased each time this function is called."
   ([udata]
@@ -347,9 +347,9 @@
   with an existing code and token.
 
   When the given e-mail is already assigned to some other registered user the
-  returned map will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of
-  existing user, `:id` set to the given e-mail (as a string) and `:reason` set to the
-  given reason (as a keyword, or `nil` if not given)."
+  returned map will contain 4 keys: `:exists?` set to `true`, `:existing-user/id` set
+  to ID of existing user, `:id` set to the given e-mail (as a string) and `:reason`
+  set to the given reason (as a keyword, or `nil` if not given)."
   ([db id user-id exp attempts user-required? reason]
    (gen-confirmation-core
     db
@@ -381,9 +381,9 @@
   with an existing code and token.
 
   When the given e-mail is already assigned to some other registered user the
-  returned map will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of
-  existing user, `:id` set to the given e-mail (as a string) and `:reason` set to the
-  given reason (as a keyword, or `nil` if not given).
+  returned map will contain 4 keys: `:exists?` set to `true`, `:existing-user/id` set
+  to ID of existing user, `:id` set to the given e-mail (as a string) and `:reason`
+  set to the given reason (as a keyword, or `nil` if not given).
 
   Attempts counter is increased each time this function is called."
   ([db id user-id exp attempts user-required? reason]
@@ -410,9 +410,9 @@
   with an existing code and token.
 
   When the given e-mail is already assigned to some other registered user the
-  returned map will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of
-  existing user, `:id` set to the given e-mail (as a string) and `:reason` set to the
-  given reason (as a keyword, or `nil` if not given)."
+  returned map will contain 4 keys: `:exists?` set to `true`, `:existing-user/id` set
+  to ID of existing user, `:id` set to the given e-mail (as a string) and `:reason` set
+  to the given reason (as a keyword, or `nil` if not given)."
   ([db id user-id exp attempts]
    (create-without-attempt db id user-id exp attempts true "change"))
   ([db id user-id exp attempts id-type]
@@ -427,9 +427,9 @@
   with an existing code and token.
 
   When the given e-mail is already assigned to some other registered user the
-  returned map will contain 4 keys: `:exists?` set to `true`, `:user/id` set to ID of
-  existing user, `:id` set to the given e-mail (as a string) and `:reason` set to the
-  given reason (as a keyword, or `nil` if not given).
+  returned map will contain 4 keys: `:exists?` set to `true`, `:existing-user/id` set
+  to ID of existing user, `:id` set to the given e-mail (as a string) and `:reason` set
+  to the given reason (as a keyword, or `nil` if not given).
 
   Attempts counter is increased each time this function is called."
   ([db id user-id exp attempts]
@@ -448,9 +448,9 @@
   with an existing code and token.
 
   When the given e-mail is assigned to the given user the returned map will contain 4
-  keys: `:exists?` set to `true`, `:user/id` set to ID of existing user, `:id` set to
-  the given e-mail (as a string) and `:reason` set to the given reason (as a keyword,
-  or `nil` if not given)."
+  keys: `:exists?` set to `true`, `:existing-user/id` set to ID of existing user,
+  `:id` set to the given e-mail (as a string) and `:reason` set to the given reason
+  (as a keyword, or `nil` if not given)."
   ([db id user-id exp attempts]
    (create-without-attempt db id user-id exp attempts false "recovery"))
   ([db id user-id exp attempts id-type]
@@ -465,9 +465,9 @@
   with an existing code and token.
 
   When the given e-mail is assigned to the given user the returned map will contain 4
-  keys: `:exists?` set to `true`, `:user/id` set to ID of existing user, `:id` set to
-  the given e-mail (as a string) and `:reason` set to the given reason (as a keyword,
-  or `nil` if not given).
+  keys: `:exists?` set to `true`, `:existing-user/id` set to ID of existing user,
+  `:id` set to the given e-mail (as a string) and `:reason` set to the given reason
+  (as a keyword, or `nil` if not given).
 
   Attempts counter is increased each time this function is called."
   ([db id user-id exp attempts]
@@ -615,6 +615,9 @@
   keyword describing the cause if the token or code was not verified. Returns `nil`
   if something went wrong during the interaction with a database or when the required
   input parameters were empty.
+
+  The `:user/id` key of a result, if exists, contains numeric user identifier of a
+  requester (the user for whom the verification was initiated).
 
   If the identity is already confirmed and there is no error (i.e. confirmation has
   not yet expired), it will also return a map with `:confirmed?` set to `true`."
