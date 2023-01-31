@@ -12,6 +12,8 @@
             [clojure.string                     :as             str]
             [amelinium.types.session            :refer         :all]
             [amelinium.logging                  :as             log]
+            [amelinium.db                       :as              db]
+            [amelinium.i18n                     :as            i18n]
             [amelinium.common                   :as          common]
             [amelinium.common.controller        :as           super]
             [amelinium.web                      :as             web]
@@ -21,13 +23,120 @@
             [amelinium.http.middleware.language :as        language]
             [amelinium.model.user               :as            user]
             [amelinium.model.confirmation       :as    confirmation]
+            [amelinium.http.client.twilio       :as          twilio]
             [io.randomseed.utils.map            :as             map]
             [io.randomseed.utils.map            :refer     [qassoc]]
-            [io.randomseed.utils                :refer         :all])
+            [io.randomseed.utils                :refer         :all]
+            [puget.printer :refer [cprint]])
 
-  (:import [amelinium Session]))
+  (:import [amelinium Session AuthSettings AuthConfig AuthConfirmation]
+           [amelinium UserData Suites SuitesJSON]))
 
 (def one-minute (t/new-duration 1 :minutes))
+
+(defn retry-after
+  "Returns an expiration date and time formatted according to the RFC 1123."
+  [expires]
+  (common/rfc1123-date-time expires))
+
+(defn verify!
+  "Performs the identity verification by sending an e-mail or SMS with a URL to
+  complete confirmation."
+  [req {:keys [no-data result reason db id id-type lang translator route-data]
+        :as   opts}]
+  (let [lang              (or lang       (common/pick-language req :registration) (common/lang-id req))
+        tr                (or translator (i18n/no-default (common/translator req lang)))
+        {:keys [confirmed?
+                errors
+                attempts
+                expires]} result
+        id-str            (db/identity->str id)
+        id-type           (or id-type (get result :id-type) :email)
+        errors?           (some? (seq errors))
+        attempts?         (and (not errors?) (int? attempts))
+        attempts-left     (if attempts? (if (neg? attempts) 0 attempts))
+        max-attempts?     (if attempts? (zero? attempts-left))
+        bad-result?       (not (or errors? attempts?))
+        retry-dur         (delay (common/duration-nanos expires))
+        retry-in          (delay (common/retry-in-mins @retry-dur))
+        in-mins           (delay (tr :in-mins @retry-in))
+        retry-in-mins     (delay (tr :try-in-mins @retry-in))
+        mins-left         (delay (tr :mins-left @retry-in))
+        attempts-left-w   (delay (tr :attempts-left attempts-left))]
+    (cond
+      bad-result?   (web/render-error  req (or no-data :verify/bad-result))
+      errors?       (web/render-error  req errors)
+      confirmed?    (web/render-status req :verify/confirmed)
+      max-attempts? (-> req
+                        (web/assoc-app-data :verify/retry-in           retry-in
+                                            :verify/in-mins            retry-in-mins
+                                            :verify/retry-unit         :minutes
+                                            :verify/retry-dur          retry-dur
+                                            :verify/mins-left          mins-left
+                                            :verify/attempts-left      attempts-left
+                                            :verify/attempts-left-word attempts-left-w
+                                            :sub-status/description    retry-in-mins)
+                        (web/add-header :Retry-After (retry-after expires))
+                        (web/add-status :verify/max-attempts))
+      :send!        (let [{:keys [token code
+                                  exists?]} result
+                          lang-str          (some-str lang)
+                          remote-ip         (get req :remote-ip/str)
+                          rdata             (or route-data (http/get-route-data req))
+                          existing-uid      (if exists? (some-str (get result :existing-user/uid)))
+                          existing-user-id  (if exists? (get result :existing-user/id))
+                          lang-qs           (common/query-string-encode {"lang" lang-str})
+                          url-type          (common/id-type->url-type id-type reason)
+                          verify-link       (str (get rdata url-type) token "/?" lang-qs)
+                          recovery-link     (if existing-uid (str (get rdata :url/recover) existing-uid "/?" lang-qs))
+                          req-updater       (get opts :async/responder super/verify-request-id-update)
+                          exc-handler       (get opts :async/raiser super/verify-process-error)
+                          req-updater       #(req-updater db id-type id code token %)
+                          exc-handler       #(exc-handler db id-type id code token %)
+                          email?            (= :email id-type)
+                          phone?            (and (not email?) (= :phone id-type))
+                          user-login        (if email? id-str (if existing-user-id (delay (user/id-to-email db existing-user-id))))
+                          template-params   (delay {:serviceName      (tr :verify/app-name)
+                                                    :expiresInMinutes @in-mins
+                                                    :remoteAddress    remote-ip
+                                                    :verifyCode       (str code)
+                                                    :verifyLink       verify-link
+                                                    :recoveryLink     recovery-link})]
+                      (case id-type
+                        :email (if-some [template (get opts (if exists?
+                                                              :tpl/email-exists
+                                                              :tpl/email-verify))]
+                                 (twilio/sendmail-l10n-template-async
+                                  (get rdata :twilio/email)
+                                  req-updater exc-handler
+                                  lang id
+                                  template
+                                  @template-params))
+                        :phone (if-some [sms-tr-key (get opts (if exists?
+                                                                :tpl/phone-exists
+                                                                :tpl/phone-verify))]
+                                 (twilio/sendsms-async
+                                  (get rdata :twilio/sms)
+                                  req-updater exc-handler
+                                  id (tr sms-tr-key @template-params))))
+                      (-> req
+                          (web/add-status :verify/sent)
+                          (web/assoc-app-data
+                           :user/identity             id-str
+                           :user/phone                (if phone? id-str)
+                           :user/email                (if email? id-str)
+                           :user/login                user-login
+                           :identity/phone?           phone?
+                           :identity/email?           email?
+                           :identity/type             id-type
+                           :verify/retry-in           retry-in
+                           :verify/in-mins            in-mins
+                           :verify/retry-in-mins      retry-in-mins
+                           :verify/retry-unit         :minutes
+                           :verify/retry-dur          retry-dur
+                           :verify/mins-left          mins-left
+                           :verify/attempts-left      attempts-left
+                           :verify/attempts-left-word attempts-left-w))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
