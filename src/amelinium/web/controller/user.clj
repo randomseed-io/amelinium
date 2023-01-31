@@ -214,9 +214,8 @@
   ([req] (login! req nil))
   ([req session-key]
    (let [^Session sess (session/of req (or session-key (http/get-route-data req :session-key)))
-         app-data      (get req :app/data web/empty-lazy-map)
          rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))]
-     (qassoc req :app/data (qassoc app-data :lock-remains rem-mins)))))
+     (web/assoc-app-data req :lock-remains rem-mins))))
 
 (defn prolong!
   "Prepares response data to be displayed on a prolongation page."
@@ -228,13 +227,12 @@
      (cond
 
        (and (session/soft-expired? sess) (some? (super/get-goto sess)))
-       (let [app-data      (get req :app/data web/empty-lazy-map)
-             sess-key      (or (session/session-key sess) :session)
+       (let [sess-key      (or (session/session-key sess) :session)
              ^Session sess (session/allow-soft-expired sess)
              rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))]
-         (qassoc req
-                 sess-key  (qassoc sess :prolonged? true)
-                 :app/data (qassoc app-data :lock-remains rem-mins)))
+         (-> req
+             (qassoc sess-key (qassoc sess :prolonged? true))
+             (web/assoc-app-data :lock-remains rem-mins)))
 
        (and sess (session/hard-expired? sess))
        (web/move-to req (or (get route-data :auth/session-expired) :login/session-expired))
