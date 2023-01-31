@@ -38,7 +38,7 @@
 (defn gen-code
   []
   (let [code (format "%07d" (unchecked-int (rand 9999999)))]
-    (if (= (first code) "0")
+    (if (= (first code) \0)
       (str (inc (rand-int 8)) (subs code 1))
       code)))
 
