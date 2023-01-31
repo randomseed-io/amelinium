@@ -1546,8 +1546,6 @@
                    false false router
                    language-settings-or-param)))
 
-;;  (amelinium.common/localized-page nil :user/password-recover "pl" {:id-type "email"} nil false true rtr nil)
-
 (defn localized-path
   "Creates a URL on a basis of route name or a path. Uses very optimistic matching
   algorithm. Tries to obtain language from user settings and client settings if the
@@ -1938,6 +1936,107 @@
   (if-some [ua (get (get req :headers) "user-agent")]
     (some? (re-find #"\b(iPhone|iPad|iPod|Android|Windows Phone|webOS|IEMobile|BlackBerry)\b" ua))))
 
+(defmacro add-header
+  "Adds a header `header` to `:response/headers` map of the `req` using built-in
+  function `qassoc`. If a header name argument is a literal identifier (keyword or
+  symbol), a character, a number, or a literal string, it will be converted to a
+  string literal and placed as `qassoc` argument. Otherwise it will be left as is and
+  wrapped into a call to `io.randomseed.utils/some-str` to ensure the result is a
+  string run-time. All arguments of the body are used to calculate a value of the
+  header. Assumes that `req` is always a map."
+  [req header-name & body]
+  (let [header-name (if (or (ident?  header-name)
+                            (string? header-name)
+                            (char?   header-name)
+                            (number? header-name))
+                      (some-str header-name)
+                      (cons `some-str (cons header-name nil)))]
+    `(let [req# ~req
+           hdr# (get req# :response/headers)]
+       (qassoc req# :response/headers
+               (if (pos? (count hdr#))
+                 (qassoc hdr# ~header-name (do ~@body))
+                 {~header-name (do ~@body)})))))
+
+(defmacro add-headers
+  "Adds headers with associated values to `:response/headers` map of the `req` using
+  built-in function `qassoc`. If any header name argument is a literal identifier
+  (a keyword or a symbol), a character, a number, or a literal string, it will be
+  converted to a string literal and placed as an argument passed to `qassoc`.
+  Otherwise it will be left as is and wrapped in a call to `io.randomseed.utils/some-str`
+  to ensure at run-time that the result will be a string. Missing header value, if any,
+  will be padded with `nil`."
+  ([req header-name header-value]
+   (let [header-name (if (or (ident?  header-name)
+                             (string? header-name)
+                             (char?   header-name)
+                             (number? header-name))
+                       (some-str header-name)
+                       (cons `some-str (cons header-name nil)))]
+     `(let [req# ~req
+            hdr# (get req# :response/headers)]
+        (qassoc req# :response/headers
+                (if (pos? (count hdr#))
+                  (qassoc hdr# ~header-name ~header-value)
+                  {~header-name ~header-value})))))
+  ([req header-name header-value & more]
+   (let [pairs  (cons header-name (cons header-value more))
+         names  (take-nth 2 pairs)
+         values (concat (take-nth 2 (rest pairs)) '(nil))
+         pairs  (map #(cons (if (or (ident?  %1)
+                                    (string? %1)
+                                    (char?   %1)
+                                    (number? %1))
+                              (some-str %1)
+                              (cons `some-str (cons %1 nil)))
+                            (cons %2 nil))
+                     names values)
+         pairs  (apply concat pairs)
+         names  (take-nth 2 pairs)
+         dups?  (not= (count names) (count (distinct names)))]
+     (if dups?
+       `(let [req# ~req]
+          (qassoc req# :response/headers (qassoc (get req# :response/headers) ~@pairs)))
+       `(let [req# ~req
+              hdr# (get req# :response/headers)]
+          (qassoc req# :response/headers
+                  (if (pos? (count hdr#))
+                    (qassoc hdr# ~@pairs)
+                    {~@pairs ~@[]})))))))
+
+;; Identities and URLs
+
+(defn id-type->url-type
+  "Returns URL type identifier which matches the given identity type and confirmation
+  reason. Used to generate confirmation link which is to be sent in verification message.
+
+  If `id-type` is `:user/email` or `:email` and `reason` is `:change` or \"change\",
+  the result is `:url/update-email.`
+
+  If `id-type` is `:user/email` or `:email` and `reason` is `:recovery` or \"recovery\",
+  the result is `:url/update-password.`
+
+  If `id-type` is `:user/email` or `:email` and `reason` is not of any above,
+  the result is `:url/create.`
+
+  If `id-type` is `:user/phone` or `:phone` and `reason` is `:recovery` or \"recovery\",
+  the result is `:url/update-password.`
+
+  If `id-type` is `:user/phone` or `:phone`, and `reason` is not of any above,
+  the result is `:url/update-phone.`
+
+  In all other cases `:url/update-email` is returned."
+  [id-type reason]
+  (case id-type
+    (:email :user/email) (case reason
+                           ("recovery" :recovery) :url/update-password
+                           ("change"   :change)   :url/update-email
+                           :url/create)
+    (:phone :user/phone) (case reason
+                           ("recovery" :recovery) :url/update-password
+                           :url/update-phone)
+    :url/update-email))
+
 ;; Phone numbers
 
 (defn guess-identity-type
@@ -1976,3 +2075,19 @@
   (when duration
     (let [mins (inc (t/minutes duration))]
       (if (pos-int? mins) mins 1))))
+
+;; Response status
+
+(defmacro add-status
+  "Adds response status to a request map `req` under its key `:response/status` using
+  `qassoc`. The status is a result of evaluating expressions passed as additional
+  arguments. Returns updated `req`. Assumes that `req` is always a map."
+  [req & body]
+  (if (and (seq? body) (> (count body) 1))
+    `(qassoc ~req :response/status (do ~@body))
+    `(qassoc ~req :response/status ~@body)))
+
+(defmacro remove-status
+  "Removes `:response/status` from `req` using `clojure.core/dissoc`."
+  [req]
+  `(dissoc ~req :response/status))

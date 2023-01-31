@@ -220,7 +220,7 @@
                           existing-uid      (get result :user/uid)
                           uid               (if exists? (some-str existing-uid))
                           lang-qs           (common/query-string-encode {"lang" lang-str})
-                          url-type          (id-type->url-type id-type reason)
+                          url-type          (common/id-type->url-type id-type reason)
                           verify-link       (str (get rdata url-type) token "/?" lang-qs)
                           recovery-link     (if uid (str (get rdata :url/recover) uid "/?" lang-qs))
                           req-updater       (get opts :async/responder verify-request-id-update)

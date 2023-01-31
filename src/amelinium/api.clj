@@ -86,6 +86,9 @@
 
 ;; Response rendering
 
+(p/import-vars [amelinium.common
+                add-header add-headers add-status remove-status])
+
 (defn render
   "Returns response body on a basis of a value associated with the `:response/body`
   key of the `req`.
@@ -937,23 +940,27 @@
     `(let [req# ~req] (if (response? req#) req# ~@code))))
 
 (defmacro add-body
-  "Adds response body to a request map `req` under its key `:response/body` using
-  `qassoc`. The body is a result of evaluating expressions passed as
-  additional arguments (`body`). Returns updated `req`. Assumes that `req` is always
-  a map."
+  "Adds a response body to a request map `req` under its key `:response/body` using
+  `qassoc`. The body is a result of evaluating expressions passed as additional
+  arguments (`body`). Returns updated `req`. Assumes that `req` is always a map."
   [req & body]
   (if (and (seq? body) (> (count body) 1))
     `(qassoc ~req :response/body (do ~@body))
     `(qassoc ~req :response/body ~@body)))
 
-(defmacro update-body
-  "Updates response body in a request map `req` under its key `:response/body` with a
-  result of calling the function `f` on the previous value of the body and optional
-  arguments passed. Uses `io.randomseed.utils.map/qupdate`. The body is a result of
-  update operation and `args` are passed as its additional arguments where the first
-  one should be a function. Returns updated `req`."
-  [req f & args]
-  `(map/qupdate ~req :response/body ~f ~@args))
+(defn update-body
+  "Updates the `:response/body` in a request map `req` with a result of calling the
+  function `f` on the previous value and optional arguments. Uses
+  `io.randomseed.utils.map/qassoc`. Returns updated `req` with a map under
+  `:response/body` key."
+  ([req]           (add-body req))
+  ([req f]         (qassoc req :response/body (f (get req :response/body))))
+  ([req f a]       (qassoc req :response/body (f (get req :response/body) a)))
+  ([req f a b]     (qassoc req :response/body (f (get req :response/body) a b)))
+  ([req f a b c]   (qassoc req :response/body (f (get req :response/body) a b c)))
+  ([req f a b c d] (qassoc req :response/body (f (get req :response/body) a b c d)))
+  ([req f a b c d & more]
+   (qassoc req :response/body (apply f (get req :response/body) a b c d more))))
 
 (defmacro assoc-body
   "Adds keys with associated values to `:response/body` map of the `req` using
@@ -992,86 +999,4 @@
           (qassoc req# :response/body
                   (if (pos? (count bod#))
                     (qassoc bod# ~@pairs)
-                    {~@pairs ~@[]})))))))
-
-(defmacro add-status
-  "Adds response status to a request map `req` under its key `:response/status` using
-  `qassoc`. The status is a result of evaluating expressions passed as additional
-  arguments. Returns updated `req`. Assumes that `req` is always a map."
-  [req & body]
-  (if (and (seq? body) (> (count body) 1))
-    `(qassoc ~req :response/status (do ~@body))
-    `(qassoc ~req :response/status ~@body)))
-
-(defmacro remove-status
-  "Removes `:response/status` from `req` using `clojure.core/dissoc`."
-  [req]
-  `(dissoc ~req :response/status))
-
-(defmacro add-header
-  "Adds a header `header` to `:response/headers` map of the `req` using built-in
-  function `qassoc`. If a header name argument is a literal identifier (keyword or
-  symbol), a character, a number, or a literal string, it will be converted to a
-  string literal and placed as `qassoc` argument. Otherwise it will be left as is and
-  wrapped into a call to `io.randomseed.utils/some-str` to ensure the result is a
-  string run-time. All arguments of the body are used to calculate a value of the
-  header. Assumes that `req` is always a map."
-  [req header-name & body]
-  (let [header-name (if (or (ident?  header-name)
-                            (string? header-name)
-                            (char?   header-name)
-                            (number? header-name))
-                      (some-str header-name)
-                      (cons `some-str (cons header-name nil)))]
-    `(let [req# ~req
-           hdr# (get req# :response/headers)]
-       (qassoc req# :response/headers
-               (if (pos? (count hdr#))
-                 (qassoc hdr# ~header-name (do ~@body))
-                 {~header-name (do ~@body)})))))
-
-(defmacro add-headers
-  "Adds headers with associated values to `:response/headers` map of the `req` using
-  built-in function `qassoc`. If any header name argument is a literal identifier
-  (a keyword or a symbol), a character, a number, or a literal string, it will be
-  converted to a string literal and placed as an argument passed to `qassoc`.
-  Otherwise it will be left as is and wrapped in a call to `io.randomseed.utils/some-str`
-  to ensure at run-time that the result will be a string. Missing header value, if any,
-  will be padded with `nil`."
-  ([req header-name header-value]
-   (let [header-name (if (or (ident?  header-name)
-                             (string? header-name)
-                             (char?   header-name)
-                             (number? header-name))
-                       (some-str header-name)
-                       (cons `some-str (cons header-name nil)))]
-     `(let [req# ~req
-            hdr# (get req# :response/headers)]
-        (qassoc req# :response/headers
-                (if (pos? (count hdr#))
-                  (qassoc hdr# ~header-name ~header-value)
-                  {~header-name ~header-value})))))
-  ([req header-name header-value & more]
-   (let [pairs  (cons header-name (cons header-value more))
-         names  (take-nth 2 pairs)
-         values (concat (take-nth 2 (rest pairs)) '(nil))
-         pairs  (map #(cons (if (or (ident?  %1)
-                                    (string? %1)
-                                    (char?   %1)
-                                    (number? %1))
-                              (some-str %1)
-                              (cons `some-str (cons %1 nil)))
-                            (cons %2 nil))
-                     names values)
-         pairs  (apply concat pairs)
-         names  (take-nth 2 pairs)
-         dups?  (not= (count names) (count (distinct names)))]
-     (if dups?
-       `(let [req# ~req]
-          (qassoc req# :response/headers (qassoc (get req# :response/headers) ~@pairs)))
-       `(let [req# ~req
-              hdr# (get req# :response/headers)]
-          (qassoc req# :response/headers
-                  (if (pos? (count hdr#))
-                    (qassoc hdr# ~@pairs)
                     {~@pairs ~@[]})))))))
