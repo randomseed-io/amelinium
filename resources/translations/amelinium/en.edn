@@ -199,18 +199,37 @@
                            :not-updated "Identity information has not been changed."}
    :user                  {:created "User account created."
                            :deleted "User account deleted."}
-   :forms                 {:logging       "Signing in"
-                           :recovery      "Password recovery"
-                           :recover       "Recover!"
-                           :login         "Login!"
-                           :email         :parameter/email
-                           :password      :parameter/password
-                           :name          :parameter/name
-                           :first-name    :parameter/first-name
-                           :second-name   :parameter/second-name
-                           :last-name     :parameter/last-name
-                           :middle-name   :parameter/middle-name
-                           :phone         :parameter/phone
-                           :regular-phone :parameter/regular-phone}
+   :forms                 {:logging          "Signing in"
+                           :recovery         "Password recovery"
+                           :recover          "Recover!"
+                           :continue         "Continue"
+                           :send-again       "Re-send!"
+                           :login            "Login!"
+                           :change           "Change!"
+                           :set              "Set!"
+                           :submit           "Submit!"
+                           :email            :parameter/email
+                           :password         :parameter/password
+                           :new-password     :parameter/password
+                           :repeat-password  :parameter/password
+                           :password-confirm :parameter/password
+                           :name             :parameter/name
+                           :first-name       :parameter/first-name
+                           :second-name      :parameter/second-name
+                           :last-name        :parameter/last-name
+                           :middle-name      :parameter/middle-name
+                           :phone            :parameter/phone
+                           :regular-phone    :parameter/regular-phone}
+
+   :in-mins       [:pluralize {:zero   "a couple of seconds"
+                               :one    "one minute"
+                               :plural "{1} minutes"}]
+   :try-in-mins   [:pluralize "Try again in a couple of seconds." "Try again in a minute." "Try again in {1} minutes."]
+   :mins-left     [:pluralize {:zero   "Less than a minute left"
+                               :one    "One minute left"
+                               :plural "{1} minutes left"}]
+   :attempts-left [:pluralize {:zero   "zero attempts"
+                               :one    "one attempt"
+                               :plural "{1} attempts"}]
 
    :tongue/pluralizer amelinium.i18n.pluralizers/en}}}

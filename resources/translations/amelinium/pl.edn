@@ -198,20 +198,43 @@
                            :lang                           :type-should/language}
    :user                  {:created "Utworzono konto użytkownika."
                            :deleted "Usunięto konto użytkownika."}
-   :forms                 {:logging         "Logowanie"
-                           :recovery        "Odzyskiwanie hasła"
-                           :login           "Zaloguj!"
-                           :recover         "Odzyskaj!"
-                           :email           :parameter/email
-                           :password        :parameter/password
-                           :new-password    :parameter/password
-                           :repeat-password :parameter/password
-                           :name            :parameter/name
-                           :first-name      :parameter/first-name
-                           :second-name     :parameter/second-name
-                           :last-name       :parameter/last-name
-                           :middle-name     :parameter/middle-name
-                           :phone           :parameter/phone
-                           :regular-phone   :parameter/regular-phone}
+   :forms                 {:logging          "Logowanie"
+                           :recovery         "Odzyskiwanie hasła"
+                           :login            "Zaloguj!"
+                           :recover          "Odzyskaj!"
+                           :continue         "Kontynuuj"
+                           :change           "Zmień!"
+                           :set              "Ustaw!"
+                           :submit           "Zatwierdź!"
+                           :send-again       "Wyślij ponownie!"
+                           :email            :parameter/email
+                           :password         :parameter/password
+                           :new-password     :parameter/password
+                           :repeat-password  :parameter/password
+                           :password-confirm :parameter/password
+                           :name             :parameter/name
+                           :first-name       :parameter/first-name
+                           :second-name      :parameter/second-name
+                           :last-name        :parameter/last-name
+                           :middle-name      :parameter/middle-name
+                           :phone            :parameter/phone
+                           :regular-phone    :parameter/regular-phone}
+
+   :in-mins       [:pluralize {:zero       "kilka sekund"
+                               :one        "minutę"
+                               :genitive   "{1} minut"
+                               :nominative "{1} minuty"}]
+   :mins-left     [:pluralize {:zero       "Pozostała niecała minuta"
+                               :one        "Pozostała minuta"
+                               :genitive   "Pozostało {1} minut"
+                               :nominative "Pozostały {1} minuty"}]
+   :try-in-mins   [:pluralize {:zero       "Spróbuj za kilka sekund."
+                               :one        "Spróbuj za minutę."
+                               :genitive   "Spróbuj za {1} minut."
+                               :nominative "Spróbuj za {1} minuty."}]
+   :attempts-left [:pluralize {:zero       "zero prób"
+                               :one        "jedna próba"
+                               :genitive   "{1} prób"
+                               :nominative "{1} próby"}]
 
    :tongue/pluralizer amelinium.i18n.pluralizers/pl}}}
