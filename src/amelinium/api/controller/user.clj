@@ -174,13 +174,6 @@
 
 ;; Identity confirmation
 
-(defmacro id-type->url-type
-  [id-type reason]
-  `(case ~id-type
-     :user/email (case ~reason ("change" :change) :url/update-email :url/create)
-     :user/phone :url/update-phone
-     :url/update-email))
-
 (defn verify!
   "Performs the identity verification by sending an e-mail or SMS with a URL to
   complete confirmation."
