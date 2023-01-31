@@ -168,7 +168,7 @@
   (Integer/toUnsignedString n))
 
 (defn ad-hoc-id
-  "Generated ad-hoc ID on a basis of values passed as arguments."
+  "Generates ad-hoc ID (a numeric string) on a basis of values passed as arguments."
   (^String [a]         (pos-str (hash a)))
   (^String [a b]       (pos-str (hash-ordered-coll [a b])))
   (^String [a b c]     (pos-str (hash-ordered-coll [a b c])))
@@ -347,45 +347,53 @@
       (let [{:keys
              [name
               label
-              type
+              parameter-type
               value
               placeholder
               autocomplete
-              input-type]} field
-            value?         (contains? params id-kw)
-            error?         (contains? errors id-kw)
-            id-str         (common/string-from-param id)
-            name           (common/string-from-param name)
-            type           (common/string-from-param type)
-            itype          (common/string-from-param input-type)
-            autoc          (common/string-from-param autocomplete)
-            label          (param-try-tr tr-sub :forms label id)
-            phold          (param-try-tr tr-sub :forms placeholder id)
-            value          (valuable (if value? (get params id-kw) value))
-            value          (if value (param-try-tr tr-sub :forms value id))
-            type           (or type (if error? (get errors id-kw)))
-            err-msgs       (if error?   (coercion/translate-error @tr-sub id-kw type))
-            err-summ       (if err-msgs (some-str (get err-msgs :error/summary)))
-            err-desc       (if err-msgs (some-str (get err-msgs :error/description)))
-            error?         (boolean (or err-summ err-desc))
-            html-id        (html-esc id-str)
-            html-label     (if label    (html-esc label))
-            html-name      (if name     (html-esc name)  html-id)
-            html-itype     (if itype    (html-esc itype) "text")
-            html-ptcls     (if type     (strb " param-type-"     (html-esc type)))
-            html-value     (if value    (strb " value=\""        (html-esc value) "\""))
-            html-phold     (if phold    (strb " placeholder=\""  (html-esc phold) "\""))
-            html-autoc     (if autoc    (strb " autocomplete=\"" (html-esc autoc) "\""))
-            html-esumm     (if err-summ (strb "      <p class=\"error-summary\">"     (html-esc err-summ) "</p>\n"))
-            html-edesc     (if err-desc (strb "      <p class=\"error-description\">" (html-esc err-desc) "</p>\n"))
-            html-error     (if error?   (strb "    <div class=\"form-error\">\n" html-esumm html-edesc "</div>\n"))
-            html-label     (if label    (strb "    <label for=\"" id-str "\" class=\"label\">" html-label "</label>\n"))]
-        (strs "<div class=\"field param-" html-id html-ptcls "\">\n"
-              html-label
-              "    <input type=\"" html-itype "\" name=\"" html-name "\" id=\"" html-id "\""
-              html-phold html-value html-autoc " />\n"
-              html-error
-              "  </div>\n")))))
+              input-type
+              type]}   field
+            value?     (contains? params id-kw)
+            error?     (contains? errors id-kw)
+            id-str     (common/string-from-param id)
+            name       (common/string-from-param name)
+            autoc      (common/string-from-param autocomplete)
+            ptype      (common/string-from-param parameter-type)
+            itype      (common/string-from-param input-type)
+            itype      (or itype (common/string-from-param type))
+            label      (param-try-tr tr-sub :forms label id)
+            phold      (param-try-tr tr-sub :forms placeholder id)
+            value      (valuable (if value? (get params id-kw) value))
+            value      (if value (param-try-tr tr-sub :forms value id))
+            ptype      (or ptype (if error? (get errors id-kw)))
+            err-msgs   (if error?   (coercion/translate-error @tr-sub id-kw ptype))
+            err-summ   (if err-msgs (some-str (get err-msgs :error/summary)))
+            err-desc   (if err-msgs (some-str (get err-msgs :error/description)))
+            error?     (boolean (or err-summ err-desc))
+            hidden?    (and itype (= "hidden" itype))
+            html-id    (html-esc id-str)
+            html-label (if label    (html-esc label))
+            html-name  (if name     (html-esc name)  html-id)
+            html-itype (if itype    (html-esc itype) "text")
+            html-ptcls (if ptype    (strb " param-type-"     (html-esc ptype)))
+            html-value (if value    (strb " value=\""        (html-esc value) "\""))
+            html-phold (if phold    (strb " placeholder=\""  (html-esc phold) "\""))
+            html-autoc (if autoc    (strb " autocomplete=\"" (html-esc autoc) "\""))
+            html-esumm (if err-summ (strb "      <p class=\"error-summary\">"     (html-esc err-summ) "</p>\n"))
+            html-edesc (if err-desc (strb "      <p class=\"error-description\">" (html-esc err-desc) "</p>\n"))
+            html-error (if error?   (strb "    <div class=\"form-error\">\n" html-esumm html-edesc "</div>\n"))
+            html-label (if label    (strb "    <label for=\"" id-str "\" class=\"label\">" html-label "</label>\n"))]
+        (if hidden?
+          (strs html-label
+                "  <input type=\"" html-itype "\" name=\"" html-name "\" id=\"" html-id "\""
+                html-phold html-value html-autoc " />\n"
+                html-error)
+          (strs "<div class=\"field param-" html-id html-ptcls "\">\n"
+                html-label
+                "    <input type=\"" html-itype "\" name=\"" html-name "\" id=\"" html-id "\""
+                html-phold html-value html-autoc " />\n"
+                html-error
+                "  </div>\n"))))))
 
 (defn form-fields
   "Helper to generate HTML for the `form-fields` tag."
