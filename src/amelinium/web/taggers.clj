@@ -59,26 +59,49 @@
   [s]
   (fp/escape-html* s))
 
+(defn render-assignment-value
+  [ctx v]
+  (if (nil? ctx)
+    v
+    (if (seq v)
+      (if-some [r (nth (re-find #"^\s*\[\[\s*([^\]]+)\s*\]\]\s*$" v) 1 nil)]
+        (some->> (str/trimr r) some-keyword (get ctx))
+        v)
+      "")))
+
+(defn parse-assigments
+  [fk fv coll]
+  (map #(%1 %2) (cycle [fk fv]) coll))
+
 (defn assignments->map
   "Parses a string `s` with key=value assignments and returns a map with keys as
-  strings."
-  [^String s]
-  (if (and s (seq s))
-    (->> (str/split s #"\,")
-         (mapcat #(map str/trim (str/split (str/trim %) #"\=")))
-         (apply array-map)
-         (not-empty))))
+  strings. Variables are resolved if they have `[[` and `]]` around."
+  ([^String s ctx]
+   (if (and s (seq s))
+     (let [tr-fn (if ctx
+                   (partial parse-assigments identity #(render-assignment-value ctx %))
+                   identity)]
+       (->> (str/split s #"\,")
+            (mapcat #(map str/trim (str/split (str/trim %) #"\=")))
+            (tr-fn)
+            (apply array-map)
+            (not-empty)))))
+  ([^String s]
+   (assignments->map s nil)))
 
 (defn assignments->kw-map
   "Parses a string `s` with key=value assignments and returns a map with keys as
-  keywords."
-  [^String s]
-  (if (and s (seq s))
-    (->> (str/split s #"\,")
-         (mapcat #(map str/trim (str/split (str/trim %) #"\=")))
-         (map #(%1 %2) (cycle [common/keyword-from-param identity]))
-         (apply array-map)
-         (not-empty))))
+  keywords. Variables are resolved if they have `[[` and `]]` around."
+  ([^String s ctx]
+   (if (and s (seq s))
+     (let [v-fn (if ctx #(render-assignment-value ctx %) identity)]
+       (->> (str/split s #"\,")
+            (mapcat #(map str/trim (str/split (str/trim %) #"\=")))
+            (parse-assigments common/keyword-from-param v-fn)
+            (apply array-map)
+            (not-empty)))))
+  ([^String s]
+   (assignments->kw-map s nil)))
 
 (defn parse-args
   "Parses arguments using `selmer.filter-parser/fix-filter-args` function."
@@ -440,8 +463,8 @@
               path-params
               query-params] args
              lang           (or lang (get-lang ctx))
-             path-params    (if path-params  (assignments->kw-map path-params))
-             query-params   (if query-params (assignments->map query-params))]
+             path-params    (if path-params  (assignments->kw-map path-params ctx))
+             query-params   (if query-params (assignments->map query-params ctx))]
          (lang-url router ctx path-or-name lang true path-params query-params lang-param))))
 
     (selmer/add-tag!
@@ -459,8 +482,8 @@
               path-params
               query-params] args
              lang           (or lang (get-lang ctx))
-             path-params    (if path-params  (assignments->kw-map path-params))
-             query-params   (if query-params (assignments->map   query-params))
+             path-params    (if path-params  (assignments->kw-map path-params ctx))
+             query-params   (if query-params (assignments->map   query-params ctx))
              out-path       (lang-url router ctx path-or-name lang false path-params query-params lang-param)]
          (if sdata
            (strs "<form name=\"sessionLink\" class=\"formlink\" action=\"" out-path "\" method=\"post\">"
@@ -580,8 +603,8 @@
              lang         (if lang   (common/string-from-param lang))
              action?      (some? action)
              action-lang  (if action? (or (common/string-from-param (get args :action-lang)) lang))
-             path-params  (if action? (assignments->kw-map (get args :path-params)))
-             query-params (if action? (assignments->map (get args :query-params)))
+             path-params  (if action? (assignments->kw-map (get args :path-params) ctx))
+             query-params (if action? (assignments->map (get args :query-params) ctx))
              id-str       (or id-str (if label? (ad-hoc-id action method label path-params query-params)))
              id-str?      (some? id-str)
              action       (if action?
