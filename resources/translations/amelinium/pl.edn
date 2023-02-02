@@ -123,6 +123,7 @@
                            :login                 "Login"
                            :password              "Hasło"
                            :password-relaxed      "Hasło"
+                           :repeated-password     "Powtórzone hasło"
                            :name                  "Imię"
                            :first-name            "Imię"
                            :last-name             "Nazwisko"
@@ -143,19 +144,20 @@
                            :session-id            "Identyfikator sesji"
                            :language              "Identyfikator języka"
                            :lang                  "Identyfikator języka"}
-   :parameter-type        {:string            "Napis tekstowy"
-                           :integer           "Liczba"
-                           :boolean           "Pole decyzji"
-                           :phone             "Numer telefoniczny"
-                           :regular-phone     "Zwyczajny numer telefoniczny"
-                           :email             "Adres e-mailowy"
-                           :password          "Hasło"
-                           :password-relaxed  "Hasło"
-                           :name              "Imię"
-                           :token             "Token"
-                           :session-id        "Identyfikator sesji"
-                           :secure-session-id "Bezpieczny identyfikator sesji"
-                           :language          "Identyfikator języka"}
+   :parameter-type        {:string             "Napis tekstowy"
+                           :integer            "Liczba"
+                           :boolean            "Pole decyzji"
+                           :phone              "Numer telefoniczny"
+                           :regular-phone      "Zwyczajny numer telefoniczny"
+                           :email              "Adres e-mailowy"
+                           :password           "Hasło"
+                           :password-relaxed   "Hasło"
+                           :name               "Imię"
+                           :token              "Token"
+                           :session-id         "Identyfikator sesji"
+                           :secure-session-id  "Bezpieczny identyfikator sesji"
+                           :language           "Identyfikator języka"
+                           :passwords-no-match "Powtórzone hasło"}
    :type-should           {:phone              "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa."
                            :regular-phone      "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa i nie być numerem specjalnym."
                            :email              "Adres e-mailowy powinien zawierać część lokalną i poprawną domenę."
@@ -166,7 +168,7 @@
                            :session-id         "Identyfikator sesji powinien być jednym lub dwoma łańcuchami znakowymi w zapisie szesnastkowym."
                            :secure-session-id  "Bezpieczny identyfikator sesji powinien być jedną lub dwoma liczbami szesnastkowymi oddzielonymi dywizem."
                            :language           "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."
-                           :passwords-no-match "Powtórzone hasło musi być takie same."}
+                           :passwords-no-match "Powtórzone hasło musi być takie same jak pierwsze hasło."}
    :parameter-should      {:phone                          :type-should/phone
                            :regular-phone                  :type-should/regular-phone
                            :email                          :type-should/email
@@ -198,27 +200,27 @@
                            :lang                           :type-should/language}
    :user                  {:created "Utworzono konto użytkownika."
                            :deleted "Usunięto konto użytkownika."}
-   :forms                 {:logging          "Logowanie"
-                           :recovery         "Odzyskiwanie hasła"
-                           :login            "Zaloguj!"
-                           :recover          "Odzyskaj!"
-                           :continue         "Kontynuuj"
-                           :change           "Zmień!"
-                           :set              "Ustaw!"
-                           :submit           "Zatwierdź!"
-                           :send-again       "Wyślij ponownie!"
-                           :email            :parameter/email
-                           :password         :parameter/password
-                           :new-password     :parameter/password
-                           :repeat-password  :parameter/password
-                           :password-confirm :parameter/password
-                           :name             :parameter/name
-                           :first-name       :parameter/first-name
-                           :second-name      :parameter/second-name
-                           :last-name        :parameter/last-name
-                           :middle-name      :parameter/middle-name
-                           :phone            :parameter/phone
-                           :regular-phone    :parameter/regular-phone}
+   :forms                 {:logging           "Logowanie"
+                           :recovery          "Odzyskiwanie hasła"
+                           :login             "Zaloguj!"
+                           :recover           "Odzyskaj!"
+                           :continue          "Kontynuuj"
+                           :change            "Zmień!"
+                           :set               "Ustaw!"
+                           :submit            "Zatwierdź!"
+                           :send-again        "Wyślij ponownie!"
+                           :email             :parameter/email
+                           :password          :parameter/password
+                           :new-password      :parameter/password
+                           :repeat-password   :parameter/password
+                           :repeated-password :parameter/repeated-password
+                           :name              :parameter/name
+                           :first-name        :parameter/first-name
+                           :second-name       :parameter/second-name
+                           :last-name         :parameter/last-name
+                           :middle-name       :parameter/middle-name
+                           :phone             :parameter/phone
+                           :regular-phone     :parameter/regular-phone}
 
    :in-mins       [:pluralize {:zero       "kilka sekund"
                                :one        "minutę"

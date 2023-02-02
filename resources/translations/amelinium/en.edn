@@ -118,6 +118,7 @@
                            :login                 "Login"
                            :password              "Password"
                            :password-relaxed      "Password"
+                           :repeated-password     "Repeated password"
                            :name                  "Name"
                            :first-name            "First name"
                            :last-name             "Last name"
@@ -138,20 +139,21 @@
                            :session-id            "Session identifier"
                            :language              "Language identifier"
                            :lang                  "Language identifier"}
-   :parameter-type        {:string            "String"
-                           :integer           "Integer number"
-                           :boolean           "Decision field"
-                           :phone             "Phone number"
-                           :regular-phone     "Regular phone number"
-                           :email             "E-mail address"
-                           :login             "Login"
-                           :password          "Password"
-                           :password-relaxed  "Password"
-                           :name              "Name"
-                           :token             "Token"
-                           :session-id        "Session identifier"
-                           :secure-session-id "Secure session identifier"
-                           :language          "Language identifier"}
+   :parameter-type        {:string             "String"
+                           :integer            "Integer number"
+                           :boolean            "Decision field"
+                           :phone              "Phone number"
+                           :regular-phone      "Regular phone number"
+                           :email              "E-mail address"
+                           :login              "Login"
+                           :password           "Password"
+                           :password-relaxed   "Password"
+                           :name               "Name"
+                           :token              "Token"
+                           :session-id         "Session identifier"
+                           :secure-session-id  "Secure session identifier"
+                           :language           "Language identifier"
+                           :passwords-no-match "Repeated password"}
    :type-should           {:phone              "Phone number should contain a country code with a plus sign."
                            :regular-phone      "Phone number should contain a country code with a plus sign and be a regular (non-special) number."
                            :email              "E-mail address should have a local part and a valid domain name."
@@ -163,7 +165,7 @@
                            :secure-session-id  "Secure session ID should be a string consisting two hexadecimal numbers separated by hyphen."
                            :language           "Language ID should express a correct, supported language code."
                            :lang               "Language ID should express a correct, supported language code."
-                           :passwords-no-match "Repeated password must be the same."}
+                           :passwords-no-match "Repeated password must match password."}
    :parameter-should      {:phone                          :type-should/phone
                            :regular-phone                  :type-should/regular-phone
                            :email                          :type-should/email
@@ -199,27 +201,27 @@
                            :not-updated "Identity information has not been changed."}
    :user                  {:created "User account created."
                            :deleted "User account deleted."}
-   :forms                 {:logging          "Signing in"
-                           :recovery         "Password recovery"
-                           :recover          "Recover!"
-                           :continue         "Continue"
-                           :send-again       "Re-send!"
-                           :login            "Login!"
-                           :change           "Change!"
-                           :set              "Set!"
-                           :submit           "Submit!"
-                           :email            :parameter/email
-                           :password         :parameter/password
-                           :new-password     :parameter/password
-                           :repeat-password  :parameter/password
-                           :password-confirm :parameter/password
-                           :name             :parameter/name
-                           :first-name       :parameter/first-name
-                           :second-name      :parameter/second-name
-                           :last-name        :parameter/last-name
-                           :middle-name      :parameter/middle-name
-                           :phone            :parameter/phone
-                           :regular-phone    :parameter/regular-phone}
+   :forms                 {:logging           "Signing in"
+                           :recovery          "Password recovery"
+                           :recover           "Recover!"
+                           :continue          "Continue"
+                           :send-again        "Re-send!"
+                           :login             "Login!"
+                           :change            "Change!"
+                           :set               "Set!"
+                           :submit            "Submit!"
+                           :email             :parameter/email
+                           :password          :parameter/password
+                           :new-password      :parameter/password
+                           :repeat-password   :parameter/password
+                           :repeated-password :parameter/repeated-password
+                           :name              :parameter/name
+                           :first-name        :parameter/first-name
+                           :second-name       :parameter/second-name
+                           :last-name         :parameter/last-name
+                           :middle-name       :parameter/middle-name
+                           :phone             :parameter/phone
+                           :regular-phone     :parameter/regular-phone}
 
    :in-mins       [:pluralize {:zero   "a couple of seconds"
                                :one    "one minute"
