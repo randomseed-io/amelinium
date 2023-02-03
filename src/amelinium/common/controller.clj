@@ -353,7 +353,8 @@
         (throw e)))))
 
 (defn throw-bad-param
-  "Generates bad parameter exception which should trigger coercion error."
+  "Generates bad parameter exception which should trigger coercion error.
+  The value of `param-type` must be a valid schema."
   [req param value param-type]
   (if-some [param (some-keyword param)]
     (let [param-type (some-keyword param-type)]

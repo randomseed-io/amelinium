@@ -22,6 +22,8 @@
             [amelinium.errors                     :as          errors]
             [amelinium.http                       :as            http]
             [amelinium.http.middleware.language   :as        language]
+            [amelinium.http.middleware.session    :as         session]
+            [amelinium.http.middleware.coercion   :as        coercion]
             [amelinium.http.middleware.validators :as      validators]
             [amelinium.logging                    :as             log]
             [io.randomseed.utils.map              :as             map]
@@ -949,6 +951,172 @@
          app-status (errors/most-significant err-config app-status)
          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
      (apply errors/render err-config app-status (or default render-ok) req data view layout lang more))))
+
+;; Form errors
+
+(defn handle-bad-request-form-params
+  "Called by other functions to generate a redirect or display a page with a form to be
+  corrected because of a parameter error (induced manually or caused by coercion
+  exception).
+
+  Takes a request map `req`, a map of erroneous parameter identifiers to parameter
+  types `errors`, a map of current parameter values `values`, a map of error
+  explanations (`explanations`), page title (`title`), and optional session key
+  `session-key` used when getting a session object from the `req`.
+
+  The following arguments can be Delay objects and `clojure.core/force` will be
+  applied to them before use: `errors`, `values`, `explanations`, `title`.
+
+  Parameter type in `errors` map can be `nil`, meaning it is of unknown type.
+
+  If there is a session then the `errors` map is stored in a session variable
+  `:form-errors` under the `:errors` key (additionally, there is a `:dest` key
+  identifying a path of the current page).
+
+  If there is no valid session or a session variable cannot be stored, the result is
+  serialized as a query string parameter `form-errors` with erroneous fields
+  separated by commas.
+
+  If type name is available for a parameter then a string in a form of
+  `parameter:type` is generated.
+
+  If type name is not available, a simple parameter name is generated. So the example
+  value (before encoding) may look like `email,secret:password` (`email` being a
+  parameter without type information, `secret` being a parameter with type named
+  `password`).
+
+  Next, the originating URI is obtained from the `Referer` header and a temporary
+  redirect (with HTTP code 307) is generated with this path and a query string
+  containing `form-errors` parameter. The value of the parameter is empty if form
+  errors were saved in a session variable.
+
+  The destination of the redirect can be overriden by the `:form-errors/page`
+  configuration option associated with HTTP route data.
+
+  If the destination URI cannot be established, or if a coercion error happened
+  during handling some previous coercion error (so the current page is where the
+  browser had been redirected to), then instead of generating a redirect, a regular
+  page is rendered with HTTP code of 422. The `:app/data` key of a request map is
+  updated with:
+
+  - `:title` set to `title`,
+  - `:form/errors` set to a map containing:
+    - `:errors` mapped to `errors`,
+    - `:params` mapped to `values`,
+    - `:dest` mapped to destination URI;
+  - `:coercion/errors` set to `explanations` map."
+  [req errors values explanations title session-key]
+  (if-not (valuable? errors)
+    req
+    (let [route-data             (http/get-route-data req)
+          forced-orig-page       (get route-data :form-errors/page)
+          orig-page              (or forced-orig-page (:page (get req :goto)))
+          referer                (if (nil? orig-page) (some-str (get (get req :headers) "referer")))
+          [orig-uri orig-params] (if referer (common/url->uri+params req referer))
+          handling-previous?     (contains? (get req :query-params) "form-errors")]
+      (if (and (or (valuable? orig-page) (valuable? orig-uri) referer)
+               (not handling-previous?))
+        ;; redirect to a form-submission page allowing user to correct errors
+        ;; transfer form errors using query params or form params (if a session is present)
+        ;; if session is present, use POST method, otherwise use GET
+        (let [orig-uri     (if orig-uri (some-str orig-uri))
+              orig-params  (if orig-uri orig-params)
+              destination  (or orig-page orig-uri)
+              dest-uri     (if (keyword? destination) (common/page req destination) destination)
+              dest-uri     (some-str dest-uri)
+              smap         (session/not-empty-of req (or session-key (get route-data :session-key)))
+              stored?      (if (and smap (session/valid? smap))
+                             (session/put-var!
+                              smap :form-errors
+                              {:dest   dest-uri
+                               :errors (force errors)
+                               :params (force values)}))
+              error-params (if stored? "" (coercion/join-errors (force errors)))
+              joint-params (qassoc orig-params "form-errors" error-params)]
+          (if dest-uri
+            (common/temporary-redirect req dest-uri nil joint-params)
+            (resp/temporary-redirect
+             (str referer (if (str/includes? referer "?") "&" "?")
+                  (common/query-string-encode joint-params)))))
+        ;; render a separate page describing invalid parameters
+        ;; instead of current page
+        (-> (assoc-app-data
+             req
+             :title           title
+             :coercion/errors explanations
+             :form/errors     (delay {:dest   (:uri req)
+                                      :errors (force errors)
+                                      :params (force values)}))
+            render-bad-params)))))
+
+(defn- param-errors-to-current-vals
+  [req errors]
+  (let [form-params (get req :form-params)]
+    (map/map-vals-by-k #(get form-params (if (string? %) % (some-str %))) errors)))
+
+(defn- param-errors-stringify-vals
+  [errors]
+  (map/map-vals some-str errors))
+
+(defn form-params-error!
+  "Called to manually generate a redirect or display a page with a form to be corrected
+  because of a parameter error. Takes a request map `req`, a map of erroneous
+  parameter identifiers to parameter types `errors`, and optional session key
+  `session-key` used when getting a session object from the `req`.
+
+  Parameter type in `errors` map can be `nil`, meaning it is of unknown type.
+
+  If there is a session then the `errors` map is stored in a session variable
+  `:form-errors` under the `:errors` key (additionally, there is a `:dest` key
+  identifying a path of the current page).
+
+  If there is no valid session or a session variable cannot be stored, the result is
+  serialized as a query string parameter `form-errors` with erroneous fields
+  separated by commas.
+
+  If type name is available for a parameter then a string in a form of
+  `parameter:type` is generated.
+
+  If type name is not available, a simple parameter name is generated. So the example
+  value (before encoding) may look like `email,secret:password` (`email` being a
+  parameter without type information, `secret` being a parameter with type named
+  `password`).
+
+  Next, the originating URI is obtained from the `Referer` header and a temporary
+  redirect (with HTTP code 307) is generated with this path and a query string
+  containing `form-errors` parameter. The value of the parameter is empty if form
+  errors were saved in a session variable.
+
+  The destination of the redirect can be overriden by the `:form-errors/page`
+  configuration option associated with HTTP route data.
+
+  If the destination URI cannot be established, or if a coercion error happened
+  during handling some previous coercion error (so the current page is where the
+  browser had been redirected to), then instead of generating a redirect, a regular
+  page is rendered with HTTP code of 422. The `:app/data` key of a request map is
+  updated with:
+
+  - `:title` set to a translated message of `:parameters/error`,
+  - `:form/errors` containing a map:
+    - `:errors` mapped to `errors`,
+    - `:params` mapped to `values`,
+    - `:dest` mapped to destination URI;
+  - `:coercion/errors` set to `nil`."
+  ([req errors]
+   (form-params-error! req errors nil))
+  ([req errors session-key]
+   (let [translate-sub (i18n/no-default (common/translator-sub req))]
+     (if-not (valuable? errors)
+       (assoc-app-data req
+                       :title (delay (translate-sub :parameters/error))
+                       :form/errors nil
+                       :coercion/errors nil)
+       (handle-bad-request-form-params req
+                                       (delay (param-errors-stringify-vals errors))
+                                       (delay (param-errors-to-current-vals req errors))
+                                       nil
+                                       (delay (translate-sub :parameters/error))
+                                       session-key)))))
 
 ;; Linking helpers
 
