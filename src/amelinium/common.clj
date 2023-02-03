@@ -300,8 +300,10 @@
    (req-param-path router match-or-path param pvalue nil))
   ([router match-or-path param pvalue query-params]
    (if (map? match-or-path)
-     (let [path                    (some-> match-or-path (r/match->path query-params))
-           [path location qparams] (split-query-params path)]
+     (let [path      (some-> match-or-path (r/match->path query-params))
+           [path
+            location
+            qparams] (split-query-params path)]
        (if (some->> path
                     (r/match-by-path router)
                     :path-params param #{pvalue})
