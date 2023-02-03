@@ -196,7 +196,7 @@
                           remote-ip         (get req :remote-ip/str)
                           rdata             (or route-data (http/get-route-data req))
                           existing-uid      (if exists? (some-str (get result :existing-user/uid)))
-                          lang-qs           (common/query-string-encode {"lang" lang-str})
+                          lang-qs           (common/query-string-encode req {"lang" lang-str})
                           url-type          (common/id-type->url-type id-type reason)
                           verify-link       (str (get rdata url-type) token "/?" lang-qs)
                           recovery-link     (if existing-uid (str (get rdata :url/recover) existing-uid "/?" lang-qs))

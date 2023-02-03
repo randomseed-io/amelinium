@@ -1636,12 +1636,21 @@
         s))))
 
 (defn parse-query-params
+  "Parses query params string `qstr` using Ring's `ring.util.codec/form-decode`. The
+  given request map `req` is used internally to get the current character
+  encoding (with fallback to UTF-8)."
   [req qstr]
   (if req
     (if-some [qstr (some-str qstr)]
-      (codec/form-decode qstr (or (req/character-encoding req) "UTF-8")))))
+      (codec/form-decode qstr (or (req/character-encoding req)
+                                  "UTF-8")))))
 
 (defn url->uri+params
+  "Takes a request map `req` and URI (`u`) and tries to decompose it into 2-element
+  vector with first element being a URI and second a query params map. If there is a
+  processing exception during the operation, string-converted `u` is returned
+  unmodified and query params slot is set to be `nil`. The request map is used
+  internally to get the current character encoding (with fallback to UTF-8)."
   [req u]
   (try (let [{:keys [uri query-string]} (parse-url u)]
          [(some-str uri) (parse-query-params req query-string)])
@@ -1650,8 +1659,9 @@
 (defn query-string-encode
   ([params]
    (if params (codec/form-encode params)))
-  ([params enc]
-   (if params (codec/form-encode params enc))))
+  ([req params]
+   (if params (codec/form-encode params (or (req/character-encoding req)
+                                            "UTF-8")))))
 
 (defn remove-params
   "Removes the given parameter or parameters from a request map locations:
@@ -1866,7 +1876,7 @@
 
 (defn lang-query-string
   [req]
-  (query-string-encode {"lang" (lang-str req)}))
+  (query-string-encode req {"lang" (lang-str req)}))
 
 (defn lang-config
   [req]

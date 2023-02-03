@@ -84,7 +84,7 @@
                           rdata             (or route-data (http/get-route-data req))
                           existing-uid      (if exists? (some-str (get result :existing-user/uid)))
                           existing-user-id  (if exists? (get result :existing-user/id))
-                          lang-qs           (common/query-string-encode {"lang" lang-str})
+                          lang-qs           (common/query-string-encode req {"lang" lang-str})
                           url-type          (common/id-type->url-type id-type reason)
                           verify-link       (str (get rdata url-type) token "/?" lang-qs)
                           recovery-link     (if existing-uid (str (get rdata :url/recover) existing-uid "/?" lang-qs))
@@ -260,7 +260,7 @@
       created?         (let [mobile-agent? (common/mobile-agent? req)
                              app-uri       (http/get-route-data req :app.url/login)
                              login         (or (some-str login) (get creation :email))
-                             qs            (common/query-string-encode {"login" login})
+                             qs            (common/query-string-encode req {"login" login})
                              destination   (str app-uri "?" qs)]
                          (confirmation/delete db login)
                          (web/render-status req :verify/done nil
@@ -304,7 +304,7 @@
                               mobile-agent? (common/mobile-agent? req)
                               route-data    (http/get-route-data req)
                               app-uri       (get route-data :app.url/login)
-                              qs            (common/query-string-encode {"login" login})
+                              qs            (common/query-string-encode req {"login" login})
                               destination   (str app-uri "?" qs)]
                           (if session-invalidator (session-invalidator req route-data id-type id user-id))
                           (confirmation/delete db id "change")
@@ -467,6 +467,7 @@
                 app-url    (delay (if @mobile? (http/get-route-data req :app.url/recover)))
                 app-link   (delay (if @app-url (str app-url "?"
                                                     (common/query-string-encode
+                                                     req
                                                      {"login" user-email
                                                       "token" token}))))]
             (web/assoc-app-data

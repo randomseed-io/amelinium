@@ -1037,7 +1037,7 @@
             (common/temporary-redirect req dest-uri nil joint-params)
             (resp/temporary-redirect
              (str referer (if (str/includes? referer "?") "&" "?")
-                  (common/query-string-encode joint-params)))))
+                  (common/query-string-encode req joint-params)))))
         ;; render a separate page describing invalid parameters
         ;; instead of current page
         (-> (assoc-app-data
