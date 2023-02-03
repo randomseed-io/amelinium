@@ -170,11 +170,15 @@
 (defn join-errors
   "Used to produce a string containing parameter names and their types (as defined in
   schema) from a coercion errors simple map or coercion errors sequence (produced by
-  `list-errors-simple` or `map-errors-simple` respectively). For a non-empty string it
-  simply returns it. Used to generate a query string containing form errors in a form
-  of `parameter-id` or `parameter-id:parameter-type` separated by commas. The whole
-  string can then be encoded and used as a query parameter `:form-errors` when
-  redirecting anonymous user to a page with a previous form which needs to be corrected."
+  `list-errors-simple` or `map-errors-simple` respectively).
+
+  For a non-empty string it simply returns it. Used to generate a query string
+  containing form errors in a form of `parameter-id` or `parameter-id:parameter-type`
+  separated by commas.
+
+  The whole string can then be encoded and used as a query
+  parameter (i.e. `:form-errors`) when redirecting anonymous user to a page with a
+  previous form which needs to be corrected."
   [errors]
   (if (and (string? errors) (pos? (count errors)))
     errors
@@ -182,7 +186,7 @@
       (->> errors
            (map (fn [[param-id param-type _]]
                   (if-some [param-id (and param-id (some-str (str/trim (some-str param-id))))]
-                    (if-some [param-type (and param-type (some-str (str/trim (str param-type))))]
+                    (if-some [param-type (and param-type (some-str (str/trim (some-str param-type))))]
                       (str param-id ":" param-type)
                       param-id))))
            (filter identity)
@@ -205,7 +209,7 @@
       (->> errors
            (map (fn [[param-id param-type param-value]]
                   (if-some [param-id (and param-id (some-str (str/trim (some-str param-id))))]
-                    (let [param-type (and param-type (some-str (str/trim (str param-type))))]
+                    (let [param-type (and param-type (some-str (str/trim (some-str param-type))))]
                       (str param-id ":" param-type ":" param-value)))))
            (filter identity)
            (str/join ",")))))
