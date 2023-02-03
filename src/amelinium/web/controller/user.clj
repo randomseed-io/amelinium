@@ -26,8 +26,7 @@
             [amelinium.http.client.twilio       :as          twilio]
             [io.randomseed.utils.map            :as             map]
             [io.randomseed.utils.map            :refer     [qassoc]]
-            [io.randomseed.utils                :refer         :all]
-            [puget.printer :refer [cprint]])
+            [io.randomseed.utils                :refer         :all])
 
   (:import [amelinium Session AuthSettings AuthConfig AuthConfirmation]
            [amelinium UserData Suites SuitesJSON]))
@@ -345,21 +344,21 @@
   the password for the given `user-id`."
   [req]
   (let [form-params  (get (get req :parameters) :form)
-        user-email   (some-str (get form-params :login))
+        user-email   (some-str (or (get form-params :username) (get form-params :login)))
         new-password (get form-params :new-password)
-        new-repeated (get form-params :new-password-confirm)
+        new-repeated (get form-params :repeated-password)
         old-password (if user-email (some-str (get form-params :password)))
         route-data   (http/get-route-data req)
         req          (auth-with-password! req user-email old-password nil route-data nil true nil)]
     (if (web/response? req)
       req
       (if (= :auth/ok (get req :response/status))
-        (if (= new-password new-repeated)
+        (if-not (= new-password new-repeated)
+          (web/form-params-error! req {:repeated-password :passwords-no-match})
           (super/set-password!
            req
            (or (get req :user/id) (user/email-to-id (auth/db req) user-email))
-           new-password)
-          (super/throw-bad-param req :new-password-confirm new-repeated :passwords-no-match))
+           new-password))
         req))))
 
 (defn password-recover!
@@ -418,13 +417,13 @@
         path-params   (get params :path)
         token         (or (get path-params :token) (get form-params :token))
         code          (get form-params :code)
-        login         (get form-params :login)
         email         (get form-params :email)
+        login         (or (get form-params :username) (get form-params :login) email)
         phone         (if-not email (get form-params :phone))
         id-type       (if email :email (if phone :phone))
         id            (or email phone)
-        password      (some-str (get form-params :password))
-        password-2    (some-str (get form-params :password-confirm))
+        password      (some-str (get form-params :new-password))
+        password-2    (some-str (get form-params :repeated-password))
         set-password? (some? (or password password-2))]
     (cond
 
@@ -432,8 +431,8 @@
       ;; validates confirmation and creates a new password
 
       (and set-password? (some? (or token (code id))))
-      (if (not= password password-2)
-        (super/throw-bad-param req :password-confirm password-2 :passwords-no-match)
+      (if-not (= password password-2)
+        (web/form-params-error! req {:repeated-password :passwords-no-match})
         (let [db   (auth/db req)
               cfrm (confirmation/establish db id code token one-minute "recovery")]
           (if (get cfrm :confirmed?)
