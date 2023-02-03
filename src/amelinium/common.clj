@@ -314,6 +314,23 @@
            (some-> (r/match->path m query-params)
                    (str location qparams))))))))
 
+(defn path-slash-variants
+  "Returns a 2-element vector of a path containing its two variants: with and without a
+  trailing slash. The original path is always placed first.
+
+  If the path is empty, vector of an empty string and a slash is returned. If the
+  path is a slash, vector of a slash and an empty string is returned.
+
+  If the path is `nil`, it returns `nil`."
+  [uri]
+  (if uri
+    (let [c (unchecked-int (count uri))]
+      (if (pos? c)
+        (if (= \/ (.charAt ^String uri (unchecked-dec-int c)))
+          [uri (subs uri 0 (dec c))]
+          [uri (str uri "/")])
+        ["" "/"]))))
+
 (defn has-param?
   "Checks if the given route match can be parameterized with a parameter of the given
   id."
