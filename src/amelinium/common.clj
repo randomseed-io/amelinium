@@ -1643,6 +1643,7 @@
   (if req
     (if-some [qstr (some-str qstr)]
       (codec/form-decode qstr (or (req/character-encoding req)
+                                  (get req :character-encoding)
                                   "UTF-8")))))
 
 (defn url->uri+params
@@ -1661,6 +1662,7 @@
    (if params (codec/form-encode params)))
   ([req params]
    (if params (codec/form-encode params (or (req/character-encoding req)
+                                            (get req :character-encoding)
                                             "UTF-8")))))
 
 (defn remove-params
