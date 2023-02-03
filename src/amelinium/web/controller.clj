@@ -315,8 +315,9 @@
   generated.
 
   If type name is not available, a simple parameter name is generated. So the example
-  value (before encoding) may look like `email,secret:password` (`email` parameter
-  without type information, `secret` parameter with type named `password`).
+  value (before encoding) may look like `email,secret:password` (`email` being a
+  parameter without type information, `secret` being a parameter with type named
+  `password`).
 
   Next, the originating URI is obtained from the `Referer` header and a temporary
   redirect (with HTTP code 307) is generated with this path and a query string
@@ -326,17 +327,18 @@
   The destination of the redirect can be overriden by the `:form-errors/page`
   configuration option associated with HTTP route data.
 
-  If the destination URI cannot be established, or if a coercion error happened during
-  handling some previous coercion error (so current page is where the browser had
-  been redirected to), then instead of generating a redirect, a regular page is
-  rendered with HTTP code of 422. The `:app/data` key of a request map is updated
-  with:
+  If the destination URI cannot be established, or if a coercion error happened
+  during handling some previous coercion error (so the current page is where the
+  browser had been redirected to), then instead of generating a redirect, a regular
+  page is rendered with HTTP code of 422. The `:app/data` key of a request map is
+  updated with:
 
-  - `:title` (translated message of `:parameters/error`),
-  - `:form/errors` (a map with the result of calling
-                    `amelinium.http.middleware.coercion/map-errors-simple`
-                    under `:errors` and ),
-  - `:coercion/errors` (result of `amelinium.http.middleware.coercion/explain-errors-simple`).
+  - `:title` set to a translated message of `:parameters/error`,
+  - `:form/errors` containing a map:
+    - `:errors` mapped to `amelinium.http.middleware.coercion/map-errors-simple` applied to `errors`,
+    - `:params` mapped to a map containing current parameter values from coercion data,
+    - `:dest` mapped to a destination URI;
+  - `:coercion/errors` (result of `amelinium.http.middleware.coercion/explain-errors-simple` applied to coercion data).
 
   When a coercion error is detected during response processing, a web page of HTTP
   code 500 is rendered. The `:app/data` key of a request map is updated with the:
@@ -354,55 +356,16 @@
          ctype (get data :type)
          data  (dissoc data :request :response)]
      (case ctype
+
        :reitit.coercion/request-coercion
-       (let [route-data             (http/get-route-data req)
-             forced-orig-page       (get route-data :form-errors/page)
-             orig-page              (or forced-orig-page (:page (get req :goto)))
-             referer                (if (nil? orig-page) (some-str (get (get req :headers) "referer")))
-             [orig-uri orig-params] (if referer (common/url->uri+params req referer))
-             handling-previous?     (contains? (get req :query-params) "form-errors")]
-         (respond
-          (if (and (or (valuable? orig-page) (valuable? orig-uri) referer)
-                   (not handling-previous?))
-            ;; redirect to a form-submission page allowing user to correct errors
-            ;; transfer form errors using query params or form params (if a session is present)
-            ;; if session is present, use POST method, otherwise use GET
-            (let [errors        (coercion/map-errors-simple data)
-                  orig-uri      (if orig-uri (some-str orig-uri))
-                  orig-params   (if orig-uri orig-params)
-                  destination   (or orig-page orig-uri)
-                  dest-uri      (if (keyword? destination) (common/page req destination) destination)
-                  dest-uri      (some-str dest-uri)
-                  ^Session smap (session/not-empty-of req (or session-key (get route-data :session-key)))
-                  stored?       (if (and smap (session/valid? smap))
-                                  (session/put-var!
-                                   smap :form-errors
-                                   {:dest   dest-uri
-                                    :errors errors
-                                    :params (->> (keys (get data :transformed))
-                                                 (select-keys (get data :value)))}))
-                  error-params  (if stored? "" (coercion/join-errors errors))
-                  joint-params  (qassoc orig-params "form-errors" error-params)]
-              (if dest-uri
-                (common/temporary-redirect req dest-uri nil joint-params)
-                (resp/temporary-redirect
-                 (str referer (if (str/includes? referer "?") "&" "?")
-                      (common/query-string-encode joint-params)))))
-            ;; render a separate page describing invalid parameters
-            ;; instead of current page
-            (let [translate-sub (i18n/no-default (common/translator-sub req))]
-              (-> req
-                  (map/assoc-missing :app/data common/empty-lazy-map)
-                  (qassoc
-                   :app/data
-                   (-> (get req :app/data web/empty-lazy-map)
-                       (qassoc :title           (delay (translate-sub :parameters/error))
-                               :coercion/errors (delay (coercion/explain-errors-simple data translate-sub))
-                               :form/errors     (delay {:errors (coercion/map-errors-simple data)
-                                                        :dest   (:uri req)
-                                                        :params (->> (keys (get data :transformed))
-                                                                     (select-keys (get data :value)))}))))
-                  web/render-bad-params)))))
+       (let [translate-sub (i18n/no-default (common/translator-sub req))]
+         (web/handle-bad-request-form-params
+          req
+          (coercion/map-errors-simple data)
+          (delay (->> (keys (get data :transformed)) (select-keys (get data :value))))
+          (delay (coercion/explain-errors-simple data translate-sub))
+          (delay (translate-sub :parameters/error))
+          session-key))
 
        :reitit.coercion/response-coercion
        (let [error-list (coercion/list-errors-simple data)]
