@@ -122,6 +122,7 @@
                            :email                 "Adres e-mailowy"
                            :login                 "Login"
                            :password              "Hasło"
+                           :new-password          "Nowe hasło"
                            :password-relaxed      "Hasło"
                            :repeated-password     "Powtórzone hasło"
                            :name                  "Imię"
@@ -174,6 +175,8 @@
                            :email                          :type-should/email
                            :login                          "Login powinien być poprawnym adresem e-mailowym."
                            :password                       :type-should/password
+                           :new-password                   :type-should/password
+                           :repeated-password              :type-should/password
                            :password-relaxed               :type-should/password-relaxed
                            :password.password              "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
                            :password.password-relaxed      "Należy podać hasło."
@@ -211,8 +214,7 @@
                            :send-again        "Wyślij ponownie!"
                            :email             :parameter/email
                            :password          :parameter/password
-                           :new-password      :parameter/password
-                           :repeat-password   :parameter/password
+                           :new-password      :parameter/new-password
                            :repeated-password :parameter/repeated-password
                            :name              :parameter/name
                            :first-name        :parameter/first-name

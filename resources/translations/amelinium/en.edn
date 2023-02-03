@@ -118,6 +118,7 @@
                            :login                 "Login"
                            :password              "Password"
                            :password-relaxed      "Password"
+                           :new-password          "New password"
                            :repeated-password     "Repeated password"
                            :name                  "Name"
                            :first-name            "First name"
@@ -171,6 +172,8 @@
                            :email                          :type-should/email
                            :login                          "Login should be a valid e-mail address."
                            :password                       :type-should/password
+                           :new-password                   :type-should/password
+                           :repeated-password              :type-should/password
                            :password-relaxed               :type-should/password-relaxed
                            :password.password              "Password should have min. 8 letters (big and small), a digit, and a special character."
                            :password.password-relaxed      "Password must be present."
@@ -213,7 +216,6 @@
                            :email             :parameter/email
                            :password          :parameter/password
                            :new-password      :parameter/password
-                           :repeat-password   :parameter/password
                            :repeated-password :parameter/repeated-password
                            :name              :parameter/name
                            :first-name        :parameter/first-name
