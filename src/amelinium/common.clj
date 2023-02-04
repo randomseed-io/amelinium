@@ -189,6 +189,7 @@
 ;; Path parsing
 
 (def ^:const max-url-len      8192)
+(def ^:const page-cache-len   4096)
 (def ^:const fast-url-matcher (re-pattern "^[a-zA-Z0-9\\+\\.\\-]+\\:"))
 (def ^:const path-splitter    (re-pattern "([^\\?\\#]+)(\\#[^\\?]+)?(\\?.*)?"))
 (def ^:const split-qparams    (re-pattern "[^\\?\\#]+|[\\?\\#].*"))
@@ -376,83 +377,150 @@
   (let [pvalue (some-str pvalue)
         param  (some-keyword-simple param)]
     (if (ident? id)
+
       ;; identifier given (route name)
+
       (if-some [m (r/match-by-name rtr id (qassoc params param pvalue))]
         (if require-param?
+
+          ;; path must be parameterized with our parameter
+
           (or (req-param-path rtr m param pvalue query-params)
               (if name-path-fallback?
                 (if-some [path (some-str (r/match->path m))]
                   (parameterized-page-core param rtr path
                                            pvalue params query-params
-                                           require-param? false))))
+                                           true name-path-fallback?))))
+
+          ;; we do not require path to be parameterized with our parameter
+
           (r/match->path m query-params)))
+
       ;; path given
+
       (if id
         (let [[id location qparams] (split-query-params id)
               qparams               (if-not (not-empty query-params) qparams)
               m                     (r/match-by-path rtr id)
               cur-pvalue            (get (get m :path-params) param)]
           (if (= cur-pvalue pvalue)
+
             ;; path is parameterized and the parameter value is the same
+
             (some-> (r/match->path m query-params) (str location qparams))
+
             ;; path is not parameterized or the parameter value is different
+
             (if-some [template (path-template-with-param m param cur-pvalue)]
+
               ;; path is parameterized with our parameter
               ;; we can re-parameterize the path by calling template-path
+
               (if-some [p (template-path m {param pvalue})]
                 (if require-param?
                   (some-> (req-param-path  rtr p param pvalue query-params)    (str location qparams))
                   (some-> (r/match-by-path rtr p) (r/match->path query-params) (str location qparams))))
-              ;; route is not parameterized with our parameter
-              ;; we have to go brute-force by trying different path variants
-              (some-> (some
-                       (if require-param?
-                         #(req-param-path rtr % param pvalue query-params)
-                         #(some-> (r/match-by-path rtr %) (r/match->path query-params)))
-                       (path-variants id pvalue))
-                      (str location qparams)))))))))
+
+              ;; path is not parameterized with our parameter
+
+              (if require-param?
+
+                ;; parameter is required and path is not parameterized with it
+
+                (some-> (some #(req-param-path rtr % param pvalue query-params)
+                              (path-variants id pvalue))
+                        (str location qparams))
+
+                ;; parameter is not required and path is not parameterized with it
+
+                (if (= :brute-force name-path-fallback?)
+
+                  ;; brute-force parameter injection was requested
+
+                  (some-> (some #(some-> (r/match-by-path rtr %) (r/match->path query-params))
+                                (path-variants id pvalue))
+                          (str location qparams))
+
+                  ;; no parameter injection, return the path
+
+                  (some-> (some #(some-> (r/match-by-path rtr %) (r/match->path query-params))
+                                (path-slash-variants id))
+                          (str location qparams)))))))))))
 
 (def ^{:private  true
        :arglists '([param rtr id param-value params query-params require-param? name-path-fallback?])}
   parameterized-page-mem
-  (mem/lu parameterized-page-core :lu/threshold 4096))
+  (mem/lu parameterized-page-core :lu/threshold page-cache-len))
 
 (defn parameterized-page
   "Generates a path for the given page identifier (which may be a name expressed with
   an identifier, preferably a keyword, or a path expressed as a string) and a
-  parameter with the given value. Optional parameters may be given as the argument
-  called params; they will be used to match a page by name if it requires additional
-  parameters to be present.
+  parameter with the given value.
+
+  Optional path parameters may be given. They will be used to match a page by name if
+  it requires additional parameters to be present.
 
   Examples:
 
-  (parameterized-page req)
-  (parameterized-page req :login-page)
-  (parameterized-page req :login-page :lang :pl)
-  (parameterized-page req :login-page :lang :pl {:client \"wow-corp\"})
-  (parameterized-page req \"/login/page/\")
-  (parameterized-page req \"/login/page/\" :lang :pl)
-  (parameterized-page req \"/en/login/page/\" :lang :pl)
+  `(parameterized-page req)`
+  `(parameterized-page req :login-page)`
+  `(parameterized-page req :login-page :lang :pl)`
+  `(parameterized-page req :login-page :lang :pl {:client \"wow-corp\"})`
+  `(parameterized-page req \"/login/page/\")`
+  `(parameterized-page req \"/login/page/\" :lang :pl)`
+  `(parameterized-page req \"/en/login/page/\" :lang :pl)`
 
   When called with just a request map, returns a path of the current page if the page
   exists. When called with a page name or path, it returns a path if the page
   exists.
 
-  The optional require-param? argument (the last one in a quaternary variant,
-  set to true when not given) enables extra check eliminating pages which do not
-  support the given parameter, yet were matched by their names. Example:
-  (parameterized-page req :login-page :lang :pl) will fail if there is no parameter
-  :lang handled by the route named :login-page and require-param? was set to
-  true.
+  The optional `name-path-fallback?` argument, when set to a truthy value (default is
+  `false`), causes non-matching route identifier to be retried by extracting its path
+  and calling this function for that path given as a string.
+
+  The optional `require-param?` argument (set to `false` when not given) enables
+  extra check eliminating pages which do not support the given parameter, yet would
+  be matched. Example:
+
+  `(parameterized-page req :login-page :lang :pl true)`
+
+   will fail if there is no parameter `:lang` handled by the route named
+  `:login-page`.
 
   When the given path is already parameterized then re-parameterized path is
   generated and checked if it exists, unless the value of the parameter is the same
   as the existing one. In such case the path is returned after a quick existence
   check.
 
-  If the path is given, it must exist, unless a parameter name and value are passed
-  as argument values too. In such case the page identified by the path does not have
-  to exist but the resulting page has to."
+  Additional path parameters (`path-params`) can be given to be used when matching by
+  name. Giving extra (unknown to route) parameters does not affect lookup. Giving
+  `path-params` when matching by path causes them to be silently ignored.
+
+  Additional query parameters (`query-params`) can be given. They will be used when
+  generating path. If the path was given and it already contains query parameters,
+  they will be replaced.
+
+  If the path is given instead of a route identifier, it must exist (after being
+  equipped with any extra parameters, if needed, using `path-params`).
+
+  When the `require-param?` is set to `false` (default) and a path is given but it
+  does not require this parameter, a path will be generated by testing whether it
+  exists for regular and for slash-stripped or slash-added variant (the original
+  variant goes first).
+
+  When the `require-param?` is set to `false` (default) and a path is given but it
+  does not require this parameter plus the `name-path-fallback?` argument is set to
+  `:brute-force`, all possible path variants (with parameter injected within its
+  succesive segments) will be tried in hope that one will exist, regardless of
+  parameter name that matches. Use it with caution as it may give weird matches; if
+  for example, there is a route path `/users/:id` defined, and the given path is
+  `/users/` with `:lang` parameter set to `:pl`, then it will match `/users/pl` even
+  though the parameter name is different.
+
+  When the `require-param?` is set to `true` and a path is given but it does not
+  require this parameter, all possible path variants (with parameter injected within
+  its succesive segments) will be tried in hope that one will match, being a path
+  that requires this parameter."
   ([] "/")
   ([req]
    (r/match->path (get req ::r/match) (get req :query-params)))
@@ -465,17 +533,17 @@
            (some-> (r/match-by-path rtr path) r/match->path (str location qparams)))))))
   ([req id-or-path param param-value]
    (if-some [rtr (get req ::r/router)]
-     (parameterized-page-mem param rtr id-or-path param-value nil nil true false)))
+     (parameterized-page-mem param rtr id-or-path param-value nil nil false false)))
   ([req id-or-path param param-value params-or-require-param?]
    (if-some [rtr (get req ::r/router)]
      (if (boolean? params-or-require-param?)
        (parameterized-page-mem param rtr id-or-path param-value nil nil params-or-require-param? false)
-       (parameterized-page-mem param rtr id-or-path param-value params-or-require-param? nil true false))))
+       (parameterized-page-mem param rtr id-or-path param-value params-or-require-param? nil false false))))
   ([req id-or-path param param-value params query-params-or-require-param?]
    (if-some [rtr (get req ::r/router)]
      (if (boolean? query-params-or-require-param?)
        (parameterized-page-mem param rtr id-or-path param-value params nil query-params-or-require-param? false)
-       (parameterized-page-mem param rtr id-or-path param-value params query-params-or-require-param? true false))))
+       (parameterized-page-mem param rtr id-or-path param-value params query-params-or-require-param? false false))))
   ([req id-or-path param param-value params query-params require-param?]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem param rtr id-or-path param-value params query-params require-param? false)))
@@ -492,20 +560,53 @@
   to support current language in use (taken from `:language/str` key of the request
   map).
 
-  The optional lang-required? argument (the last one in a quaternary variant, set to
-  `true` when not given) enables extra check which eliminates the resulting pages not
-  supporting the language parameter (yet were matched by their names).
+  The optional `name-path-fallback?` argument, when set to a truthy value (`true` by
+  default), causes non-matching route identifier to be retried by extracting its path
+  and calling this function for that path given as a string.
 
-  When the given path is already localized then re-localized path is generated and
-  checked if it exists, unless its language is the same as the existing one. In such
-  case the path is returned after a quick existence check.
+  The optional `lang-required?` argument (set to `false` when not given) enables
+  extra check eliminating pages which do not support the given language
+  parameter. Example:
 
-  If the path is given it does not have to exist but the resulting page (identified
-  by the localized path) has to.
+  `(localized-page req :login-page :pl true)`
 
-  When having a path given, the failed matching causes it to fall back into
-  brute-force mode where the given language parameter is injected into every possible
-  segment of a path to check if it exists."
+   will fail if there is no parameter `:lang` handled by the route named
+  `:login-page`.
+
+  When the given path is already parameterized with language then re-parameterized
+  path is generated and checked if it exists, unless the value of the parameter is
+  the same as the existing one. In such case the path is returned after a quick
+  existence check.
+
+  Additional path parameters (`path-params`) can be given to be used when matching by
+  name. Giving extra (unknown to route) parameters does not affect lookup. Giving
+  `path-params` when matching by path causes them to be silently ignored.
+
+  Additional query parameters (`query-params`) can be given. They will be used when
+  generating path. If the path was given and it already contains query parameters,
+  they will be replaced.
+
+  If the path is given instead of a route identifier, it must exist (after being
+  equipped with any extra parameters, if needed, using `path-params`).
+
+  When the `lang-required?` is set to `false` (default) and a path is given but it
+  does not require language parameter, a path will be generated by testing whether it
+  exists for regular and for slash-stripped or slash-added variant (the original
+  variant goes first).
+
+  When the `lang-required?` is set to `false` (default) and a path is given but it
+  does not require language parameter plus the `name-path-fallback?` argument is set
+  to `:brute-force`, all possible path variants (with language parameter injected
+  within its succesive segments) will be tried in hope that one will exist,
+  regardless of parameter name that matches. Use it with caution as it may give weird
+  matches; if for example, there is a route path `/users/:id` defined, and the given
+  path is `/users/` with language set to `:pl`, then it will match `/users/pl` even
+  though the parameter is not related to a language.
+
+  When the `lang-required?` is set to `true` and a path is given but it does not
+  require a language parameter, all possible path variants (with parameter injected
+  within its succesive segments) will be tried in hope that one will match, being a
+  path that requires language parameter."
   {:arglists '([req]
                [req name-or-path]
                [req name-or-path path-params]
@@ -527,15 +628,15 @@
                      (get req :language/str)
                      (or (get req :path-params) (get m :path-params))
                      (get req :query-params)
-                     false false)))
+                     false true)))
   ([req name-or-path]
    (localized-page req name-or-path
                    (get req :language/str)
-                   nil nil false false))
+                   nil nil false true))
   ([req name-or-path lang]
    (localized-page req name-or-path
                    (or lang (get req :language/str))
-                   nil nil false false))
+                   nil nil false true))
   ([req name-or-path lang params-or-lang-required?]
    (if-some [rtr (get req ::r/router)]
      (if (boolean? params-or-lang-required?)
@@ -544,12 +645,12 @@
                                (or lang (get req :language/str))
                                nil nil
                                params-or-lang-required?
-                               false)
+                               true)
        (parameterized-page-mem (lang-param req)
                                rtr name-or-path
                                (or lang (get req :language/str))
                                params-or-lang-required?
-                               nil false false))))
+                               nil false true))))
   ([req name-or-path lang params query-params-or-lang-required?]
    (if-some [rtr (get req ::r/router)]
      (if (boolean? query-params-or-lang-required?)
@@ -558,19 +659,19 @@
                                (or lang (get req :language/str))
                                params nil
                                query-params-or-lang-required?
-                               false)
+                               true)
        (parameterized-page-mem (lang-param req)
                                rtr name-or-path
                                (or lang (get req :language/str))
                                params query-params-or-lang-required?
-                               false false))))
+                               false true))))
   ([req name-or-path lang params query-params lang-required?]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
                              params query-params
-                             lang-required? false)))
+                             lang-required? true)))
   ([req name-or-path lang params query-params lang-required? name-path-fallback?]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
@@ -596,9 +697,10 @@
                              name-path-fallback?))))
 
 (defn strictly-localized-page
-  "Same as `localized-page` with `lang-required?` always set to `true` and with less
-  arities supported. When the language version of a page identified by its name is
-  not present it will return `nil`."
+  "Same as `localized-page` with `lang-required?` always set to `true`,
+  `name-path-fallback?` set to `false`, and with less arities supported. When the
+  language version of a page identified by its name is not present it will return
+  `nil`."
   ([req]
    (let [m (get req ::r/match)]
      (localized-page req
@@ -666,36 +768,57 @@
       [lang-param lang-str])))
 
 (defn page
-  "Generates page path for the given page identifier (a name) or a path and optional
-  language identifier. When called with just a request map, returns a path of the
-  current page.
+  "Generates a page path for the given page identifier (a route name) or a path, and
+  optional language identifier. When called with just a request map, returns a path
+  of the current page.
 
   It tries to be optimistic. When called for a page identified by its name (expressed
-  as an identifier, usually a keyword) and requiring a language parameter to be
-  found (so it cannot be looked up using just a name alone) then it will use
-  currently detected language obtained from the given request
-  map (key `:language/str`), and use it.
+  as an identifier, usually a keyword) and with a language parameter to be found (so
+  it cannot be looked up using just a name alone), it will use currently detected
+  language obtained from the given request map (key `:language/str`), and will use
+  it.
 
-  When invoked with a language parameter, it calls localized-page to handle it. The
-  lang-required? parameter is used when localized-page is called to check if the
-  route which was matched is parameterized with the language parameter. This is to
-  ensure that a localized route is used.
+  Additional query parameters (`query-params`) can be given. They will be used when
+  generating path with `localized-page`. If the path was given and it already
+  contains query parameters, they will be replaced.
 
-  If the path is given, it must exist, unless the language argument is given. In such
-  case the path does not have to exist but the resulting page (identified by the
-  localized path) has to.
+  Additional path parameters (`path-params`) may be given. Giving extra (unknown to
+  route) parameters does not affect lookup. Giving `path-params` when matching by
+  path causes them to be silently ignored.
 
-  Additional path parameters (path-params) can be given to be used when matching by
-  name. Giving extra (unknown to route) parameters does not affect lookup. Giving
-  path-params when matching by path causes them to be silently ignored.
+  When invoked with a language parameter, calls `localized-page` internally.
 
-  Additional query parameters (query-params) can be given. They will be used when
-  generating path. If the path was given and it already contains query parameters,
-  they will be replaced.
+  When invoked with a language parameter, the `lang-required?` argument may be
+  used (by default set to `false`) to check if a matching route is parameterized with
+  a language parameter. This is to ensure that only a localized route is used.
 
-  When having a language and a path given, the failed matching causes internally
-  called `localized-page` to fall back into brute-force mode where the given language
-  parameter is injected into every possible segment of a path to check if it exists."
+  When invoked with a language parameter, the optional `name-path-fallback?`
+  argument may be used (set to `true` by default) to cause non-matching route
+  identifier to be retried by extracting its path and calling `localized-page`
+  function for that path expressed as a string.
+
+  If the path is given instead of a route identifier, it must exist (after being
+  equipped with any extra parameters, if needed, using `path-params`).
+
+  When invoked with a language parameter, the `lang-required?` is set to
+  `false` (default), and a path is given but it does not require language parameter,
+  a path will be generated by testing whether it exists for regular and for
+  slash-stripped or slash-added variant (the original variant goes first).
+
+  When invoked with a language parameter, the `lang-required?` is set to
+  `false` (default), and a path is given but it does not require language parameter
+  plus the `name-path-fallback?` argument is set to `:brute-force`, all possible path
+  variants (with language parameter injected within its succesive segments) will be
+  tried in hope that one will exist, regardless of parameter name that matches. Use
+  it with caution as it may give weird matches; if for example, there is a route path
+  `/users/:id` defined, and the given path is `/users/` with language set to `:pl`,
+  then it will match `/users/pl` even though the parameter is not related to a
+  language.
+
+  When invoked with a language parameter, the `lang-required?` is set to `true`, and
+  a path is given but it does not require a language parameter, all possible path
+  variants (with language parameter injected within its succesive segments) will be
+  tried in hope that one will match, being a path that requires language parameter."
   {:arglists '([req]
                [req name-or-path]
                [req name-or-path path-params]
@@ -761,14 +884,14 @@
                        lang-or-params
                        nil nil
                        params-or-query-params-or-required?
-                       false)
+                       true)
        (localized-page req
                        name-or-path
                        lang-or-params
                        params-or-query-params-or-required?
                        nil
                        false
-                       false))))
+                       true))))
   ([req name-or-path lang-or-params params-or-query-params query-params-or-require-param?]
    (if (or (nil? lang-or-params) (map? lang-or-params))
      ;; no language specified
@@ -792,14 +915,14 @@
                        lang-or-params
                        nil nil
                        query-params-or-require-param?
-                       false)
+                       true)
        (localized-page req
                        name-or-path
                        lang-or-params
                        nil
                        query-params-or-require-param?
                        false
-                       false))))
+                       true))))
   ([req name-or-path lang params query-params require-param?]
    ;; language specified
    (localized-page req
@@ -808,7 +931,7 @@
                    params
                    query-params
                    require-param?
-                   false))
+                   true))
   ([req name-or-path lang params query-params require-param? name-path-fallback?]
    ;; language specified
    (localized-page req
@@ -1537,7 +1660,7 @@
 ;; Linking helpers
 
 (defn path
-  "Creates a URL path on a basis of route name or a path."
+  "Creates a URL path on a basis of route name or a path. Uses `localized-page`."
   ([]
    nil)
   ([req]
