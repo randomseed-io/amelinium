@@ -437,6 +437,27 @@
           "    <button type=\"submit\"" sdata ">" label "</button>\n"
           "  </div>\n")))
 
+(defn get-form-action
+  "Prepares default form action attribute by removing `form-errors` from a query string
+  for current page if the `:action` in `args` is set to `nil`. If the `:action` is
+  not `nil`, it is returned as is. If there is no query params, `nil` is returned. If
+  there is no `form-errors` in query params, `nil` is returned.
+
+  This function takes care about a corner case where leaving form action empty on a
+  rendered form would cause current form errors encoded in a query parameter string
+  to be sent again to the same page, giving possibly misleading information about
+  form errors."
+  [args ctx]
+  (if (contains? args :action)
+    (get args :action)
+    (if-some [qp (get ctx :query-params)]
+      (if (and (contains? qp "form-errors") (contains? ctx :uri))
+        (let [qp (dissoc qp "form-errors")]
+          (if (pos? (count qp))
+            (str (get ctx :uri) "?" (common/query-string-encode ctx qp))
+            (get ctx :uri)))
+        nil))))
+
 (defn add-taggers
   "Registers taggers in a global repository. To be changed to a pure fn some day."
   [router language translations-fn validators]
