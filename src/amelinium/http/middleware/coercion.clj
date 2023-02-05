@@ -167,6 +167,22 @@
   (if-some [r (list-errors-simple data)]
     (reduce (partial apply qassoc) {} (map butlast r))))
 
+(defn join-param-names
+  "Used to produce a string containing parameter names from a map or a sequence."
+  [params]
+  (if params
+    (cond
+      (map?     params) (if (pos? (count params))
+                          (some->> (keys params)
+                                   (map some-str)
+                                   (filter identity) seq
+                                   (str/join ",")))
+      (string?  params) (if (not-empty-string? params) params)
+      (seqable? params) (some->> (seq params)
+                                 (map some-str)
+                                 (filter identity) seq
+                                 (str/join ",")))))
+
 (defn join-errors
   "Used to produce a string containing parameter names and their types (as defined in
   schema) from a coercion errors simple map or coercion errors sequence (produced by
@@ -254,6 +270,24 @@
                s       (if s (some-str (str/trim s)))
                v       (if v (some-str v))]
            (if (or f s) [(keyword f) s v])))))))
+
+(defn valid-param-name?
+  "Returns `true` if the given parameter name matches a pattern and can be sefely
+  converted to an identifier (a keyword or a symbol)."
+  ^Boolean [s]
+  (and (string? s)
+       (not-empty-string? s)
+       (some?
+        (first
+         (re-matches #"([a-zA-Z0-9](\.?[a-zA-Z0-9])*/)?[a-zA-Z0-9](\.?[a-zA-Z0-9])*" s)))))
+
+(defn- valid-error-pair?
+  [coll]
+  (and (some? coll)
+       (valid-param-name? (nth coll 0 nil))
+       (if-some [ptype (nth coll 1 nil)]
+         (valid-param-name? ptype)
+         true)))
 
 (defn parse-errors
   "Transforms a string previously exposed with `join-errors`, a list created with
