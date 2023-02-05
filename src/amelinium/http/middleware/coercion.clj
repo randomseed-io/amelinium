@@ -263,13 +263,12 @@
   ([param-id]
    (if (and (sequential? param-id) (seq param-id))
      (apply split-error (take 3 param-id))
-     (if-some [param-id (some-str param-id)]
-       (if-some [param-id (not-empty (str/trim param-id))]
-         (let [[f s v] (str/split param-id #":" 3)
-               f       (if f (some-str (str/trim f)))
-               s       (if s (some-str (str/trim s)))
-               v       (if v (some-str v))]
-           (if (or f s) [(keyword f) s v])))))))
+     (if-some [param-id (some-> param-id some-str str/trim some-str)]
+       (let [[f s v] (str/split param-id #":" 3)
+             f       (if f (some-str (str/trim f)))
+             s       (if s (some-str (str/trim s)))
+             v       (if v (some-str v))]
+         (if (or f s) [(keyword f) s v]))))))
 
 (defn valid-param-name?
   "Returns `true` if the given parameter name matches a pattern and can be sefely
