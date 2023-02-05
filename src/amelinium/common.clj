@@ -198,9 +198,11 @@
 
 (defn is-url?
   [s]
-  (and s (string? s) (pos? (count ^String s))
-       (not= \/ (.charAt ^String s 0))
-       (some? (re-find fast-url-matcher ^String s))))
+  (if (and s (string? s))
+    (let [^String s s]
+      (and (not-empty-string? s)
+           (not= \/ (.charAt s 0))
+           (some? (re-find fast-url-matcher s))))))
 
 (defn path-variants-core
   "Generates a list of all possible language variants of a path."
@@ -1797,9 +1799,9 @@
 
 (defn string-from-param
   [s]
-  (if-some [s (some-str s)]
-    (if (= \: (.charAt ^String s 0))
-      (let [s (subs s 1)] (if (pos? (count s)) s))
+  (if-some [^String s (some-str s)]
+    (if (= \: (.charAt s 0))
+      (let [^String s (subs s 1)] (if (not-empty-string? s) s))
       s)))
 
 (defn keyword-from-param
@@ -1807,8 +1809,8 @@
   (if (keyword? s)
     s
     (if-some [^String s (some-str s)]
-      (if (= \: (.charAt ^String s 0))
-        (let [s (subs s 1)] (if (pos? (count s)) (keyword s)))
+      (if (= \: (.charAt s 0))
+        (let [^String s (subs s 1)] (if (not-empty-string? s) (keyword s)))
         (keyword s)))))
 
 (defn try-kw-from-param
@@ -1816,8 +1818,8 @@
   (if (keyword? s)
     s
     (if-some [^String s (some-str s)]
-      (if (= \: (.charAt ^String s 0))
-        (let [s (subs s 1)] (if (pos? (count s)) (keyword s)))
+      (if (= \: (.charAt s 0))
+        (let [^String s (subs s 1)] (if (not-empty-string? s) (keyword s)))
         s))))
 
 (defn parse-query-params
@@ -2257,11 +2259,12 @@
   [v]
   (cond
 
-    (and (string? v) (pos? (count v)))
-    (if (and (= (.charAt v 0) \+) (phone/valid? v))
-      :phone
-      (if (some? (str/index-of v \@ 1))
-        :email))
+    (string? v)
+    (if (not-empty-string? v)
+      (if (and (= (.charAt v 0) \+) (phone/valid? v))
+        :phone
+        (if (some? (str/index-of v \@ 1))
+          :email)))
 
     (phone/native? v)
     :phone))

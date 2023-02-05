@@ -73,7 +73,7 @@
 
 (defn valid-password-relaxed?
   [p]
-  (and (string? p) (pos-int? (count p))))
+  (and (string? p) (utils/not-empty-string?)))
 
 (defn valid-session-id?
   [s]

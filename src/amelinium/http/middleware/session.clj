@@ -977,7 +977,7 @@
   "Returns `true` if the given session ID is valid."
   ^Boolean [sid]
   (boolean
-   (and sid (string? sid)
+   (and sid (string? sid) (not-empty-string? sid)
         (<= 30 (count sid) 256)
         (re-matches sid-match sid))))
 

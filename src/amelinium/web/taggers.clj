@@ -320,7 +320,7 @@
   [v]
   (or (keyword? v)
       (and (string? v)
-           (pos? (count ^String v))
+           (not-empty-string? v)
            (= \: (.charAt ^String v 0)))))
 
 (defn param-try-tr
