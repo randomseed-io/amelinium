@@ -336,6 +336,25 @@
            (apply dissoc params)
            delay
            (qassoc req :form-params {} :body-params {} :params))
+(defn parse-param-names
+  "Takes a parameter names separated by commas, removes duplicates and empty strings,
+  and returns a sequence of strings."
+  [s]
+  (if (and (string? s) (not-empty-string? s))
+    (some->> (str/split s #",+" 108) seq
+             (filter valid-param-name?)
+             distinct seq)))
+
+(defn get-form-params
+  "Using the request map `req` gets the values of all parameters from `ids` (expressed
+  as a sequence of strings). Returns a map where keys are parameter names and values
+  are form parameter values."
+  [req ids]
+  (if (seq ids)
+    (let [form-params (get req :form-params)]
+      (if (and form-params (pos? (count form-params)))
+        (reduce #(qassoc %1 (some-keyword %2) (get form-params %2)) {} ids)))))
+
       req)
     req))
 
