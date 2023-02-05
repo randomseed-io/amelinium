@@ -301,24 +301,25 @@
   input field had invalid data."
   [errors]
   (cond
-    (map?        errors) errors
-    (string?     errors) (if (pos? (count errors))
+    (map?        errors) (pos? (count errors))
+    (string?     errors) (if (not-empty-string? errors)
                            (->> (str/split errors #",+" 108)
                                 (map split-error)
                                 (map #(take 2 %))
-                                (filter identity)
+                                (filter valid-error-pair?)
                                 (mapcat seq)
                                 (apply qassoc {})
-                                not-empty))
-    (sequential? errors) (->> (seq errors)
-                              (map #(take 2 %))
-                              (filter identity)
-                              (mapcat seq)
-                              (apply qassoc {})
-                              not-empty)))
+                                (not-empty)))
+    (sequential? errors) (if (seq errors)
+                           (->> errors
+                                (map #(take 2 %))
+                                (filter valid-error-pair?)
+                                (mapcat seq)
+                                (apply qassoc {})
+                                (not-empty)))))
 
 (defn inject-errors
-  "Takes coercion errors, parses them, and puts it into a newly created map under the
+  "Takes coercion errors, parses them, and puts into a newly created map under the
   key named `:errors` among with a current URI associated with the key `:dest`. The
   whole map is then injected into a request map `req` under the key `:form/errors`."
   [req errors]
