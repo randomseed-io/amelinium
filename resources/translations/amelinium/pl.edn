@@ -145,38 +145,38 @@
                            :session-id            "Identyfikator sesji"
                            :language              "Identyfikator języka"
                            :lang                  "Identyfikator języka"}
-   :parameter-type        {:string             "Napis tekstowy"
-                           :integer            "Liczba"
-                           :boolean            "Pole decyzji"
-                           :phone              "Numer telefoniczny"
-                           :regular-phone      "Zwyczajny numer telefoniczny"
-                           :email              "Adres e-mailowy"
-                           :password           "Hasło"
-                           :password-relaxed   "Hasło"
-                           :name               "Imię"
-                           :token              "Token"
-                           :session-id         "Identyfikator sesji"
-                           :secure-session-id  "Bezpieczny identyfikator sesji"
-                           :language           "Identyfikator języka"
-                           :passwords-no-match "Powtórzone hasło"}
-   :type-should           {:phone              "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa."
-                           :regular-phone      "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa i nie być numerem specjalnym."
-                           :email              "Adres e-mailowy powinien zawierać część lokalną i poprawną domenę."
-                           :password           "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
-                           :password-relaxed   "Należy podać hasło."
-                           :name               "Imię powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
-                           :token              "Token powinien być łańcuchem znakowym reprezentującym liczbę w zapisie szesnastkowym."
-                           :session-id         "Identyfikator sesji powinien być jednym lub dwoma łańcuchami znakowymi w zapisie szesnastkowym."
-                           :secure-session-id  "Bezpieczny identyfikator sesji powinien być jedną lub dwoma liczbami szesnastkowymi oddzielonymi dywizem."
-                           :language           "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."
-                           :passwords-no-match "Powtórzone hasło musi być takie same jak pierwsze hasło."}
+   :parameter-type        {:string            "Napis tekstowy"
+                           :integer           "Liczba"
+                           :boolean           "Pole decyzji"
+                           :phone             "Numer telefoniczny"
+                           :regular-phone     "Zwyczajny numer telefoniczny"
+                           :email             "Adres e-mailowy"
+                           :password          "Hasło"
+                           :password-relaxed  "Hasło"
+                           :name              "Imię"
+                           :token             "Token"
+                           :session-id        "Identyfikator sesji"
+                           :secure-session-id "Bezpieczny identyfikator sesji"
+                           :language          "Identyfikator języka"
+                           :repeated-password "Powtórzone hasło"}
+   :type-should           {:phone             "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa."
+                           :regular-phone     "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa i nie być numerem specjalnym."
+                           :email             "Adres e-mailowy powinien zawierać część lokalną i poprawną domenę."
+                           :password          "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
+                           :password-relaxed  "Należy podać hasło."
+                           :name              "Imię powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
+                           :token             "Token powinien być łańcuchem znakowym reprezentującym liczbę w zapisie szesnastkowym."
+                           :session-id        "Identyfikator sesji powinien być jednym lub dwoma łańcuchami znakowymi w zapisie szesnastkowym."
+                           :secure-session-id "Bezpieczny identyfikator sesji powinien być jedną lub dwoma liczbami szesnastkowymi oddzielonymi dywizem."
+                           :language          "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."
+                           :repeated-password "Powtórzone hasło musi być takie samo jak pierwsze hasło."}
    :parameter-should      {:phone                          :type-should/phone
                            :regular-phone                  :type-should/regular-phone
                            :email                          :type-should/email
                            :login                          "Login powinien być poprawnym adresem e-mailowym."
                            :password                       :type-should/password
                            :new-password                   :type-should/password
-                           :repeated-password              :type-should/password
+                           :repeated-password              :type-should/repeated-password
                            :password-relaxed               :type-should/password-relaxed
                            :password.password              "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
                            :password.password-relaxed      "Należy podać hasło."
