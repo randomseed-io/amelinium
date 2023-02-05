@@ -192,11 +192,11 @@
   containing form errors in a form of `parameter-id` or `parameter-id:parameter-type`
   separated by commas.
 
-  The whole string can then be encoded and used as a query
-  parameter (i.e. `:form-errors`) when redirecting anonymous user to a page with a
-  previous form which needs to be corrected."
+  The whole string can then be encoded and used as a query parameter (i.e.
+  `:form-errors`) when redirecting anonymous user to a page with a previous form
+  which needs to be corrected."
   [errors]
-  (if (and (string? errors) (pos? (count errors)))
+  (if (and (string? errors) (not-empty-string? errors))
     errors
     (if-some [errors (seq errors)]
       (->> errors
