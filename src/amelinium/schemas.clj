@@ -347,6 +347,21 @@
                       :json-schema/example (gen/generate gen-password)
                       :gen/gen             gen-password}}))
 
+(def repeated-password
+  (m/-simple-schema
+   {:type            :repeated-password
+    :pred            valid-password?
+    :property-pred   (m/-min-max-pred count)
+    :type-properties {:error/message       "should be the same as first password"
+                      :error/key           :repeated-test-key
+                      :decode/json         utils/some-str
+                      :encode/string       utils/some-str
+                      :encode/json         utils/some-str
+                      :json-schema/type    "string"
+                      :json-schema/format  "password"
+                      :json-schema/example (gen/generate gen-password)
+                      :gen/gen             gen-password}}))
+
 (def password-relaxed
   (m/-simple-schema
    {:type            :password-relaxed
@@ -509,6 +524,7 @@
    :name               personal-name
    :password           password
    :password-relaxed   password-relaxed
+   :repeated-password  repeated-password
    :instant            instant
    :duration           duration
    :phone              phone
