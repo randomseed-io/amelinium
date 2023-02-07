@@ -283,7 +283,7 @@
 (defn- valid-error-pair?
   [coll]
   (and (some? coll)
-       (valid-param-name? (nth coll 0 nil))
+       (keyword? (nth coll 0 nil))
        (if-some [ptype (nth coll 1 nil)]
          (valid-param-name? ptype)
          true)))
