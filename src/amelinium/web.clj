@@ -1018,30 +1018,33 @@
           handling-previous?     (contains? (get req :query-params) "form-errors")]
       (if (and (or (valuable? orig-page) (valuable? orig-uri) referer)
                (not handling-previous?))
+
         ;; redirect to a form-submission page allowing user to correct errors
         ;; transfer form errors using query params or form params (if a session is present)
-        ;; if session is present, use POST method, otherwise use GET
+
         (let [orig-uri     (if orig-uri (some-str orig-uri))
               orig-params  (if orig-uri orig-params)
-              destination  (or orig-page orig-uri)
-              dest-uri     (if (keyword? destination) (common/page req destination) destination)
+              dest         (or orig-page orig-uri)
+              dest-uri     (if (keyword? dest) (common/page req dest) dest)
               dest-uri     (some-str dest-uri)
-              smap         (session/not-empty-of req (or session-key (get route-data :session-key)))
+              skey         (or session-key (get route-data :session-key))
+              smap         (session/not-empty-of req skey)
               stored?      (if (and smap (session/valid? smap))
                              (session/put-var!
                               smap :form-errors
                               {:dest   dest-uri
                                :errors (force errors)
                                :params (force values)}))
-              error-params (if stored? "" (coercion/join-errors (force errors)))
-              joint-params (qassoc orig-params "form-errors" error-params)]
+              joint-params (qassoc orig-params "form-errors" (if stored? "" (coercion/join-errors (force errors))))]
           (if dest-uri
             (common/temporary-redirect req dest-uri nil joint-params)
-            (resp/temporary-redirect
-             (str referer (if (str/includes? referer "?") "&" "?")
-                  (common/query-string-encode req joint-params)))))
+            (resp/temporary-redirect (str referer
+                                          (if (str/includes? referer "?") "&" "?")
+                                          (common/query-string-encode req joint-params)))))
+
         ;; render a separate page describing invalid parameters
         ;; instead of current page
+
         (-> (assoc-app-data
              req
              :title           title

@@ -362,7 +362,7 @@
          (web/handle-bad-request-form-params
           req
           (coercion/map-errors-simple data)
-          (delay (->> (keys (get data :transformed)) (select-keys (get data :value))))
+          (delay (->> (keys (get data :transformed)) (select-keys (get data :value)) (map/map-keys some-str)))
           (delay (coercion/explain-errors-simple data translate-sub))
           (delay (translate-sub :parameters/error))
           session-key))

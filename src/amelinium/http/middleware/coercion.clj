@@ -148,16 +148,16 @@
 
 (defn list-errors-simple
   "Returns a sequence of coercion errors consisting of 3-element sequences. First
-  element of each being a parameter identifier, second element being a parameter type
-  described by schema (if detected), and third being its current value. Takes an
-  exception data map which should contain the `:coercion` key. Used, among other
-  applications, to expose form errors to another page which should indicate them to a
-  visitor."
+  element of each being a parameter identifier (a string), second element being
+  a parameter type described by schema (if detected, a string), and third being
+  its current value. Takes an exception data map which should contain the `:coercion` key.
+  Used, among other applications, to expose form errors to another page which should
+  indicate them to a visitor."
   [data]
   (let [dat (coercion/encode-error data)
         err (get dat :errors)
         err (if (coll? err) err (if (some? err) (cons err nil)))]
-    (->> err (filter identity) (map (juxt-seq (comp some-keyword first :path) param-type :value)))))
+    (->> err (filter identity) (map (juxt-seq (comp some-str first :path) param-type :value)))))
 
 (defn map-errors-simple
   "Like `list-errors-simple` but returns a map in which keys are parameter names and
@@ -249,7 +249,7 @@
            ty (if ty (str/trim ty))]
        (if (or (and id (pos? (count id)))
                (and ty (pos? (count ty))))
-         [(keyword id) ty va]))))
+         [id ty va]))))
   ([param-id param-type]
    (if-not param-type
      (if param-id (split-error param-id))
@@ -259,7 +259,7 @@
            ty (if ty (str/trim ty))]
        (if (or (and id (pos? (count id)))
                (and ty (pos? (count ty))))
-         [(keyword id) ty nil]))))
+         [id ty nil]))))
   ([param-id]
    (if (and (sequential? param-id) (seq param-id))
      (apply split-error (take 3 param-id))
@@ -268,7 +268,7 @@
              f       (if f (some-str (str/trim f)))
              s       (if s (some-str (str/trim s)))
              v       (if v (some-str v))]
-         (if (or f s) [(keyword f) s v]))))))
+         (if (or f s) [f s v]))))))
 
 (defn valid-param-name?
   "Returns `true` if the given parameter name or parameter type name matches a pattern
@@ -278,12 +278,12 @@
        (not-empty-string? s)
        (some?
         (first
-         (re-matches #"([a-zA-Z0-9](\.?[a-zA-Z0-9])*/)?[a-zA-Z0-9](\.?[a-zA-Z0-9])*" s)))))
+         (re-matches #"([a-zA-Z0-9_\!\?\-](\.?[a-zA-Z0-9_\!\?\-])*/)?[a-zA-Z0-9_\!\?\-](\.?[a-zA-Z0-9_\!\?\-])*" s)))))
 
 (defn- valid-error-pair?
   [coll]
   (and (some? coll)
-       (keyword? (nth coll 0 nil))
+       (valid-param-name? (nth coll 0 nil))
        (if-some [ptype (nth coll 1 nil)]
          (valid-param-name? ptype)
          true)))
@@ -326,15 +326,6 @@
 
 ;; Form-errors handling
 
-(defn- remove-params
-  [req]
-  (if-some [to-remove (seq (concat (keys (get req :form-params))
-                                   (keys (get req :body-params))))]
-    (if-some [params (not-empty (get req :params))]
-      (->> (concat to-remove (map keyword to-remove))
-           (apply dissoc params)
-           delay
-           (qassoc req :form-params {} :body-params {} :params))
 (defn parse-param-names
   "Takes a parameter names separated by commas, removes duplicates and empty strings,
   and returns a sequence of strings."
@@ -347,41 +338,72 @@
 (defn get-form-params
   "Using the request map `req` gets the values of all parameters from `ids` (expressed
   as a sequence of strings). Returns a map where keys are parameter names and values
-  are form parameter values."
+  are parameter values."
   [req ids]
   (if (seq ids)
     (let [form-params (get req :form-params)]
       (if (and form-params (pos? (count form-params)))
-        (reduce #(qassoc %1 (some-keyword %2) (get form-params %2)) {} ids)))))
+        (reduce #(qassoc %1 %2 (get form-params %2)) {} ids)))))
 
-      req)
-    req))
+(defn remove-params
+  "Removes all parameters from known locations of the given request map `req` except
+  of parameters listed in `to-keep` unless they also exist in `to-remove`."
+  [req to-remove to-keep]
+  (let [params (get req :params)]
+    (if (seq params)
+      (let [remove-str  (delay (map some-str to-remove))
+            form-params (delay (if to-keep
+                                 (let [r (select-keys (get req :form-params) to-keep)]
+                                   (if to-remove (apply dissoc r to-remove) r))))
+            params      (delay (if to-keep
+                                 (let [r (select-keys params to-keep)]
+                                   (if to-remove (apply dissoc r to-remove) r))))]
+        (qassoc req
+                :body-params {}
+                :form-params form-params
+                :params      params))
+      req)))
 
 (defn handle-form-errors
   "Tries to obtain form errors from a previously visited page, saved as a session
-  variable `:form-errors` or as a query parameter `form-errors`. The result is a map
-  of at least 3 keys: `:errors` (parsed errors), `:dest` (destination URI, matching
-  current URI if using a session variable), `:params` (map of other parameters and
-  their values, only when session variable is a source). The resulting map is then
-  added to a request map under the `:form/errors` key."
-  [req session-key]
+  variable `:form-errors` or as a query parameter `form-errors`.
+
+  The result is a map of at least 3 keys: `:errors` (parsed errors), `:dest`
+  (destination URI, matching current URI if using a session variable), `:params`
+  (map of other parameters and their values, only when session variable is a source).
+
+  The resulting map is then added to a request map under the `:form/errors` key and
+  can be later used by form generating or other HTML rendering functions to display
+  errors and previous form values.
+
+  It is intended to be used as a wrapper in coercion middleware so it can catch
+  erroneous form fields which were reported back (via POST redirect using 307 code)
+  and remove them from the request map's parameter maps to avoid trouble when
+  pre-filling in forms."
+  [req form-keep session-key]
   (if-some [qp (get req :query-params)]
-    (if-let [query-params-errors (get qp "form-errors")]
-      (-> req remove-params
-          (qassoc
-           :form/errors
-           (delay
-             (or (if-let [smap (session/valid-of req session-key)]
-                   (let [sess-var (session/fetch-var! smap :form-errors)]
-                     (let [expected-uri    (:dest sess-var)
-                           sess-var-errors (:errors sess-var)]
-                       (if (and (map? sess-var-errors) (not-empty sess-var-errors)
-                                (or (not expected-uri) (= expected-uri (get req :uri))))
-                         (map/qassoc sess-var :errors (parse-errors sess-var-errors))))))
-                 (if (valuable? query-params-errors)
-                   {:errors (parse-errors query-params-errors)
-                    :dest   (get req :uri)
-                    :params nil})))))
+    (if-let [bad-params (get qp "form-errors")]
+      (let [svar         (some-> (session/valid-of req session-key)
+                                 (session/fetch-var! :form-errors))
+            expected-uri (if svar (get svar :dest))
+            svar-errors  (if svar (get svar :errors))
+            svar-params  (if svar (get svar :params))]
+        (if (and (or (and (map? svar-errors) (pos? (count svar-errors)))
+                     (and (map? svar-params) (pos? (count svar-params))))
+                 (or (not expected-uri) (= expected-uri (get req :uri))))
+          ;; Previous parameters or parameter errors were fetched from a session variable
+          (-> req
+              (remove-params (keys svar-errors) form-keep)
+              (qassoc :form/errors svar))
+          ;; Previous parameters and parameter errors were sent with POST
+          (if-some [qp-errors (parse-errors bad-params)]
+            (-> req
+                (remove-params (keys qp-errors) form-keep)
+                (qassoc :form/errors
+                        (delay {:dest   (get req :uri)
+                                :errors qp-errors
+                                :params (get req :form-params)})))
+            req)))
       req)
     req))
 
@@ -392,6 +414,16 @@
   (rrc/handle-coercion-exception e responder raiser))
 
 ;; Initializers
+
+(defn- prep-form-keep
+  [v]
+  (if v
+    (if (and (seqable? v) (seq v))
+      (some->> (if (map? v) (keys v) v)
+               (map some-str)
+               (filter identity)
+               (distinct) seq vec)
+      [(some-str v)])))
 
 (defn- process-schema-entry
   [id {:keys [compile options] :as sch}]
@@ -418,22 +450,23 @@
                          responder         identity
                          raiser            #(throw %)}}]
   {:name    k
-   :compile (fn [{:keys [session-key form-errors? coercion parameters responses]} _]
+   :compile (fn [{:keys [session-key form-errors? form-keep coercion parameters responses]} _]
               (if (and enabled? coercion (or parameters responses))
                 (let [exception-handler (var/deref-symbol exception-handler)
                       responder         (var/deref-symbol responder)
-                      raiser            (var/deref-symbol raiser)]
+                      raiser            (var/deref-symbol raiser)
+                      form-keep         (prep-form-keep form-keep)]
                   (if form-errors?
                     (fn [handler]
                       (fn coercion-exception-handler
                         ([req]
                          (try
-                           (handler (handle-form-errors req session-key))
+                           (handler (handle-form-errors req form-keep session-key))
                            (catch Exception e
                              (exception-handler e responder raiser))))
                         ([req respond raise]
                          (try
-                           (handler (handle-form-errors req session-key) respond #(exception-handler % respond raise))
+                           (handler (handle-form-errors req form-keep session-key) respond #(exception-handler % respond raise))
                            (catch Exception e
                              (exception-handler e respond raise))))))
                     (fn [handler]

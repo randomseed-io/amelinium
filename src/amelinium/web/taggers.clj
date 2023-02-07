@@ -366,7 +366,7 @@
   [args tr-sub errors params]
   (let [field (args->map args)
         id    (get field :id)]
-    (if-some [id-kw (common/keyword-from-param id)]
+    (if-some [id-str (common/string-from-param id)]
       (let [{:keys
              [name
               label
@@ -376,8 +376,8 @@
               autocomplete
               input-type
               type]}   field
-            value?     (contains? params id-kw)
-            error?     (contains? errors id-kw)
+            value?     (contains? params id-str)
+            error?     (contains? errors id-str)
             id-str     (common/string-from-param id)
             name       (common/string-from-param name)
             autoc      (common/string-from-param autocomplete)
@@ -386,10 +386,10 @@
             itype      (or itype (common/string-from-param type))
             label      (param-try-tr tr-sub :forms label id)
             phold      (param-try-tr tr-sub :forms placeholder id)
-            value      (valuable (if value? (get params id-kw) value))
+            value      (valuable (if value? (get params id-str) value))
             value      (if value (param-try-tr tr-sub :forms value id))
-            ptype      (or ptype (if error? (get errors id-kw)))
-            err-msgs   (if error?   (coercion/translate-error @tr-sub id-kw ptype))
+            ptype      (or ptype (if error? (get errors id-str)))
+            err-msgs   (if error?   (coercion/translate-error @tr-sub id-str ptype))
             err-summ   (if err-msgs (some-str (get err-msgs :error/summary)))
             err-desc   (if err-msgs (some-str (get err-msgs :error/description)))
             error?     (boolean (or err-summ err-desc))
@@ -547,7 +547,7 @@
          (let [fe         (get fe :errors)
                param-id   (common/string-from-param (first args))
                param-type (common/string-from-param (second args))]
-           (if (and param-id (contains? fe (keyword param-id)))
+           (if (and param-id (contains? fe param-id))
              (let [translator-sub (i18n/no-default (translator-sub ctx translations-fn))
                    param-type     (or param-type (get fe param-id))
                    ptype-class    (if param-type (strb " param-type-" param-type))
@@ -565,7 +565,7 @@
      (fn [args ctx]
        (if-some [fe (not-empty (get ctx :form/errors))]
          (if-some [pa (not-empty (get fe :params))]
-           (if-let [param-id (common/keyword-from-param (first args))]
+           (if-let [param-id (common/string-from-param (first args))]
              (if-some [param (some-str (get pa param-id))]
                (binding [sutil/*escape-variables* true]
                  (html-esc param))))))))
