@@ -63,7 +63,7 @@
 (defn routes-parse
   [v keyz]
   (cond-> v
-    (symbol? v)         var/deref-symbol
+    (symbol?      v)    var/deref-symbol
     (descriptive? v)    prep-descriptions
     (and (map? v) keyz) (reduce-sets-with-meta keyz)))
 
