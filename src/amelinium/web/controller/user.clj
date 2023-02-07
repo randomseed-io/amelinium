@@ -354,7 +354,7 @@
       req
       (if (= :auth/ok (get req :response/status))
         (if-not (= new-password new-repeated)
-          (web/form-params-error! req {:repeated-password :passwords-no-match})
+          (web/form-params-error! req {:repeated-password :repeated-password})
           (super/set-password!
            req
            (or (get req :user/id) (user/email-to-id (auth/db req) user-email))
@@ -432,7 +432,7 @@
 
       (and set-password? (some? (or token (code id))))
       (if-not (= password password-2)
-        (web/form-params-error! req {:repeated-password :passwords-no-match})
+        (web/form-params-error! req {:repeated-password :repeated-password})
         (let [db   (auth/db req)
               cfrm (confirmation/establish db id code token one-minute "recovery")]
           (if (get cfrm :confirmed?)
