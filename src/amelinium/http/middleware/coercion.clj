@@ -271,8 +271,8 @@
          (if (or f s) [(keyword f) s v]))))))
 
 (defn valid-param-name?
-  "Returns `true` if the given parameter name matches a pattern and can be sefely
-  converted to an identifier (a keyword or a symbol)."
+  "Returns `true` if the given parameter name or parameter type name matches a pattern
+  and can be sefely converted to an identifier (a keyword or a symbol)."
   ^Boolean [s]
   (and (string? s)
        (not-empty-string? s)
@@ -303,20 +303,19 @@
   (cond
     (map?        errors) (pos? (count errors))
     (string?     errors) (if (not-empty-string? errors)
-                           (->> (str/split errors #",+" 108)
-                                (map split-error)
-                                (map #(take 2 %))
-                                (filter valid-error-pair?)
-                                (mapcat seq)
-                                (apply qassoc {})
-                                (not-empty)))
+                           (some->> (str/split errors #",+" 108) seq
+                                    (map #(take 2 (split-error %)))
+                                    (filter valid-error-pair?) seq
+                                    (mapcat seq)
+                                    (apply qassoc {})
+                                    (not-empty)))
     (sequential? errors) (if (seq errors)
-                           (->> errors
-                                (map #(take 2 %))
-                                (filter valid-error-pair?)
-                                (mapcat seq)
-                                (apply qassoc {})
-                                (not-empty)))))
+                           (some->> errors
+                                    (map #(take 2 %))
+                                    (filter valid-error-pair?) seq
+                                    (mapcat seq)
+                                    (apply qassoc {})
+                                    (not-empty)))))
 
 (defn inject-errors
   "Takes coercion errors, parses them, and puts into a newly created map under the
