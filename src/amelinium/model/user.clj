@@ -1006,25 +1006,35 @@
 
 (defn- emailable?
   [v]
-  (and (valuable? v)
-       (or (and (string? v) (nat-int? (str/index-of v \@)))
-           (ident? v) (nat-int? (str/index-of (str (symbol v)) \@)))))
+  (if v
+    (or (and (string? v) (not-empty-string? v) (nat-int? (str/index-of v \@)))
+        (ident? v) (nat-int? (str/index-of (str (symbol v)) \@)))))
+
+(defn- phoneable?
+  [v]
+  (if v
+    (or (phone/native? v)
+        (and (string? v) (not-empty-string? v) (= (.charAt ^String v 0) \+)
+             (phone/valid? v)))))
 
 (defn find-id
   "Gets user ID on a basis of a map with `:id` key or on a basis of a map with `:uid`
-  key or on a basis of a number, a string or a keyword being ID, email or UID. User
-  must exist in a database. Uses cached properties if possible."
+  key or on a basis of a number, a string or a keyword being ID, email, phone or
+  UID. User must exist in a database. Uses cached properties if possible."
   [db user-spec]
   (if (and db user-spec)
     (if (map? user-spec)
       (let [id    (delay (get user-spec :id))
             uid   (delay (get user-spec :uid))
-            email (delay (get user-spec :email))]
+            email (delay (get user-spec :email))
+            phone (delay (get user-spec :phone))]
         (cond
-          (and @id    (number?        @id))    (some-id     db @id)
+          (and @id    (pos-int?        @id))   (some-id     db @id)
           (and @uid   (uuid/uuidable? @uid))   (uid-to-id   db @uid)
-          (and @email (emailable?     @email)) (email-to-id db @email)))
+          (and @email (emailable?     @email)) (email-to-id db @email)
+          (and @phone (phoneable?     @phone)) (phone-to-id db @phone)))
       (cond
         (number?        user-spec) (some-id     db user-spec)
         (uuid/uuidable? user-spec) (uid-to-id   db user-spec)
-        (emailable?     user-spec) (email-to-id db user-spec)))))
+        (emailable?     user-spec) (email-to-id db user-spec)
+        (phoneable?     user-spec) (phone-to-id db user-spec)))))
