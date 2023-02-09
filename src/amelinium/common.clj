@@ -19,6 +19,7 @@
             [ring.util.codec                       :as           codec]
             [ring.util.http-response               :as            resp]
             [ring.util.request                     :as             req]
+            [clj-uuid                              :as            uuid]
             [amelinium                             :as               p]
             [amelinium.types.session               :refer         :all]
             [amelinium.types.auth                  :refer         :all]
@@ -2253,21 +2254,27 @@
                            :url/update-phone)
     :url/update-email))
 
-;; Phone numbers
+;; Identities
 
 (defn guess-identity-type
-  [v]
-  (cond
-
-    (string? v)
-    (if (not-empty-string? v)
-      (if (and (= (.charAt v 0) \+) (phone/valid? v))
-        :phone
-        (if (some? (str/index-of v \@ 1))
-          :email)))
-
-    (phone/native? v)
-    :phone))
+  "Returns a keyword describing identity type detected by analyzing the given
+  value (`:phone` for a phone number, `:email` for e-mail address, `:id` for numeric
+  user ID). Does not perform full validation, just detection."
+  ([v identity-type]
+   (if identity-type
+     (if (contains? #{:email :phone :id :uid} identity-type)
+       identity-type)
+     (guess-identity-type v)))
+  ([v]
+   (cond
+     (string? v)       (if (not-empty-string? v)
+                         (cond
+                           (and (= (.charAt ^String v 0) \+) (phone/valid? v)) :phone
+                           (some? (str/index-of v \@ 1))                       :email
+                           (uuid/uuid-string? v)                               :uid))
+     (pos-int? v)      :id
+     (phone/native? v) :phone
+     (uuid? v)         :uid)))
 
 ;; Date and time
 
