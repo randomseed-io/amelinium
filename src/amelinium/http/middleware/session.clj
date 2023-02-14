@@ -161,7 +161,8 @@
 
   SessionConfig
 
-  (^SessionConfig p/config [s] s)
+  (config   (^SessionConfig [s] s) (^SessionConfig [s _] s))
+  (control? (^Boolean [s] false) (^Boolean [s _] false))
 
   Session
 
@@ -182,6 +183,10 @@
   (config
     (^SessionConfig [s]       (p/config (.control ^Session s)))
     (^SessionConfig [s _]     (p/config (.control ^Session s))))
+
+  (control?
+    (^Boolean [s]             (p/control? (.control ^Session s)))
+    (^Boolean [s k]           (p/control? (.control ^Session s))))
 
   (empty
     (^Session [s]             (p/empty (.control ^Session s)))
@@ -256,6 +261,10 @@
     (^SessionConfig [req] (p/config (p/session req)))
     (^SessionConfig [req ^Keyword session-key] (p/config (p/session req session-key))))
 
+  (control?
+    (^Boolean [req] (p/control? (p/session req)))
+    (^Boolean [req ^Keyword session-key] (p/control? (p/session req session-key))))
+
   (empty
     (^Session [req] (p/empty (p/session req)))
     (^Session [req ^Keyword session-key] (p/empty (p/session req session-key))))
@@ -286,6 +295,7 @@
   (mem-handler  ([s]               nil) ([s s-k]       nil))
   (empty        ([s]               nil) ([s s-k]       nil))
   (config       ([s]               nil) ([s s-k]       nil))
+  (control?     ([s]             false) ([s s-k]     false))
   (identify     ([s]               nil) ([s req]       nil))
   (from-db      ([s db-sid ip]     nil) ([s db-sid]    nil) ([s] nil))
   (invalidate   ([s db-sid ip]     nil) ([s db-sid]    nil) ([s] nil))
@@ -309,6 +319,7 @@
 
   Object
 
+  (control? ([s] false) ([s s-k] false))
   (empty [s] (clojure.core/empty s)))
 
 (defn of
@@ -373,10 +384,12 @@
      (if (.valid? s) s))))
 
 (defn control?
-  "Returns `true` if the given value is an instance of a class which satisfies
-  `SessionControl` protocol."
-  ^Boolean [v]
-  (satisfies? p/SessionControl v))
+  "Returns `true` if the given value is an instance of a class which fully satisfies
+  `SessionControl` protocol (directly or indirectly). If the indirect testing is
+  required, the tested object must be convertable to a control object (as described
+  by the `SessionControl` protocol)."
+  (^Boolean [v]   (p/control? v))
+  (^Boolean [v k] (p/control? v k)))
 
 (defn control
   "Returns a `SessionControl` object from the given source and optional session
@@ -1933,6 +1946,8 @@
                                    (set-active    ^Long    [_ db-sid ip t]   (update-active-fn-w db-sid ip t))
                                    (get-active    ^Instant [_ db-sid ip]     (last-active-fn-w   db-sid ip))
                                    (identify      ^String  [_ req]           (identifier-fn req))
+                                   (control?      ^Boolean [_]   true)
+                                   (control?      ^Boolean [_ k] true)
                                    (mem-handler   [_]            mem-handler)
                                    (mem-atom      [_]            mem-atom)
                                    (mem-cache     [_]            (if mem-atom (deref mem-atom)))

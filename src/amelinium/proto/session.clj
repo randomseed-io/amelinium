@@ -26,6 +26,12 @@
    [c] [c s-k]
    "Returns an empty session with the `:control` field populated.")
 
+  (^{:tag Boolean}
+   control?
+   [c] [c s-k]
+   "Returns `true` if the given object is an instance of a class implementing
+  `SessionControl` protocol (directly or indirectly).")
+
   (^{:tag SessionConfig}
    config
    [c] [c s-k]
