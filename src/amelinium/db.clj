@@ -135,6 +135,24 @@
   [m k]
   (map/update-existing m k ip/string-to-address))
 
+;; User ID parsing
+
+(defn parse-user-id
+  ^Long [v]
+  (when-let [v (safe-parse-long v)]
+    (if (pos-int? v) v)))
+
+;; E-mail parsing
+
+(defn parse-email
+  ^String [v]
+  (if-some [^String v (some-str v)]
+    (let [l (unchecked-int (.length v))]
+      (if (> l 2)
+        (if-some [idx ^long (str/index-of v \@ 1)]
+          (if (and (> (unchecked-dec-int l) idx 0))
+            (str (subs v 0 idx) (str/lower-case (subs v idx l)))))))))
+
 ;; Phone number mapping
 
 (defn parse-phone
@@ -149,37 +167,21 @@
 
 (defn some-uuid-str
   [s]
-  (let [s (some-str s)]
+  (if-some [s (some-str s)]
     (if (uuid/uuidable? s) s)))
 
 (defn uuidable?
   [v]
   (uuid/uuidable? v))
 
-(defn as-uuid
+(defn parse-uid
   [v]
-  (if (uuid/uuidable? v)
-    (uuid/as-uuid v)))
+  (if (uuid? v) v
+      (if (and v (uuid/uuidable? v)) (uuid/as-uuid v))))
 
 (defn key-as-uuid
   [m k]
-  (map/update-existing m k as-uuid))
-
-(defn get-id-by-uid
-  [db query uid]
-  (let [uid (some-uuid-str uid)]
-    (if (and db uid)
-      (first (jdbc/execute-one! db [query uid] opts-simple-vec)))))
-
-(defn get-ids-by-uids
-  [db query uids]
-  (if (and db uids)
-    (let [uids  (map some-uuid-str uids)
-          query (str query " " (braced-join-? uids))]
-      (->> (sql/query db (cons query uids) opts-simple-vec)
-           next
-           (map #(vector (as-uuid (nth % 0)) (nth % 1)))
-           (into {})))))
+  (map/update-existing m k parse-uid))
 
 ;; Memoization
 
@@ -196,8 +198,7 @@
                         (cache/miss %1 %2 (delay (apply map/qassoc @e k v kvs))) %1)
                    key)))
 
-
-;; Email/phone mapping
+;; Email/phone/uid/id mapping to a DB-consumable values
 
 (defn identity->str
   [id]
