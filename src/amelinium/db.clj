@@ -137,9 +137,9 @@
 
 ;; Phone number mapping
 
-(defn- parse-phone
+(defn parse-phone
   [v]
-  (phutil/try-parse (phone/number v)))
+  (phutil/try-parse (phone/number-optraw v)))
 
 (defn key-as-phone
   [m k]

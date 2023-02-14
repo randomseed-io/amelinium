@@ -302,7 +302,7 @@
                         :gen/gen             gen-email}})))
 
 (def regular-phone
-  (let [obj->phone #(phutil/try-parse (phone/number %))
+  (let [obj->phone #(phutil/try-parse (phone/number-optraw %))
         phone->str #(phone/format % :phone-number.format/e164)]
     (m/-simple-schema
      {:type            :regular-phone
@@ -318,7 +318,7 @@
                         :gen/gen             gen-regular-phone}})))
 
 (def phone
-  (let [obj->phone #(phutil/try-parse (phone/number %))
+  (let [obj->phone #(phutil/try-parse (phone/number-optraw %))
         phone->str #(phone/format % :phone-number.format/e164)]
     (m/-simple-schema
      {:type            :phone
