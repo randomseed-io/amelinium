@@ -10,4 +10,5 @@
   (:import  [amelinium ErrorsConfig]))
 
 (defprotocol ErrorsConfigurable
-  (^{:tag ErrorsConfig} config [src]))
+  (^{:tag ErrorsConfig} config [src])
+  (^{:tag Boolean} configurable? [src]))

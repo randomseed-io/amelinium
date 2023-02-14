@@ -30,14 +30,21 @@
   ErrorsConfig
 
   (config ^ErrorsConfig [src] src)
+  (configurable? [src] true)
 
   clojure.lang.IPersistentMap
 
   (config ^ErrorsConfig [src] (http/get-route-data src :errors/config))
+  (configurable? [src] (p/configurable? (http/get-route-data src :errors/config)))
 
   nil
 
-  (config [src] nil))
+  (config [src] nil)
+  (configurable? [src] false)
+
+  Object
+
+  (configurable? [src] false))
 
 (defn config?
   "Returns `true` if the given object is an instance of `ErrorsConfig`."
@@ -46,8 +53,9 @@
 
 (defn configurable?
   ^Boolean [v]
-  "Returns `true` if the given object implements `ErrorsConfigurable` protocol."
-  (satisfies? p/ErrorsConfigurable v))
+  "Returns `true` if the given object implements `ErrorsConfigurable` protocol and can
+  be used to actually access the protocol methods (in case of indirect object)."
+  (p/configurable? v))
 
 (defn most-significant
   "Returns the most significant error from the given `errors` using the given
