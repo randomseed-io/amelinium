@@ -196,39 +196,6 @@
                         (cache/miss %1 %2 (delay (apply map/qassoc @e k v kvs))) %1)
                    key)))
 
-;; UUID caching
-
-(defn cache-lookup-uuid
-  [cache db id-getter uid]
-  (if (and db (uuidable? uid))
-    (cwr/lookup-or-miss cache (uuid/as-uuid uid) #(id-getter db %))))
-
-(defn cache-lookup-uuids
-  [cache uids]
-  (if (seq uids)
-    (let [uids (map #(when-valuable % (as-uuid %)) uids)]
-      (reduce (fn [m uid]
-                (let [id (cwr/lookup cache uid false)]
-                  (if (false? id)
-                    (qassoc m false (conj (get m false) uid))
-                    (qassoc m uid id))))
-              {} uids))))
-
-(defn uid-to-id
-  ([db cache getter uid]
-   (cache-lookup-uuid cache db getter uid)))
-
-(defn uids-to-ids
-  [db cache getter uids]
-  (if (and db uids)
-    (let [looked-up (cache-lookup-uuids cache uids)
-          missing   (seq (get looked-up false))]
-      (if-not missing
-        looked-up
-        (let [db-ids  (getter db missing)
-              present (or (dissoc looked-up false) {})]
-          (reduce #(qassoc %1 %2 (cwr/lookup-or-miss cache %2 db-ids))
-                  present missing))))))
 
 ;; Email/phone mapping
 
