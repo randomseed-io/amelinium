@@ -20,15 +20,16 @@
             [ring.util.http-response               :as            resp]
             [ring.util.request                     :as             req]
             [clj-uuid                              :as            uuid]
-            [amelinium                             :as               p]
+            [amelinium                             :refer         :all]
             [amelinium.types.session               :refer         :all]
             [amelinium.types.auth                  :refer         :all]
+            [amelinium.proto.identity              :as             pid]
+            [amelinium.identity                    :as        identity]
             [amelinium.auth                        :as            auth]
             [amelinium.http                        :as            http]
             [amelinium.http.middleware.roles       :as           roles]
             [amelinium.http.middleware.language    :as        language]
             [amelinium.http.middleware.session     :as         session]
-            [amelinium.http.middleware.db          :as          mid-db]
             [amelinium.common.oplog.auth           :as      oplog-auth]
             [amelinium.i18n                        :as            i18n]
             [amelinium.logging                     :as             log]
@@ -2254,27 +2255,87 @@
                            :url/update-phone)
     :url/update-email))
 
-;; Identities
-
 (defn guess-identity-type
-  "Returns a keyword describing identity type detected by analyzing the given
-  value (`:phone` for a phone number, `:email` for e-mail address, `:id` for numeric
-  user ID). Does not perform full validation, just detection."
-  ([v identity-type]
-   (if identity-type
-     (if (contains? #{:email :phone :id :uid} identity-type)
-       identity-type)
-     (guess-identity-type v)))
-  ([v]
+  "Detects the identity type and checks if it is assigned to a tag
+  `:amelinium.identity/standard` or to a tag passed as `acceptable-tag` argument. To
+  accept any valid identity type the `amelinium.proto.identity/valid` must be
+  explicitly given.
+
+  The `src` may be a map or a single value. If it is a map, the keys `:identity`,
+  `:user/identity` and `:id` are looked up to get the identity of a user, keys
+  `:id-type` and `:identity/type` are used to look up to get already established
+  identity type. If it is a single value then it should contain the identity
+  source (a string, a phone number, a number, etc).
+
+  When the optional `id` argument is given, it is tried before any lookup in a source
+  map and even before getting it from `src` directly (in case it is a single value).
+
+  If the identity type was obtained (from the optional `identity-type` argument or a
+  map entry, if any), it is checked whether it is acceptable. If the identity type
+  was not obtained, it is guessed by analyzing the identity value (and also checked
+  against the acceptable types).
+
+  If the identity type cannot be established or it is not acceptable, `nil` is
+  returned."
+  ([src]
+   (guess-identity-type src nil nil nil))
+  ([src identity-type]
+   (guess-identity-type src nil identity-type nil))
+  ([src id identity-type]
+   (guess-identity-type src id identity-type nil))
+  ([src id identity-type acceptable-tag]
    (cond
-     (string? v)       (if (not-empty-string? v)
-                         (cond
-                           (and (= (.charAt ^String v 0) \+) (phone/valid? v)) :phone
-                           (some? (str/index-of v \@ 1))                       :email
-                           (uuid/uuid-string? v)                               :uid))
-     (pos-int? v)      :id
-     (phone/native? v) :phone
-     (uuid? v)         :uid)))
+     (and (nil? src)
+          (nil? id)) nil
+     (map? src)      (identity/guess-acceptable-type
+                      (or (if id id)
+                          (get src :identity)
+                          (get src :user/identity)
+                          (get src :id))
+                      (or (if identity-type (some-keyword identity-type))
+                          (get src :id-type)
+                          (get src :identity/type))
+                      (or (if acceptable-tag (some-keyword acceptable-tag))
+                          ::identity/standard))
+     :else           (identity/guess-acceptable-type
+                      (if id id src)
+                      identity-type
+                      (or (if acceptable-tag (some-keyword acceptable-tag))
+                          ::identity/standard)))))
+
+(defn identity-and-type
+  "Detects the identity type and checks if it is assigned to a tag
+  `:amelinium.identity/standard` or to a tag passed as `acceptable-tag` argument. To
+  accept any valid identity type the `amelinium.proto.identity/valid` must be
+  explicitly given. If `identity-type` is not given or is `nil` or `false`, it is
+  guessed by analyzing `user-identity`.
+
+  Returns a 2-element vector containing user identity and identity type. If user
+  identity is not given or identity type cannot be established or it is not
+  acceptable, returns `nil`."
+  ([user-identity]
+   (if-some [id-type (identity/guess-acceptable-type user-identity nil ::identity/standard)]
+     [user-identity id-type]))
+  ([user-identity identity-type]
+   (identity-and-type user-identity identity-type ::identity/standard))
+  ([user-identity identity-type acceptable-tag]
+   (if user-identity
+     (if-some [id-type (identity/guess-acceptable-type
+                        user-identity
+                        identity-type
+                        (or (if acceptable-tag (some-keyword acceptable-tag))
+                            ::identity/standard))]
+       [user-identity id-type]))))
+
+(defn acceptable-identity-type
+  ([identity-type]
+   (acceptable-identity-type identity-type nil))
+  ([identity-type acceptable-tag]
+   (if-some [id-type (some-keyword identity-type)]
+     (if (identity/type? id-type
+                         (or (if acceptable-tag (some-keyword acceptable-tag))
+                             ::identity/standard))
+       id-type))))
 
 ;; Date and time
 
