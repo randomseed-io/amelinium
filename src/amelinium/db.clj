@@ -115,7 +115,7 @@
 
 ;; Single-point cache management
 
-(p/import-vars [io.randomseed.utils.db init-cache init-caches purge-caches])
+(p/import-vars [io.randomseed.utils.db init-cache init-caches remove-caches])
 
 (defn print-caches
   ([]           (db/print-caches caches))
@@ -649,7 +649,7 @@
 (system/add-halt!    ::migrators   [k config] (var/make k nil))
 
 (system/add-init     ::caches      [k config] (var/make k (init-caches  config)))
-(system/add-halt!    ::caches      [k config] (var/make k (purge-caches config)))
+(system/add-halt!    ::caches      [k config] (var/make k (remove-caches config)))
 
 (derive ::main                ::initializer)
 (derive ::main.props          ::properties)
