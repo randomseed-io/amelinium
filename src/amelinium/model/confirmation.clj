@@ -18,6 +18,7 @@
             [buddy.core.codecs        :as        codecs]
             [clj-uuid                 :as          uuid]
             [amelinium.db             :as            db]
+            [amelinium.identity       :as      identity]
             [amelinium.common         :as        common]
             [phone-number.core        :as         phone]
             [io.randomseed.utils.time :as          time]
@@ -172,16 +173,10 @@
   (gen-confirmation-query :phone false false))
 
 (defn- parse-id-type
+  "Parses identity type, guessing it when necessary. Returns its string
+  representation. If the type cannot be established, falls back to \"email\"."
   [id id-type]
-  (if id-type
-    (if (ident? id-type)
-      (name id-type)
-      (if-some [id-type (some-str id-type)]
-        (name (symbol id-type))
-        "email"))
-    (if-some [id-type (if id (common/guess-identity-type id))]
-      (name id-type)
-      "email")))
+  (or (some-str (identity/guess-type id id-type)) "email"))
 
 (defn- gen-full-confirmation-core
   "Creates a confirmation code for the given identity (an e-mail address or a
