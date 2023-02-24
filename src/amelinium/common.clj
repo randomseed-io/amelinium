@@ -452,7 +452,8 @@
                           (str location qparams)))))))))))
 
 (def ^{:private  true
-       :arglists '([param rtr id param-value params query-params require-param? name-path-fallback?])}
+       :tag String
+       :arglists '(^String [param rtr id param-value params query-params require-param? name-path-fallback?])}
   parameterized-page-mem
   (mem/lu parameterized-page-core :lu/threshold page-cache-len))
 
@@ -525,47 +526,48 @@
   require this parameter, all possible path variants (with parameter injected within
   its succesive segments) will be tried in hope that one will match, being a path
   that requires this parameter."
-  {:arglists '([]
-               [req]
-               [req name-or-path]
-               [req name-or-path param param-value]
-               [req name-or-path param param-value path-params]
-               [req name-or-path param param-value path-params query-params]
-               [req name-or-path param param-value require-param?]
-               [req name-or-path param param-value path-params require-param?]
-               [req name-or-path param param-value path-params query-params require-param?]
-               [req name-or-path param param-value path-params query-params require-param? name-path-fallback?]
-               [_   name-or-path param param-value path-params query-params require-param? name-path-fallback? router])}
-  ([] "/")
-  ([req]
+  {:tag      String
+   :arglists '(^String []
+               ^String [req]
+               ^String [req name-or-path]
+               ^String [req name-or-path param param-value]
+               ^String [req name-or-path param param-value path-params]
+               ^String [req name-or-path param param-value path-params query-params]
+               ^String [req name-or-path param param-value require-param?]
+               ^String [req name-or-path param param-value path-params require-param?]
+               ^String [req name-or-path param param-value path-params query-params require-param?]
+               ^String [req name-or-path param param-value path-params query-params require-param? name-path-fallback?]
+               ^String [_   name-or-path param param-value path-params query-params require-param? name-path-fallback? router])}
+  (^String [] "/")
+  (^String [req]
    (r/match->path (get req ::r/match) (get req :query-params)))
-  ([req id-or-path]
+  (^String [req id-or-path]
    (if-some [rtr (get req ::r/router)]
      (if (ident? id-or-path)
        (some-> (r/match-by-name rtr id-or-path) r/match->path)
        (if-some [path (some-str id-or-path)]
          (let [[path location qparams] (split-query-params path)]
            (some-> (r/match-by-path rtr path) r/match->path (str location qparams)))))))
-  ([req id-or-path param param-value]
+  (^String [req id-or-path param param-value]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem param rtr id-or-path param-value nil nil false false)))
-  ([req id-or-path param param-value params-or-require-param?]
+  (^String [req id-or-path param param-value params-or-require-param?]
    (if-some [rtr (get req ::r/router)]
      (if (boolean? params-or-require-param?)
        (parameterized-page-mem param rtr id-or-path param-value nil nil params-or-require-param? false)
        (parameterized-page-mem param rtr id-or-path param-value params-or-require-param? nil false false))))
-  ([req id-or-path param param-value params query-params-or-require-param?]
+  (^String [req id-or-path param param-value params query-params-or-require-param?]
    (if-some [rtr (get req ::r/router)]
      (if (boolean? query-params-or-require-param?)
        (parameterized-page-mem param rtr id-or-path param-value params nil query-params-or-require-param? false)
        (parameterized-page-mem param rtr id-or-path param-value params query-params-or-require-param? false false))))
-  ([req id-or-path param param-value params query-params require-param?]
+  (^String [req id-or-path param param-value params query-params require-param?]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem param rtr id-or-path param-value params query-params require-param? false)))
-  ([req id-or-path param param-value params query-params require-param? name-path-fallback?]
+  (^String [req id-or-path param param-value params query-params require-param? name-path-fallback?]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem param rtr id-or-path param-value params query-params require-param? name-path-fallback?)))
-  ([_ id-or-path param param-value params query-params require-param? name-path-fallback? router]
+  (^String [_ id-or-path param param-value params query-params require-param? name-path-fallback? router]
    (if (some? router)
      (parameterized-page-mem param router id-or-path param-value params query-params require-param? name-path-fallback?))))
 
@@ -622,21 +624,22 @@
   require a language parameter, all possible path variants (with parameter injected
   within its succesive segments) will be tried in hope that one will match, being a
   path that requires language parameter."
-  {:arglists '([req]
-               [req name-or-path]
-               [req name-or-path path-params]
-               [req name-or-path path-params query-params]
-               [req name-or-path lang]
-               [req name-or-path lang path-params]
-               [req name-or-path lang path-params query-params]
-               [req name-or-path lang lang-required?]
-               [req name-or-path lang path-params lang-required?]
-               [req name-or-path lang path-params query-params lang-required?]
-               [req name-or-path lang path-params query-params lang-required? name-path-fallback?]
-               [req name-or-path lang path-params query-params lang-required? name-path-fallback? router]
-               [_   name-or-path lang path-params query-params lang-required? name-path-fallback? router language-settings-or-param])}
-  ([] "/")
-  ([req]
+  {:tag String
+   :arglists '(^String [req]
+               ^String [req name-or-path]
+               ^String [req name-or-path path-params]
+               ^String [req name-or-path path-params query-params]
+               ^String [req name-or-path lang]
+               ^String [req name-or-path lang path-params]
+               ^String [req name-or-path lang path-params query-params]
+               ^String [req name-or-path lang lang-required?]
+               ^String [req name-or-path lang path-params lang-required?]
+               ^String [req name-or-path lang path-params query-params lang-required?]
+               ^String [req name-or-path lang path-params query-params lang-required? name-path-fallback?]
+               ^String [req name-or-path lang path-params query-params lang-required? name-path-fallback? router]
+               ^String [_   name-or-path lang path-params query-params lang-required? name-path-fallback? router language-settings-or-param])}
+  (^String [] "/")
+  (^String [req]
    (let [m (get req ::r/match)]
      (localized-page req
                      (r/match->path m)
@@ -644,15 +647,15 @@
                      (or (get req :path-params) (get m :path-params))
                      (get req :query-params)
                      false true)))
-  ([req name-or-path]
+  (^String [req name-or-path]
    (localized-page req name-or-path
                    (get req :language/str)
                    nil nil false true))
-  ([req name-or-path lang]
+  (^String [req name-or-path lang]
    (localized-page req name-or-path
                    (or lang (get req :language/str))
                    nil nil false true))
-  ([req name-or-path lang params-or-lang-required?]
+  (^String [req name-or-path lang params-or-lang-required?]
    (if-some [rtr (get req ::r/router)]
      (if (boolean? params-or-lang-required?)
        (parameterized-page-mem (lang-param req)
@@ -666,7 +669,7 @@
                                (or lang (get req :language/str))
                                params-or-lang-required?
                                nil false true))))
-  ([req name-or-path lang params query-params-or-lang-required?]
+  (^String [req name-or-path lang params query-params-or-lang-required?]
    (if-some [rtr (get req ::r/router)]
      (if (boolean? query-params-or-lang-required?)
        (parameterized-page-mem (lang-param req)
@@ -680,14 +683,14 @@
                                (or lang (get req :language/str))
                                params query-params-or-lang-required?
                                false true))))
-  ([req name-or-path lang params query-params lang-required?]
+  (^String [req name-or-path lang params query-params lang-required?]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
                              params query-params
                              lang-required? true)))
-  ([req name-or-path lang params query-params lang-required? name-path-fallback?]
+  (^String [req name-or-path lang params query-params lang-required? name-path-fallback?]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
@@ -695,7 +698,7 @@
                              params query-params
                              lang-required?
                              name-path-fallback?)))
-  ([req name-or-path lang params query-params lang-required? name-path-fallback? router]
+  (^String [req name-or-path lang params query-params lang-required? name-path-fallback? router]
    (if (some? router)
      (parameterized-page-mem (lang-param req)
                              router name-or-path
@@ -703,7 +706,7 @@
                              params query-params
                              lang-required?
                              name-path-fallback?)))
-  ([_ name-or-path lang params query-params lang-required? name-path-fallback? router language-settings-or-param]
+  (^String [_ name-or-path lang params query-params lang-required? name-path-fallback? router language-settings-or-param]
    (if (some? router)
      (parameterized-page-mem (guess-lang-param language-settings-or-param)
                              router name-or-path lang
@@ -716,7 +719,7 @@
   `name-path-fallback?` set to `false`, and with less arities supported. When the
   language version of a page identified by its name is not present it will return
   `nil`."
-  ([req]
+  (^String [req]
    (let [m (get req ::r/match)]
      (localized-page req
                      (r/match->path m)
@@ -724,44 +727,44 @@
                      (or (get req :path-params) (get m :path-params))
                      (get req :query-params)
                      true false)))
-  ([req name-or-path]
+  (^String [req name-or-path]
    (localized-page req
                    name-or-path
                    (get req :language/str)
                    nil nil true false))
-  ([req name-or-path lang]
+  (^String [req name-or-path lang]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
                              nil nil true false)))
-  ([req name-or-path lang params]
+  (^String [req name-or-path lang params]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
                              params nil true false)))
-  ([req name-or-path lang params query-params]
+  (^String [req name-or-path lang params query-params]
    (if-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
                              params query-params
                              true false)))
-  ([name-or-path lang params query-params router lang-param]
+  (^String [name-or-path lang params query-params router lang-param]
    (parameterized-page-mem lang-param
                            router name-or-path
                            lang params query-params
                            true false)))
 
-(defn- page-core
-  ([rtr id]
+(defn- ^{:tag String} page-core
+  (^String [rtr id]
    (page-core rtr id nil nil nil))
-  ([rtr id params]
+  (^String [rtr id params]
    (page-core rtr id params nil nil))
-  ([rtr id params query-params]
+  (^String [rtr id params query-params]
    (page-core rtr id params query-params nil))
-  ([rtr id params query-params fb-lang-settings]
+  (^String [rtr id params query-params fb-lang-settings]
    (if rtr
      (if (ident? id)
        ;; identifier given (route name)
@@ -834,22 +837,23 @@
   a path is given but it does not require a language parameter, all possible path
   variants (with language parameter injected within its succesive segments) will be
   tried in hope that one will match, being a path that requires language parameter."
-  {:arglists '([req]
-               [req name-or-path]
-               [req name-or-path path-params]
-               [req name-or-path path-params query-params]
-               [req name-or-path lang]
-               [req name-or-path lang path-params]
-               [req name-or-path lang path-params query-params]
-               [req name-or-path lang lang-required?]
-               [req name-or-path lang path-params lang-required?]
-               [req name-or-path lang path-params query-params lang-required?]
-               [req name-or-path lang path-params query-params lang-required? name-path-fallback?]
-               [_ _ name-or-path path-params query-params router hint-lang lang-settings-or-param]
-               [_   name-or-path lang path-params query-params lang-required? name-path-fallback? router lang-settings-or-param])}
-  ([req]
+  {:tag String
+   :arglists '(^String [req]
+               ^String [req name-or-path]
+               ^String [req name-or-path path-params]
+               ^String [req name-or-path path-params query-params]
+               ^String [req name-or-path lang]
+               ^String [req name-or-path lang path-params]
+               ^String [req name-or-path lang path-params query-params]
+               ^String [req name-or-path lang lang-required?]
+               ^String [req name-or-path lang path-params lang-required?]
+               ^String [req name-or-path lang path-params query-params lang-required?]
+               ^String [req name-or-path lang path-params query-params lang-required? name-path-fallback?]
+               ^String [_ _ name-or-path path-params query-params router hint-lang lang-settings-or-param]
+               ^String [_   name-or-path lang path-params query-params lang-required? name-path-fallback? router lang-settings-or-param])}
+  (^String [req]
    (r/match->path (get req ::r/match) (get req :query-params)))
-  ([req name-or-path]
+  (^String [req name-or-path]
    (if (ident? name-or-path)
      ;; route name
      (page-core (get req ::r/router)
@@ -860,7 +864,7 @@
      (page-core (get req ::r/router)
                 name-or-path
                 nil nil nil)))
-  ([req name-or-path lang-or-params]
+  (^String [req name-or-path lang-or-params]
    (if (or (nil? lang-or-params) (map? lang-or-params))
      ;; no language specified
      (if (ident? name-or-path)
@@ -876,7 +880,7 @@
                   nil nil))
      ;; language specified
      (localized-page req name-or-path lang-or-params nil nil false false)))
-  ([req name-or-path lang-or-params params-or-query-params-or-required?]
+  (^String [req name-or-path lang-or-params params-or-query-params-or-required?]
    (if (or (nil? lang-or-params) (map? lang-or-params))
      ;; no language specified
      (if (ident? name-or-path)
@@ -907,7 +911,7 @@
                        nil
                        false
                        true))))
-  ([req name-or-path lang-or-params params-or-query-params query-params-or-require-param?]
+  (^String [req name-or-path lang-or-params params-or-query-params query-params-or-require-param?]
    (if (or (nil? lang-or-params) (map? lang-or-params))
      ;; no language specified
      (if (ident? name-or-path)
@@ -938,7 +942,7 @@
                        query-params-or-require-param?
                        false
                        true))))
-  ([req name-or-path lang params query-params require-param?]
+  (^String [req name-or-path lang params query-params require-param?]
    ;; language specified
    (localized-page req
                    name-or-path
@@ -947,7 +951,7 @@
                    query-params
                    require-param?
                    true))
-  ([req name-or-path lang params query-params require-param? name-path-fallback?]
+  (^String [req name-or-path lang params query-params require-param? name-path-fallback?]
    ;; language specified
    (localized-page req
                    name-or-path
@@ -956,14 +960,14 @@
                    query-params
                    require-param?
                    name-path-fallback?))
-  ([_ _ name-or-path params query-params router hint-lang lang-settings-or-param]
+  (^String [_ _ name-or-path params query-params router hint-lang lang-settings-or-param]
    (if (ident? name-or-path)
      ;; route name
      (page-core router name-or-path params query-params
                 [(guess-lang-param lang-settings-or-param) hint-lang])
      ;; path
      (page-core router name-or-path params query-params nil)))
-  ([_ name-or-path lang params query-params require-param? name-path-fallback? router lang-settings-or-param]
+  (^String [_ name-or-path lang params query-params require-param? name-path-fallback? router lang-settings-or-param]
    ;; language specified
    (localized-page nil
                    name-or-path
@@ -977,7 +981,7 @@
 
 (defn current-page
   "Returns a path of the current page."
-  [req]
+  ^String [req]
   (page req))
 
 (defn current-page-id
@@ -993,13 +997,13 @@
 
 (defn login-page
   "Returns a path for the login page. The page must have ID of `:login`."
-  ([req]         (page req :login))
-  ([req lang-id] (page req :login lang-id)))
+  (^String [req]         (page req :login))
+  (^String [req lang-id] (page req :login lang-id)))
 
 (defn auth-page
   "Returns a path for the authentication page. The page must have ID of `:welcome`."
-  ([req]         (page req :welcome))
-  ([req lang-id] (page req :welcome lang-id)))
+  (^String [req]         (page req :welcome))
+  (^String [req lang-id] (page req :welcome lang-id)))
 
 ;; Additional responses
 

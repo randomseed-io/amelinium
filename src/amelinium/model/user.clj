@@ -129,19 +129,19 @@
 ;; Users
 
 (defn get-user-by-id
-  "Given a user ID, return the user record."
+  "Given a user ID, returns the user record."
   [db id]
   (if-some [id (parse-long id)]
     (sql/get-by-id db :users id db/opts-simple-map)))
 
 (defn get-user-by-email
-  "Given an email, return the user record."
+  "Given an email, returns the user record."
   [db email]
   (if-some [email (some-str email)]
     (sql/get-by-id db :users email :email db/opts-simple-map)))
 
 (defn get-user-by-uid
-  "Given an UID, return the user record."
+  "Given a database connectable object `db` and a UID `uid`, returns the user record."
   [db uid]
   (if (pos-int? uid)
     (sql/get-by-id db :users (long uid) :uid db/opts-simple-map)))
@@ -393,11 +393,11 @@
   "Takes a user identity and a database connectable object and returns a numerical user
   ID (not cached). Optional identity type will constrain the identity to be treated
   as it will be of certain type."
-  ([db ^Identifiable user-identity]
+  (^Long [db ^Identifiable user-identity]
    (if db
      (if-some [^Identity user-identity (identity/of user-identity)]
        (query-id db (identity/type user-identity) user-identity))))
-  ([db ^Keyword identity-type ^Identifiable user-identity]
+  (^Long [db ^Keyword identity-type ^Identifiable user-identity]
    (if-some [user-identity (identity/of-type identity-type user-identity)]
      (get-id db user-identity))))
 
@@ -426,13 +426,13 @@
             (into {}))))))
 
 (defn- id-core
-  ([^Boolean trust? db ^Identifiable user-identity]
+  (^Long [^Boolean trust? db ^Identifiable user-identity]
    (if db
      (if-some [^Identity user-identity (identity/of user-identity)]
        (if (and trust? (= :id (.id-type user-identity)))
          (identity/value user-identity)
          (cwr/lookup-or-miss identity-cache user-identity #(get-id db %))))))
-  ([^Boolean trust? db ^Keyword identity-type ^Identifiable user-identity]
+  (^Long [^Boolean trust? db ^Keyword identity-type ^Identifiable user-identity]
    (if db
      (if-some [^Identity user-identity (identity/of-type identity-type user-identity)]
        (if (and trust? (= :id identity-type))
@@ -534,16 +534,16 @@
 ;; Existence testing (cached)
 
 (defn exists?
-  ([db ^Identifiable user-identity]
+  (^Boolean [db ^Identifiable user-identity]
    (some? (id db user-identity)))
-  ([db ^Keyword identity-type ^Identifiable user-identity]
+  (^Boolean [db ^Keyword identity-type ^Identifiable user-identity]
    (some? (id identity-type user-identity))))
 
 (defn existing
-  ([db  ^Identifiable user-identity]
+  (^Identity [db ^Identifiable user-identity]
    (if-some [user-identity (identity/of user-identity)]
      (if (exists? user-identity) user-identity)))
-  ([db ^Keyword identity-type  ^Identifiable user-identity]
+  (^Identity [db ^Keyword identity-type  ^Identifiable user-identity]
    (if-some [user-identity (identity/of-type identity-type user-identity)]
      (if (exists? user-identity) user-identity))))
 

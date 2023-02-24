@@ -17,27 +17,30 @@
   (:import  [amelinium    Identity]
             [clojure.lang Keyword PersistentVector IPersistentMap]))
 
-(defonce type-hierarchy (make-hierarchy))
-(defdoc! type-hierarchy
-  "A type hierarchy for identity types expressed as unqualified and qualified
+(defonce ^{:doc "A type hierarchy for identity types expressed as unqualified and qualified
   keywords. Any tag derived from `:amelinium.identity/valid` will be considered
-  valid.")
+  valid."}
+  type-hierarchy
+  (make-hierarchy))
 
-(defonce type-string-matchers [])
-(defdoc! type-string-matchers
-  "Identity string matchers repository. A vector of functions executed in a sequence
-  until one will return anything but `nil`.")
+(defonce ^{:doc "Identity string matchers repository. A vector of functions executed in a sequence
+  until one will return anything but `nil`."}
+  type-string-matchers [])
 
-(defonce type-string-match (constantly nil))
-(defdoc! type-string-match "Internal function for matching strings on a basis of `type-string-matchers`.")
+(defonce ^{:doc      "Internal function for matching strings on a basis of `type-string-matchers`."
+           :tag      Keyword
+           :arglists '(^Keyword [^String v])}
+  type-string-match
+  (constantly nil))
 
-(defonce valid-types (constantly nil))
-(defdoc! valid-types "List of valid types, regenerated each time types are added or deleted.")
+(defonce ^{:doc "List of valid types, regenerated each time types are added or deleted."}
+  valid-types
+  '())
 
-(defonce prioritized-types [:id :email :phone :uid])
-(defdoc! prioritized-types
-  "Prioritized identity types. If they appear on a `valid-types` list, they will be
-  placed at the beginning.")
+(defonce ^{:doc "Prioritized identity types. If they appear on a `valid-types` list, they will be
+  placed at the beginning."}
+  prioritized-types
+  [:id :email :phone :uid])
 
 (defn- get-valid-types
   [prio]
@@ -142,9 +145,9 @@
   (^{:tag Identity}
    make
    [user-identity] [user-identity ^Keyword identity-type]
-   "Creates `amelinium.identity.type.Identity` record by detecting identity type and
-  parsing the identity. If `identity-type` is given, parsing for the given identity
-  type will be called explicitly.
+   "Creates `amelinium.Identity` record by detecting identity type and parsing the
+  identity. If `identity-type` is given, parsing for the given identity type will be
+  called explicitly.
 
   For the `Identity` record it simply returns it unless the `identity-type` is given
   and it differs from a value of its `:id-type` field."))
