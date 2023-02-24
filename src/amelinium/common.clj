@@ -2260,8 +2260,8 @@
 (defn guess-identity-type
   "Detects the identity type and checks if it is assigned to a tag
   `:amelinium.identity/standard` or to a tag passed as `acceptable-tag` argument. To
-  accept any valid identity type the `amelinium.proto.identity/valid` must be
-  explicitly given.
+  accept any valid identity type the `:amelinium.identity/valid` must be explicitly
+  given.
 
   The `src` may be a map or a single value. If it is a map, the keys `:identity`,
   `:user/identity` and `:id` are looked up to get the identity of a user, keys
@@ -2289,7 +2289,7 @@
    (cond
      (and (nil? src)
           (nil? id)) nil
-     (map? src)      (identity/guess-acceptable-type
+     (map? src)      (identity/acceptable-type
                       (or (if id id)
                           (get src :identity)
                           (get src :user/identity)
@@ -2299,7 +2299,7 @@
                           (get src :identity/type))
                       (or (if acceptable-tag (some-keyword acceptable-tag))
                           ::identity/standard))
-     :else           (identity/guess-acceptable-type
+     :else           (identity/acceptable-type
                       (if id id src)
                       identity-type
                       (or (if acceptable-tag (some-keyword acceptable-tag))
@@ -2308,21 +2308,21 @@
 (defn identity-and-type
   "Detects the identity type and checks if it is assigned to a tag
   `:amelinium.identity/standard` or to a tag passed as `acceptable-tag` argument. To
-  accept any valid identity type the `amelinium.proto.identity/valid` must be
-  explicitly given. If `identity-type` is not given or is `nil` or `false`, it is
-  guessed by analyzing `user-identity`.
+  accept any valid identity type the `:amelinium.identity/valid` must be explicitly
+  given. If `identity-type` is not given or is `nil` or `false`, it is guessed by
+  analyzing `user-identity`.
 
   Returns a 2-element vector containing user identity and identity type. If user
   identity is not given or identity type cannot be established or it is not
   acceptable, returns `nil`."
   ([user-identity]
-   (if-some [id-type (identity/guess-acceptable-type user-identity nil ::identity/standard)]
+   (if-some [id-type (identity/acceptable-type user-identity nil ::identity/standard)]
      [user-identity id-type]))
   ([user-identity identity-type]
    (identity-and-type user-identity identity-type ::identity/standard))
   ([user-identity identity-type acceptable-tag]
    (if user-identity
-     (if-some [id-type (identity/guess-acceptable-type
+     (if-some [id-type (identity/acceptable-type
                         user-identity
                         identity-type
                         (or (if acceptable-tag (some-keyword acceptable-tag))

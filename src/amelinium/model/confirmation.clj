@@ -50,7 +50,7 @@
 (defn phone-exists?
   [db phone]
   (if db
-    (if-some [phone (db/identity->str phone)]
+    (if-some [phone (identity/->db phone)]
       (-> (jdbc/execute-one! db [phone-exists-query phone] db/opts-simple-vec)
           first some?))))
 
@@ -176,7 +176,7 @@
   "Parses identity type, guessing it when necessary. Returns its string
   representation. If the type cannot be established, falls back to \"email\"."
   [id id-type]
-  (or (some-str (identity/guess-type id id-type)) "email"))
+  (or (some-str (identity/type id id-type)) "email"))
 
 (defn- gen-full-confirmation-core
   "Creates a confirmation code for the given identity (an e-mail address or a
@@ -359,7 +359,7 @@
       (if user-required?
         phone-confirmation-query-without-attempt
         phone-confirmation-query-without-attempt-nouser)
-      (db/identity->str id) user-id exp attempts :phone user-required? reason)
+      (identity/->db id) user-id exp attempts :phone user-required? reason)
      (gen-confirmation-core
       db
       (if user-required?
@@ -389,7 +389,7 @@
    (if (phone? id-type)
      (gen-confirmation-core
       db (if user-required? phone-confirmation-query phone-confirmation-query-nouser)
-      (db/identity->str id) user-id exp attempts :phone user-required? reason)
+      (identity/->db id) user-id exp attempts :phone user-required? reason)
      (gen-confirmation-core
       db (if user-required? email-confirmation-query email-confirmation-query-nouser)
       id user-id exp attempts :email user-required? reason))))
@@ -532,7 +532,7 @@
      (or (process-errors (jdbc/execute-one! db qargs db/opts-simple-map) should-be-confirmed?)
          verify-bad-token-set)))
   ([db id code reason should-be-confirmed?]
-   (let [id     (db/identity->str id)
+   (let [id     (identity/->db id)
          reason (or (some-str reason) "creation")
          qargs  (cond code          [report-errors-code-query      reason id code]
                       (false? code) [report-errors-simple-id-query reason id]
@@ -550,7 +550,7 @@
   ([errs id src-id email-id phone-id]
    (if errs
      (if (contains? errs src-id)
-       (if-some [id (db/identity->str id)]
+       (if-some [id (identity/->str id)]
          (if-some [dst-id (cond (str/index-of id \@ 1) email-id
                                 (= (first id) \+)      phone-id)]
            (conj (disj errs src-id) dst-id)
@@ -618,7 +618,7 @@
   not yet expired), it will also return a map with `:confirmed?` set to `true`."
   ([db id code exp-inc reason]
    (let [reason  (or (some-str reason) "creation")
-         id      (db/identity->str id)
+         id      (identity/->db id)
          code    (some-str code)
          exp-inc (time/minutes exp-inc 1)]
      (if (and id code)
@@ -635,7 +635,7 @@
              (if r
                {:confirmed? false
                 :id-type    (some-keyword (get r :id-type))
-                :identity   id
+                :identity   (identity/of-type (get r :id-type) id)
                 :user/id    user-id
                 :code       code
                 :errors     errs}
@@ -698,7 +698,7 @@
 (defn- decrease-attempts-core
   [db id reason]
   (if db
-    (if-some [id (db/identity->str id)]
+    (if-some [id (identity/->db id)]
       (let [reason (or (some-str reason) "creation")]
         (if-some [r (jdbc/execute-one! db [decrease-attempts-query id reason] db/opts-simple-map)]
           (-> r
@@ -745,7 +745,7 @@
    (if db
      (if-some [request-id (some-str request-id)]
        (if-some [code (some-str code)]
-         (if-some [id (db/identity->str id)]
+         (if-some [id (identity/->db id)]
            (sql/update! db :confirmations
                         {:req-id request-id}
                         {:id id :code code}

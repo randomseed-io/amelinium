@@ -6,24 +6,46 @@
 
     amelinium.proto.identity
 
+  (:refer-clojure :exclude [type value])
+
   (:require [amelinium]
-            [io.randomseed.utils :as utils])
-  (:import  [clojure.lang PersistentVector IPersistentMap]))
+            [amelinium.types.identity  :refer      :all]
+            [io.randomseed.utils.db    :as          rdb]
+            [io.randomseed.utils       :as        utils]
+            [io.randomseed.utils       :refer [defdoc!]])
 
-(def ^IPersistentMap type-hierarchy
+  (:import  [amelinium    Identity]
+            [clojure.lang Keyword PersistentVector IPersistentMap]))
+
+(defonce type-hierarchy (make-hierarchy))
+(defdoc! type-hierarchy
   "A type hierarchy for identity types expressed as unqualified and qualified
-  keywords. Any tag derived from `:amelinium.identity.proto/valid` will be considered
-  valid."
-  (make-hierarchy))
+  keywords. Any tag derived from `:amelinium.identity/valid` will be considered
+  valid.")
 
-(def ^PersistentVector type-string-matchers
+(defonce type-string-matchers [])
+(defdoc! type-string-matchers
   "Identity string matchers repository. A vector of functions executed in a sequence
-  until one will return anything but `nil`."
-  [])
+  until one will return anything but `nil`.")
 
-(def type-string-match
-  "Internal function for matching strings on a basis of `type-string-matchers`."
-  (constantly nil))
+(defonce type-string-match (constantly nil))
+(defdoc! type-string-match "Internal function for matching strings on a basis of `type-string-matchers`.")
+
+(defonce valid-types (constantly nil))
+(defdoc! valid-types "List of valid types, regenerated each time types are added or deleted.")
+
+(defonce prioritized-types [:id :email :phone :uid])
+(defdoc! prioritized-types
+  "Prioritized identity types. If they appear on a `valid-types` list, they will be
+  placed at the beginning.")
+
+(defn- get-valid-types
+  [prio]
+  (let [types (filter simple-keyword? (descendants type-hierarchy ::valid))
+        prios (set prio)]
+    (concat
+     (keep #(if (contains? prios %) %) prio)
+     (remove #(contains? prios %) types))))
 
 (defn- reduce-hierarchy
   [h types f & args]
@@ -33,7 +55,10 @@
   [f parent t]
   (if parent
     (if-some [t (utils/some-keyword t)]
-      (locking #'type-hierarchy (alter-var-root #'type-hierarchy f t parent) nil))))
+      (locking #'type-hierarchy
+        (alter-var-root #'type-hierarchy f t parent)
+        (alter-var-root #'valid-types (constantly (get-valid-types prioritized-types)))
+        nil))))
 
 (defn- on-hierarchy-types!
   [f parent types]
@@ -41,6 +66,7 @@
     (if-some [types (->> types (map utils/some-keyword) (filter identity) seq)]
       (locking #'type-hierarchy
         (alter-var-root #'type-hierarchy reduce-hierarchy types f parent)
+        (alter-var-root #'valid-types (constantly (get-valid-types prioritized-types)))
         nil))))
 
 (defn add-subtype!
@@ -60,20 +86,20 @@
 (defn add-type!
   "Adds a new identity type to the global identity type hierarchy
   `amelinium.identity.proto/type-hierarchy` and marks it as valid."
-  ([t]        (add-subtype!       ::valid t))
-  ([t & more] (apply add-subtype! ::valid t more)))
+  ([t]        (add-subtype!       :amelinium.identity/valid t))
+  ([t & more] (apply add-subtype! :amelinium.identity/valid t more)))
 
 (defn del-type!
   "Removes an identity type from the global identity type hierarchy
   `amelinium.identity.proto/type-hierarchy`."
-  ([t]        (del-subtype!       ::valid t))
-  ([t & more] (apply del-subtype! ::valid t more)))
+  ([t]        (del-subtype!       :amelinium.identity/valid t))
+  ([t & more] (apply del-subtype! :amelinium.identity/valid t more)))
 
 (defn add-acceptable-type!
   "For the given parent tag `acceptable-tag` (which should be a qualified keyword) and
   an identity type `t`, creates a relation so that the identity type is a descendant
   of the given parent. It also ensures that the parent itself is a descendant of
-  `amelinium.proto.identity/valid` tag.
+  `:amelinium.identity/valid` tag.
 
   Useful when there is a need to accept a limited set of recognized identity
   types. Then the detection function can check whether an identity belongs to a
@@ -83,12 +109,12 @@
   `amelinium.identity.proto/type-hierarchy`."
   ([acceptable-tag t]
    (add-subtype! acceptable-tag t)
-   (if-not (isa? acceptable-tag ::valid)
-     (add-subtype! ::valid acceptable-tag)))
+   (if-not (isa? type-hierarchy acceptable-tag :amelinium.identity/valid)
+     (add-subtype! :amelinium.identity/valid acceptable-tag)))
   ([acceptable-tag t & more]
    (apply add-subtype! acceptable-tag t more)
-   (if-not (isa? acceptable-tag ::valid)
-     (add-subtype! ::valid acceptable-tag))))
+   (if-not (isa? type-hierarchy acceptable-tag :amelinium.identity/valid)
+     (add-subtype! :amelinium.identity/valid acceptable-tag))))
 
 (defn unaccept-type!
   "Removes identity type `t` from the given parent `acceptable-tag`. Makes changes in
@@ -101,12 +127,27 @@
 (defprotocol Identifiable
   "This protocol allows to extend known identity types."
 
-  (^{:tag Boolean}
-   guess-type
-   [v]
+  (^{:tag Keyword}
+   type
+   [user-identity]
    "Returns a keyword describing identity type detected by analyzing the given
   value (`:phone` for a phone number, `:email` for e-mail address, `:id` for numeric
-  user ID, `:uid` for UUID). Does not perform full validation, just detection."))
+  user ID, `:uid` for UUID). Does not perform full validation, just detection.")
+
+  (value
+    [user-identity] [user-identity ^Keyword identity-type]
+    "Returns a value of the given identity which is an object which represents
+  it best.")
+
+  (^{:tag Identity}
+   make
+   [user-identity] [user-identity ^Keyword identity-type]
+   "Creates `amelinium.identity.type.Identity` record by detecting identity type and
+  parsing the identity. If `identity-type` is given, parsing for the given identity
+  type will be called explicitly.
+
+  For the `Identity` record it simply returns it unless the `identity-type` is given
+  and it differs from a value of its `:id-type` field."))
 
 (defn add-type-string-matcher!
   "Adds new identity type string matcher to a global chain. Multiple functions may be
@@ -114,11 +155,17 @@
   ([f]
    (locking #'type-string-matchers
      (alter-var-root #'type-string-matchers conj f)
-     (alter-var-root #'type-string-match (constantly (apply some-fn type-string-matchers)))))
+     (alter-var-root #'type-string-match
+                     (constantly
+                      (rdb/memoize
+                       (apply some-fn type-string-matchers) 4096)))))
   ([f & more]
    (locking #'type-string-matchers
      (doseq [f (cons f more)] (alter-var-root #'type-string-matchers conj f))
-     (alter-var-root #'type-string-match (constantly (apply some-fn type-string-matchers))))))
+     (alter-var-root #'type-string-match
+                     (constantly
+                      (rdb/memoize
+                       (apply some-fn type-string-matchers) 4096))))))
 
 (defn del-type-string-matcher!
   "Deletes identity type string matcher of the given index `n` from a global
@@ -126,9 +173,15 @@
   ([n]
    (locking #'type-string-matchers
      (alter-var-root #'type-string-matchers #(into (subvec % 0 n) (subvec % (inc n))))
-     (alter-var-root #'type-string-match (constantly (apply some-fn type-string-matchers)))))
+     (alter-var-root #'type-string-match
+                     (constantly
+                      (rdb/memoize
+                       (apply some-fn type-string-matchers) 4096)))))
   ([n & more]
    (locking #'type-string-matchers
      (doseq [n (cons n more)]
        (alter-var-root #'type-string-matchers #(into (subvec % 0 n) (subvec % (inc n)))))
-     (alter-var-root #'type-string-match (constantly (apply some-fn type-string-matchers))))))
+     (alter-var-root #'type-string-match
+                     (constantly
+                      (rdb/memoize
+                       (apply some-fn type-string-matchers) 4096))))))

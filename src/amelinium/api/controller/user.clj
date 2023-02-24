@@ -11,11 +11,9 @@
   (:require [tick.core                          :as               t]
             [clojure.string                     :as             str]
             [amelinium.logging                  :as             log]
+            [amelinium.identity                 :as        identity]
             [amelinium.common                   :as          common]
             [amelinium.common.controller        :as           super]
-            [io.randomseed.utils.map            :as             map]
-            [io.randomseed.utils.map            :refer     [qassoc]]
-            [io.randomseed.utils                :refer         :all]
             [amelinium.i18n                     :as            i18n]
             [amelinium.api                      :as             api]
             [amelinium.auth                     :as            auth]
@@ -28,6 +26,9 @@
             [amelinium.types.auth               :refer         :all]
             [amelinium.types.session            :refer         :all]
             [amelinium                          :refer         :all]
+            [io.randomseed.utils.map            :as             map]
+            [io.randomseed.utils.map            :refer     [qassoc]]
+            [io.randomseed.utils                :refer         :all]
             [puget.printer                      :refer     [cprint]])
 
   (:import [amelinium Session AuthSettings AuthConfig AuthConfirmation]
@@ -170,7 +171,7 @@
                 errors
                 attempts
                 expires]} result
-        id-type           (or id-type (get :id-type result) :email)
+        id-type           (common/guess-identity-type result id id-type)
         errors?           (some? (seq errors))
         attempts?         (and (not errors?) (int? attempts))
         attempts-left     (if attempts? (if (neg? attempts) 0 attempts))
@@ -313,7 +314,7 @@
         (api/render-error req :profile/update-error)
         (-> req
             (api/add-status (if change? :profile/updated :profile/not-updated))
-            (api/add-body (common/pick-params (user/props-by-session auth-db smap)
+            (api/add-body (common/pick-params (user/props-of :session auth-db smap)
                                               :user [:uid :first-name :last-name :middle-name]))))))))
 
 ;; Identity management
@@ -326,7 +327,7 @@
     req
     (let [smap    (session/not-empty-of req (or session-key (http/get-route-data req :session-key)))
           auth-db (auth/db req)
-          props   (user/props-by-session auth-db smap)]
+          props   (user/props-of :session auth-db smap)]
       (if (:uid props)
         (api/add-body req (common/pick-params props :user [:uid :email :phone]))
         (api/render-error req :verify/bad-result))))))
@@ -385,11 +386,6 @@
                                 :tpl/email-exists :update/exists
                                 :tpl/email-verify :update/verify})))))))))))
 
-(defn guess-identity-type
-  [db-result]
-  (if db-result
-    (or (get db-result :id-type)
-        (common/guess-identity-type (get db-result :identity)))))
 
 (defn identity-create!
   "Verifies confirmation code or token against a database and if it matches, creates
@@ -411,7 +407,7 @@
           (let [db           (auth/db req)
                 confirmation (confirmation/establish db id code token one-minute "change")
                 confirmed?   (get confirmation :confirmed?)
-                id-type      (or id-type (guess-identity-type confirmation))
+                id-type      (common/guess-identity-type confirmation id id-type)
                 updated      (if confirmed? (user/update-identity-with-token-or-code id-type db id token code))
                 updated?     (:updated? updated)
                 bad-result?  (or (nil? confirmation) (and confirmed? (nil? updated)))]
@@ -487,7 +483,7 @@
       (if (= :auth/ok (get req :response/status))
         (let [user-id (or (get req :user/id)
                           (session/user-email session)
-                          (user/email-to-id (auth/db req) user-email))
+                          (user/id-of :email (auth/db req) user-email))
               req     (super/set-password! req user-id new-password)]
           (if (and session-invalidator (= :pwd/created (get req :response/status)))
             (session-invalidator req nil :user/email user-email user-id))
@@ -513,6 +509,7 @@
         (api/render-error req :parameters/error)
         (let [db           (auth/db req)
               confirmation (confirmation/establish db id code token one-minute "recovery")
+              id-type      (common/guess-identity-type confirmation id id-type)
               confirmed?   (boolean (if confirmation (get confirmation :confirmed?)))
               user-id      (if confirmation (get confirmation :user/id))
               req          (if confirmed? (super/set-password! req user-id new-password) req)
@@ -520,7 +517,10 @@
           (cond
             (nil? confirmation) (api/render-error req :verify/bad-result)
             updated?            (do (if session-invalidator
-                                      (session-invalidator req nil :user/email (user/id-to-email db user-id) user-id))
+                                      (session-invalidator req nil
+                                                           :user/email
+                                                           (user/prop-of :id db :email user-id)
+                                                           user-id))
                                     (confirmation/delete db id "recovery")
                                     req)
             (not confirmed?)    (api/render-error req (:errors confirmation))
@@ -544,8 +544,8 @@
        (let [auth-settings               (auth/settings req)
              auth-db                     (auth/db auth-settings)
              [id props id-type]          (if phone?
-                                           [phone (user/props-by-phone auth-db phone) :phone]
-                                           [email (user/props-by-email auth-db email) :email])
+                                           [phone (user/props-of :phone auth-db phone) :phone]
+                                           [email (user/props-of :email auth-db email) :email])
              user-id                     (get props :id)
              ^AuthConfig auth-config     (auth/config auth-settings (get props :account-type))
              ^AuthConfig auth-config     (or auth-config (auth/config auth-settings))

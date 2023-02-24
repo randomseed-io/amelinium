@@ -72,8 +72,8 @@
    (lock-remaining-mins req auth-db smap time-fn :login))
   ([req auth-db smap time-fn id-field]
    (if auth-db
-     (let [user (and smap (user/props-by-session auth-db smap))
-           user (or user (user/props-by-email auth-db (get-in req [:parameters :form id-field])))]
+     (let [user (and smap (user/props-of :session auth-db smap))
+           user (or user (user/props-of :email auth-db (get-in req [:parameters :form id-field])))]
        (if (some? user)
          (if-some [auth-config (auth/config req (get user :account-type))]
            (if-some [mins (time/minutes (common/soft-lock-remains user auth-config (time-fn)))]
@@ -316,7 +316,7 @@
   (qassoc
    req :response/status
    (let [auth-settings (auth/settings req)]
-     (if-some [ac-type (user/prop (auth/db auth-settings) :account-type user-id)]
+     (if-some [ac-type (user/prop (auth/db auth-settings) :account-type :id user-id)]
        (let [auth-config (auth/config auth-settings ac-type)
              pwd-data    (user/make-user-password auth-config password)]
          (if-some [pwd-suite-id (get pwd-data :suite-id)]

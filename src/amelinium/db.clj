@@ -17,6 +17,7 @@
             [next.jdbc                     :as                   jdbc]
             [next.jdbc.sql                 :as                    sql]
             [next.jdbc.connection          :as             connection]
+            [next.jdbc.prepare              :as                    jp]
             [ragtime.repl                  :as           ragtime-repl]
             [potemkin.namespaces           :as                      p]
             [io.randomseed.utils           :refer                :all]
@@ -34,14 +35,16 @@
             [amelinium.app                 :as                    app]
             [amelinium.system              :as                 system]
             [amelinium.logging             :as                    log]
-            [amelinium.types.db            :refer                :all])
+            [amelinium.types.db            :refer                :all]
+            [amelinium.types.identity      :refer                :all]
+            [amelinium.identity            :as               identity])
 
   (:import [com.zaxxer.hikari HikariConfig HikariDataSource HikariPoolMXBean]
-           [amelinium DBConfig]
-           [java.sql Connection]
-           [javax.sql DataSource]
-           [java.lang.reflect Method]
-           [java.io Closeable]))
+           [amelinium         DBConfig]
+           [java.sql          Connection PreparedStatement]
+           [javax.sql         DataSource]
+           [java.io           Closeable]
+           [java.lang.reflect Method]))
 
 (set! *warn-on-reflection* true)
 
@@ -83,7 +86,7 @@
 
 (p/import-vars [io.randomseed.utils.db
                 make-getter-coll make-getter make-setter make-deleter
-                get-ids get-id])
+                get-ids get-id not-found?])
 
 ;; Cached database access
 
@@ -135,53 +138,17 @@
   [m k]
   (map/update-existing m k ip/string-to-address))
 
-;; User ID parsing
-
-(defn parse-user-id
-  ^Long [v]
-  (when-let [v (safe-parse-long v)]
-    (if (pos-int? v) v)))
-
-;; E-mail parsing
-
-(defn parse-email
-  ^String [v]
-  (if-some [^String v (some-str v)]
-    (let [l (unchecked-int (.length v))]
-      (if (> l 2)
-        (if-some [idx ^long (str/index-of v \@ 1)]
-          (if (and (> (unchecked-dec-int l) idx 0))
-            (str (subs v 0 idx) (str/lower-case (subs v idx l)))))))))
-
 ;; Phone number mapping
-
-(defn parse-phone
-  [v]
-  (phutil/try-parse (phone/number-optraw v)))
 
 (defn key-as-phone
   [m k]
-  (map/update-existing m k parse-phone))
+  (map/update-existing m k identity/preparse-phone))
 
 ;; UUID mapping
 
-(defn some-uuid-str
-  [s]
-  (if-some [s (some-str s)]
-    (if (uuid/uuidable? s) s)))
-
-(defn uuidable?
-  [v]
-  (uuid/uuidable? v))
-
-(defn parse-uid
-  [v]
-  (if (uuid? v) v
-      (if (and v (uuid/uuidable? v)) (uuid/as-uuid v))))
-
 (defn key-as-uuid
   [m k]
-  (map/update-existing m k parse-uid))
+  (map/update-existing m k identity/preparse-uid))
 
 ;; Memoization
 
@@ -201,67 +168,146 @@
 ;; Email/phone/uid/id mapping to a DB-consumable values
 
 (defn identity->str
+  "Converts the given `id` to a string unless it's a positive integer. Used to prepare
+  user identities to a format acceptable by raw query strings (where they cannot be
+  passed as parameters in database prepared statements)."
   [id]
   (cond
     (string? id)       (some-str id)
     (phone/native? id) (phone/format id nil :phone-number.format/e164)
+    (pos-int? id)      id
     :else              (some-str id)))
 
 (defn identity->kw
+  "Calls `identity->str` and then converts the result into a keyword."
   [id]
-  (when-some [id (identity->str id)]
-    (keyword id)))
+  (some-keyword (identity->str id)))
 
 (defn get-user-id-by-identity
-  [db query identity]
-  (let [identity (identity->str identity)]
-    (if (and db identity)
-      (first (jdbc/execute-one! db [query identity] opts-simple-vec)))))
+  "For the given `db` (database connectable object), a query string `query` and user's
+  identity `identity`, performs a query on a database and returns its result.
+
+  Identity can optionally be pre-processed with the given `key-transformer` which
+  should be a function. It will be called to transform `user-identity` before
+  querying a database. The purpose of it is to transform an identifier into its
+  native form and let the JDBC layer coerce it in a proper way."
+  ([db query user-identity]
+   (get-user-id-by-identity db query identity))
+  ([db query user-identity key-transformer]
+   (if db
+     (if-let [user-identity (key-transformer user-identity)]
+       (first (jdbc/execute-one! db [query user-identity] opts-simple-vec))))))
 
 (defn get-user-ids-by-identities
-  [db query identities]
-  (if (and db identities)
-    (let [identities (map identity->str identities)
-          query      (str query " " (braced-join-? identities))]
-      (->> (sql/query db (cons query identities) opts-simple-vec)
-           next
-           (map #(vector (keyword (nth % 0)) (nth % 1)))
-           (into {})))))
+  "For the given `db` (database connectable object), a query string `query` and a
+  sequence of user's identities `identities`, performs a query on a database and
+  returns its result.
 
-;; Email/phone caching
+  Identities can optionally be pre-processed with the given `key-transformer` which
+  should be a function. It will be called to transform each identity before querying
+  a database, and after results are obtained in a form of a map, for each key of that
+  map. The purpose of it is to transform any identifier into its native form and let
+  the JDBC layer coerce it in a proper way, and then to ensure that when it comes
+  back from a database it is in the same form. That way this function results can
+  safely be processed with other function calls since the types of keys are
+  normalized."
+  ([db query identities]
+   (get-user-ids-by-identities db query identities identity))
+  ([db query identities key-transformer]
+   (if (and db identities)
+     (let [identities (filter identity (map key-transformer identities))
+           query      (str query " " (braced-join-? identities))]
+       (->> (sql/query db (cons query identities) opts-simple-vec)
+            next
+            (map #(vector (key-transformer (nth % 0)) (nth % 1)))
+            (into {}))))))
+
+;; Email/phone/uid/id caching
 
 (defn cache-lookup-user-id
-  [cache db id-getter user-identity]
-  (let [user-identity (identity->str user-identity)]
-    (if (and db user-identity)
-      (cwr/lookup-or-miss cache (keyword user-identity) #(id-getter db %)))))
+  "Performs a cache lookup of user identity `user-identity` using a cache object
+  `cache`. Returns a value being a result of a cache lookup and, if the entry
+  identified by `user-identity` is not in a cache, returns
+  `:io.randomseed.utils.db/not-found`.
+
+  Does not perform any pre-processing or post-processing of the `user-identity`."
+  [cache user-identity]
+  (if user-identity
+    (cwr/lookup cache user-identity ::db/not-found)))
 
 (defn cache-lookup-user-ids
+  "Takes a cache object `cache` and a sequence of identities `identities`, and returns
+  a map with keys and values found in the cache, plus a special key
+  `:io.randomseed.utils.db/not-found` with a list of keys which were not found
+  associated to it.
+
+  Does not perform any pre-processing or post-processing of the `user-identity`."
   [cache identities]
   (if (seq identities)
-    (let [identities (map identity->kw identities)]
-      (reduce (fn [m user-identity]
-                (let [id (cwr/lookup cache user-identity false)]
-                  (if (false? id)
-                    (qassoc m false (conj (get m false) user-identity))
-                    (qassoc m user-identity id))))
-              {} identities))))
+    (reduce (fn [m user-identity]
+              (let [id (cwr/lookup cache user-identity ::db/not-found)]
+                (if (db/not-found? id)
+                  (qassoc m ::db/not-found (conj (get m ::db/not-found) user-identity))
+                  (qassoc m user-identity id))))
+            {} identities)))
 
 (defn identity-to-user-id
+  "Takes a cache object `cache`, a database connectable object `db`, and a user
+  identifier `user-identity`, and returns a value found in the cache for it. If there
+  is a cache miss, the `getter` function is called to obtain the user ID and return
+  it.
+
+  Identity can optionally be pre-processed with the given `key-transformer` which
+  should be a function. It will be called to transform `user-identity` before
+  querying a database. The purpose of it is to transform an identifier into its
+  native form and let the JDBC layer coerce it in a proper way.
+
+  As a side effect it updates the cache in a thread-safe way."
   ([db cache getter user-identity]
-   (cache-lookup-user-id cache db getter user-identity)))
+   (identity-to-user-id db cache getter user-identity identity))
+  ([db cache getter user-identity key-transformer]
+   (if-let [user-identity (key-transformer user-identity)]
+     (cwr/lookup-or-miss cache user-identity #(getter db %)))))
 
 (defn identities-to-user-ids
-  [db cache getter identities]
-  (if (and db identities)
-    (let [looked-up (cache-lookup-user-ids cache identities)
-          missing   (seq (get looked-up false))]
-      (if-not missing
-        looked-up
-        (let [db-ids  (getter db missing)
-              present (dissoc looked-up false)]
-          (reduce #(qassoc %1 %2 (cwr/lookup-or-miss cache %2 db-ids))
-                  present missing))))))
+  "Takes a cache object `cache`, a database connectable object `db`, and a sequence of
+  user identifiers `user-identities`, and returns a map in which keys are the given
+  identities and values are user IDs. At first the cache is looked up for any
+  identity and if it is found, it's collected. Next, for all missing identities a
+  database query is performed using `getter` function. It should return a map of
+  assignments from the identity to a numeric identifier. Then the results are merged
+  and presented as a map.
+
+  Identities can optionally be pre-processed with the given `key-transformer` which
+  should be a function. It will be called on each identity before querying a database
+  and before returning the result. The purpose of it is to transform each identifier
+  into its native form and let the JDBC layer coerce it in a proper way, and then to
+  normalize the keys of the returned map so they are look the same and are in sync
+  with the cache.
+
+  As a side effect it updates the cache in a thread-safe way."
+  ([db cache getter identities]
+   (identities-to-user-ids db cache getter identities identity))
+  ([db cache getter identities key-transformer]
+   (if (and db identities)
+     (let [identities (filter identity (map key-transformer identities))
+           looked-up  (cache-lookup-user-ids cache identities)
+           missing    (seq (get looked-up ::db/not-found))]
+       (if-not missing
+         looked-up
+         (let [db-ids  (getter db missing)
+               present (dissoc looked-up ::db/not-found)]
+           (reduce #(qassoc %1 %2 (cwr/lookup-or-miss cache %2 db-ids))
+                   present missing)))))))
+
+;; Settable parameters
+
+(extend-protocol jp/SettableParameter
+
+  amelinium.Identity
+
+  (set-parameter [^amelinium.Identity v ^PreparedStatement ps ^long i]
+    (jp/set-parameter (identity/->db v) ps i)))
 
 ;; Configuration record
 

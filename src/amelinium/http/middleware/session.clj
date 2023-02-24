@@ -31,14 +31,14 @@
             [io.randomseed.utils.ip       :as         ip]
             [io.randomseed.utils.db.types :as      types])
 
-  (:import [clojure.lang            Keyword PersistentVector IPersistentMap IFn Fn]
-           [java.time               Instant Duration]
-           [javax.sql               DataSource]
-           [inet.ipaddr             IPAddress]
-           [clojure.core.memoize    PluggableMemoization]
-           [clojure.core.cache      TTLCacheQ]
-           [amelinium.proto.session SessionControl Sessionable]
-           [amelinium               Session SessionConfig SessionError]))
+  (:import [clojure.lang             Keyword PersistentVector IPersistentMap IFn Fn]
+           [java.time                Instant Duration]
+           [javax.sql                DataSource]
+           [inet.ipaddr              IPAddress]
+           [clojure.core.memoize     PluggableMemoization]
+           [clojure.core.cache       TTLCacheQ]
+           [amelinium.proto.session  SessionControl Sessionable]
+           [amelinium                Session SessionConfig SessionError]))
 
 (set! *warn-on-reflection* true)
 

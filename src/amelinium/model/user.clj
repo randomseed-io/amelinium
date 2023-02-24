@@ -20,49 +20,43 @@
             [amelinium.db                      :as            db]
             [amelinium.auth                    :as          auth]
             [amelinium.auth.pwd                :as           pwd]
-            [amelinium.proto.auth              :as             p]
+            [amelinium.identity                :as      identity]
+            [amelinium.common                  :as        common]
+            [amelinium.proto.auth              :as         pauth]
+            [amelinium.proto.identity          :as           pid]
+            [amelinium.proto.session           :as           sid]
             [amelinium.http.middleware.session :as       session]
             [amelinium.http.middleware.roles   :as         roles]
             [amelinium.model.confirmation      :as  confirmation]
             [amelinium                         :refer       :all]
             [amelinium.types.auth              :refer       :all]
+            [amelinium.types.identity          :refer       :all]
+            [amelinium.types.session           :refer       :all]
+            [phone-number.core                 :as         phone]
             [io.randomseed.utils.time          :as          time]
             [io.randomseed.utils.ip            :as            ip]
             [io.randomseed.utils.map           :as           map]
             [io.randomseed.utils.map           :refer   [qassoc]]
             [io.randomseed.utils               :refer       :all])
 
-  (:import [amelinium.proto.auth Authorizable]
-           [phone_number.core    Phoneable]
-           [amelinium            Suites SuitesJSON PasswordData]
-           [amelinium            UserData AuthQueries DBPassword]
-           [amelinium            AuthConfig AuthSettings AuthLocking AuthConfirmation AccountTypes]
-           [javax.sql            DataSource]
-           [java.time            Duration]))
+  (:import [clojure.lang             Keyword]
+           [phone_number.core        Phoneable]
+           [amelinium.proto.auth     Authorizable]
+           [amelinium.proto.identity Identifiable]
+           [amelinium.proto.session  Sessionable]
+           [amelinium                Suites SuitesJSON PasswordData]
+           [amelinium                Identity Session UserData AuthQueries DBPassword]
+           [amelinium                AuthConfig AuthSettings AuthLocking AuthConfirmation AccountTypes]
+           [javax.sql                DataSource]
+           [java.time                Duration]))
 
 (defonce props-cache    (atom nil))
 (defonce settings-cache (atom nil))
-(defonce ids-cache      (atom nil))
+(defonce identity-cache (atom nil))
 
 ;; User data initialization
 
 (declare create-or-get-shared-suite-id)
-(declare prop)
-
-(defn auth-config
-  "Returns authentication configuration (of type `AuthConfig`) for the given
-  `user-id`. Uses `:account-type` property of a registered user to obtain
-  user-specific authentication configuration.
-
-  If user ID is given but it is `nil` or `false`, or the specified user is not found,
-  `nil` is returned. If user ID is not given (unary variant is called) then generic
-  authentication configuration is returned (based on a default account type)."
-  ([req]
-   (auth/config req))
-  ([req ^Long user-id]
-   (if-some [^AuthSettings auth-settings (auth/settings req)]
-     (if-some [ac-type (prop (.db ^AuthSettings auth-settings) :account-type user-id)]
-       (auth/config auth-settings ac-type)))))
 
 (defn make-user-password
   "Creates user password (of type `PasswordData`) on a basis of authentication source
@@ -146,11 +140,11 @@
   (if-some [email (some-str email)]
     (sql/get-by-id db :users email :email db/opts-simple-map)))
 
-(defn get-user-by-uuid
+(defn get-user-by-uid
   "Given an UID, return the user record."
   [db uid]
-  (if-some [uid (db/some-uuid-str)]
-    (sql/get-by-id db :users uid :uid db/opts-simple-map)))
+  (if (pos-int? uid)
+    (sql/get-by-id db :users (long uid) :uid db/opts-simple-map)))
 
 ;; Roles
 
@@ -186,22 +180,22 @@
 ;; Settings (cached)
 
 (defn setting
-  [db user-id setting-id]
+  [db ^Long user-id setting-id]
   (db/cached-setting-get settings-cache get-setting db user-id setting-id))
 
 (defn setting-set
-  ([db user-id setting-id value]
+  ([db ^Long user-id setting-id value]
    (db/cached-setting-set settings-cache put-setting! db user-id setting-id value))
-  ([db user-id setting-id value & pairs]
+  ([db ^Long user-id setting-id value & pairs]
    (apply db/cached-setting-set settings-cache put-setting!
           db user-id setting-id value pairs)))
 
 (defn setting-del
-  ([db user-id]
+  ([db ^Long user-id]
    (db/cached-setting-del settings-cache del-setting! db user-id))
-  ([db user-id setting-id]
+  ([db ^Long user-id setting-id]
    (db/cached-setting-del settings-cache del-setting! db user-id setting-id))
-  ([db user-id setting-id & more]
+  ([db ^Long user-id setting-id & more]
    (apply db/cached-setting-del settings-cache del-setting!
           db user-id setting-id more)))
 
@@ -236,12 +230,9 @@
   (db/make-getter :users :id info-cols info-getter-coll))
 
 (defn info-getter
-  ([db id]
-   (info-coercer (info-getter-core db id)))
-  ([db _ id]
-   (info-coercer (info-getter-core db nil id)))
-  ([db _ id & more]
-   (info-getter-coll db (cons id more))))
+  ([db id]          (info-coercer (info-getter-core db id)))
+  ([db _ id]        (info-coercer (info-getter-core db nil id)))
+  ([db _ id & more] (info-getter-coll db (cons id more))))
 
 (def ^{:arglists '([db id keys-vals])}
   info-setter
@@ -253,304 +244,360 @@
 
 (defn props-set
   "Sets properties of a user with the given ID."
-  [db id keys-vals]
-  (let [r (info-setter db id keys-vals)]
-    (db/cache-evict! props-cache (long id)) r))
+  [db ^Long user-id keys-vals]
+  (let [r (info-setter db user-id keys-vals)]
+    (db/cache-evict! props-cache (long user-id)) r))
 
 (defn props-del
   "Deletes all properties of a user with the given ID."
-  [db id]
-  (let [r (info-deleter db id)]
-    (db/cache-evict! props-cache (long id)) r))
+  [db ^Long user-id]
+  (let [r (info-deleter db user-id)]
+    (db/cache-evict! props-cache (long user-id)) r))
 
 (defn prop-set
   "Sets property k of a user with the given ID to value v."
-  [db id k v]
-  (let [r (info-setter db id {k v})]
-    (db/cache-evict! props-cache (long id)) r))
+  [db ^Long user-id ^Keyword k v]
+  (let [r (info-setter db user-id {k v})]
+    (db/cache-evict! props-cache (long user-id)) r))
 
 (defn prop-del
   "Deletes property of a user with the given ID by setting it to nil."
-  [db id k]
-  (prop-set db id k nil))
-
-(defn props
-  "Returns user properties for the given user ID (cached)."
-  ([db id]
-   (db/get-cached props-cache info-getter db id))
-  ([db id & ids]
-   (db/get-cached-coll props-cache info-getter-coll db (cons id ids))))
-
-(defn props-multi
-  "Returns user properties for each of the given user IDs (cached)."
-  [db ids]
-  (db/get-cached-coll props-cache info-getter-coll db ids))
-
-(defn prop
-  "Returns user property for the given user ID or a map of user property keyed with its
-  ID if multiple IDs are given (cached)."
-  ([db prop id]
-   (db/get-cached-prop props-cache info-getter db prop id))
-  ([db prop id & ids]
-   (db/get-cached-coll-prop props-cache info-getter-coll db prop (cons id ids))))
-
-(defn prop-or-default
-  "Returns user property for the given user ID or a map of user property keyed with its
-  ID if multiple IDs are given (cached)."
-  ([db prop default id]
-   (db/get-cached-prop-or-default props-cache info-getter db prop default id))
-  ([db prop default id & ids]
-   (apply db/get-cached-prop-or-default props-cache info-getter-coll
-          db prop default id ids)))
+  [db ^Long user-id ^Keyword k]
+  (prop-set db user-id k nil))
 
 ;; Getting user properties by...
 
 (defn prop-by-id
-  "Returns the given property of the given user ID (cached)."
-  [db prop user-id]
-  (if (some? user-id) (prop db prop user-id)))
+  "Returns user property for the given user ID or a map of user properties keyed with
+  their IDs if multiple IDs are given (cached)."
+  ([db ^Keyword prop-id ^Long user-id]
+   (if (and prop-id user-id)
+     (db/get-cached-prop props-cache info-getter db prop-id user-id)))
+  ([db ^Keyword prop-id ^Long user-id & ids]
+   (if (and prop-id user-id)
+     (db/get-cached-coll-prop props-cache info-getter-coll db prop-id (cons user-id ids)))))
 
-(defn prop-by-session
-  "Returns the given property of the given session (cached)."
-  [db prop smap]
-  (if-some [user-id (session/user-id smap)] (prop db prop user-id)))
+(defn seq-prop-by-id
+  "Returns user properties for the given user IDs (cached)."
+  [db ^Keyword prop-id user-ids]
+  (if (and prop-id user-ids)
+    (db/get-cached-coll-prop props-cache info-getter-coll db prop-id user-ids)))
 
-(defn prop-by-session-or-id
-  "Returns the given property of the given session or user ID (cached)."
-  [db prop smap user-id]
-  (if db (or (prop-by-session db prop smap) (prop-by-id db prop user-id))))
+(defn prop-by-ids
+  "Returns property for the given user IDs (cached)."
+  [db prop-id ids]
+  (seq-prop-by-id db prop-id ids))
+
+(defn prop-by-id-or-default
+  "Returns user property for the given user ID or a map of user property keyed with its
+  ID if multiple IDs are given (cached). If the property is not found the default tag
+  is returned instead of `nil`."
+  ([db ^Keyword prop default ^Long id]
+   (db/get-cached-prop-or-default props-cache info-getter db prop default id))
+  ([db ^Keyword prop default ^Long id & ids]
+   (apply db/get-cached-prop-or-default props-cache info-getter-coll
+          db prop default id ids)))
 
 (defn props-by-id
-  "Returns properties of the given user ID (cached)."
-  [db user-id]
-  (if (some? user-id) (props db user-id)))
+  "Returns user properties for the given user ID (cached)."
+  ([db ^Long user-id]
+   (if user-id (db/get-cached props-cache info-getter db user-id)))
+  ([db ^Long user-id & ids]
+   (db/get-cached-coll props-cache info-getter-coll db (cons user-id ids))))
 
-(defn props-by-session
-  "Returns properties of the given user session (cached)."
-  [db smap]
-  (if-some [user-id (session/user-id smap)] (props db user-id)))
-
-(defn props-by-session-or-id
-  "Returns properties of the given user session or ID (cached)."
-  [db smap user-id]
-  (if db (or (props-by-session db smap) (props-by-id db user-id))))
-
-;; E-mail to ID mapping
-
-(def ^:const email-id-query
-  "SELECT id FROM users WHERE email = ?")
-
-(def ^:const emails-ids-query
-  "SELECT email, id FROM users WHERE email IN")
-
-(defn get-user-id-by-email
-  "Returns user ID for the given e-mail (not cached)."
-  ([db email]
-   (db/get-user-id-by-identity db email-id-query email))
-  ([db _ email]
-   (db/get-user-id-by-identity db email-id-query email)))
-
-(defn get-user-ids-by-emails
-  "Returns user IDs for the given e-mails (not cached)."
-  ([db emails]
-   (db/get-user-ids-by-identities db emails-ids-query emails))
-  ([db _ emails]
-   (db/get-user-ids-by-identities db emails-ids-query emails)))
-
-(defn email-to-id
-  "Returns user ID for the given e-mail (cached)."
-  [db email]
-  (db/identity-to-user-id db ids-cache get-user-id-by-email email))
-
-(defn emails-to-ids
-  "Returns user IDs for the given e-mails (cached)."
-  [db emails]
-  (db/identities-to-user-ids db ids-cache get-user-ids-by-emails emails))
-
-(defn props-by-email
-  "Returns user properties for the given e-mail (cached)."
-  [db email]
-  (props db (email-to-id db email)))
-
-(defn prop-by-email
-  "Returns user property identified by `prop-id` for the given e-mail (cached)."
-  ([db prop-id email]
-   (prop db prop-id (email-to-id db email)))
-  ([db prop-id email & emails]
-   (apply prop db prop-id (emails-to-ids db (cons email emails)))))
-
-(defn id-to-email
-  "Returns user e-mail for the given user ID (cached)."
-  ([db id]
-   (prop db :email id))
-  ([db id & ids]
-   (apply prop db :email id ids)))
-
-(defn ids-to-emails
-  "Returns user e-mails for the given user IDs (cached)."
+(defn seq-props-by-id
+  "Returns user properties for each of the given user IDs (cached)."
   [db ids]
-  (db/get-cached-coll-prop props-cache info-getter-coll db :email ids))
+  (db/get-cached-coll props-cache info-getter-coll db ids))
 
-;; Phone to ID mapping
-
-(def ^:const phone-id-query
-  "SELECT id FROM users WHERE phone = ?")
-
-(def ^:const phones-ids-query
-  "SELECT phone, id FROM users WHERE phone IN")
-
-(defn get-user-id-by-phone
-  "Returns user ID for the given phone (not cached)."
-  ([db phone]
-   (db/get-user-id-by-identity db phone-id-query phone))
-  ([db _ phone]
-   (db/get-user-id-by-identity db phone-id-query phone)))
-
-(defn get-user-ids-by-phones
-  "Returns user IDs for the given phones (not cached)."
-  ([db phones]
-   (db/get-user-ids-by-identities db phones-ids-query phones))
-  ([db _ phones]
-   (db/get-user-ids-by-identities db phones-ids-query phones)))
-
-(defn phone-to-id
-  "Returns user ID for the given phone (cached)."
-  [db phone]
-  (db/identity-to-user-id db ids-cache get-user-id-by-phone phone))
-
-(defn phones-to-ids
-  "Returns user IDs for the given phones (cached)."
-  [db phones]
-  (db/identities-to-user-ids db ids-cache get-user-ids-by-phones phones))
-
-(defn props-by-phone
-  "Returns user properties for the given phone (cached)."
-  [db phone]
-  (props db (phone-to-id db phone)))
-
-(defn prop-by-phone
-  "Returns user property identified by `prop-id` for the given phone (cached)."
-  ([db prop-id phone]
-   (prop db prop-id (phone-to-id db phone)))
-  ([db prop-id phone & phones]
-   (apply prop db prop-id (phones-to-ids db (cons phone phones)))))
-
-(defn id-to-phone
-  "Returns user phone for the given user ID (cached)."
-  ([db id]
-   (prop db :phone id))
-  ([db id & ids]
-   (apply prop db :phone id ids)))
-
-(defn ids-to-phones
-  "Returns user phones for the given user IDs (cached)."
+(defn props-by-ids
+  "Returns user properties for each of the given user IDs (cached)."
   [db ids]
-  (db/get-cached-coll-prop props-cache info-getter-coll db :phone ids))
+  (seq-props-by-id db ids))
 
-(defn phone-to-email
-  "Returns user e-mail for the given phone number (cached)."
-  ([db phone]
-   (prop db :email (phone-to-id db phone)))
-  ([db phone & phones]
-   (apply prop db :email (phones-to-ids db (cons phone phones)))))
+;; Getting attribute by identity
 
-;; UID to ID mapping
+(defn- ids-updater
+  ([f]
+   (fn [m ^Keyword id-type ids]
+     (if id-type
+       (or (some->> (not-empty ids) (f id-type) (into m)) m) m)))
+  ([f a]
+   (fn [m ^Keyword id-type ids]
+     (if id-type
+       (or (some->> (not-empty ids) (f a id-type) (into m)) m) m)))
+  ([f a b]
+   (fn [m ^Keyword id-type ids]
+     (if id-type
+       (or (some->> (not-empty ids) (f a b id-type) (into m)) m) m)))
+  ([f a b c]
+   (fn [m ^Keyword id-type ids]
+     (if id-type
+       (or (some->> (not-empty ids) (f a b c id-type) (into m)) m) m)))
+  ([f a b c & more]
+   (let [fargs (apply vector a b c more)]
+     (fn [m ^Keyword id-type ids]
+       (if id-type
+         (or (some->> (not-empty ids) (conj fargs id-type) (apply f) (into m)) m) m)))))
 
-(def ^:const uid-id-query
-  "SELECT id FROM users WHERE uid = ?")
+(defn- some-identities
+  ([user-identities]
+   (->> (identity/of-seq user-identities) (filter identity) seq))
+  ([^Keyword identity-type user-identities]
+   (->> (identity/of-seq identity-type user-identities) (filter identity) seq)))
 
-(def ^:const uids-ids-query
-  "SELECT uid, id FROM users WHERE uid IN")
+(defn- cache-lookup-user-id
+  "Performs a cache lookup of user identity `user-identity` using a cache object
+  `cache`. Returns a value being a result of a cache lookup and, if the entry
+  identified by `user-identity` is not in a cache, returns `:amelinium.db/not-found`.
 
-(defn get-user-id-by-uid
-  "Returns user ID for the given user UID (not cached)."
-  ([db uid]
-   (db/get-id-by-uid db uid-id-query uid))
-  ([db _ uid]
-   (db/get-id-by-uid db uid-id-query uid)))
+  Does not perform any pre-processing or post-processing of the `user-identity`."
+  [cache ^Identity user-identity]
+  (if user-identity
+    (cwr/lookup cache user-identity ::db/not-found)))
 
-(defn get-user-ids-by-uids
-  "Returns user IDs for the given user UIDs (not cached)."
-  ([db uids]
-   (db/get-ids-by-uids db uids-ids-query uids))
-  ([db _ uids]
-   (db/get-ids-by-uids db uids-ids-query uids)))
+(defn- cache-lookup-user-ids
+  "Takes a cache object `cache` and a sequence of identities `identities`, and returns
+  a map with keys and values found in the cache, plus a special key
+  `:amelinium.db/not-found` with a list of keys which were not found associated to
+  it.
 
-(defn uid-to-id
-  "Returns user ID for the given user UID (cached)."
-  [db uid]
-  (db/uid-to-id db ids-cache get-user-id-by-uid uid))
+  Does not perform any pre-processing or post-processing of the `user-identity`."
+  [cache identities]
+  (if (seq identities)
+    (reduce (fn [m ^Identity user-identity]
+              (let [id (cwr/lookup cache user-identity ::db/not-found)]
+                (if (= ::db/not-found id)
+                  (qassoc m ::db/not-found (conj (get m ::db/not-found) user-identity))
+                  (qassoc m user-identity id))))
+            {} identities)))
 
-(defn uids-to-ids
-  "Returns user IDs for the given user UIDs (cached)."
-  [db uids]
-  (db/uids-to-ids db ids-cache get-user-ids-by-uids uids))
+(defmulti get-id-query
+  "Returns an ID-getting SQL query for the given identity type."
+  {:arglists '(^String [^Keyword identity-type])}
+  (fn ^Keyword [^Keyword identity-type] (identity/check-type identity-type))
+  :hierarchy #'pid/type-hierarchy)
 
-(defn prop-by-uid
-  "Returns the given user property for the given user UID (cached)."
-  [db prop uid]
-  (prop db prop (uid-to-id db uid)))
+(defmulti get-ids-query
+  "Returns a multiple IDs-getting SQL query for the given identity type."
+  {:arglists '(^String [^Keyword identity-type])}
+  (fn ^Keyword [^Keyword identity-type] (identity/check-type identity-type))
+  :hierarchy #'pid/type-hierarchy)
 
-(defn props-by-uid
-  "Returns user properties for the given user UID (cached)."
-  [db uid]
-  (props db (uid-to-id db uid)))
+(defn get-id
+  "Takes a user identity and a database connectable object and returns a numerical user
+  ID (not cached). Optional identity type will constrain the identity to be treated
+  as it will be of certain type."
+  ([db ^Identifiable user-identity]
+   (if db
+     (if-some [^Identity user-identity (identity/of user-identity)]
+       (let [^Keyword id-type (identity/type user-identity)]
+         (if-some [^String qs (get-id-query id-type)]
+           (if-some [dbs (identity/->db user-identity)]
+             (first (jdbc/execute-one! db [qs dbs] db/opts-simple-vec))))))))
+  ([db ^Keyword identity-type ^Identifiable user-identity]
+   (if-some [user-identity (identity/of-type identity-type user-identity)]
+     (get-id db user-identity))))
 
-(defn id-to-uid
-  "Returns user UID for the given user ID (cached)."
-  ([db id]
-   (prop db :uid id))
-  ([db id & ids]
-   (apply prop db :uid id ids)))
+(defn get-ids
+  "Takes user identities and a database connectable object and returns a numerical user
+  IDs (not cached). Optional identity type will constrain the identity to be treated
+  as it will be of certain type. Returns a map with `amelinium.Identity` objects as
+  keys and numerical identifiers as values."
+  ([db user-identities]
+   (if db
+     (->> (some-identities user-identities)
+          (group-by identity/type)
+          (reduce-kv (ids-updater get-ids db) {}))))
+  ([db ^Keyword identity-type user-identities]
+   (if db
+     (if-some [user-ids (some-identities identity-type user-identities)]
+       (let [db-ids (map identity/->db user-ids)]
+         (if-some [^String qs (some-> (get-ids-query identity-type)
+                                      (str " " (db/braced-join-? db-ids)))]
+           (->> (sql/query db (cons qs db-ids) db/opts-simple-vec) next
+                (map #(vector (identity/of-type identity-type (nth % 0)) (nth % 1)))
+                (into {}))))))))
 
-(defn ids-to-uids
-  "Returns user UIDs for the given user IDs (cached)."
-  ([db ids]
-   (db/get-cached-coll-prop props-cache info-getter-coll db :uid ids)))
+(defn- id-core
+  ([^Boolean trust? db ^Identifiable user-identity]
+   (if db
+     (if-some [^Identity user-identity (identity/of user-identity)]
+       (if (and trust? (= :id (.id-type user-identity)))
+         (identity/value user-identity)
+         (cwr/lookup-or-miss identity-cache user-identity #(get-id db %))))))
+  ([^Boolean trust? db ^Keyword identity-type ^Identifiable user-identity]
+   (if db
+     (if-some [^Identity user-identity (identity/of-type identity-type user-identity)]
+       (if (and trust? (= :id identity-type))
+         (identity/value user-identity)
+         (cwr/lookup-or-miss identity-cache user-identity #(get-id db identity-type %)))))))
 
-;; Existence testing (not cached)
+(defn- ids-core
+  ([^Boolean trust? db user-identities]
+   (if db
+     (->> (some-identities user-identities)
+          (group-by identity/type)
+          (reduce-kv (ids-updater ids-core trust? db) {}))))
+  ([^Boolean trust? db ^Keyword identity-type user-identities]
+   (if db
+     (if-some [user-ids (some-identities identity-type user-identities)]
+       (if (and trust? (= :id identity-type))
+         (->> user-ids (map (juxt identity identity/value)) (into {}))
+         (let [looked-up (cache-lookup-user-ids identity-cache user-ids)
+               missing   (seq (get looked-up ::db/not-found))]
+           (if-not missing
+             looked-up
+             (let [db-ids  (get-ids db identity-type user-ids)
+                   present (dissoc looked-up ::db/not-found)]
+               (reduce #(qassoc %1 %2 (cwr/lookup-or-miss identity-cache %2 db-ids))
+                       present missing)))))))))
 
-(def ^:const id-exists-query
-  "SELECT 1 FROM users WHERE id = ?")
+(defn id
+  "Takes a user identity, optional identity type and a database connectable object, and
+  returns a numerical user ID (cached).
 
-(defn get-user-id-exists?
-  [db id]
-  (if (and db id)
-    (some? (jdbc/execute-one! db [id-exists-query (db/id-to-db id)] db/opts-simple-map))))
+  Optional identity type will constrain the identity to be treated as it will be of
+  certain type."
+  (^Long [db ^Identifiable user-identity]
+   (id-core false db user-identity))
+  (^Long [db ^Keyword identity-type ^Identifiable user-identity]
+   (id-core false db identity-type user-identity)))
 
-(defn get-user-uid-exists?
-  [db uid]
-  (some? (get-user-id-by-uid db uid)))
+(defn id-of
+  "Like `id` but `identity-type` is a first argument."
+  ^Long [^Keyword identity-type db ^Identifiable user-identity]
+  (id db identity-type user-identity))
 
-(defn get-user-email-exists?
-  [db email]
-  (some? (get-user-id-by-email db email)))
+(defn trusted-id
+  "Takes a user identity, optional identity type and a database connectable object, and
+  returns a numerical user ID (cached).
+
+  When the given identity is of type `:id` (a numerical identifier), it will NOT
+  interact with a database but simply trust that the ID exists and will simply return
+  it.
+
+  Optional identity type will constrain the identity to be treated as it will be of
+  certain type."
+  (^Long [db ^Identifiable user-identity]
+   (id-core true db user-identity))
+  (^Long [db ^Keyword identity-type ^Identifiable user-identity]
+   (id-core true db identity-type user-identity)))
+
+(defn trusted-id-of
+  "Like `trusted-id` but `identity-type` is a first argument."
+  ^Long [^Keyword identity-type db ^Identifiable user-identity]
+  (trusted-id db identity-type user-identity))
+
+(defn ids
+  "Takes user identities, optional identity type and a database connectable object, and
+  returns a map with `amelinium.Identity` keys and numerical user IDs values (cached).
+
+  Optional identity type will constrain the identities to be treated as they will be
+  of certain type."
+  ([db user-identities]
+   (ids-core false db user-identities))
+  ([db ^Keyword identity-type user-identities]
+   (ids-core false db identity-type user-identities)))
+
+(defn ids-of
+  "Like `ids` but `identity-type` is a first argument."
+  ^Long [^Keyword identity-type db user-identities]
+  (ids db identity-type user-identities))
+
+(defn trusted-ids
+  "Takes user identities, optional identity type and a database connectable object, and
+  returns a map with `amelinium.Identity` keys and numerical user IDs values (cached).
+
+  When any of the given identities is of type `:id` (a numerical identifier), it will
+  NOT interact with a database to get the ID but simply trust that this ID exists and
+  will simply put it into a map.
+
+  Optional identity type will constrain the identities to be treated as they will be
+  of certain type."
+  ([db user-identities]
+   (ids-core true db user-identities))
+  ([db ^Keyword identity-type user-identities]
+   (ids-core true db identity-type user-identities)))
+
+(defn trusted-ids-of
+  "Like `trusted-ids` but `identity-type` is a first argument."
+  ^Long [^Keyword identity-type db user-identities]
+  (trusted-ids db identity-type user-identities))
 
 ;; Existence testing (cached)
 
-(defn id-exists?
-  [db id]
-  (some? (id-to-uid db id)))
+(defn exists?
+  ([db ^Identifiable user-identity]
+   (some? (id db user-identity)))
+  ([db ^Keyword identity-type ^Identifiable user-identity]
+   (some? (id identity-type user-identity))))
 
-(defn uid-exists?
-  [db uid]
-  (some? (uid-to-id db uid)))
+(defn existing
+  ([db  ^Identifiable user-identity]
+   (if-some [user-identity (identity/of user-identity)]
+     (if (exists? user-identity) user-identity)))
+  ([db ^Keyword identity-type  ^Identifiable user-identity]
+   (if-some [user-identity (identity/of-type identity-type user-identity)]
+     (if (exists? user-identity) user-identity))))
 
-(defn email-exists?
-  [db email]
-  (some? (email-to-id db email)))
+;; Generic identity mapping
 
-(defn some-id
-  [db id]
-  (if (and id (id-exists? db id)) id))
+(defn seq-props
+  ([db ^Keyword identity-type ^Identifiable user-identities]
+   (if-some [by-identity (trusted-ids db identity-type user-identities)]
+     (if-some [by-id (seq-props-by-id db (vals by-identity))]
+       (reduce-kv (fn [m user-identity user-id]
+                    (if-some [p (get by-id user-id)]
+                      (qassoc m user-identity p)
+                      (dissoc m user-identity)))
+                  by-identity by-identity))))
+  ([db ^Identifiable user-identities]
+   (if-some [by-identity (trusted-ids db user-identities)]
+     (if-some [by-id (seq-props-by-id db (vals by-identity))]
+       (reduce-kv (fn [m user-identity user-id]
+                    (if-some [p (get by-id user-id)]
+                      (qassoc m user-identity p)
+                      (dissoc m user-identity)))
+                  by-identity by-identity)))))
 
-(defn some-uid
-  [db uid]
-  (if (and uid (uid-exists? db uid)) uid))
+(defn props
+  ([db ^Identifiable user-identity]
+   (some->> (trusted-id db user-identity) (props-by-id db)))
+  ([db ^Identifiable user-identity & identities]
+   (seq-props db (cons user-identity identities))))
 
-(defn some-email
-  [db email]
-  (if (and email (email-exists? db email)) email))
+(defn props-of
+  ([^Keyword identity-type db ^Identifiable user-identity]
+   (some->> (trusted-id db identity-type user-identity) (props-by-id db)))
+  ([^Keyword identity-type db ^Identifiable user-identity & identities]
+   (seq-props db identity-type (cons user-identity identities))))
+
+(defn seq-prop
+  ([db ^Keyword prop-id user-identities]
+   (if-some [prop-id (some-keyword prop-id)]
+     (->> (seq-props db user-identities)
+          (map/map-vals #(get % prop-id)))))
+  ([db ^Keyword prop-id ^Keyword identity-type user-identities]
+   (if-some [prop-id (some-keyword prop-id)]
+     (->> (seq-props db identity-type user-identities)
+          (map/map-vals #(get % prop-id))))))
+
+(defn seq-prop-of
+  [^Keyword identity-type db ^Keyword prop-id user-identities]
+  (seq-prop db prop-id identity-type user-identities))
+
+(defn prop
+  ([db ^Keyword prop-id ^Identifiable user-identity]
+   (some->> (some-keyword prop-id) (get (props db user-identity))))
+  ([db ^Keyword prop-id ^Identifiable user-identity & identities]
+   (seq-prop db prop-id (cons user-identity identities))))
+
+(defn prop-of
+  ([^Keyword identity-type db ^Keyword prop-id ^Identifiable user-identity]
+   (some->> (some-keyword prop-id) (get (props-of identity-type db user-identity))))
+  ([^Keyword identity-type db ^Keyword prop-id ^Identifiable user-identity & identities]
+   (seq-prop db prop-id identity-type (cons user-identity identities))))
 
 ;; Creation
 
@@ -570,7 +617,7 @@
   (let [token (some-str token)]
     (if token
       (if-some [r (jdbc/execute-one! db [create-with-token-query token] db/opts-simple-map)]
-        (qassoc r :created? true :uid (db/as-uuid (get r :uid)) :identity (get r :email))
+        (qassoc r :created? true :uid (identity/parse-uid (get r :uid)) :identity (get r :email))
         (let [errs (confirmation/report-errors db token "creation" true)]
           {:created? false
            :errors   errs})))))
@@ -592,7 +639,7 @@
         email (some-str email)]
     (if (and code email)
       (if-some [r (jdbc/execute-one! db [create-with-code-query code email] db/opts-simple-map)]
-        (qassoc r :created? true :uid (db/as-uuid (get r :uid)) :identity (get r :email))
+        (qassoc r :created? true :uid (identity/parse-uid (get r :uid)) :identity (get r :email))
         (let [errs (confirmation/report-errors db email code "creation" true)]
           {:created? false
            :errors   errs})))))
@@ -628,7 +675,7 @@
   (let [token (some-str token)]
     (if token
       (if-some [r (jdbc/execute-one! db [update-email-with-token-query token] db/opts-simple-map)]
-        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)) :identity (get r :email))
+        (qassoc r :updated? true :uid (identity/parse-uid (get r :uid)) :identity (get r :email))
         (let [errs (confirmation/report-errors db token "change" true)]
           {:updated? false
            :errors   errs})))))
@@ -638,7 +685,7 @@
   (let [token (some-str token)]
     (if token
       (if-some [r (jdbc/execute-one! db [update-phone-with-token-query token] db/opts-simple-map)]
-        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)) :identity (get r :phone))
+        (qassoc r :updated? true :uid (identity/parse-uid (get r :uid)) :identity (get r :phone))
         (let [errs (confirmation/report-errors db token "change" true)]
           {:updated? false
            :errors   errs})))))
@@ -669,7 +716,7 @@
         email (some-str email)]
     (if (and code email)
       (if-some [r (jdbc/execute-one! db [update-email-with-code-query code email] db/opts-simple-map)]
-        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)) :identity (get r :email))
+        (qassoc r :updated? true :uid (identity/parse-uid (get r :uid)) :identity (get r :email))
         (let [errs (confirmation/report-errors db email code "change" true)]
           {:updated? false
            :errors   errs})))))
@@ -677,10 +724,10 @@
 (defn update-phone-with-code
   [db phone code]
   (let [code  (some-str code)
-        phone (db/identity->str phone)]
+        phone (identity/->db phone)]
     (if (and code phone)
       (if-some [r (jdbc/execute-one! db [update-phone-with-code-query code phone] db/opts-simple-map)]
-        (qassoc r :updated? true :uid (db/as-uuid (get r :uid)) :identity (get r :phone))
+        (qassoc r :updated? true :uid (identity/parse-uid (get r :uid)) :identity (get r :phone))
         (let [errs (confirmation/report-errors db phone code "change" true)]
           {:updated? false
            :errors   errs})))))
@@ -773,7 +820,7 @@
                  password-query-atypes-post
                  password-query-atypes-single))
 
-(extend-protocol p/Authorizable
+(extend-protocol pauth/Authorizable
 
   AuthConfig
 
@@ -797,7 +844,7 @@
                 db
                 (cons (.single ^AuthQueries queries) (cons email (cons (name ac-type) nil)))
                 db/opts-simple-map)))))
-       (p/get-user-auth-data src email queries))))
+       (pauth/get-user-auth-data src email queries))))
 
   AuthSettings
 
@@ -805,14 +852,14 @@
     ([^AuthSettings src email ^AuthQueries queries]
      (if email
        (let [db (.db ^AuthSettings src)]
-         (if-some [ac-type (keyword (prop-by-email db :account-type email))]
-           (p/get-user-auth-data (get (.types ^AuthSettings src) ac-type) email ac-type queries)))))
+         (if-some [ac-type (keyword (prop-of :email db :account-type email))]
+           (pauth/get-user-auth-data (get (.types ^AuthSettings src) ac-type) email ac-type queries)))))
     ([^AuthSettings src email ac-type ^AuthQueries queries]
      (if-some [ac-type (if (keyword? ac-type) ac-type (some-keyword ac-type))]
        (if email
          (if-some [auth-config (get (.types ^AuthSettings src) ac-type)]
-           (p/get-user-auth-data auth-config email ac-type queries)))
-       (p/get-user-auth-data src email queries))))
+           (pauth/get-user-auth-data auth-config email ac-type queries)))
+       (pauth/get-user-auth-data src email queries))))
 
   DataSource
 
@@ -828,21 +875,21 @@
          (jdbc/execute-one! src
                             (cons (.single ^AuthQueries queries) (cons email (cons ac-type nil)))
                             db/opts-simple-map))
-       (p/get-user-auth-data src email queries)))))
+       (pauth/get-user-auth-data src email queries)))))
 
 (defn get-login-data
   "Returns data required for user to log in, including password information."
   ([^Authorizable auth-source email]
-   (p/get-user-auth-data auth-source email login-data-queries))
+   (pauth/get-user-auth-data auth-source email login-data-queries))
   ([^Authorizable auth-source email account-type]
-   (p/get-user-auth-data auth-source email account-type login-data-queries)))
+   (pauth/get-user-auth-data auth-source email account-type login-data-queries)))
 
 (defn get-password-suites
   "Returns password information."
   ([^Authorizable auth-source email]
-   (p/get-user-auth-data auth-source email password-data-queries))
+   (pauth/get-user-auth-data auth-source email password-data-queries))
   ([^Authorizable auth-source email account-type]
-   (p/get-user-auth-data auth-source email account-type password-data-queries)))
+   (pauth/get-user-auth-data auth-source email account-type password-data-queries)))
 
 (def ^:const insert-shared-suite-query
   (str-spc
@@ -976,11 +1023,65 @@
                             (or max-attempts 3)
                             user-id]))))
 
+;; Session as identity
+
+(pid/add-type! :session)
+
+(defmethod identity/parser :session [_] session/of)
+(defmethod get-id-query    :session [_] "SELECT user_id FROM sessions WHERE id = ?")
+(defmethod get-ids-query   :session [_] "SELECT id, user_id FROM sessions WHERE id IN")
+
+(defmethod identity/->str :session
+  ([user-identity]   (session/id (pid/value user-identity)))
+  ([t user-identity] (session/id (pid/value user-identity t))))
+
+(defmethod identity/->db :session
+  ([user-identity]   (session/db-sid (pid/value user-identity)))
+  ([t user-identity] (session/db-sid (pid/value user-identity t))))
+
+(extend-protocol pid/Identifiable
+
+  Session
+
+  (type ^Keyword [v] :session)
+
+  (value
+    (^Session [session]
+     session)
+    (^Session [session ^Keyword identity-type]
+     (if (= :session identity-type) session)))
+
+  (make
+    (^Identity [session]
+     (Identity. :session session))
+    (^Identity [session ^Keyword identity-type]
+     (if (= :session identity-type) (Identity. :session session)))))
+
+(extend-protocol sid/Sessionable
+
+  Identity
+
+  (session
+    (^Session [src]   (pid/value src :session))
+    (^Session [src _] (pid/value src :session)))
+
+  (inject
+    ([user-identity dst ^Keyword session-key] (sid/inject (sid/session user-identity) dst session-key))
+    ([user-identity dst]                      (sid/inject (sid/session user-identity) dst)))
+
+  (empty?
+    (^Boolean [user-identity]                 (sid/empty? (sid/session user-identity)))
+    (^Boolean [user-identity _]               (sid/empty? (sid/session user-identity))))
+
+  (control
+    (^SessionControl [user-identity]          (sid/control (sid/session user-identity)))
+    (^SessionControl [user-identity _]        (sid/control (sid/session user-identity)))))
+
 ;; Authentication
 
 (defn auth-by-user-id
   "Gets authentication configuration (`AuthConfig`) for the given user. Uses cached
-  user props provided by `amelinium.model.user/props-by-id`."
+  user props provided by `amelinium.model.user/props`."
   [settings-src user-id]
   (if-some [as (auth/settings settings-src)]
     (if-some [ac-type (prop-by-id (.db ^AuthSettings as) :account-type user-id)]
@@ -988,34 +1089,53 @@
 
 (defn auth-by-session
   "Gets authentication configuration (`AuthConfig`) for the given user identified by a
-  session object. Uses cached user props provided by
-  `amelinium.model.user/props-by-session`."
+  session object. Uses cached user props provided by `amelinium.model.user/props`."
   [settings-src smap]
   (if-some [as (auth/settings settings-src)]
-    (if-some [ac-type (prop-by-session (.db ^AuthSettings as) :account-type smap)]
+    (if-some [ac-type (prop-of :session (.db ^AuthSettings as) :session smap)]
       (get (.types ^AuthSettings as) ac-type))))
+
+(defn auth-config
+  "Returns user authentication configuration for the user specified by `user-identity`
+  and optional `identity-type` (which can be `:email`, `:phone`, `:id` or `:uid`). If
+  the identity type is not given it will be guessed.
+
+  The resulting map will be an authentication configuration (`AuthConfig` record)
+  obtained for an account type associated with a user entry, or a generic
+  authentication configuration if account type could not be found because either user
+  does not exist in an authentication database or there is no account type specified
+  for the user.
+
+  The returned record will have extra entries present (available only via its map
+  interface):
+
+  - `:identity/type`     (detected or given identity type),
+  - `:user/account-type` (detected account type or `nil` if it couldn't be obtained),
+  - `:user/properties`   (user properties obtained when querying the database)."
+  (^AuthConfig [req user-identity]
+   (auth-config req user-identity nil))
+  ([req user-identity identity-type]
+   (if user-identity
+     (if-some [identity-type (identity/type identity-type user-identity)]
+       (if-some [^AuthSettings auth-settings (auth/settings req)]
+         (let [auth-db                 (.db auth-settings)
+               props                   (props-of identity-type auth-db user-identity)
+               ac-type                 (if props (get props :account-type))
+               ^AuthConfig auth-config (if ac-type (auth/config auth-settings ac-type))]
+           (if-some [^AuthConfig auth-config (or auth-config (auth/config auth-settings))]
+             (qassoc auth-config
+                     :identity/type     identity-type
+                     :user/account-type ac-type
+                     :user/properties   props))))))))
 
 ;; Other
 
 (defn prop-get-locked
   "Returns hard-lock status for the user account. Uses cached property."
-  ([db id]
-   (prop db :locked id))
-  ([db id & ids]
-   (apply prop db :locked id ids)))
-
-(defn- emailable?
-  [v]
-  (if v
-    (or (and (string? v) (not-empty-string? v) (nat-int? (str/index-of v \@)))
-        (ident? v) (nat-int? (str/index-of (str (symbol v)) \@)))))
-
-(defn- phoneable?
-  [v]
-  (if v
-    (or (phone/native? v)
-        (and (string? v) (not-empty-string? v) (= (.charAt ^String v 0) \+)
-             (phone/valid? v)))))
+  ([db user-id]
+   (prop-by-id db :locked user-id))
+  ([db user-id & ids]
+   (apply prop-by-id db :locked user-id ids)))
 
 (defn find-id
   "Gets user ID on a basis of a map with `:id` key or on a basis of a map with `:uid`
@@ -1024,17 +1144,17 @@
   [db user-spec]
   (if (and db user-spec)
     (if (map? user-spec)
-      (let [id    (delay (get user-spec :id))
-            uid   (delay (get user-spec :uid))
-            email (delay (get user-spec :email))
-            phone (delay (get user-spec :phone))]
-        (cond
-          (and @id    (pos-int?        @id))   (some-id     db @id)
-          (and @uid   (uuid/uuidable? @uid))   (uid-to-id   db @uid)
-          (and @email (emailable?     @email)) (email-to-id db @email)
-          (and @phone (phoneable?     @phone)) (phone-to-id db @phone)))
-      (cond
-        (number?        user-spec) (some-id     db user-spec)
-        (uuid/uuidable? user-spec) (uid-to-id   db user-spec)
-        (emailable?     user-spec) (email-to-id db user-spec)
-        (phoneable?     user-spec) (phone-to-id db user-spec)))))
+      (some #(id db % user-spec) pid/valid-types)
+      (id db user-spec))))
+
+;; ID getting queries for common identities
+
+(defmethod get-id-query  :email [_] "SELECT id FROM users WHERE email = ?")
+(defmethod get-id-query  :phone [_] "SELECT id FROM users WHERE phone = ?")
+(defmethod get-id-query  :uid   [_] "SELECT id FROM users WHERE uid   = ?")
+(defmethod get-id-query  :id    [_] "SELECT id FROM users WHERE id    = ?")
+
+(defmethod get-ids-query :email [_] "SELECT email, id FROM users WHERE email IN")
+(defmethod get-ids-query :phone [_] "SELECT phone, id FROM users WHERE phone IN")
+(defmethod get-ids-query :uid   [_] "SELECT uid,   id FROM users WHERE uid   IN")
+(defmethod get-ids-query :id    [_] "SELECT id,    id FROM users WHERE id    IN")

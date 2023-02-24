@@ -19,6 +19,7 @@
             [amelinium.web                      :as             web]
             [amelinium.auth                     :as            auth]
             [amelinium.http                     :as            http]
+            [amelinium.identity                 :as        identity]
             [amelinium.http.middleware.session  :as         session]
             [amelinium.http.middleware.language :as        language]
             [amelinium.model.user               :as            user]
@@ -26,7 +27,8 @@
             [amelinium.http.client.twilio       :as          twilio]
             [io.randomseed.utils.map            :as             map]
             [io.randomseed.utils.map            :refer     [qassoc]]
-            [io.randomseed.utils                :refer         :all])
+            [io.randomseed.utils                :refer         :all]
+            [puget.printer :refer [cprint]])
 
   (:import [amelinium Session AuthSettings AuthConfig AuthConfirmation]
            [amelinium UserData Suites SuitesJSON]))
@@ -40,8 +42,24 @@
 
 (defn verify!
   "Performs the identity verification by sending an e-mail or SMS with a URL to
-  complete confirmation."
-  [req {:keys [no-data result reason db id id-type lang translator route-data]
+  complete confirmation. Takes a request map `req` and configuration options as a
+  map with the following keys:
+
+  `:db`              - database connection handler or a data source object,
+  `:id`              - identity used for verification (e-mail address or a phone number),
+  `:id-type`         - identity type (`:email` or `:phone`),
+  `:lang`            - language (defaults to a result of `common/pick-language`),
+  `:reason`          – verification reason (`:creation`, `:recovery`, `:change`, `:unlock`),
+  `:no-data`         - status to be set when there is no result from a database (default: `:verify/bad-result`),
+  `:result`          - a result of calling confirmation function from a model,
+  `:translator`      - translation function (defaults to a result of `amelinium.common/translator`),
+  `:route-data`      - route data (defaults to a result of calling `amelinium.http/get-route-data`),
+  `:confirm-once?`   - if truthy (default) then existing confirmation will cause error response,
+  `:async/responder` - asynchronous response handler for Twilio client (default: `amelinium.common.controller/verify-request-id-update`),
+  `:async/raiser`    - asynchronous error handler for Twilio client (default: `amelinium.common.controller/verify-process-error`)."
+  [req {:keys [no-data result reason db id id-type confirm-once?
+               lang translator route-data]
+        :or   {confirm-once? true}
         :as   opts}]
   (let [lang              (or lang       (common/pick-language req :registration) (common/lang-id req))
         tr                (or translator (i18n/no-default (common/translator req lang)))
@@ -49,8 +67,8 @@
                 errors
                 attempts
                 expires]} result
-        id-str            (db/identity->str id)
-        id-type           (or id-type (get result :id-type) :email)
+        id-type           (common/guess-identity-type result id id-type)
+        id-str            (identity/->str id id-type)
         errors?           (some? (seq errors))
         attempts?         (and (not errors?) (int? attempts))
         attempts-left     (if attempts? (if (neg? attempts) 0 attempts))
@@ -61,7 +79,8 @@
         in-mins           (delay (tr :in-mins @retry-in))
         retry-in-mins     (delay (tr :try-in-mins @retry-in))
         mins-left         (delay (tr :mins-left @retry-in))
-        attempts-left-w   (delay (tr :attempts-left attempts-left))]
+        attempts-left-w   (delay (tr :attempts-left attempts-left))
+        confirmed?        (and confirmed? (boolean confirm-once?))]
     (cond
       bad-result?   (web/render-error  req (or no-data :verify/bad-result))
       errors?       (web/render-error  req errors)
@@ -79,28 +98,29 @@
                         (web/add-status :verify/max-attempts))
       :send!        (let [{:keys [token code
                                   exists?]} result
-                          lang-str          (some-str lang)
-                          remote-ip         (get req :remote-ip/str)
-                          rdata             (or route-data (http/get-route-data req))
-                          existing-uid      (if exists? (some-str (get result :existing-user/uid)))
-                          existing-user-id  (if exists? (get result :existing-user/id))
-                          lang-qs           (common/query-string-encode req {"lang" lang-str})
-                          url-type          (common/id-type->url-type id-type reason)
-                          verify-link       (str (get rdata url-type) token "/?" lang-qs)
-                          recovery-link     (if existing-uid (str (get rdata :url/recover) existing-uid "/?" lang-qs))
-                          req-updater       (get opts :async/responder super/verify-request-id-update)
-                          exc-handler       (get opts :async/raiser super/verify-process-error)
-                          req-updater       #(req-updater db id-type id code token %)
-                          exc-handler       #(exc-handler db id-type id code token %)
-                          email?            (= :email id-type)
-                          phone?            (and (not email?) (= :phone id-type))
-                          user-login        (if email? id-str (if existing-user-id (delay (user/id-to-email db existing-user-id))))
-                          template-params   (delay {:serviceName      (tr :verify/app-name)
-                                                    :expiresInMinutes @in-mins
-                                                    :remoteAddress    remote-ip
-                                                    :verifyCode       (str code)
-                                                    :verifyLink       verify-link
-                                                    :recoveryLink     recovery-link})]
+
+                          lang-str         (some-str lang)
+                          remote-ip        (get req :remote-ip/str)
+                          rdata            (or route-data (http/get-route-data req))
+                          existing-uid     (if exists? (some-str (get result :existing-user/uid)))
+                          existing-user-id (if exists? (get result :existing-user/id))
+                          lang-qs          (common/query-string-encode req {"lang" lang-str})
+                          url-type         (common/id-type->url-type id-type reason)
+                          verify-link      (str (get rdata url-type) token "/?" lang-qs)
+                          recovery-link    (if existing-uid (str (get rdata :url/recover) existing-uid "/?" lang-qs))
+                          req-updater      (get opts :async/responder super/verify-request-id-update)
+                          exc-handler      (get opts :async/raiser super/verify-process-error)
+                          req-updater      #(req-updater db id-type id code token %)
+                          exc-handler      #(exc-handler db id-type id code token %)
+                          email?           (= :email id-type)
+                          phone?           (and (not email?) (= :phone id-type))
+                          user-login       (if email? id-str (if existing-user-id (delay (user/prop-of :id db :email existing-user-id))))
+                          template-params  (delay {:serviceName      (tr :verify/app-name)
+                                                   :expiresInMinutes @in-mins
+                                                   :remoteAddress    remote-ip
+                                                   :verifyCode       (str code)
+                                                   :verifyLink       verify-link
+                                                   :recoveryLink     recovery-link})]
                       (case id-type
                         :email (if-some [template (get opts (if exists?
                                                               :tpl/email-exists
@@ -286,10 +306,10 @@
          all-params   (get req :parameters)
          path-params  (get all-params  :path)
          form-params  (get all-params  :form)
-         token        (get path-params :token)
-         id-type      (or (some-keyword (get path-params :id-type)) :email)
-         id           (get form-params id-type)
          code         (get form-params :code)
+         token        (get path-params :token)
+         id-type      (some-keyword (get path-params :id-type))
+         [id id-type] (common/identity-and-type (get form-params id-type) id-type)
          confirmation (confirmation/establish db id code token one-minute "change")
          confirmed?   (get confirmation :confirmed?)
          updated      (if confirmed? (user/update-identity-with-token-or-code id-type db id token code))
@@ -316,10 +336,10 @@
                                               :identity/email?    (= id-type :email)
                                               :identity/phone?    (= id-type :phone)
                                               :identity/type      id-type
-                                              :user/identity      (db/identity->str id)
+                                              :user/identity      (identity/->str id id-type)
                                               :user/login         login
-                                              :user/email         (db/identity->str login)
-                                              :user/phone         (db/identity->str phone)
+                                              :user/email         (identity/->str login :email)
+                                              :user/phone         (identity/->str phone :phone)
                                               :agent/mobile?      mobile-agent?}))
        (not confirmed?) (web/render-error req (:errors confirmation))
        (not updated?)   (web/render-error req (:errors updated))
@@ -357,7 +377,7 @@
           (web/form-params-error! req {:repeated-password :repeated-password})
           (super/set-password!
            req
-           (or (get req :user/id) (user/email-to-id (auth/db req) user-email))
+           (or (get req :user/id) (user/prop-of :email (auth/db req) :id user-email))
            new-password))
         req))))
 
@@ -365,52 +385,59 @@
   "Displays password recovery form and initiates password recovery by sending an e-mail
   or SMS message with a verification code or token."
   [req]
-  (let [params (get req :parameters)]
-    (if-some [id-type (some-keyword (get (get params :path) :id-type))]
-      (let [phone? (or (= :phone id-type) (= :user/phone id-type))
-            email? (not phone?)
-            req    (web/assoc-app-data req :identity/type id-type :phone? phone? :email? email?)]
-        (if-some [id (get (get params :form) id-type)]
+  (let [params  (get req :parameters)
+        id-type (common/acceptable-identity-type (get (get params :path) :id-type))
+        email?  (or (= :email id-type) (= :user/email id-type))
+        phone?  (and id-type (not email?))
+        req     (web/assoc-app-data req :identity/type id-type :phone? phone? :email? email?)]
+    (if-some [[id id-type] (common/identity-and-type (get-in params [:form id-type]) id-type)]
 
-          ;; initiate recovery
-          ;; by generating a verification code and token
-          ;; associated with the given identity
-          ;; and sending e-mail or SMS message
+      ;; initiate recovery
+      ;; by generating a verification code and token
+      ;; associated with the given identity
+      ;; and sending e-mail or SMS message
 
-          (let [auth-settings               (auth/settings req)
-                auth-db                     (auth/db auth-settings)
-                [props id-type]             (if phone?
-                                              [(user/props-by-phone auth-db id) :phone]
-                                              [(user/props-by-email auth-db id) :email])
-                user-id                     (get props :id)
-                ^AuthConfig auth-config     (auth/config auth-settings (get props :account-type))
-                ^AuthConfig auth-config     (or auth-config (auth/config auth-settings))
-                ^AuthConfirmation auth-cfrm (if auth-config (.confirmation auth-config))
-                auth-db                     (if auth-config (.db auth-config) auth-db)
-                attempts                    (if auth-cfrm   (.max-attempts auth-cfrm))
-                exp                         (if auth-cfrm   (.expires      auth-cfrm))
-                result                      (confirmation/create-for-recovery auth-db id user-id exp attempts id-type)
-                req                         (verify! req {:id               id
-                                                          :db               auth-db
-                                                          :lang             (common/lang-id req)
-                                                          :id-type          id-type
-                                                          :reason           "recovery"
-                                                          :result           result
-                                                          :tpl/phone-exists :verify/sms-recovery
-                                                          :tpl/email-exists :recovery/verify})]
-            (web/response
-             req
-             (qassoc req :app/view :user/password-recover-sent)))
+      (let [user-auth (user/auth-config req id id-type)
+            user-id   (if user-auth (get (get user-auth :user/properties) :id))
+            auth-cfrm (if user-auth (get user-auth :confirmation))
+            auth-db   (if user-auth (get user-auth :db))
+            attempts  (if auth-cfrm (get auth-cfrm :max-attempts))
+            exp       (if auth-cfrm (get auth-cfrm :expires))
+            result    (confirmation/create-for-recovery auth-db id user-id exp attempts id-type)
+            req       (verify! req {:id               id
+                                    :db               auth-db
+                                    :lang             (common/lang-id req)
+                                    :id-type          id-type
+                                    :reason           "recovery"
+                                    :result           result
+                                    :confirm-once?    false
+                                    :tpl/phone-exists :verify/sms-recovery
+                                    :tpl/email-exists :recovery/verify})]
+        (web/response
 
-          ;; display initial password recovery form
+         ;; verify! returned a response with some error
 
-          req))
+         req
+
+         ;; display a form for entering verification code
+
+         (qassoc req :app/view :user/password-recover-sent)))
+
+      ;; display initial password recovery form
+      ;; with known identity type (id-type)
+      ;; or
+      ;; display generic password recovery form
+      ;; with unknown identity type (id-type)
+
       req)))
 
 (defn password-update!
   "Displays password setting form and changes password for a user authenticated with a
   token or code."
   [req]
+  (println (str "password-update!"))
+  (println "form-params:")
+  (cprint (get req :form-params))
   (let [params        (get req :parameters)
         form-params   (get params :form)
         query-params  (get params :query)
@@ -420,8 +447,7 @@
         email         (get form-params :email)
         login         (or (get form-params :username) (get form-params :login) email)
         phone         (if-not email (get form-params :phone))
-        id-type       (if email :email (if phone :phone))
-        id            (or email phone)
+        [id id-type]  (common/identity-and-type (or email phone) (if email :email (if phone :phone)))
         password      (some-str (get form-params :new-password))
         password-2    (some-str (get form-params :repeated-password))
         set-password? (some? (or password password-2))]
@@ -455,12 +481,12 @@
         (if-not (get cfrm :confirmed?)
           (web/render-error req (or (:errors cfrm) :verify/bad-result))
           (let [id         (get cfrm :identity)
-                id-type    (get cfrm :id-type)
                 user-id    (get cfrm :user/id)
-                id-str     (db/identity->str id)
+                id-type    (common/guess-identity-type cfrm id nil)
+                id-str     (identity/->str id id-type)
                 token      (some-str (or token (get cfrm :token)))
-                user-email (db/identity->str (user/id-to-email db user-id))
-                user-phone (delay (db/identity->str (user/id-to-phone db user-id)))
+                user-email (identity/->str (user/prop-of :id db :email user-id))
+                user-phone (delay (identity/->str (user/prop-of :phone db :phone user-id)))
                 phone?     (= id-type :phone)
                 email?     (and (not phone?) (= id-type :email))
                 mobile?    (delay (common/mobile-agent? req))
