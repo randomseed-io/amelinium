@@ -258,12 +258,12 @@
         (sort-by #(nth % 0))
         (map #(nth % 1)))))
 
-(defmethod parser :email    [_] parse-email)
-(defmethod parser :phone    [_] parse-phone)
-(defmethod parser :uid      [_] parse-uid)
-(defmethod parser :id       [_] parse-id)
-(defmethod parser ::any     [_] parse)
-(defmethod parser :default  [_] (constantly nil))
+(defmethod parser :email   [_] parse-email)
+(defmethod parser :phone   [_] parse-phone)
+(defmethod parser :uid     [_] parse-uid)
+(defmethod parser :id      [_] parse-id)
+(defmethod parser ::any    [_] parse)
+(defmethod parser :default [_] (constantly nil))
 
 ;; Creating identities
 
@@ -472,7 +472,7 @@
     (^Keyword [^Identifiable user-identity]
      (p/type user-identity))
     (^Keyword [^Keyword identity-type ^Identifiable user-identity]
-     (if (isa? p/type-hierarchy identity-type ::valid) identity-type )))
+     (if (isa? p/type-hierarchy identity-type ::valid) identity-type)))
   :hierarchy #'p/type-hierarchy)
 
 (defmethod ->db :email
