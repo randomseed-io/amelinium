@@ -372,17 +372,22 @@
                   (qassoc m user-identity id))))
             {} identities)))
 
-(defmulti get-id-query
-  "Returns an ID-getting SQL query for the given identity type."
-  {:arglists '(^String [^Keyword identity-type])}
-  (fn ^Keyword [^Keyword identity-type] (identity/check-type identity-type))
+(defmulti query-id
+  "Performs an ID-getting query for the given identity and identity type."
+  {:arglists '([db ^Keyword identity-type user-identity])}
+  (fn ^Keyword [db ^Keyword identity-type user-identity] (identity/check-type identity-type))
   :hierarchy #'pid/type-hierarchy)
 
-(defmulti get-ids-query
-  "Returns a multiple IDs-getting SQL query for the given identity type."
-  {:arglists '(^String [^Keyword identity-type])}
-  (fn ^Keyword [^Keyword identity-type] (identity/check-type identity-type))
+(defmulti query-ids
+  "Performs a multiple IDs-getting SQL query for the given identity and identity type."
+  {:arglists '([db ^Keyword identity-type user-identities])}
+  (fn ^Keyword [db ^Keyword identity-type user-identities] (identity/check-type identity-type))
   :hierarchy #'pid/type-hierarchy)
+
+(defn query-id-std
+  [db query user-identity]
+  (if-some [dbs (identity/->db user-identity)]
+    (first (jdbc/execute-one! db [query dbs] db/opts-simple-vec))))
 
 (defn get-id
   "Takes a user identity and a database connectable object and returns a numerical user
@@ -391,13 +396,17 @@
   ([db ^Identifiable user-identity]
    (if db
      (if-some [^Identity user-identity (identity/of user-identity)]
-       (let [^Keyword id-type (identity/type user-identity)]
-         (if-some [^String qs (get-id-query id-type)]
-           (if-some [dbs (identity/->db user-identity)]
-             (first (jdbc/execute-one! db [qs dbs] db/opts-simple-vec))))))))
+       (query-id db (identity/type user-identity) user-identity))))
   ([db ^Keyword identity-type ^Identifiable user-identity]
    (if-some [user-identity (identity/of-type identity-type user-identity)]
      (get-id db user-identity))))
+
+(defn query-ids-std
+  [db query user-identities]
+  (let [db-ids (map identity/->db user-identities)]
+    (->> db/opts-simple-vec
+         (sql/query db (cons (str query " " (db/braced-join-? db-ids)) db-ids))
+         next)))
 
 (defn get-ids
   "Takes user identities and a database connectable object and returns a numerical user
@@ -412,12 +421,9 @@
   ([db ^Keyword identity-type user-identities]
    (if db
      (if-some [user-ids (some-identities identity-type user-identities)]
-       (let [db-ids (map identity/->db user-ids)]
-         (if-some [^String qs (some-> (get-ids-query identity-type)
-                                      (str " " (db/braced-join-? db-ids)))]
-           (->> (sql/query db (cons qs db-ids) db/opts-simple-vec) next
-                (map #(vector (identity/of-type identity-type (nth % 0)) (nth % 1)))
-                (into {}))))))))
+       (->> (query-ids db identity-type user-ids)
+            (map #(vector (identity/of-type identity-type (nth % 0)) (nth % 1)))
+            (into {}))))))
 
 (defn- id-core
   ([^Boolean trust? db ^Identifiable user-identity]
@@ -1028,12 +1034,12 @@
 (pid/add-type! :session)
 
 (defmethod identity/parser :session [_] session/of)
-(defmethod get-id-query    :session [_] "SELECT user_id FROM sessions WHERE id = ?")
-(defmethod get-ids-query   :session [_] "SELECT id, user_id FROM sessions WHERE id IN")
+(defmethod query-id        :session [_ _ i] (session/user-id i))
+(defmethod query-ids       :session [_ _ i] (map session/user-id i))
 
 (defmethod identity/->str :session
-  ([user-identity]   (session/id (pid/value user-identity)))
-  ([t user-identity] (session/id (pid/value user-identity t))))
+  ([user-identity]   (session/any-id (pid/value user-identity)))
+  ([t user-identity] (session/any-id (pid/value user-identity t))))
 
 (defmethod identity/->db :session
   ([user-identity]   (session/db-sid (pid/value user-identity)))
@@ -1056,6 +1062,8 @@
      (Identity. :session session))
     (^Identity [session ^Keyword identity-type]
      (if (= :session identity-type) (Identity. :session session)))))
+
+;; Identity as a source of session
 
 (extend-protocol sid/Sessionable
 
@@ -1147,14 +1155,14 @@
       (some #(id db % user-spec) pid/valid-types)
       (id db user-spec))))
 
-;; ID getting queries for common identities
+;; ID database getters for common identities
 
-(defmethod get-id-query  :email [_] "SELECT id FROM users WHERE email = ?")
-(defmethod get-id-query  :phone [_] "SELECT id FROM users WHERE phone = ?")
-(defmethod get-id-query  :uid   [_] "SELECT id FROM users WHERE uid   = ?")
-(defmethod get-id-query  :id    [_] "SELECT id FROM users WHERE id    = ?")
+(defmethod query-id  :email [db _ i] (query-id-std  db "SELECT id FROM users WHERE email = ?" i))
+(defmethod query-id  :phone [db _ i] (query-id-std  db "SELECT id FROM users WHERE phone = ?" i))
+(defmethod query-id  :uid   [db _ i] (query-id-std  db "SELECT id FROM users WHERE uid   = ?" i))
+(defmethod query-id  :id    [db _ i] (query-id-std  db "SELECT id FROM users WHERE id    = ?" i))
 
-(defmethod get-ids-query :email [_] "SELECT email, id FROM users WHERE email IN")
-(defmethod get-ids-query :phone [_] "SELECT phone, id FROM users WHERE phone IN")
-(defmethod get-ids-query :uid   [_] "SELECT uid,   id FROM users WHERE uid   IN")
-(defmethod get-ids-query :id    [_] "SELECT id,    id FROM users WHERE id    IN")
+(defmethod query-ids :email [db _ i] (query-ids-std db "SELECT email, id FROM users WHERE email IN" i))
+(defmethod query-ids :phone [db _ i] (query-ids-std db "SELECT phone, id FROM users WHERE phone IN" i))
+(defmethod query-ids :uid   [db _ i] (query-ids-std db "SELECT uid,   id FROM users WHERE uid   IN" i))
+(defmethod query-ids :id    [db _ i] (query-ids-std db "SELECT id,    id FROM users WHERE id    IN" i))
