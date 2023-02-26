@@ -27,7 +27,7 @@
            mvxcvi/puget                         {:mvn/version "1.3.2"}        ;; pretty printing
            io.randomseed/smangler               {:mvn/version "1.0.4"}        ;; fast string trimming
            io.randomseed/bankster               {:mvn/version "1.2.16"}       ;; currency and money
-           io.randomseed/phone-number           {:mvn/version "8.13.6-2"}     ;; phone number validation
+           io.randomseed/phone-number           {:mvn/version "8.13.6-3"}     ;; phone number validation
            io.randomseed/utils                  {:mvn/version "1.2.27"}       ;; random utilities
            iso-country-codes/iso-country-codes  {:git/url "https://github.com/randomseed-io/iso-country-codes.git"
                                                  :sha     "991336a419c3746979bc5a80e7a2447f081371be"}
