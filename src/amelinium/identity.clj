@@ -513,23 +513,55 @@
 
 ;; DB conversions
 
-(defmulti ->db
+(defmulti to-db
   "For the given user identity `user-identity` tries to express the identity in a
-  database suitable format."
+  database suitable format.
+
+  If the given identity is not a kind of `amelinium.Identity` record it will be
+  converted to it first. If the given value cannot be used as valid identity, `nil`
+  is returned.
+
+  If the `identity-type` is given, it should be a valid identity type. It instructs
+  the function to treat the given identity as of this type. If the identity is an
+  `amelinium.Identity` record but its type is different, `nil` will be returned.
+
+  This is internal multimethod which does not perform conversions or checks. Use
+  `->db` instead.
+
+  Caution: The identity type must be a keyword (it will not be coerced)."
+  {:arglists '([^Identifiable user-identity]
+               [^Keyword identity-type ^Identifiable user-identity])
+   :see-also ["->db"]}
   (fn
-    (^Keyword [^Identifiable user-identity]
-     (p/type user-identity))
-    (^Keyword [^Keyword identity-type ^Identifiable user-identity]
-     (if (isa? p/type-hierarchy identity-type ::valid) identity-type)))
+    (^Keyword [^Identifiable user-identity] (p/type user-identity))
+    (^Keyword [identity-type ^Identifiable user-identity] identity-type))
   :hierarchy #'p/type-hierarchy)
 
-(defmethod ->db :email
+(defn ->db
+  "For the given user identity `user-identity` and optional identity type
+  `identity-type` tries to express the given identity's value in a database suitable
+  format.
+
+  If the given identity is not a kind of `amelinium.Identity` record it will be
+  converted to it first. If the given value cannot be used as valid identity, `nil`
+  is returned.
+
+  If the `identity-type` is given, it should be a valid identity type. It instructs
+  the function to treat the given identity as of this type. If the identity is an
+  `amelinium.Identity` record but its type is different, `nil` will be returned."
+  {:see-also ["->str" "of"]}
+  (^Keyword [^Identifiable user-identity]
+   (to-db user-identity))
+  (^Keyword [identity-type ^Identifiable user-identity]
+   (to-db (some-keyword identity-type) user-identity)))
+
+(defmethod to-db :email
   (^String [^Identifiable user-identity]
    (p/value user-identity))
   (^String [^Keyword identity-type ^Identifiable user-identity]
    (p/value user-identity identity-type)))
 
-(defmethod ->db :phone
+(defmethod to-db :phone
   (^Phonenumber$PhoneNumber [^Identifiable user-identity]
    (phone/format (p/value user-identity) nil
                  :phone-number.format/e164))
@@ -537,19 +569,19 @@
    (phone/format (p/value user-identity identity-type) nil
                  :phone-number.format/e164)))
 
-(defmethod ->db :uid
+(defmethod to-db :uid
   (^UUID [^Identifiable user-identity]
    (p/value user-identity))
   (^UUID [^Keyword identity-type ^Identifiable user-identity]
    (p/value user-identity identity-type)))
 
-(defmethod ->db :id
+(defmethod to-db :id
   (^Long [^Identifiable user-identity]
    (p/value user-identity))
   (^Long [^Keyword identity-type ^Identifiable user-identity]
    (p/value user-identity identity-type)))
 
-(defmethod ->db :default
+(defmethod to-db :default
   ([^Identifiable user-identity]                        nil)
   ([^Keyword identity-type ^Identifiable user-identity] nil))
 
