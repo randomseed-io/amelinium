@@ -587,42 +587,70 @@
 
 ;; String conversions
 
-(defmulti ->str
+(defmulti to-str
   "Takes a user identity `user-identity` and converts it to a string.
 
   If the given identity is not a kind of `amelinium.Identity` record it will be
   converted to it first. If the given value cannot be used as valid identity, `nil`
   is returned.
 
-  If the `identity-type` is given, it should be a valid identity type expressed with
-  a keyword. It instructs the function to treat the given identity as of this
-  type. If the identity is an `amelinium.Identity` record and its type is different,
-  `nil` will be returned."
+  If the `identity-type` is given, it should be a valid identity type. It instructs
+  the function to treat the given identity as of this type. If the identity is an
+  `amelinium.Identity` record but its type is different, `nil` will be returned.
+
+  This is internal multimethod which does not perform conversions or checks. Use
+  `->str` instead.
+
+  Caution: The identity type must be a keyword (it will not be coerced)."
+  {:arglists '(^String [^Identifiable user-identity]
+               ^String [^Keyword identity-type ^Identifiable user-identity])
+   :see-also ["->str"]}
   (fn
     (^Keyword [^Identifiable user-identity] (p/type user-identity))
-    (^Keyword [^Keyword identity-type ^Identifiable user-identity]
-     (if (isa? p/type-hierarchy identity-type ::valid) identity-type)))
+    (^Keyword [^Keyword identity-type ^Identifiable user-identity] identity-type))
   :hierarchy #'p/type-hierarchy)
 
-(defmethod ->str :email
+(defn ->str
+  "Takes a user identity `user-identity` and optional identity type `identity-type`,
+  and converts it to a string.
+
+  If the given identity is not a kind of `amelinium.Identity` record it will be
+  converted to it first. If the given value cannot be used as valid identity, `nil`
+  is returned.
+
+  If the `identity-type` is given, it should be a valid identity type. It instructs
+  the function to treat the given identity as of this type. If the identity is an
+  `amelinium.Identity` record but its type is different, `nil` will be returned.
+
+  This is internal multimethod which does not perform conversions or checks. Use
+  `->str` instead.
+
+  Caution: The identity type must be a keyword (it will not be coerced)."
+  {:see-also ["->db" "of"]}
+  (^String [^Identifiable user-identity]
+   (to-str user-identity))
+  (^String [identity-type ^Identifiable user-identity]
+   (to-str (some-keyword identity-type) user-identity)))
+
+(defmethod to-str :email
   (^String [^Identifiable user-identity]
    (some-str (p/value user-identity)))
   (^String [^Keyword identity-type ^Identifiable user-identity]
-   (some-str (p/value identity-type user-identity))))
+   (some-str (p/value user-identity identity-type))))
 
-(defmethod ->str :uid
+(defmethod to-str :uid
   (^String [^Identifiable user-identity]
    (some-str (p/value user-identity)))
   (^String [^Keyword identity-type ^Identifiable user-identity]
-   (some-str (p/value identity-type user-identity))))
+   (some-str (p/value user-identity identity-type))))
 
-(defmethod ->str :id
+(defmethod to-str :id
   (^String [^Identifiable user-identity]
    (some-str (p/value user-identity)))
   (^String [^Keyword identity-type ^Identifiable user-identity]
-   (some-str (p/value identity-type user-identity))))
+   (some-str (p/value user-identity identity-type))))
 
-(defmethod ->str :phone
+(defmethod to-str :phone
   (^String [^Identifiable user-identity]
    (phone/format (p/value user-identity) nil
                  :phone-number.format/e164))
@@ -630,6 +658,6 @@
    (phone/format (p/value user-identity identity-type) nil
                  :phone-number.format/e164)))
 
-(defmethod ->str :default
+(defmethod to-str :default
   ([^Identifiable user-identity]                        nil)
   ([^Keyword identity-type ^Identifiable user-identity] nil))
