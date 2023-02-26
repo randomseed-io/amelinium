@@ -316,20 +316,22 @@
   [req user-id password]
   (qassoc
    req :response/status
-   (let [auth-settings (auth/settings req)]
-     (if-some [ac-type (user/prop (auth/db auth-settings) :account-type :id user-id)]
-       (let [auth-config (auth/config auth-settings ac-type)
-             pwd-data    (user/make-user-password auth-config password)]
-         (if-some [pwd-suite-id (get pwd-data :suite-id)]
-           (if-some [result (user/update-password (auth/db auth-config)
-                                                  user-id
-                                                  pwd-suite-id
-                                                  (get pwd-data :intrinsic))]
-             (if (pos-int? result)
-               :pwd/created
-               :pwd/bad-user)
-             :pwd/db-error)
-           :pwd/bad-password))
+   (let [auth-settings (auth/settings req)
+         auth-db       (auth/db auth-settings)]
+     (if-some [ac-type (user/prop-of :id auth-db :account-type user-id)]
+       (if-some [auth-config (auth/config auth-settings ac-type)]
+         (let [pwd-data (user/make-user-password auth-config password)]
+           (if-some [pwd-suite-id (get pwd-data :suite-id)]
+             (if-some [result (user/update-password (auth/db auth-config)
+                                                    user-id
+                                                    pwd-suite-id
+                                                    (get pwd-data :intrinsic))]
+               (if (pos-int? result)
+                 :pwd/created
+                 :pwd/bad-user)
+               :pwd/db-error)
+             :pwd/bad-password))
+         :pwd/bad-user)
        :pwd/bad-user))))
 
 ;; Coercion error handler
