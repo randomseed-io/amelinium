@@ -68,7 +68,7 @@
                 attempts
                 expires]} result
         id-type           (common/guess-identity-type result id id-type)
-        id-str            (identity/->str id id-type)
+        id-str            (identity/->str id-type id)
         errors?           (some? (seq errors))
         attempts?         (and (not errors?) (int? attempts))
         attempts-left     (if attempts? (if (neg? attempts) 0 attempts))
@@ -336,10 +336,10 @@
                                               :identity/email?    (identical? id-type :email)
                                               :identity/phone?    (identical? id-type :phone)
                                               :identity/type      id-type
-                                              :user/identity      (identity/->str id id-type)
+                                              :user/identity      (identity/->str id-type id)
                                               :user/login         login
-                                              :user/email         (identity/->str login :email)
-                                              :user/phone         (identity/->str phone :phone)
+                                              :user/email         (identity/->str :email login)
+                                              :user/phone         (identity/->str :phone phone)
                                               :agent/mobile?      mobile-agent?}))
        (not confirmed?) (web/render-error req (:errors confirmation))
        (not updated?)   (web/render-error req (:errors updated))
@@ -483,7 +483,7 @@
           (let [id         (get cfrm :identity)
                 user-id    (get cfrm :user/id)
                 id-type    (common/guess-identity-type cfrm id nil)
-                id-str     (identity/->str id id-type)
+                id-str     (identity/->str id-type id)
                 token      (some-str (or token (get cfrm :token)))
                 user-email (some-str (user/prop-of :id db :email user-id))
                 user-phone (delay (identity/->str (user/prop-of :phone db :phone user-id)))
