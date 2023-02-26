@@ -121,7 +121,7 @@
         vls (get dat :value)
         err (if (coll? err) err (if (some? err) (cons err nil)))
         src (if (coll? src) src (if (some? src) (cons src nil)))
-        src (if (= (first src) :request) (rest src) src)
+        src (if (identical? (first src) :request) (rest src) src)
         src (or (first src) :unknown)]
     (if err
       (->> err

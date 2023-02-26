@@ -328,7 +328,7 @@
 
 (defn- handle-val
   [config v kpath]
-  (if (and (sequential? v) (= (first v) :pluralize))
+  (if (and (sequential? v) (identical? :pluralize (first v)))
     (prep-pluralizer config (first kpath) (rest v))
     (var/deref-symbol v)))
 

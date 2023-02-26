@@ -112,8 +112,8 @@
                           exc-handler      (get opts :async/raiser super/verify-process-error)
                           req-updater      #(req-updater db id-type id code token %)
                           exc-handler      #(exc-handler db id-type id code token %)
-                          email?           (= :email id-type)
-                          phone?           (and (not email?) (= :phone id-type))
+                          email?           (identical? :email id-type)
+                          phone?           (and (not email?) (identical? :phone id-type))
                           user-login       (if email? id-str (if existing-user-id (delay (user/prop-of :id db :email existing-user-id))))
                           template-params  (delay {:serviceName      (tr :verify/app-name)
                                                    :expiresInMinutes @in-mins
@@ -333,8 +333,8 @@
                                               :app.url/login      destination
                                               :confirmation/token token
                                               :confirmation/code  code
-                                              :identity/email?    (= id-type :email)
-                                              :identity/phone?    (= id-type :phone)
+                                              :identity/email?    (identical? id-type :email)
+                                              :identity/phone?    (identical? id-type :phone)
                                               :identity/type      id-type
                                               :user/identity      (identity/->str id id-type)
                                               :user/login         login
@@ -372,7 +372,7 @@
         req          (auth-with-password! req user-email old-password nil route-data nil true nil)]
     (if (web/response? req)
       req
-      (if (= :auth/ok (get req :response/status))
+      (if (identical? :auth/ok (get req :response/status))
         (if-not (= new-password new-repeated)
           (web/form-params-error! req {:repeated-password :repeated-password})
           (super/set-password!
@@ -387,7 +387,7 @@
   [req]
   (let [params  (get req :parameters)
         id-type (common/acceptable-identity-type (get (get params :path) :id-type))
-        email?  (or (= :email id-type) (= :user/email id-type))
+        email?  (or (identical? :email id-type) (identical? :user/email id-type))
         phone?  (and id-type (not email?))
         req     (web/assoc-app-data req :identity/type id-type :phone? phone? :email? email?)]
     (if-some [[id id-type] (common/identity-and-type (get-in params [:form id-type]) id-type)]
@@ -487,8 +487,8 @@
                 token      (some-str (or token (get cfrm :token)))
                 user-email (identity/->str (user/prop-of :id db :email user-id))
                 user-phone (delay (identity/->str (user/prop-of :phone db :phone user-id)))
-                phone?     (= id-type :phone)
-                email?     (and (not phone?) (= id-type :email))
+                phone?     (identical? id-type :phone)
+                email?     (and (not phone?) (identical? id-type :email))
                 mobile?    (delay (common/mobile-agent? req))
                 app-url    (delay (if @mobile? (http/get-route-data req :app.url/recover)))
                 app-link   (delay (if @app-url (str app-url "?"

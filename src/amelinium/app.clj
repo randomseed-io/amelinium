@@ -159,14 +159,14 @@
 (defonce exception         nil)  ;; unhandled exception
 (defonce phase        :stopped)  ;; phase flag
 
-(defn starting?    [] (locking lock (= :starting   phase)))
-(defn failed?      [] (locking lock (= :failed     phase)))
-(defn running?     [] (locking lock (= :running    phase)))
-(defn stopping?    [] (locking lock (= :stopping   phase)))
-(defn stopped?     [] (locking lock (= :stopped    phase)))
-(defn suspended?   [] (locking lock (= :suspended  phase)))
-(defn resuming?    [] (locking lock (= :resuming   phase)))
-(defn suspending?  [] (locking lock (= :suspending phase)))
+(defn starting?    [] (locking lock (identical? :starting   phase)))
+(defn failed?      [] (locking lock (identical? :failed     phase)))
+(defn running?     [] (locking lock (identical? :running    phase)))
+(defn stopping?    [] (locking lock (identical? :stopping   phase)))
+(defn stopped?     [] (locking lock (identical? :stopped    phase)))
+(defn suspended?   [] (locking lock (identical? :suspended  phase)))
+(defn resuming?    [] (locking lock (identical? :resuming   phase)))
+(defn suspending?  [] (locking lock (identical? :suspending phase)))
 (defn configured?  [] (locking lock (some? post-config)))
 
 ;;

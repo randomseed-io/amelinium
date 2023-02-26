@@ -118,7 +118,7 @@
   `amelinium.proto.identity/add-acceptable-type`."
   ([t]
    (isa? p/type-hierarchy (some-keyword t) ::valid))
-  ([t acceptable-tag]
+  ([t ^Keyword acceptable-tag]
    (and acceptable-tag (isa? p/type-hierarchy (some-keyword t) acceptable-tag))))
 
 (defn check-type
@@ -151,7 +151,7 @@
   (^Keyword [^Keyword identity-type user-identity]
    (if user-identity
      (if-some [t (some-keyword identity-type)]
-       (if (= t (p/type user-identity)) t)))))
+       (if (identical? t (p/type user-identity)) t)))))
 
 (defn acceptable-type
   "Returns a keyword describing identity type detected by analyzing the given user
@@ -218,9 +218,10 @@
 (defmulti parser
   "Takes an identity type expressed as keyword and returns a parser suitable for that
   identity type. The parser function takes 1 argument and converts the given value to
-  identity record (of type `amelinium.Identity`)."
-  (fn [^clojure.lang.Keyword identity-type]
-    (if (isa? p/type-hierarchy identity-type ::valid) identity-type))
+  identity record (of type `amelinium.Identity`).
+
+  Caution: The identity type must be a keyword (it will not be coerced)."
+  (fn ^Keyword [identity-type] identity-type)
   :hierarchy #'p/type-hierarchy)
 
 (defn- parse-single
@@ -313,19 +314,19 @@
 
   Identity
 
-  (type  ^Keyword [v]
+  (type ^Keyword [v]
     (.id-type ^Identity v))
 
   (value
     ([v] (.value ^Identity v))
     ([v ^Keyword identity-type]
-     (if (= identity-type (.id-type ^Identity v))
+     (if (identical? identity-type (.id-type ^Identity v))
        (.value ^Identity v))))
 
   (make
     (^Identity [v] v)
     (^Identity [v ^Keyword identity-type]
-     (if (= identity-type (.id-type ^Identity v)) v)))
+     (if (identical? identity-type (.id-type ^Identity v)) v)))
 
   String
 
@@ -385,7 +386,7 @@
     (^Long [v]
      (if (pos-int? v) (long v)))
     (^Long [v ^Keyword identity-type]
-     (if (and (pos-int? v) (= :id identity-type))
+     (if (and (pos-int? v) (identical? :id identity-type))
        (long v))))
 
   (make
@@ -394,7 +395,7 @@
        (Identity. :id (long v))))
     (^Identity [v ^Keyword identity-type]
      (if (and (pos-int? v)
-              (= :id identity-type))
+              (identical? :id identity-type))
        (Identity. :id (long v)))))
 
   Phonenumber$PhoneNumber
@@ -404,12 +405,12 @@
   (value
     (^Phonenumber$PhoneNumber [v] v)
     (^Phonenumber$PhoneNumber [v ^Keyword identity-type]
-     (if (= :phone identity-type) v)))
+     (if (identical? :phone identity-type) v)))
 
   (make
     (^Identity [v] (Identity. :phone v))
     (^Identity [v ^Keyword identity-type]
-     (if (= :phone identity-type)
+     (if (identical? :phone identity-type)
        (Identity. :phone v))))
 
   UUID
@@ -419,12 +420,12 @@
   (value
     (^UUID [v] v)
     (^UUID [v ^Keyword identity-type]
-     (if (= :uid identity-type) v)))
+     (if (identical? :uid identity-type) v)))
 
   (make
     (^Identity [v] (Identity. :uid v))
     (^Identity [v ^Keyword identity-type]
-     (if (= :uid identity-type)
+     (if (identical? :uid identity-type)
        (Identity. :uid v))))
 
   Character

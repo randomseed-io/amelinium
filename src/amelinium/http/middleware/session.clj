@@ -1301,8 +1301,8 @@
            ^Keyword id     (.id e)
            id?             (some? id)
            expired?        (and id?
-                                (or (= :session/expired id)
-                                    (and (= :session/bad-ip id)
+                                (or (identical? :session/expired id)
+                                    (and (identical? :session/bad-ip id)
                                          (if-some [^SessionConfig cfg (p/config smap)]
                                            (.bad-ip-expires? cfg)))))
            h-expired?      (and expired? (p/hard-expired? smap))
@@ -1314,7 +1314,7 @@
                                (if id?
                                  (if cause?
                                    er
-                                   (if (= id :session/unknown-error)
+                                   (if (identical? id :session/unknown-error)
                                      (map/qassoc er :cause "Unknown session error")
                                      er))
                                  (if cause?
@@ -1489,7 +1489,7 @@
   "Returns `true` if the value `v` obtained from a session variable indicates that it
   actually could not be successfully fetched from a database."
   [v]
-  (= ::db/get-failed v))
+  (identical? ::db/get-failed v))
 
 ;; Cache invalidation.
 

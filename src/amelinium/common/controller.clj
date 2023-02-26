@@ -166,7 +166,7 @@
   ([req route-data id-type id user-id]
    (invalidate-user-sessions! req route-data id-type id user-id nil))
   ([req route-data id-type id user-id session-key]
-   (if (or (= :email id-type) (= :user/email id-type))
+   (if (or (identical? :email id-type) (identical? :user/email id-type))
      (let [route-data  (or route-data (http/get-route-data req))
            session-key (or session-key (get route-data :session-key))]
        (session/delete-all! req session-key user-id)))))

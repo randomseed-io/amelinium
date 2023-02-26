@@ -115,7 +115,7 @@
   ([req page-id-or-path]
    (if (ident? page-id-or-path)
      (let [rn (http/route-name req)]
-       (and (some? rn) (= page-id-or-path rn)))
+       (and (some? rn) (identical? page-id-or-path rn)))
      (let [pn (http/path req)]
        (and (some? pn) (= page-id-or-path pn)))))
   ([req page-id-or-path & more]
@@ -437,7 +437,7 @@
 
                 ;; parameter is not required and path is not parameterized with it
 
-                (if (= :brute-force name-path-fallback?)
+                (if (identical? :brute-force name-path-fallback?)
 
                   ;; brute-force parameter injection was requested
 

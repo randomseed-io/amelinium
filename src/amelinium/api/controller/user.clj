@@ -360,7 +360,7 @@
             (let [user-id      (session/user-id smap)
                   props        (user/props-by-id auth-db user-id)
                   [id-type id] (first to-change)
-                  id-type      (if (= id-type :user/email) :email (if (= id-type :user/phone) :phone id-type))
+                  id-type      (if (identical? id-type :user/email) :email (if (identical? id-type :user/phone) :phone id-type))
                   to-change?   (some? id)
                   body         (common/pick-params props :user [:uid :email :phone])
                   req          (api/add-body req body)]
@@ -480,12 +480,12 @@
           session      (session/valid-of req session-key)
           user-email   (session/user-email session)
           req          (super/auth-user-with-password! req user-email old-password nil route-data true nil)]
-      (if (= :auth/ok (get req :response/status))
+      (if (identical? :auth/ok (get req :response/status))
         (let [user-id (or (get req :user/id)
                           (session/user-email session)
                           (user/id-of :email (auth/db req) user-email))
               req     (super/set-password! req user-id new-password)]
-          (if (and session-invalidator (= :pwd/created (get req :response/status)))
+          (if (and session-invalidator (identical? :pwd/created (get req :response/status)))
             (session-invalidator req nil :user/email user-email user-id))
           req)
         req)))))
@@ -504,7 +504,7 @@
           token        (get form-params :token)
           code         (get form-params :code)
           [id-type id] (first to-change)
-          id-type      (if (= id-type :user/email) :email (if (= id-type :user/phone) :phone id-type))]
+          id-type      (if (identical? id-type :user/email) :email (if (identical? id-type :user/phone) :phone id-type))]
       (if (and token code)
         (api/render-error req :parameters/error)
         (let [db           (auth/db req)
@@ -513,7 +513,7 @@
               confirmed?   (boolean (if confirmation (get confirmation :confirmed?)))
               user-id      (if confirmation (get confirmation :user/id))
               req          (if confirmed? (super/set-password! req user-id new-password) req)
-              updated?     (if confirmed? (= (get req :response/status) :pwd/created))]
+              updated?     (if confirmed? (identical? (get req :response/status) :pwd/created))]
           (cond
             (nil? confirmation) (api/render-error req :verify/bad-result)
             updated?            (do (if session-invalidator

@@ -921,11 +921,11 @@
   ([req smap translate-sub]
    (let [rstatus (get req :response/status)
          smap    (if (keyword? smap) (session/of req smap) (session/of smap))]
-     (if (or (= rstatus :auth/session-error)
-             (= rstatus :error/session)
+     (if (or (identical? rstatus :auth/session-error)
+             (identical? rstatus :error/session)
              (session/error? smap))
        (add-missing-sub-status req (session-status smap) :session-status :response/body translate-sub)
-       (if (= rstatus :auth/ok)
+       (if (identical? rstatus :auth/ok)
          (-> req
              (add-missing-sub-status :session/created :session-status :response/body translate-sub)
              (body-add-session-id smap))

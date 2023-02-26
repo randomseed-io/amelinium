@@ -20,7 +20,7 @@
   ([n]
    (str n))
   ([n any]
-   (if (= :parse-args n)
+   (if (identical? :parse-args n)
      (let [zero   (or (:zero any) (:z any) (:none any) (get any 0))
            one    (or (:one  any) (:o any) (:singular any) (:single any) (get any 1))
            plural (or (:many any) (:plural any) (:p any) (:more any) (:multiple any))
@@ -50,7 +50,7 @@
   ([n]
    (str n))
   ([n any]
-   (if (= :parse-args n)
+   (if (identical? :parse-args n)
      (let [zero       (or (:zero any) (:z any) (:none any) (get any 0))
            one        (or (:one  any) (:singular any ) (:single any) (:o any) (get any 1))
            genitive   (or (:genitive any) (:g any))
