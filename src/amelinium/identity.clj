@@ -211,7 +211,7 @@
   (^Keyword [^Keyword identity-type user-identity]
    (if user-identity
      (if-some [t (some-keyword identity-type)]
-       (p/value user-identity identity-type)))))
+       (p/value user-identity t)))))
 
 ;; Parsing
 
