@@ -1111,7 +1111,7 @@
   session object. Uses cached user props provided by `amelinium.model.user/prop-of`."
   [settings-src smap]
   (if-some [as (auth/settings settings-src)]
-    (if-some [ac-type (prop-of :session (.db ^AuthSettings as) :session smap)]
+    (if-some [ac-type (prop-of :session (.db ^AuthSettings as) :account-type smap)]
       (get (.types ^AuthSettings as) ac-type))))
 
 (defn auth-config
