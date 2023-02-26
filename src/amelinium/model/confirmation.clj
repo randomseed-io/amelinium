@@ -50,14 +50,14 @@
 (defn phone-exists?
   [db phone]
   (if db
-    (if-some [phone (identity/->db phone)]
+    (if-some [phone (identity/->db :phone phone)]
       (-> (jdbc/execute-one! db [phone-exists-query phone] db/opts-simple-vec)
           first some?))))
 
 (defn email-exists?
   [db email]
   (if db
-    (if-some [email (some-str email)]
+    (if-some [email (identity/->db :email email)]
       (-> (jdbc/execute-one! db [email-exists-query email] db/opts-simple-vec)
           first some?))))
 
@@ -175,8 +175,8 @@
 (defn- parse-id-type
   "Parses identity type, guessing it when necessary. Returns its string
   representation. If the type cannot be established, falls back to \"email\"."
-  [id id-type]
-  (or (some-str (identity/type id id-type)) "email"))
+  ^String [id id-type]
+  (or (some-str (identity/type id-type id)) "email"))
 
 (defn- gen-full-confirmation-core
   "Creates a confirmation code for the given identity (an e-mail address or a
@@ -359,13 +359,13 @@
       (if user-required?
         phone-confirmation-query-without-attempt
         phone-confirmation-query-without-attempt-nouser)
-      (identity/->db id) user-id exp attempts :phone user-required? reason)
+      (identity/->db :phone id) user-id exp attempts :phone user-required? reason)
      (gen-confirmation-core
       db
       (if user-required?
         email-confirmation-query-without-attempt
         email-confirmation-query-without-attempt-nouser)
-      id user-id exp attempts :email user-required? reason))))
+      (identity/->db :email id) user-id exp attempts :email user-required? reason))))
 
 (defn create
   "Creates a confirmation code for an existing user identified by the given user
@@ -389,10 +389,10 @@
    (if (phone? id-type)
      (gen-confirmation-core
       db (if user-required? phone-confirmation-query phone-confirmation-query-nouser)
-      (identity/->db id) user-id exp attempts :phone user-required? reason)
+      (identity/->db :phone id) user-id exp attempts :phone user-required? reason)
      (gen-confirmation-core
       db (if user-required? email-confirmation-query email-confirmation-query-nouser)
-      id user-id exp attempts :email user-required? reason))))
+      (identity/->db :email id) user-id exp attempts :email user-required? reason))))
 
 ;; E-mail/phone change
 
@@ -550,11 +550,8 @@
   ([errs id src-id email-id phone-id]
    (if errs
      (if (contains? errs src-id)
-       (if-some [id (identity/->str id)]
-         (if-some [dst-id (cond (str/index-of id \@ 1) email-id
-                                (= (first id) \+)      phone-id)]
-           (conj (disj errs src-id) dst-id)
-           errs)
+       (if-some [dst-id (identity/type id)]
+         (conj (disj errs src-id) dst-id)
          errs)
        errs)))
   ([errs src-id dst-id]
@@ -627,20 +624,22 @@
              confirmed? (if r (pos-int? (get r :confirmed)))
              user-id    (if r (get r :requester-id))]
          (if confirmed?
-           (qassoc r :confirmed? true
-                   :id-type     (some-keyword (get r :id-type))
-                   :user/id     user-id)
-           (let [errs (report-errors db id code reason false)
-                 errs (specific-id errs id :verify/bad-id :verify/bad-email :verify/bad-phone)]
+           (-> (dissoc r :confirmed :requester-id)
+               (qassoc :confirmed? true
+                       :id-type     (some-keyword (get r :id-type))
+                       :user/id     user-id))
+           (let [errs    (report-errors db id code reason false)
+                 errs    (specific-id errs id :verify/bad-id :verify/bad-email :verify/bad-phone)
+                 id-type (get r :id-type)]
              (if r
                {:confirmed? false
                 :id-type    (some-keyword (get r :id-type))
-                :identity   (identity/of-type (get r :id-type) id)
+                :identity   (or (identity/of-type id-type id) (identity/of id) id)
                 :user/id    user-id
                 :code       code
                 :errors     errs}
                {:confirmed? false
-                :identity   id
+                :identity   (or (identity/of-type id-type id) (identity/of id) id)
                 :user/id    nil
                 :code       code
                 :errors     errs})))))))
@@ -657,15 +656,17 @@
              confirmed? (if r (pos-int? (get r :confirmed)))
              user-id    (if r (get r :requester-id))]
          (if confirmed?
-           (qassoc r
-                   :confirmed? true
-                   :id-type   (some-keyword (get r :id-type))
-                   :user/id   user-id)
-           (let [errs (report-errors db token reason false)]
+           (-> (dissoc r :confirmed :requester-id)
+               (qassoc :confirmed? true
+                       :id-type   (some-keyword (get r :id-type))
+                       :user/id   user-id))
+           (let [errs    (report-errors db token reason false)
+                 id      (get r :identity)
+                 id-type (some-keyword (get r :id-type))]
              (if r
                {:confirmed? false
-                :identity   (get r :identity)
-                :id-type    (some-keyword (get r :id-type))
+                :identity   (or (identity/of-type id-type id) (identity/of id) id)
+                :id-type    id-type
                 :user/id    user-id
                 :token      token
                 :errors     errs}

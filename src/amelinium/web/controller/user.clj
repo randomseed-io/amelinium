@@ -485,7 +485,7 @@
                 id-type    (common/guess-identity-type cfrm id nil)
                 id-str     (identity/->str id id-type)
                 token      (some-str (or token (get cfrm :token)))
-                user-email (identity/->str (user/prop-of :id db :email user-id))
+                user-email (some-str (user/prop-of :id db :email user-id))
                 user-phone (delay (identity/->str (user/prop-of :phone db :phone user-id)))
                 phone?     (identical? id-type :phone)
                 email?     (and (not phone?) (identical? id-type :email))
