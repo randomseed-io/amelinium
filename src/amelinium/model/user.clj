@@ -367,24 +367,26 @@
   (if (seq identities)
     (reduce (fn [m ^Identity user-identity]
               (let [id (cwr/lookup cache user-identity ::db/not-found)]
-                (if (= ::db/not-found id)
+                (if (identical? ::db/not-found id)
                   (qassoc m ::db/not-found (conj (get m ::db/not-found) user-identity))
                   (qassoc m user-identity id))))
             {} identities)))
 
 (defmulti query-id
-  "Performs an ID-getting query for the given identity and identity type."
-  {:arglists '([db ^Keyword identity-type user-identity])}
-  (fn ^Keyword [db ^Keyword identity-type user-identity] (identity/check-type identity-type))
+  "Performs an ID-getting query for the given identity and identity type (must be a
+  keyword)."
   :hierarchy #'pid/type-hierarchy)
 
 (defmulti query-ids
-  "Performs a multiple IDs-getting SQL query for the given identity and identity type."
-  {:arglists '([db ^Keyword identity-type user-identities])}
-  (fn ^Keyword [db ^Keyword identity-type user-identities] (identity/check-type identity-type))
+  "Performs a multiple IDs-getting SQL query for the given identity and identity
+  type (must be a keyword)."
   :hierarchy #'pid/type-hierarchy)
 
 (defn query-id-std
+  "Converts the given user identity `user-identity` to a database-suitable value and
+  then performs a SQL query `query` with the obtained value as a parameter. Returns
+  query result as vector."
+  {:see-also ["query-id"]}
   [db query user-identity]
   (if-some [dbs (identity/->db user-identity)]
     (first (jdbc/execute-one! db [query dbs] db/opts-simple-vec))))
@@ -402,6 +404,9 @@
      (get-id db user-identity))))
 
 (defn query-ids-std
+  "Converts the given user identities `user-identities` to a database-suitable values
+  and then performs a SQL query `query` with the obtained value as parameters added
+  using \"IN(...)\" clause. Returns query result as vector."
   [db query user-identities]
   (let [db-ids (map identity/->db user-identities)]
     (->> db/opts-simple-vec
@@ -429,13 +434,13 @@
   (^Long [^Boolean trust? db ^Identifiable user-identity]
    (if db
      (if-some [^Identity user-identity (identity/of user-identity)]
-       (if (and trust? (= :id (.id-type user-identity)))
+       (if (and trust? (identical? :id (.id-type user-identity)))
          (identity/value user-identity)
          (cwr/lookup-or-miss identity-cache user-identity #(get-id db %))))))
   (^Long [^Boolean trust? db ^Keyword identity-type ^Identifiable user-identity]
    (if db
      (if-some [^Identity user-identity (identity/of-type identity-type user-identity)]
-       (if (and trust? (= :id identity-type))
+       (if (and trust? (identical? :id identity-type))
          (identity/value user-identity)
          (cwr/lookup-or-miss identity-cache user-identity #(get-id db identity-type %)))))))
 
@@ -448,7 +453,7 @@
   ([^Boolean trust? db ^Keyword identity-type user-identities]
    (if db
      (if-some [user-ids (some-identities identity-type user-identities)]
-       (if (and trust? (= :id identity-type))
+       (if (and trust? (identical? :id identity-type))
          (->> user-ids (map (juxt identity identity/value)) (into {}))
          (let [looked-up (cache-lookup-user-ids identity-cache user-ids)
                missing   (seq (get looked-up ::db/not-found))]
@@ -1055,13 +1060,13 @@
     (^Session [session]
      session)
     (^Session [session ^Keyword identity-type]
-     (if (= :session identity-type) session)))
+     (if (identical? :session identity-type) session)))
 
   (make
     (^Identity [session]
      (Identity. :session session))
     (^Identity [session ^Keyword identity-type]
-     (if (= :session identity-type) (Identity. :session session)))))
+     (if (identical? :session identity-type) (Identity. :session session)))))
 
 ;; Identity as a source of session
 
@@ -1089,7 +1094,7 @@
 
 (defn auth-by-user-id
   "Gets authentication configuration (`AuthConfig`) for the given user. Uses cached
-  user props provided by `amelinium.model.user/props`."
+  user props provided by `amelinium.model.user/prop-by-id`."
   [settings-src user-id]
   (if-some [as (auth/settings settings-src)]
     (if-some [ac-type (prop-by-id (.db ^AuthSettings as) :account-type user-id)]
@@ -1097,7 +1102,7 @@
 
 (defn auth-by-session
   "Gets authentication configuration (`AuthConfig`) for the given user identified by a
-  session object. Uses cached user props provided by `amelinium.model.user/props`."
+  session object. Uses cached user props provided by `amelinium.model.user/prop-of`."
   [settings-src smap]
   (if-some [as (auth/settings settings-src)]
     (if-some [ac-type (prop-of :session (.db ^AuthSettings as) :session smap)]

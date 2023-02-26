@@ -125,6 +125,7 @@
   (settings
     ^AuthSettings [settings-src]
     settings-src)
+
   (config
     (^AuthConfig [settings-src]
      (.default ^AuthSettings settings-src))
@@ -132,6 +133,7 @@
      (if account-type
        (get (.types ^AuthSettings settings-src)
             (if (keyword? account-type) account-type (keyword account-type))))))
+
   (db
     (^DataSource [settings-src]
      (.db ^AuthSettings settings-src))
@@ -151,6 +153,7 @@
               (.ids ^AccountTypes (.account-types ^AuthConfig config-source))
               (if (keyword? account-type) account-type (keyword account-type))))
        config-source)))
+
   (db
     (^DataSource [settings-src]
      (.db ^AuthConfig settings-src))
@@ -172,6 +175,7 @@
   (settings
     ^AuthSettings [m]
     (get (.data ^Match m) :auth/setup))
+
   (config
     (^AuthConfig [m]
      (if-some [^AuthSettings as (get (.data ^Match m) :auth/setup)]
@@ -181,6 +185,7 @@
        (if-some [^AuthSettings as (get (.data ^Match m) :auth/setup)]
          (get (.types ^AuthSettings as)
               (if (keyword? account-type) account-type (keyword account-type)))))))
+
   (db
     (^DataSource [m]
      (if-some [as (get (.data ^Match m) :auth/setup)]
@@ -197,6 +202,7 @@
   (settings
     ^AuthSettings [req]
     (http/get-route-data req :auth/setup))
+
   (config
     (^AuthConfig [req]
      (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
@@ -206,6 +212,7 @@
        (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
          (get (.types ^AuthSettings as)
               (if (keyword? account-type) account-type (keyword account-type)))))))
+
   (db
     (^DataSource [req]
      (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
@@ -222,6 +229,7 @@
   (settings
     ^AuthSettings [req]
     (http/get-route-data req :auth/setup))
+
   (config
     (^AuthConfig [req]
      (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
@@ -231,6 +239,7 @@
        (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
          (get (.types ^AuthSettings as)
               (if (keyword? account-type) account-type (keyword account-type)))))))
+
   (db
     (^DataSource [req]
      (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
@@ -245,9 +254,11 @@
   nil
 
   (settings [settings-src] nil)
+
   (config
     ([settings-src] nil)
     ([settings-src account-type] nil))
+
   (db
     ([settings-src] nil)
     ([settings-src account-type] nil)))

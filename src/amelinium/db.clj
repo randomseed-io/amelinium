@@ -168,7 +168,7 @@
 ;; Email/phone/uid/id mapping to a DB-consumable values
 
 (defn identity->str
-  "Converts the given `id` to a string unless it's a positive integer. Used to prepare
+  "Converts the given `user-identity` to a string value. Used to prepare
   user identities to a format acceptable by raw query strings (where they cannot be
   passed as parameters in database prepared statements)."
   [id]
@@ -179,7 +179,7 @@
     :else              (some-str id)))
 
 (defn identity->kw
-  "Calls `identity->str` and then converts the result into a keyword."
+  "Calls `identity->str` and then converts a result into a keyword."
   [id]
   (some-keyword (identity->str id)))
 

@@ -232,12 +232,15 @@
 
 (def ^{:tag      Identity
        :arglists '(^Identity [user-identity]
-                   ^Identity [^Keyword identity-type user-identity])}
+                   ^Identity [^Keyword identity-type user-identity])
+       :see-also ["of"]}
   parse
   "Parses the given identity `user-identity` with optional `identity-type`
   predefined. Returns an identity record of type `amelinium.Identity`. Memoized proxy
   for parsing strings and other non-native data. Do not use it directly, use `of`
-  instead."
+  instead.
+
+  Caution: The identity type must be a keyword (it will not be coerced)."
   (rdb/memoize parse-single 4096))
 
 (defn- parse-indexed

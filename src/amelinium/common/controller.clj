@@ -311,7 +311,8 @@
 (defn set-password!
   "Sets user password for the given user ID. Returns `:pwd/created` if operation
   succeeded. May return error statuses: `:pwd/bad-user`, `:pwd/db-error`,
-  `:pwd/bad-password`."
+  `:pwd/bad-password`. User must have account type assigned for this operation to
+  succeed."
   [req user-id password]
   (qassoc
    req :response/status
