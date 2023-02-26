@@ -21,7 +21,8 @@
             [io.randomseed.utils.validators.common :as          vc]
             [io.randomseed.utils.ip                :as          ip]
             [io.randomseed.utils                   :as       utils]
-            [amelinium.locale                      :as      locale])
+            [amelinium.locale                      :as      locale]
+            [amelinium.identity                    :as    identity])
 
   (:import [java.util UUID]
            [java.time Duration]))
@@ -286,27 +287,28 @@
                         :gen/gen             gen-duration}})))
 
 (def email
-  (let [str->email (comp utils/some-str str/trim str)]
+  (let [obj->email #(identity/of-type :email %)
+        email->str #(identity/->str   :email %)]
     (m/-simple-schema
      {:type            :email
-      :pred            vc/valid-email?
+      :pred            #(vc/valid-email? (identity/value %))
       :property-pred   (m/-min-max-pred count)
       :type-properties {:error/message       "should be an e-mail address"
-                        :encode/json         utils/some-str
-                        :decode/json         str->email
-                        :encode/string       utils/some-str
-                        :decode/string       str->email
+                        :encode/json         email->str
+                        :decode/json         obj->email
+                        :encode/string       email->str
+                        :decode/string       obj->email
                         :json-schema/type    "string"
                         :json-schema/format  "email"
                         :json-schema/example (gen/generate gen-email)
                         :gen/gen             gen-email}})))
 
 (def regular-phone
-  (let [obj->phone #(phutil/try-parse (phone/number-optraw %))
-        phone->str #(phone/format % :phone-number.format/e164)]
+  (let [obj->phone #(identity/of-type :phone %)
+        phone->str #(identity/->str   :phone %)]
     (m/-simple-schema
      {:type            :regular-phone
-      :pred            vc/valid-regular-phone?
+      :pred            #(vc/valid-regular-phone? (identity/value %))
       :type-properties {:error/message       "should be a regular phone number"
                         :decode/string       obj->phone
                         :decode/json         obj->phone
@@ -318,11 +320,11 @@
                         :gen/gen             gen-regular-phone}})))
 
 (def phone
-  (let [obj->phone #(phutil/try-parse (phone/number-optraw %))
-        phone->str #(phone/format % :phone-number.format/e164)]
+  (let [obj->phone #(identity/of-type :phone %)
+        phone->str #(identity/->str   :phone %)]
     (m/-simple-schema
      {:type            :phone
-      :pred            phone/valid?
+      :pred            #(phone/valid? (identity/value %))
       :type-properties {:error/message       "should be a phone number"
                         :decode/string       obj->phone
                         :decode/json         obj->phone
