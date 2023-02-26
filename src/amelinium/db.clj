@@ -171,12 +171,8 @@
   "Converts the given `user-identity` to a string value. Used to prepare
   user identities to a format acceptable by raw query strings (where they cannot be
   passed as parameters in database prepared statements)."
-  [id]
-  (cond
-    (string? id)       (some-str id)
-    (phone/native? id) (phone/format id nil :phone-number.format/e164)
-    (pos-int? id)      id
-    :else              (some-str id)))
+  [user-identity]
+  (some-str user-identity))
 
 (defn identity->kw
   "Calls `identity->str` and then converts a result into a keyword."
