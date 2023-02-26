@@ -375,11 +375,17 @@
 (defmulti query-id
   "Performs an ID-getting query for the given identity and identity type (must be a
   keyword)."
+  {:see-also ["query-ids"]
+   :arglists '([db ^Keyword identity-type user-identity])}
+  (fn ^Keyword [db ^Keyword identity-type user-identity] identity-type)
   :hierarchy #'pid/type-hierarchy)
 
 (defmulti query-ids
   "Performs a multiple IDs-getting SQL query for the given identity and identity
   type (must be a keyword)."
+  {:see-also ["query-id"]
+   :arglists '([db ^Keyword identity-type user-identities])}
+  (fn ^Keyword [db ^Keyword identity-type user-identities] identity-type)
   :hierarchy #'pid/type-hierarchy)
 
 (defn query-id-std
