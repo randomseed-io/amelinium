@@ -277,6 +277,32 @@
   identity value in a form it expresses it best. If the identity type cannot be
   established and it was not given, `nil` is returned.
 
+  Optional identity type `identity-type` (which must be a keyword) may be given as a
+  first argument. It is used to pick the right parser (if parsing is needed) and to
+  reject wrong identity type (if `amelinium.Identity` record is given). If there is a
+  need to give list of keywords as user identities (including the first), and not to
+  give an identity type, then first argument's value needs to be converted to a
+  string, or `of-value` should be used as an alternative.
+
+  If multiple identities are given it will return a sequence of these identities
+  parsed with parsing functions chosen for detected identity types. If an identity
+  type is cannot be detected and/or is not valid, `nil` value will be inserted into
+  the corresponding location of generated output sequence."
+  {:see-also ["of-value" "of-type" "of-seq"]
+   :arglists '([user-identity]
+               [identity-type user-identity]
+               [identity-type user-identity & user-identities]
+               [user-identity & user-identities])}
+  (^Identity [user-identity]
+   (p/make user-identity))
+  ([identity-type user-identity]
+   (if (keyword? identity-type)
+     (p/make user-identity identity-type)
+     (map p/make (cons identity-type (cons user-identity nil)))))
+  ([identity-type user-identity & ids]
+   (if (keyword? identity-type)
+     (map #(p/make % identity-type) (cons user-identity ids))
+     (map p/make (cons identity-type (cons user-identity ids))))))
   If multiple identities are given it will return a sequence of these identities
   parsed with parsing functions chosen for detected identity types. If an identity
   type is cannot be detected and/or is not valid, `nil` value will be inserted into
