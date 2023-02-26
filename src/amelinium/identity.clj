@@ -330,8 +330,12 @@
   parsed with parsing functions chosen for the given identity type. If the identity
   type is not valid or the parsing cannot be applied for an input value, `nil` will
   be inserted into corresponding location of the output sequence."
-  ([identity-type user-identity]       (p/make user-identity identity-type))
-  ([identity-type user-identity & ids] (map #(p/make % identity-type) (cons user-identity ids))))
+  {:see-also ["of" "of-value" "of-seq"]}
+  (^Identity [identity-type user-identity]
+   (p/make user-identity (some-keyword identity-type)))
+  ([identity-type user-identity & ids]
+   (let [identity-type (some-keyword identity-type)]
+     (map #(p/make % identity-type) (cons user-identity ids)))))
 
 (defn of-seq
   "For the given user identities `user-identities` tries to parse each identity and
@@ -344,8 +348,12 @@
   `nil` value will be inserted into the corresponding location of generated output
   sequence. Same with the given identity type which is not applicable to a particular
   value or invalid."
-  ([user-identities]                   (map p/make user-identities))
-  ([identity-type user-identities]     (map #(p/make % identity-type) user-identities)))
+  {:see-also ["of" "of-value" "of-type"]}
+  ([user-identities]
+   (map p/make user-identities))
+  ([identity-type user-identities]
+   (if-some [identity-type (some-keyword identity-type)]
+     (map #(p/make % identity-type) user-identities))))
 
 ;; Standard class-based matchers and getters
 
