@@ -519,7 +519,7 @@
             updated?            (do (if session-invalidator
                                       (session-invalidator req nil
                                                            :user/email
-                                                           (user/prop-of :id db :email user-id)
+                                                           (user/email db :id user-id)
                                                            user-id))
                                     (confirmation/delete db id "recovery")
                                     req)

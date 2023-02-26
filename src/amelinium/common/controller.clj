@@ -318,7 +318,7 @@
    req :response/status
    (let [auth-settings (auth/settings req)
          auth-db       (auth/db auth-settings)]
-     (if-some [ac-type (user/prop-of :id auth-db :account-type user-id)]
+     (if-some [ac-type (user/account-type auth-db :id user-id)]
        (if-some [auth-config (auth/config auth-settings ac-type)]
          (let [pwd-data (user/make-user-password auth-config password)]
            (if-some [pwd-suite-id (get pwd-data :suite-id)]

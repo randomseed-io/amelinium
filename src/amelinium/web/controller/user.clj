@@ -114,7 +114,7 @@
                           exc-handler      #(exc-handler db id-type id code token %)
                           email?           (identical? :email id-type)
                           phone?           (and (not email?) (identical? :phone id-type))
-                          user-login       (if email? id-str (if existing-user-id (delay (user/prop-of :id db :email existing-user-id))))
+                          user-login       (if email? id-str (if existing-user-id (delay (user/email db :id existing-user-id))))
                           template-params  (delay {:serviceName      (tr :verify/app-name)
                                                    :expiresInMinutes @in-mins
                                                    :remoteAddress    remote-ip
@@ -377,7 +377,7 @@
           (web/form-params-error! req {:repeated-password :repeated-password})
           (super/set-password!
            req
-           (or (get req :user/id) (user/prop-of :email (auth/db req) :id user-email))
+           (or (get req :user/id) (user/id (auth/db req) :email user-email))
            new-password))
         req))))
 
@@ -485,8 +485,8 @@
                 id-type    (common/guess-identity-type cfrm id nil)
                 id-str     (identity/->str id-type id)
                 token      (some-str (or token (get cfrm :token)))
-                user-email (some-str (user/prop-of :id db :email user-id))
-                user-phone (delay (identity/->str (user/prop-of :phone db :phone user-id)))
+                user-email (some-str (user/email db :id user-id))
+                user-phone (delay (identity/->str (user/phone db :id user-id)))
                 phone?     (identical? id-type :phone)
                 email?     (and (not phone?) (identical? id-type :email))
                 mobile?    (delay (common/mobile-agent? req))

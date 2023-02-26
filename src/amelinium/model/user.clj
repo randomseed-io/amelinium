@@ -1150,7 +1150,8 @@
 ;; Other
 
 (defn prop-get-locked
-  "Returns hard-lock status for the user account. Uses cached property."
+  "Using the database connectable object `db`, returns the hard-lock status for the
+  user account of the given ID `user-id`. Uses cached property."
   ([db user-id]
    (prop-by-id db :locked user-id))
   ([db user-id & ids]
@@ -1177,3 +1178,131 @@
 (defmethod query-ids :phone [db _ i] (query-ids-std db "SELECT phone, id FROM users WHERE phone IN" i))
 (defmethod query-ids :uid   [db _ i] (query-ids-std db "SELECT uid,   id FROM users WHERE uid   IN" i))
 (defmethod query-ids :id    [db _ i] (query-ids-std db "SELECT id,    id FROM users WHERE id    IN" i))
+
+;; Wrappers for commonly used properties
+
+(defn account-type
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns an account type of the existing user. Optional `identity-type` can be given
+  to constrain the given identity."
+  ([db user-identity] (prop db :account-type user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :account-type user-identity)))
+
+(defn first-name
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns a first name of the existing user. Optional `identity-type` can be given to
+  constrain the given identity."
+  ([db user-identity] (prop db :first-name user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :first-name user-identity)))
+
+(defn last-name
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns a last name of the existing user. Optional `identity-type` can be given to
+  constrain the given identity."
+  ([db user-identity] (prop db :last-name user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :last-name user-identity)))
+
+(defn middle-name
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns a middle name of the existing user. Optional `identity-type` can be given to
+  constrain the given identity."
+  ([db user-identity] (prop db :middle-name user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :middle-name user-identity)))
+
+(defn login-attempts
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns a number of login attempts of the existing user. Optional `identity-type`
+  can be given to constrain the given identity."
+  ([db user-identity] (prop db :login-attempts user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :login-attempts user-identity)))
+
+(defn last-ok-ip
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns a last IP address from which the user has logged in successfully. Optional
+  `identity-type` can be given to constrain the given identity."
+  ([db user-identity] (prop db :last-ok-ip user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :last-ok-ip user-identity)))
+
+(defn last-failed-ip
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns a last IP address from which the user has failed to log in
+  successfully. Optional `identity-type` can be given to constrain the given
+  identity."
+  ([db user-identity] (prop db :last-failed-ip user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :last-failed-ip user-identity)))
+
+(defn last-attempt
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns a time of last log-in attempt of the existing user. Optional
+  `identity-type` can be given to constrain the given identity."
+  ([db user-identity] (prop db :last-attempt user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :last-attempt user-identity)))
+
+(defn last-login
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns a time of last successful log-in of the existing user. Optional
+  `identity-type` can be given to constrain the given identity."
+  ([db user-identity] (prop db :last-login user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :last-login user-identity)))
+
+(defn soft-locked
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns a time of the account's soft-lock (if any). Optional `identity-type` can be
+  given to constrain the given identity."
+  ([db user-identity] (prop db :soft-locked user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :soft-locked user-identity)))
+
+(defn hard-locked
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns a time of the account's hard-lock (if any). Optional `identity-type` can be
+  given to constrain the given identity."
+  ([db user-identity] (prop db :locked user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :locked user-identity)))
+
+(def locked hard-locked)
+(reset-meta! #'locked (meta #'hard-locked))
+
+(defn created
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns the existing user's creation time. Optional `identity-type` can be given to
+  constrain the given identity."
+  ([db user-identity] (prop db :created user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :created user-identity)))
+
+(defn created-by
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns the existing user's creator ID. Optional `identity-type` can be given to
+  constrain the given identity."
+  ([db user-identity] (prop db :created-by user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :created-by user-identity)))
+
+(defn email
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns an e-mail of the existing user. Optional `identity-type` can be given to
+  constrain the given identity."
+  ([db user-identity] (prop db :email user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :email user-identity)))
+
+(defn phone
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns a phone number of the existing user. Optional `identity-type` can be given
+  to constrain the given identity."
+  ([db user-identity] (prop db :phone user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :phone user-identity)))
+
+(defn uid
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns a UID of the existing user. Optional `identity-type` can be given to
+  constrain the given identity."
+  ([db user-identity] (prop db :uid user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :uid user-identity)))
+
+(defn session
+  "For the given database connectable object `db` and user identity `user-identity`
+  returns a session of the existing user. Optional `identity-type` can be given to
+  constrain the given identity.
+
+  Be aware that this operation will only work if the identity type is a
+  session. There is no parsing of session ID, nor getting it from a database."
+  ([db user-identity] (prop db :session user-identity))
+  ([db identity-type user-identity] (prop-of identity-type db :session user-identity)))
