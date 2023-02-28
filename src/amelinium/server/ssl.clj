@@ -31,8 +31,8 @@
   {"p12"  "PKCS12"
    "pkcs" "PKCS12"})
 
-(defonce keystore-password   (atom nil))
-(defonce truststore-password (atom nil))
+(defonce ^:redef keystore-password   (atom nil))
+(defonce ^:redef truststore-password (atom nil))
 
 (defn reset-password!
   [pwd-atom]

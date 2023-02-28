@@ -18,7 +18,7 @@
             [io.randomseed.utils.map  :as        map]
             [io.randomseed.utils      :refer    :all]))
 
-(defonce log nil)
+(defonce ^:redef log nil)
 
 (def ^:const authlog-levels
   {:dbg           "debug"

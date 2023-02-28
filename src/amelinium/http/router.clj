@@ -15,8 +15,8 @@
             [io.randomseed.utils.var   :as    var]
             [clojurewerkz.balagan.core :as      b]))
 
-(defonce routes  nil)
-(defonce default nil)
+(defonce ^:redef routes  nil)
+(defonce ^:redef default nil)
 
 ;; Initializers
 

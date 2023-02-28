@@ -14,7 +14,7 @@
             [amelinium.system          :as    system]
             [clojurewerkz.balagan.core :as         b]))
 
-(defonce default nil)
+(defonce ^:redef default nil)
 
 (defn new-handler
   [{:keys [router resource-pathname not-found redirect-slash]}]

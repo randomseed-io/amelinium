@@ -28,7 +28,7 @@
            [java.time    Duration]
            [reitit.core  Match]))
 
-(defonce setup nil)
+(defonce ^:redef setup nil)
 
 (def confirmation-expires-default (t/new-duration 10 :minutes))
 

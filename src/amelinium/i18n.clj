@@ -18,7 +18,7 @@
             [amelinium.logging       :as       log]
             [amelinium.http          :as      http]))
 
-(defonce translations nil)
+(defonce ^:redef translations nil)
 
 (def ^:dynamic *handle-missing-keys* true)
 

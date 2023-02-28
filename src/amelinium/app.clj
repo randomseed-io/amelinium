@@ -151,13 +151,13 @@
 ;; application state management
 ;;
 
-(defonce ^:private lock 'lock)
+(defonce ^:private ^:redef lock 'lock)
 
-(defonce config            nil)  ;; configuration which was read from files
-(defonce post-config       nil)  ;; configuration prepared by parser
-(defonce state             nil)  ;; current state of this application
-(defonce exception         nil)  ;; unhandled exception
-(defonce phase        :stopped)  ;; phase flag
+(defonce ^:redef config            nil)  ;; configuration which was read from files
+(defonce ^:redef post-config       nil)  ;; configuration prepared by parser
+(defonce ^:redef state             nil)  ;; current state of this application
+(defonce ^:redef exception         nil)  ;; unhandled exception
+(defonce ^:redef phase        :stopped)  ;; phase flag
 
 (defn starting?    [] (locking lock (identical? :starting   phase)))
 (defn failed?      [] (locking lock (identical? :failed     phase)))

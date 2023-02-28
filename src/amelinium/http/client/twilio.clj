@@ -30,9 +30,9 @@
            [amelinium.proto.twilio  TwilioControl]
            [amelinium               TwilioConfig]))
 
-(defonce sms    (constantly nil))
-(defonce email  (constantly nil))
-(defonce verify (constantly nil))
+(defonce ^:redef sms    (constantly nil))
+(defonce ^:redef email  (constantly nil))
+(defonce ^:redef verify (constantly nil))
 
 ;; Constants
 

@@ -452,7 +452,7 @@
                           (str location qparams)))))))))))
 
 (def ^{:private  true
-       :tag String
+       :tag      String
        :arglists '(^String [param rtr id param-value params query-params require-param? name-path-fallback?])}
   parameterized-page-mem
   (mem/lu parameterized-page-core :lu/threshold page-cache-len))
@@ -1343,7 +1343,8 @@
 
 ;; Language
 
-(def ^{:arglists '([req]
+(def ^{:tag      clojure.lang.Keyword
+       :arglists '([req]
                    [req pickers]
                    [req picker-id]
                    [req pickers picker-id])}
@@ -1354,7 +1355,8 @@
   triggers configured pickers from a default or given chain. Returns a keyword."
   language/pick)
 
-(def ^{:arglists '([req]
+(def ^{:tag      String
+       :arglists '([req]
                    [req pickers]
                    [req picker-id]
                    [req pickers picker-id])}
@@ -1365,7 +1367,8 @@
   triggers configured pickers from a default or given chain. Returns a string."
   (comp some-str language/pick))
 
-(def ^{:arglists '([req]
+(def ^{:tag      clojure.lang.Keyword
+       :arglists '([req]
                    [req pickers]
                    [req picker-id]
                    [req pickers picker-id])}
@@ -1377,7 +1380,8 @@
   be found it simply returns `nil` instead of a default language. Returns a keyword."
   language/pick-without-fallback)
 
-(def ^{:arglists '([req]
+(def ^{:tag      String
+       :arglists '([req]
                    [req pickers]
                    [req picker-id]
                    [req pickers picker-id])}
@@ -1393,7 +1397,7 @@
 
 (defn add-slash
   "Adds trailing slash to a path unless it already exists."
-  [uri]
+  ^String [^String uri]
   (if uri
     (let [c (unchecked-int (count uri))]
       (if (pos? c)
@@ -1450,22 +1454,22 @@
 (defn hard-locked?
   "Returns true if the given user map contains the :locked key and a value associated
   with it is not nil. Does not connect to a database."
-  [user]
+  ^Boolean [user]
   (some? (hard-lock-time user)))
 
 (defn soft-locked?
   "Returns true if the given user account is soft-locked (the time amount which passed
   from the lock till the given time is lesser than the soft lock wait configuration
   option). Does not connect to a database."
-  ([lock-passed auth-config-or-lw]
+  (^Boolean [lock-passed auth-config-or-lw]
    (if lock-passed
      (if-some [lock-wait (lock-wait auth-config-or-lw)]
-       (t/< lock-passed lock-wait))))
-  ([user auth-config-or-lw time]
+       (t/< lock-passed lock-wait) false) false))
+  (^Boolean [user auth-config-or-lw time]
    (if auth-config-or-lw
      (if-some [lock-passed (soft-lock-passed user time)]
        (if-some [lock-wait (lock-wait auth-config-or-lw)]
-         (t/< lock-passed lock-wait))))))
+         (t/< lock-passed lock-wait) false) false) false)))
 
 (defn soft-lock-remains
   "Returns the amount of time left before reaching lock-wait. If the amount is negative
@@ -1704,11 +1708,11 @@
   slash-added variant (the original variant goes first)."
   ([]
    nil)
-  ([req]
+  (^String [req]
    (page req (current-page req)))
-  ([req name-or-path]
+  (^String [req name-or-path]
    (page req name-or-path))
-  ([req name-or-path lang]
+  (^String [req name-or-path lang]
    (localized-page nil name-or-path lang
                    nil nil false false
                    (get req ::r/router)
@@ -1762,30 +1766,30 @@
   slash-added variant (the original variant goes first)."
   ([]
    nil)
-  ([req]
+  (^String[req]
    (localized-path req (current-page req)))
-  ([req name-or-path]
+  (^String [req name-or-path]
    (localized-page nil name-or-path
                    (or (get req :language/id) (pick-language-str req :default))
                    nil nil false true
                    (get req ::r/router)
                    (lang-param req)))
-  ([req name-or-path lang]
+  (^String [req name-or-path lang]
    (localized-page nil name-or-path lang
                    nil nil false true
                    (get req ::r/router)
                    (lang-param req)))
-  ([req name-or-path lang params]
+  (^String [req name-or-path lang params]
    (localized-page nil name-or-path lang
                    params nil false true
                    (get req ::r/router)
                    (lang-param req)))
-  ([req name-or-path lang params query-params]
+  (^String [req name-or-path lang params query-params]
    (localized-page nil name-or-path lang
                    params query-params false true
                    (get req ::r/router)
                    (lang-param req)))
-  ([name-or-path lang params query-params router language-settings-or-param]
+  (^String [name-or-path lang params query-params router language-settings-or-param]
    (localized-page nil name-or-path lang
                    params query-params
                    false true
@@ -1804,14 +1808,14 @@
 ;; Parameters
 
 (defn string-from-param
-  [s]
+  ^String [s]
   (if-some [^String s (some-str s)]
     (if (= \: (.charAt s 0))
       (let [^String s (subs s 1)] (if (not-empty-string? s) s))
       s)))
 
 (defn keyword-from-param
-  [s]
+  ^clojure.lang.Keyword [s]
   (if (keyword? s)
     s
     (if-some [^String s (some-str s)]
@@ -2023,21 +2027,21 @@
 ;; Language helpers
 
 (defn lang-url
-  ([router req path-or-name lang localized? path-params]
+  (^String [router req path-or-name lang localized? path-params]
    (lang-url router req path-or-name lang localized? path-params nil nil))
-  ([router req path-or-name lang localized?]
+  (^String [router req path-or-name lang localized?]
    (lang-url router req path-or-name lang localized? nil nil nil))
-  ([router req path-or-name lang]
+  (^String [router req path-or-name lang]
    (lang-url router req path-or-name lang true nil nil nil))
-  ([router req path-or-name]
+  (^String [router req path-or-name]
    (lang-url router req path-or-name nil true nil nil nil))
-  ([router req]
+  (^String [router req]
    (lang-url router req nil nil true nil nil nil))
-  ([req]
+  (^String [req]
    (lang-url nil req nil nil true nil nil nil))
-  ([req path-or-name lang localized? path-params query-params lang-param]
+  (^String [req path-or-name lang localized? path-params query-params lang-param]
    (lang-url nil req path-or-name lang localized? path-params query-params lang-param))
-  ([router req path-or-name lang localized? path-params query-params lang-param]
+  (^String [router req path-or-name lang localized? path-params query-params lang-param]
    (let [router       (or router (get req ::r/router) (get req :router))
          lang         (or lang (get req :language/str) (some-str (get req :language/id)) (some-str (get req :lang)))
          lang-param   (or lang-param (get req :language/settings) :lang)
@@ -2052,21 +2056,21 @@
   (or (get (get req :language/settings) :param) :lang))
 
 (defn lang-id
-  [req]
+  ^clojure.lang.Keyword [req]
   (or (get req :language/id)
       (get req :language/default)))
 
 (defn lang-id-or-nil
-  [req]
+  ^clojure.lang.Keyword [req]
   (get req :language/id))
 
 (defn lang-str
-  [req]
+  ^String [req]
   (or (get req :language/str)
       (str (get req :language/default))))
 
 (defn lang-str-or-nil
-  [req]
+  ^String [req]
   (get req :language/str))
 
 (defn lang-query-string
@@ -2148,13 +2152,13 @@
 
 (defn untranslatable?
   "Returns true if the given argument cannot be used as a translation key."
-  [v]
+  ^Boolean [v]
   (not (or (ident? v) (string? v))))
 
 ;; Headers
 
 (defn mobile-agent?
-  [req]
+  ^Boolean [req]
   (if-some [ua (get (get req :headers) "user-agent")]
     (some? (re-find #"\b(iPhone|iPad|iPod|Android|Windows Phone|webOS|IEMobile|BlackBerry)\b" ua))))
 

@@ -51,9 +51,9 @@
 (alter-var-root #'nippy/*thaw-serializable-allowlist*
                 conj "com.google.i18n.phonenumbers.Phonenumber$PhoneNumber")
 
-(defonce auth      nil)
-(defonce migrators nil)
-(defonce caches    nil)
+(defonce ^:redef auth      nil)
+(defonce ^:redef migrators nil)
+(defonce ^:redef caches    nil)
 
 ;; Database column readers and result set setters
 

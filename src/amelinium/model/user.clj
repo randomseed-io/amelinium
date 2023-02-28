@@ -50,9 +50,9 @@
            [javax.sql                DataSource]
            [java.time                Duration]))
 
-(defonce props-cache    (atom nil))
-(defonce settings-cache (atom nil))
-(defonce identity-cache (atom nil))
+(defonce ^:redef props-cache    (atom nil))
+(defonce ^:redef settings-cache (atom nil))
+(defonce ^:redef identity-cache (atom nil))
 
 ;; User data initialization
 

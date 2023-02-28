@@ -23,21 +23,25 @@
   type-hierarchy
   (make-hierarchy))
 
-(defonce ^{:doc "Identity string matchers repository. A vector of functions executed in a sequence
+(defonce ^{:redef true
+           :doc   "Identity string matchers repository. A vector of functions executed in a sequence
   until one will return anything but `nil`."}
   type-string-matchers [])
 
 (defonce ^{:doc      "Internal function for matching strings on a basis of `type-string-matchers`."
            :tag      Keyword
+           :redef    true
            :arglists '(^Keyword [^String v])}
   type-string-match
   (constantly nil))
 
-(defonce ^{:doc "List of valid types, regenerated each time types are added or deleted."}
+(defonce ^{:redef true
+           :doc   "List of valid types, regenerated each time types are added or deleted."}
   valid-types
   '())
 
-(defonce ^{:doc "Prioritized identity types. If they appear on a `valid-types` list, they will be
+(defonce ^{:redef true
+           :doc   "Prioritized identity types. If they appear on a `valid-types` list, they will be
   placed at the beginning."}
   prioritized-types
   [:id :email :phone :uid])
