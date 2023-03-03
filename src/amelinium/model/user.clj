@@ -235,33 +235,33 @@
   (db/make-deleter :users :id))
 
 (defn props-set
-  "Sets properties of a user with the given ID."
+  "Sets properties of a user identified with the given ID `user-id`."
   [db ^Long user-id keys-vals]
   (let [r (props-setter db user-id keys-vals)]
     (db/cache-evict! props-cache (db/<- :users/id user-id)) r))
 
 (defn props-del
-  "Deletes all properties of a user with the given ID."
+  "Deletes all properties of a user identified with the given ID  `user-id`."
   [db ^Long user-id]
   (let [r (props-deleter db user-id)]
     (db/cache-evict! props-cache (db/<- :users/id user-id)) r))
 
 (defn prop-set
-  "Sets property k of a user with the given ID to value v."
+  "Sets property `k` of a user identified with the given ID `user-id` to value `v`."
   [db ^Long user-id ^Keyword k v]
   (let [r (props-setter db user-id {k v})]
     (db/cache-evict! props-cache (db/<- :users/id user-id)) r))
 
 (defn prop-del
-  "Deletes property of a user with the given ID by setting it to nil."
+  "Deletes property of a user with the given ID `user-id` by setting it to `nil`."
   [db ^Long user-id ^Keyword k]
   (prop-set db user-id k nil))
 
 ;; Getting user properties by...
 
 (defn prop-by-id
-  "Returns user property for the given user ID or a map of user properties keyed with
-  their IDs if multiple IDs are given (cached)."
+  "Returns user property `prop-id` for the given user ID `user-id` or a map of user
+  properties keyed with their IDs if multiple IDs are given (cached)."
   ([db ^Keyword prop-id ^Long user-id]
    (if (and prop-id user-id)
      (db/get-cached-prop props-cache props-getter db prop-id user-id)))
@@ -270,20 +270,20 @@
      (db/get-cached-coll-prop props-cache props-getter-coll db prop-id (cons user-id ids)))))
 
 (defn seq-prop-by-id
-  "Returns user properties for the given user IDs (cached)."
+  "Returns user property `prop-id` for the given user IDs `user-ids` (cached)."
   [db ^Keyword prop-id user-ids]
   (if (and prop-id user-ids)
     (db/get-cached-coll-prop props-cache props-getter-coll db prop-id user-ids)))
 
 (defn prop-by-ids
-  "Returns property for the given user IDs (cached)."
+  "Returns property `prop-id` for the given user IDs `ids` (cached)."
   [db prop-id ids]
   (seq-prop-by-id db prop-id ids))
 
 (defn prop-by-id-or-default
-  "Returns user property for the given user ID or a map of user property keyed with its
-  ID if multiple IDs are given (cached). If the property is not found the default tag
-  is returned instead of `nil`."
+  "Returns user property `prop` for the given user ID `id` or a map of user property
+  keyed with its ID if multiple IDs are given (cached). If the property is not found
+  the default value, given as `default`, is returned instead of `nil`."
   ([db ^Keyword prop default ^Long id]
    (db/get-cached-prop-or-default props-cache props-getter db prop default id))
   ([db ^Keyword prop default ^Long id & ids]
@@ -291,25 +291,54 @@
           db prop default id ids)))
 
 (defn props-by-id
-  "Returns user properties for the given user ID (cached)."
+  "Returns user properties for the given user ID `user-id` (cached)."
   ([db ^Long user-id]
    (if user-id (db/get-cached props-cache props-getter db user-id)))
   ([db ^Long user-id & ids]
    (db/get-cached-coll props-cache props-getter-coll db (cons user-id ids))))
 
 (defn seq-props-by-id
-  "Returns user properties for each of the given user IDs (cached)."
+  "Returns user properties for each of the given user IDs `ids` (cached)."
   [db ids]
   (db/get-cached-coll props-cache props-getter-coll db ids))
 
 (defn props-by-ids
-  "Returns user properties for each of the given user IDs (cached)."
+  "Returns user properties for each of the given user IDs `ids` (cached)."
   [db ids]
   (seq-props-by-id db ids))
 
 ;; Getting attribute by identity
 
 (defn- ids-updater
+  "Helper function which takes a function `f` and additional arguments (zero or more),
+  and returns a function which takes a map `m`, identity type `id-type` and a
+  sequence of identifiers `ids`, and calls `f` with all arguments and `id-type`
+  passed on the sequence. Then it calls `clojure.core/into` to put the result of
+  calling `f` into a map `m`.
+
+  Example: `(ids-updater get-ids db)
+
+  In this example `get-ids` the function similar to presented below will be returned:
+
+  `(fn [m id-type ids] (into m (get-ids db id-type)))`.
+
+  Used mainly as a transformer in `reduce-kv` when dealing with multiple user
+  identifiers grouped by identity type. Having a map of vectors grouped by identity
+  type like the one below:
+
+  `{:email [#amelinium.Identity {:id-type :email :value \"pw@gnu.org\"}],
+    :id    [#amelinium.Identity {:id-type :id    :value 1}
+            #amelinium.Identity {:id-type :id,   :value 42}]}`
+
+  We can call `(reduce-kv (ids-updater get-ids db) {})` to get:
+
+  `{#amelinium.Identity{:id-type :id,    :value 1}               1
+    #amelinium.Identity{:id-type :id,    :value 42}             42
+    #amelinium.Identity{:id-type :email, :value \"pw@gnu.org\"}  1}`.
+
+  The `get-ids` will be called for each identity group, receiving a list of
+  identities and passed arguments to get the numerical user identifiers which then
+  will be assigned to identity objects in a map."
   ([f]
    (fn [m ^Keyword id-type ids]
      (if id-type
@@ -333,6 +362,8 @@
          (or (some->> (not-empty ids) (conj fargs id-type) (apply f) (into m)) m) m)))))
 
 (defn- some-identities
+  "Tries to coerce identities to `amelinium.Identity` objects and filters out those who
+  could not be coerced."
   ([user-identities]
    (->> (identity/of-seq user-identities) (filter identity) seq))
   ([^Keyword identity-type user-identities]
@@ -366,16 +397,18 @@
 
 (defmulti query-id
   "Performs an ID-getting query for the given identity and identity type (must be a
-  keyword)."
-  {:see-also ["query-ids"]
+  keyword). This method is used to get user ID for the given identity of a known
+  type."
+  {:see-also ["get-id" "query-ids"]
    :arglists '([db ^Keyword identity-type user-identity])}
   (fn ^Keyword [db ^Keyword identity-type user-identity] identity-type)
   :hierarchy #'pid/type-hierarchy)
 
 (defmulti query-ids
   "Performs a multiple IDs-getting SQL query for the given identity and identity
-  type (must be a keyword)."
-  {:see-also ["query-id"]
+  type (must be a keyword). This method is used to get user IDs for the given
+  identities of known types."
+  {:see-also ["get-ids" "query-id"]
    :arglists '([db ^Keyword identity-type user-identities])}
   (fn ^Keyword [db ^Keyword identity-type user-identities] identity-type)
   :hierarchy #'pid/type-hierarchy)
@@ -383,16 +416,26 @@
 (defn query-id-std
   "Converts the given user identity `user-identity` to a database-suitable value and
   then performs a SQL query `query` with the obtained value as a parameter. Returns
-  query result as vector."
-  {:see-also ["query-id"]}
+  query result as vector. This is a standard querying function applicable to many
+  simple database schemas. Used primarily as a default operation in method
+  definitions of `query-id`."
+  {:see-also ["query-id" "get-id"]}
   [db colspec query user-identity]
   (if-some [dbs (db/<- colspec user-identity)]
     (first (db/execute-one! db [query dbs] db/opts-simple-vec))))
 
 (defn get-id
-  "Takes a user identity and a database connectable object and returns a numerical user
-  ID (not cached). Optional identity type will constrain the identity to be treated
-  as it will be of certain type."
+  "Takes a user identity `user-identity` and a database connectable object and returns
+  a numerical user ID (not cached). Optional identity type will constrain the
+  identity to be treated as it will be of certain type.
+
+  This function is using `query-id` to perform the actual query on a database using
+  identity record created with `amelinium.identify/of` or
+  `amelinium.identity/of-type`.
+
+  This function is used by cache-backed functions `id`, `id-of`, `trusted-id` and
+  `trusted-id-of` to communicate with a database."
+  {:see-also ["query-id"]}
   (^Long [db ^Identifiable user-identity]
    (if db
      (if-some [^Identity user-identity (identity/of user-identity)]
@@ -404,7 +447,9 @@
 (defn query-ids-std
   "Converts the given user identities `user-identities` to a database-suitable values
   and then performs a SQL query `query` with the obtained value as parameters added
-  using \"IN(...)\" clause. Returns query result as vector."
+  using \"IN(...)\" clause. Returns query result as vector. Used primarily as a
+  default operation in method definitions of `query-ids`."
+  {:see-also ["query-ids" "get-ids"]}
   [db colspec query user-identities]
   (let [db-ids (db/<-seq colspec user-identities)]
     (->> db/opts-simple-vec
@@ -412,10 +457,18 @@
          next)))
 
 (defn get-ids
-  "Takes user identities and a database connectable object and returns a numerical user
-  IDs (not cached). Optional identity type will constrain the identity to be treated
-  as it will be of certain type. Returns a map with `amelinium.Identity` objects as
-  keys and numerical identifiers as values."
+  "Takes user identities and a database connectable object, and returns a numerical
+  user IDs (not cached). Optional identity type will constrain the identity to be
+  treated as it will be of certain type. Returns a map with `amelinium.Identity`
+  objects as keys and numerical identifiers as values.
+
+  This function is using `query-ids` to perform the actual query on a database using
+  identity records created with `amelinium.identify/of` or
+  `amelinium.identity/of-type`.
+
+  This function is used by cache-backed functions `ids`, `ids-of`, `trusted-ids` and
+  `trusted-ids-of` to communicate with a database."
+  {:see-also ["query-ids" "get-id"]}
   ([db user-identities]
    (if db
      (->> (some-identities user-identities)
@@ -468,6 +521,7 @@
 
   Optional identity type will constrain the identity to be treated as it will be of
   certain type."
+  {:see-also ["id-of" "trusted-id" "query-id" "get-id"]}
   (^Long [db ^Identifiable user-identity]
    (id-core false db user-identity))
   (^Long [db ^Keyword identity-type ^Identifiable user-identity]
@@ -475,6 +529,7 @@
 
 (defn id-of
   "Like `id` but `identity-type` is a first argument."
+  {:see-also ["id" "trusted-id-of" "query-id" "get-id"]}
   ^Long [^Keyword identity-type db ^Identifiable user-identity]
   (id db identity-type user-identity))
 
@@ -488,6 +543,7 @@
 
   Optional identity type will constrain the identity to be treated as it will be of
   certain type."
+  {:see-also ["id" "trusted-id-of" "id-of" "query-id" "get-id"]}
   (^Long [db ^Identifiable user-identity]
    (id-core true db user-identity))
   (^Long [db ^Keyword identity-type ^Identifiable user-identity]
@@ -495,6 +551,7 @@
 
 (defn trusted-id-of
   "Like `trusted-id` but `identity-type` is a first argument."
+  {:see-also ["id" "trusted-id" "id-of" "query-id" "get-id"]}
   ^Long [^Keyword identity-type db ^Identifiable user-identity]
   (trusted-id db identity-type user-identity))
 
@@ -502,8 +559,9 @@
   "Takes user identities, optional identity type and a database connectable object, and
   returns a map with `amelinium.Identity` keys and numerical user IDs values (cached).
 
-  Optional identity type will constrain the identities to be treated as they will be
-  of certain type."
+  Optional identity type will constrain the identities to be treated as they will be of
+  certain type."
+  {:see-also ["ids-of" "trusted-ids" "query-ids" "get-ids"]}
   ([db user-identities]
    (ids-core false db user-identities))
   ([db ^Keyword identity-type user-identities]
@@ -511,12 +569,14 @@
 
 (defn ids-of
   "Like `ids` but `identity-type` is a first argument."
+  {:see-also ["ids" "trusted-ids-of" "query-ids" "get-ids"]}
   ^Long [^Keyword identity-type db user-identities]
   (ids db identity-type user-identities))
 
 (defn trusted-ids
   "Takes user identities, optional identity type and a database connectable object, and
-  returns a map with `amelinium.Identity` keys and numerical user IDs values (cached).
+  returns a map with `amelinium.Identity` keys and numerical user IDs
+  values (cached).
 
   When any of the given identities is of type `:id` (a numerical identifier), it will
   NOT interact with a database to get the ID but simply trust that this ID exists and
@@ -524,6 +584,7 @@
 
   Optional identity type will constrain the identities to be treated as they will be
   of certain type."
+  {:see-also ["trusted-ids-of" "ids" "ids-of" "query-ids" "get-ids"]}
   ([db user-identities]
    (ids-core true db user-identities))
   ([db ^Keyword identity-type user-identities]
@@ -531,18 +592,24 @@
 
 (defn trusted-ids-of
   "Like `trusted-ids` but `identity-type` is a first argument."
+  {:see-also ["trusted-ids" "ids" "ids-of" "query-ids" "get-ids"]}
   ^Long [^Keyword identity-type db user-identities]
   (trusted-ids db identity-type user-identities))
 
 ;; Existence testing (cached)
 
 (defn exists?
+  "Returns `true` if a user specified by the given `user-identity` with optional
+  `identity-type` exists. Returns `false` otherwise."
   (^Boolean [db ^Identifiable user-identity]
    (some? (id db user-identity)))
   (^Boolean [db ^Keyword identity-type ^Identifiable user-identity]
    (some? (id identity-type user-identity))))
 
 (defn existing
+  "Returns user identity record (of type `amelinium.Identity`) if a user specified by
+  the given `user-identity` with optional `identity-type` exists. Otherwise it
+  returns `nil`."
   (^Identity [db ^Identifiable user-identity]
    (if-some [user-identity (identity/of user-identity)]
      (if (exists? user-identity) user-identity)))
@@ -553,6 +620,10 @@
 ;; Generic identity mapping
 
 (defn seq-props
+  "For the given database connectable object `db`, optional identity type
+  `identity-type` and identifiable object `user-identity`, returns users' properties
+  as map keyed with `amelinium.Identity` records. The given identities must be of the
+  given type if the type is given. (cached)"
   ([db ^Keyword identity-type ^Identifiable user-identities]
    (if-some [by-identity (trusted-ids db identity-type user-identities)]
      (if-some [by-id (seq-props-by-id db (vals by-identity))]
@@ -571,18 +642,30 @@
                   by-identity by-identity)))))
 
 (defn props
+  "For the given database connectable object `db` and identifiable object
+  `user-identity`, returns user's properties as a map. If multiple identities are
+  given, returns a sequence of maps. (cached)"
   ([db ^Identifiable user-identity]
    (some->> (trusted-id db user-identity) (props-by-id db)))
   ([db ^Identifiable user-identity & identities]
    (seq-props db (cons user-identity identities))))
 
 (defn props-of
+  "For the given database connectable object `db`, identity type `identity-type` and
+  identifiable object `user-identity`, returns user's properties as a map. If
+  multiple identities are given, returns a map keyed with `amelinium.Identity`
+  records. The given identity must be of the given type. (cached)"
   ([^Keyword identity-type db ^Identifiable user-identity]
    (some->> (trusted-id db identity-type user-identity) (props-by-id db)))
   ([^Keyword identity-type db ^Identifiable user-identity & identities]
    (seq-props db identity-type (cons user-identity identities))))
 
 (defn seq-prop
+  "For the given database connectable object `db`, property identifier `prop-id`,
+  optional identity type `identity-type` and identifiable objects `user-identities`,
+  returns a map of `amelinium.Identity` records associated with selected property
+  values. Each given identity must be of the given type if `identity-type` is
+  used. (cached)"
   ([db ^Keyword prop-id user-identities]
    (if-some [prop-id (some-keyword prop-id)]
      (->> (seq-props db user-identities)
@@ -593,16 +676,26 @@
           (map/map-vals #(get % prop-id))))))
 
 (defn seq-prop-of
+  "The same as `seq-prop` but `identity-type` is a mandatory first argument. (cached)"
   [^Keyword identity-type db ^Keyword prop-id user-identities]
   (seq-prop db prop-id identity-type user-identities))
 
 (defn prop
+  "For the given database connectable object `db`, property identifier `prop-id`,
+  and identifiable object `user-identity`, returns user's property. If multiple
+  identities are given, returns a map of `amelinium.Identity` records associated with
+  selected property values. (cached)"
   ([db ^Keyword prop-id ^Identifiable user-identity]
    (some->> (some-keyword prop-id) (get (props db user-identity))))
   ([db ^Keyword prop-id ^Identifiable user-identity & identities]
    (seq-prop db prop-id (cons user-identity identities))))
 
 (defn prop-of
+  "For the given identity type `identity-type`, database connectable object `db`,
+  property identifier `prop-id`, and identifiable object `user-identity`, returns
+  user's property. If multiple identities are given, returns a map of
+  `amelinium.Identity` records associated with selected property values. Identity
+  type(s) must be of the given type. (cached)"
   ([^Keyword identity-type db ^Keyword prop-id ^Identifiable user-identity]
    (some->> (some-keyword prop-id) (get (props-of identity-type db user-identity))))
   ([^Keyword identity-type db ^Keyword prop-id ^Identifiable user-identity & identities]
