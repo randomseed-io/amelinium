@@ -20,7 +20,7 @@
            org.clojure/java.data                {:mvn/version "1.0.92"}       ;; java data structures and conversions
            org.clojure/data.avl                 {:mvn/version "0.1.0"}        ;; sorted sets with splitting
            org.clojure/core.memoize             {:mvn/version "1.0.250"}      ;; memoization
-           org.clojure/core.cache               {:mvn/version "1.0.217"}      ;; caching
+           org.clojure/core.cache               {:mvn/version "1.0.225"}      ;; caching
            org.clojure/core.async               {:mvn/version "1.5.648"}      ;; asynchronous operations
            clojure-interop/javax.security       {:mvn/version "1.0.5"}        ;; inter-op for javax.security
            fipp/fipp                            {:mvn/version "0.6.23"}       ;; pretty printing

@@ -6,10 +6,11 @@
 
     amelinium.db
 
-  (:refer-clojure :exclude [memoize parse-long uuid random-uuid])
+  (:refer-clojure :exclude [memoize parse-long uuid random-uuid -> <-])
 
   (:require [clojure.set                   :as                    set]
             [clojure.string                :as                    str]
+            [clojure.core                  :as                      c]
             [clojure.core.cache            :as                  cache]
             [clojure.core.cache.wrapped    :as                    cwr]
             [clojure.core.memoize          :as                    mem]
@@ -17,7 +18,9 @@
             [next.jdbc                     :as                   jdbc]
             [next.jdbc.sql                 :as                    sql]
             [next.jdbc.connection          :as             connection]
-            [next.jdbc.prepare              :as                    jp]
+            [next.jdbc.result-set          :as                     rs]
+            [next.jdbc.prepare             :as                     jp]
+            [next.jdbc.protocols           :as                    jpr]
             [ragtime.repl                  :as           ragtime-repl]
             [potemkin.namespaces           :as                      p]
             [io.randomseed.utils           :refer                :all]
@@ -31,20 +34,31 @@
             [phone-number.util             :as                 phutil]
             [phone-number.core             :as                  phone]
             [taoensso.nippy                :as                  nippy]
+            [lazy-map.core                 :as               lazy-map]
             [amelinium                     :refer                :all]
             [amelinium.app                 :as                    app]
             [amelinium.system              :as                 system]
             [amelinium.logging             :as                    log]
             [amelinium.types.db            :refer                :all]
             [amelinium.types.identity      :refer                :all]
-            [amelinium.identity            :as               identity])
+            [amelinium.identity            :as               identity]
+            [puget.printer :refer [cprint]])
 
-  (:import [com.zaxxer.hikari HikariConfig HikariDataSource HikariPoolMXBean]
-           [amelinium         DBConfig]
-           [java.sql          Connection PreparedStatement]
-           [javax.sql         DataSource]
-           [java.io           Closeable]
-           [java.lang.reflect Method]))
+  (:import (amelinium         DBConfig)
+           (lazy_map.core     LazyMap)
+           (com.zaxxer.hikari HikariConfig
+                              HikariDataSource
+                              HikariPoolMXBean)
+           (javax.sql         DataSource)
+           (java.io           Closeable)
+           (java.lang.reflect Method)
+           (java.sql          Connection
+                              PreparedStatement
+                              DatabaseMetaData
+                              ParameterMetaData
+                              ResultSet
+                              ResultSetMetaData
+                              Statement)))
 
 (set! *warn-on-reflection* true)
 
@@ -64,9 +78,7 @@
 
 (p/import-vars [io.randomseed.utils.db
                 to-lisp-simple to-snake-simple to-lisp to-snake
-                to-lisp-slashed to-snake-slashed
-                opts-simple-map opts-map opts-simple-vec opts-vec
-                opts-slashed-map opts-slashed-vec])
+                to-lisp-slashed to-snake-slashed])
 
 ;; SQL strings preparation
 
@@ -173,6 +185,339 @@
 
   (set-parameter [^amelinium.Identity v ^PreparedStatement ps ^long i]
     (jp/set-parameter (identity/->db v) ps i)))
+
+;; Keyword processing
+
+(defn idname
+  "If the given value `v` is an ident, it returns its (optional) namespace and name
+  joined with a dot character. Otherwise it returns the string representation of
+  the given object."
+  ^String [v]
+  (if (ident? v)
+    (if-some [nsp (namespace v)]
+      (str nsp "." (name v))
+      (str/replace (name v) \/ \.))
+    (str/replace (str v) \/ \.)))
+
+(defn idname-simple
+  "If the given value `v` is an ident, it returns its name. Otherwise it returns the
+  string representation of the given object."
+  ^String [v]
+  (if (ident? v) (name v) (str v)))
+
+(defn make-kw
+  "Creates a keyword with the given name and namespace which both can be expressed as
+  strings or idents. If the second argument is `nil` then a keyword is created using
+  the first argument by simply converting it with the `keyword` function. If both
+  `ns` and `name` are given then the following is applied: if `ns` or `name` is a
+  qualified ident, its name and namespace will be joined with a dot character before
+  producing a keyword; additionally, if `ns` or `name` is a simple ident, any slash
+  character in its name will be replaced with a dot. If `ns` or `name` is not an
+  ident then any slash character in its string representation will be replaced with a
+  dot before creating a keyword."
+  (^clojure.lang.Keyword [name]
+   (if (keyword? name) name (keyword name)))
+  (^clojure.lang.Keyword [ns name]
+   (if name
+     (keyword (idname ns) (idname name))
+     (if (keyword? ns) ns (keyword ns)))))
+
+(defn make-kw-simple
+  "Creates a keyword with the given name and namespace which both can be expressed as
+  strings or idents. If the second argument is `nil` then a keyword is created using
+  the first argument by simply converting it with the `keyword` function. If any
+  given ident is namespaced, only its name is used."
+  (^clojure.lang.Keyword [name]
+   (if (keyword? name) name (keyword name)))
+  (^clojure.lang.Keyword [ns name]
+   (if name
+     (keyword (idname-simple ns) (idname-simple name))
+     (if (keyword? ns) ns (keyword ns)))))
+
+(defn make-kw-snake
+  "Creates a keyword with the given name and namespace which both can be expressed as
+  strings or idents. All hyphen characters will be replaced by underscores. If the
+  second argument is `nil` then a keyword is created using the first argument by
+  simply converting it with the `keyword` function. If any given ident is namespaced,
+  only its name is used."
+  (^clojure.lang.Keyword [name]
+   (keyword (db/to-snake name)))
+  (^clojure.lang.Keyword [ns name]
+   (if name
+     (keyword (db/to-snake-simple (idname-simple ns)) (db/to-snake-simple (idname-simple name)))
+     (keyword (db/to-snake ns)))))
+
+(defn make-kw-lisp
+  "Creates a keyword with the given name and namespace which both can be expressed as
+  strings or idents. All underscore characters will be replaced by hyphens. If the
+  second argument is `nil` then a keyword is created using the first argument by
+  simply converting it with the `keyword` function. If any given ident is namespaced,
+  only its name is used."
+  (^clojure.lang.Keyword [name]
+   (keyword (db/to-lisp name)))
+  (^clojure.lang.Keyword [ns name]
+   (if name
+     (keyword (db/to-lisp-simple (idname-simple ns)) (db/to-lisp-simple (idname-simple name)))
+     (keyword (db/to-lisp ns)))))
+
+;; Coercion
+
+(defmulti in-coercer
+  "Returns a coercer suitable for transforming the given argument `v` to a
+  database-suitable value, assuming table and column specified by the given qualified
+  keyword `table-column`."
+  {:arglists '([table-column v])}
+  identity)
+
+(defmulti out-coercer
+  "Returns a coercer suitable for transforming the given argument `v` read from a
+  database, assuming table and column specified by the given qualified keyword
+  `table-column`."
+  {:arglists '([table-column v])}
+  identity)
+
+(defmethod in-coercer  :default [_] nil)
+(defmethod out-coercer :default [_] nil)
+
+(defn <-
+  "Coerces value `v` to a database type by calling a function returned by invoking
+  `amelinium.db/in-coercer` multimethod on a qualified keyword `table-column` (or a
+  qualified keyword made out of `table` and `column`). If there is no coercer
+  attached for the keyword, returns unchanged `v`."
+  ([table column v] (if-some [f (in-coercer (make-kw-simple table column))] (f v) v))
+  ([table-column v] (if-some [f (in-coercer table-column)] (f v) v)))
+
+(defn ->
+  "Coerces value `v` from a database type by calling a function returned by invoking
+  `amelinium.db/out-coercer` multimethod on a qualified keyword `table-column` (or a
+  qualified keyword made out of `table` and `column`). If there is no coercer
+  attached for the keyword, returns unchanged `v`."
+  ([table column v] (if-some [f (out-coercer (make-kw-simple table column))] (f v) v))
+  ([table-column v] (if-some [f (out-coercer table-column)] (f v) v)))
+
+(defn <-seq
+  "Coerces a sequence of values `coll` to database types by calling a function returned
+  by invoking `amelinium.db/in-coercer` multimethod on a qualified keyword
+  `table-column` (or a qualified keyword made out of `table` and `column`). If there
+  is no coercer attached for the keyword, returns unchanged `coll`."
+  ([table column coll] (if-some [f (in-coercer (make-kw-simple table column))] (map f coll) coll))
+  ([table-column coll] (if-some [f (in-coercer table-column)] (map f coll) coll)))
+
+(defn seq->
+  "Coerces a sequence of values `coll` from database types by calling a function
+  returned by invoking `amelinium.db/out-coercer` multimethod on a qualified keyword
+  `table-column` (or a qualified keyword made out of `table` and `column`). If there
+  is no coercer attached for the keyword, returns unchanged `coll`."
+  ([table column coll] (if-some [f (out-coercer (make-kw-simple table column))] (map f coll) coll))
+  ([table-column coll] (if-some [f (out-coercer table-column)] (map f coll) coll)))
+
+(defn simple->
+  [table m]
+  (let [table (some-str table)]
+    (map/map-vals-by-kv #(-> (keyword table (name %1)) %2) m)))
+
+(defn map->
+  ([m]
+   (map/map-vals-by-kv -> m))
+  ([table m]
+   (let [table (some-str table)]
+     (map/map-vals-by-kv
+      #(-> (if (namespace %1) %1 (keyword table (name %1))) %2)
+      m))))
+
+(defmacro defcoercions
+  "Defines input and output coercions for a database table `table`. The `specs` should
+  be an argument list consisting of triples in a form of `column-name`,
+  `input-coercer`, `output-coercer`.
+
+  For each definition 4 multimethod implementations will be emitted, identified by a
+  keyword having a namespace the same as the given table, and a name the same as
+  currently processed column name, both in 2 variants: one for snake, and one for
+  lisp case. Two multimethod definitions will be created for
+  `amelinium.db/in-coercer` and two for `amelinium.db/out-coercer`.
+
+  Example:
+
+  `(defcoercions :users :some-identifier str keyword)`
+
+  The above will expand the following code:
+
+  - `(defmethod amelinium.db/in-coercer  :users/some-identifier [_] str)`
+  - `(defmethod amelinium.db/in-coercer  :users/some_identifier [_] str)`
+  - `(defmethod amelinium.db/out-coercer :users/some-identifier [_] keyword)`,
+  - `(defmethod amelinium.db/out-coercer :users/some_identifier [_] keyword)`.
+
+  This will allow specialized database coercion functions to transformed values which
+  are exchanged with a database."
+  [table & specs]
+  (let [t# (some-str table)]
+    `(do
+       ~@(mapcat (fn [[c# in# out#]]
+                   `((defmethod  in-coercer ~(make-kw-lisp  t# c#) [~'_] ~in#)
+                     (defmethod  in-coercer ~(make-kw-snake t# c#) [~'_] ~in#)
+                     (defmethod out-coercer ~(make-kw-lisp  t# c#) [~'_] ~out#)
+                     (defmethod out-coercer ~(make-kw-snake t# c#) [~'_] ~out#)))
+                 (partition 3 specs))
+       nil)))
+
+(defn- delayed-column-by-index-fn
+  "Adds coercion to a database result set `rs` handled by builder `builder` with result
+  index `i`. For each result it reads its table name and column label (or name, if
+  label is not set), and calls output coercer obtained using
+  `amelinium.db/out-coercer`. Each result is wrapped in a Delay object unless it does
+  not require coercion."
+  [builder ^ResultSet rs ^Integer i]
+  (let [^ResultSetMetaData rsm (.getMetaData rs)
+        coercer-fn             (out-coercer (make-kw-simple (.getTableName   rsm i)
+                                                            (.getColumnLabel rsm i)))
+        v                      (.getObject rs i)]
+    (rs/read-column-by-index (if coercer-fn (delay (coercer-fn v)) v) rsm i)))
+
+(defn- column-by-index-fn
+  "Adds coercion to a database result set `rs` handled by builder `builder` with result
+  index `i`. For each result it reads its table name and column label (or name, if
+  label is not set), and calls output coercer using `amelinium.db/->` passing to it the
+  mentioned names and a value."
+  [builder ^ResultSet rs ^Integer i]
+  (let [^ResultSetMetaData rsm (.getMetaData rs)]
+    (rs/read-column-by-index (-> (.getTableName   rsm i)
+                                 (.getColumnLabel rsm i)
+                                 (.getObject      rs  i))
+                             rsm
+                             i)))
+
+(defn gen-builder
+  "Generates result set builder on a basis of the given builder `rs-builder`. Uses
+  `amelinium.db/column-by-index-fn` to coerce the results."
+  [rs-builder]
+  (rs/builder-adapter rs-builder column-by-index-fn))
+
+(defn gen-builder-delayed
+  "Generates result set builder on a basis of the given builder `rs-builder`. Uses
+  `amelinium.db/delayed-column-by-index-fn` to coerce the results."
+  [rs-builder]
+  (rs/builder-adapter rs-builder delayed-column-by-index-fn))
+
+;; Predefined database options
+
+(def opts-map               (update db/opts-map         :builder-fn gen-builder))
+(def opts-simple-map        (update db/opts-simple-map  :builder-fn gen-builder))
+(def opts-vec               (update db/opts-vec         :builder-fn gen-builder))
+(def opts-simple-vec        (update db/opts-simple-vec  :builder-fn gen-builder))
+(def opts-slashed-map       (update db/opts-slashed-map :builder-fn gen-builder))
+(def opts-slashed-vec       (update db/opts-slashed-vec :builder-fn gen-builder))
+(def opts-lazy-vec          (update db/opts-vec         :builder-fn gen-builder-delayed))
+(def opts-lazy-simple-vec   (update db/opts-simple-vec  :builder-fn gen-builder-delayed))
+(def opts-lazy-slashed-vec  (update db/opts-slashed-vec :builder-fn gen-builder-delayed))
+(def opts-lazy-map          (update db/opts-map         :builder-fn gen-builder-delayed))
+(def opts-lazy-simple-map   (update db/opts-simple-map  :builder-fn gen-builder-delayed))
+(def opts-lazy-slashed-map  (update db/opts-slashed-map :builder-fn gen-builder-delayed))
+
+;; Main wrappers
+
+(defn lazy-execute-one!
+  ([connectable sql-params opts]
+   (let [m (jdbc/execute-one! connectable sql-params (into opts-lazy-simple-map opts))]
+     (if m (map/to-lazy m) m)))
+  ([connectable sql-params]
+   (lazy-execute-one! connectable sql-params nil)))
+
+(defn lazy-execute!
+  ([connectable sql-params opts]
+   (if-some [coll (jdbc/execute! connectable sql-params (into opts-lazy-simple-map opts))]
+     (mapv #(if % (map/to-lazy %) %) coll)))
+  ([connectable sql-params]
+   (lazy-execute! connectable sql-params nil)))
+
+(defn execute-one!
+  ([connectable sql-params opts]
+   (jdbc/execute-one! connectable sql-params (into opts-simple-map opts)))
+  ([connectable sql-params]
+   (execute-one! connectable sql-params nil)))
+
+(defn execute!
+  ([connectable sql-params opts]
+   (jdbc/execute! connectable sql-params (into opts-simple-map opts)))
+  ([connectable sql-params]
+   (execute! connectable sql-params nil)))
+
+(defmacro lazy-do
+  [& cmd]
+  `(let [r# ~@cmd] (if r# (map/to-lazy r#) r#)))
+
+(defn lazy-get-by-id
+  "Like `next.jdbc/get-by-id` but supports lazy maps."
+  ([connectable table pk]
+   (lazy-get-by-id connectable table pk :id {}))
+  ([connectable table pk opts]
+   (lazy-get-by-id connectable table pk :id opts))
+  ([connectable table pk pk-name opts]
+   (let [opts (into (into (or (:options connectable) {}) opts-lazy-simple-map) opts)]
+     (lazy-do (sql/get-by-id connectable table pk pk-name opts)))))
+
+;; Abstract getters and setters
+
+(defn make-getter
+  ([f opts id-col cols]
+   (make-getter f opts nil id-col cols nil))
+  ([f opts table id-col cols]
+   (make-getter f opts table id-col cols nil))
+  ([f opts table id-col cols getter-coll-fn]
+   (let [id-col (keyword id-col)
+         cols   (if (map? cols)  (keys cols) cols)
+         cols   (if (coll? cols) (seq cols) cols)
+         cols   (if (coll? cols) cols [(or cols "*")])
+         table  (db/to-snake-simple table)
+         q      (str-spc "SELECT" (db/join-col-names cols)
+                         "FROM"   (or table "?")
+                         "WHERE"  (db/to-snake-simple id-col) "= ?")]
+     (if table
+       (if getter-coll-fn
+         (fn db-lazy-getter
+           ([db id]          (db-lazy-getter db nil id))
+           ([db _ id]        (f db [q id] opts))
+           ([db _ id & more] (getter-coll-fn db (cons id more))))
+         (fn [db _ id]
+           (f db [q id] opts)))
+       (if getter-coll-fn
+         (fn
+           ([db table id]        (f db [q (db/to-snake-simple table) id] opts))
+           ([db table id & more] (getter-coll-fn db table (cons id more))))
+         (fn [db table id]
+           (f db [q (db/to-snake-simple table) id] opts)))))))
+
+(defn make-getter-coll
+  "Creates a database getter suitable for use with `get-cached-coll-` family of
+  functions. The returned function should accept an argument containing multiple
+  identifiers."
+  ([f opts id-col]
+   (make-getter-coll f opts nil id-col nil))
+  ([f opts id-col cols]
+   (make-getter-coll f opts nil id-col cols))
+  ([f opts table id-col cols]
+   (let [id-col (keyword id-col)
+         cols   (if (map? cols) (keys cols) cols)
+         cols   (if (coll? cols) (seq cols) cols)
+         cols   (if (coll? cols) cols [(or cols "*")])
+         table  (to-snake-simple table)
+         q      (str-spc "SELECT" (join-col-names cols)
+                         "FROM"   (or table "?")
+                         "WHERE"  (to-snake-simple id-col)
+                         "IN (")]
+     (if table
+       (fn db-getter-coll
+         ([db ids]   (db-getter-coll db nil ids))
+         ([db _ ids] (if-some [ids (seq ids)]
+                       (let [query (str q (join-? ids) ")")]
+                         (->> (f db (cons query ids) opts)
+                              (reduce #(qassoc %1 (get %2 id-col) %2) {}))))))
+       (fn [db table ids]
+         (if-some [ids (seq ids)]
+           (let [ids   (map id-to-db ids)
+                 table (to-snake-simple table)
+                 query (str q (join-? ids) ")")]
+             (->> (f db (cons query (cons table ids)) opts)
+                  (reduce #(qassoc %1 (get %2 id-col) %2) {})))))))))
 
 ;; Configuration record
 
@@ -407,13 +752,13 @@
   [config]
   (if-not (map? config)
     config
-    (-> config
-        (map/update-existing :dbname         fs/parse-java-properties)
-        (map/update-existing :migrations-dir fs/parse-java-properties)
-        (map/assoc-missing  :user            (get config :username))
-        (map/assoc-missing  :username        (get config :user))
-        (map/dissoc-if      :username        nil?)
-        (map/dissoc-if      :user            nil?))))
+    (c/-> config
+          (map/update-existing :dbname         fs/parse-java-properties)
+          (map/update-existing :migrations-dir fs/parse-java-properties)
+          (map/assoc-missing  :user            (get config :username))
+          (map/assoc-missing  :username        (get config :user))
+          (map/dissoc-if      :username        nil?)
+          (map/dissoc-if      :user            nil?))))
 
 (defn init-db
   ([k config]
@@ -430,7 +775,7 @@
    (init-db k config ds-getter ds-closer ds-suspender nil))
   ([k config ds-getter ds-closer ds-suspender ds-resumer]
    (if config
-     (let [db-props (-> :properties config (dissoc :logger :migrations-dir) prep-db)
+     (let [db-props (c/-> :properties config (dissoc :logger :migrations-dir) prep-db)
            db-name  (db-name db-props config k)
            db-key   (db-key-name k db-props config)
            db-props (map/assoc-missing db-props :name db-name :dbkey db-key)]
@@ -478,11 +823,11 @@
 (defn migrator-config
   [config loader migration-dir]
   (let [db-key (db-key-name config)]
-    (-> config
-        (assoc :migrations (loader migration-dir))
-        (map/assoc-missing  :initializer identity)
-        (map/assoc-missing  :reporter  (partial default-reporter db-key))
-        (map/update-missing :datastore (:initializer config)))))
+    (c/-> config
+          (assoc :migrations (loader migration-dir))
+          (map/assoc-missing  :initializer identity)
+          (map/assoc-missing  :reporter  (partial default-reporter db-key))
+          (map/update-missing :datastore (:initializer config)))))
 
 (defn init-mig
   [k config]
@@ -490,11 +835,11 @@
         loader (var/deref (:loader config))
         migdir (fs/parse-java-properties (or (:migrations-dir config)
                                              (get-in config [:properties :migrations-dir])))
-        config (-> config
-                   (assoc :dbkey k :datastore ds)
-                   (map/update-existing :reporter  var/deref-symbol)
-                   (map/update-existing :strategy  keyword)
-                   (dissoc :loader :logger :initializer :properties))]
+        config (c/-> config
+                     (assoc :dbkey k :datastore ds)
+                     (map/update-existing :reporter  var/deref-symbol)
+                     (map/update-existing :strategy  keyword)
+                     (dissoc :loader :logger :initializer :properties))]
     (fn []
       (migrator-config config loader migdir))))
 

@@ -47,8 +47,9 @@
            [amelinium                Suites SuitesJSON PasswordData]
            [amelinium                Identity Session UserData AuthQueries DBPassword]
            [amelinium                AuthConfig AuthSettings AuthLocking AuthConfirmation AccountTypes]
+           [java.util                UUID]
            [javax.sql                DataSource]
-           [java.time                Duration]))
+           [java.time                Duration Instant]))
 
 (defonce ^:redef props-cache    (atom nil))
 (defonce ^:redef settings-cache (atom nil))
@@ -129,22 +130,23 @@
 ;; Users
 
 (defn get-user-by-id
-  "Given a user ID, returns the user record."
+  "Given a user ID, returns the user data in a form of lazy map."
   [db id]
   (if-some [id (parse-long id)]
-    (sql/get-by-id db :users id db/opts-simple-map)))
+    (db/lazy-get-by-id db :users id)))
 
 (defn get-user-by-email
-  "Given an email, returns the user record."
+  "Given an email, returns the user data in a form of lazy map."
   [db email]
   (if-some [email (some-str email)]
-    (sql/get-by-id db :users email :email db/opts-simple-map)))
+    (db/lazy-get-by-id db :users email :email)))
 
 (defn get-user-by-uid
-  "Given a database connectable object `db` and a UID `uid`, returns the user record."
+  "Given a database connectable object `db` and a UID `uid`, returns
+  the user data in a form of lazy map."
   [db uid]
   (if (pos-int? uid)
-    (sql/get-by-id db :users (long uid) :uid db/opts-simple-map)))
+    (db/lazy-get-by-id db :users (long uid) :uid)))
 
 ;; Roles
 
@@ -201,64 +203,54 @@
 
 ;; Properties (cached)
 
-(def ^:const info-cols
+(def ^:const prop-cols
   [:id :uid :email :account_type
    :first_name :last_name :middle_name :phone
    :login_attempts :last_ok_ip :last_failed_ip
    :last_attempt :last_login :created :created_by
    :soft_locked :locked])
 
-(defn info-coercer
-  [m]
-  (-> m
-      (db/key-as-uuid    :uid)
-      (db/key-as-keyword :account-type)
-      (db/key-as-ip      :last-ok-ip)
-      (db/key-as-ip      :last-failed-ip)
-      (db/key-as-phone   :phone)))
+(def ^:const prop-get-query
+  (str-spc "SELECT" (db/join-col-names prop-cols) "FROM users WHERE id = ?"))
 
-(defn info-coercer-coll
-  [coll]
-  (map/map-vals info-coercer coll))
+(def ^:const props-get-query
+  (str-spc "SELECT" (db/join-col-names prop-cols) "FROM users WHERE id IN"))
 
-(def ^{:arglists '([db ids])}
-  info-getter-coll
-  (comp info-coercer-coll (db/make-getter-coll :users :id info-cols)))
+(def ^{:arglists '([db ids] [db _ ids])}
+  props-getter-coll
+  (db/make-getter-coll db/lazy-execute! db/opts-lazy-simple-map
+                       :users :id prop-cols))
 
-(def ^{:arglists '([db id] [db id & more])}
-  info-getter-core
-  (db/make-getter :users :id info-cols info-getter-coll))
-
-(defn info-getter
-  ([db id]          (info-coercer (info-getter-core db id)))
-  ([db _ id]        (info-coercer (info-getter-core db nil id)))
-  ([db _ id & more] (info-getter-coll db (cons id more))))
+(def ^{:arglists '([db id] [db _ id] [db _ id & ids])}
+  props-getter
+  (db/make-getter db/lazy-execute-one! db/opts-lazy-simple-map
+                  :users :id prop-cols props-getter-coll))
 
 (def ^{:arglists '([db id keys-vals])}
-  info-setter
+  props-setter
   (db/make-setter :users :id))
 
 (def ^{:arglists '([db id])}
-  info-deleter
+  props-deleter
   (db/make-deleter :users :id))
 
 (defn props-set
   "Sets properties of a user with the given ID."
   [db ^Long user-id keys-vals]
-  (let [r (info-setter db user-id keys-vals)]
-    (db/cache-evict! props-cache (long user-id)) r))
+  (let [r (props-setter db user-id keys-vals)]
+    (db/cache-evict! props-cache (db/<- :users/id user-id)) r))
 
 (defn props-del
   "Deletes all properties of a user with the given ID."
   [db ^Long user-id]
-  (let [r (info-deleter db user-id)]
-    (db/cache-evict! props-cache (long user-id)) r))
+  (let [r (props-deleter db user-id)]
+    (db/cache-evict! props-cache (db/<- :users/id user-id)) r))
 
 (defn prop-set
   "Sets property k of a user with the given ID to value v."
   [db ^Long user-id ^Keyword k v]
-  (let [r (info-setter db user-id {k v})]
-    (db/cache-evict! props-cache (long user-id)) r))
+  (let [r (props-setter db user-id {k v})]
+    (db/cache-evict! props-cache (db/<- :users/id user-id)) r))
 
 (defn prop-del
   "Deletes property of a user with the given ID by setting it to nil."
@@ -272,16 +264,16 @@
   their IDs if multiple IDs are given (cached)."
   ([db ^Keyword prop-id ^Long user-id]
    (if (and prop-id user-id)
-     (db/get-cached-prop props-cache info-getter db prop-id user-id)))
+     (db/get-cached-prop props-cache props-getter db prop-id user-id)))
   ([db ^Keyword prop-id ^Long user-id & ids]
    (if (and prop-id user-id)
-     (db/get-cached-coll-prop props-cache info-getter-coll db prop-id (cons user-id ids)))))
+     (db/get-cached-coll-prop props-cache props-getter-coll db prop-id (cons user-id ids)))))
 
 (defn seq-prop-by-id
   "Returns user properties for the given user IDs (cached)."
   [db ^Keyword prop-id user-ids]
   (if (and prop-id user-ids)
-    (db/get-cached-coll-prop props-cache info-getter-coll db prop-id user-ids)))
+    (db/get-cached-coll-prop props-cache props-getter-coll db prop-id user-ids)))
 
 (defn prop-by-ids
   "Returns property for the given user IDs (cached)."
@@ -293,22 +285,22 @@
   ID if multiple IDs are given (cached). If the property is not found the default tag
   is returned instead of `nil`."
   ([db ^Keyword prop default ^Long id]
-   (db/get-cached-prop-or-default props-cache info-getter db prop default id))
+   (db/get-cached-prop-or-default props-cache props-getter db prop default id))
   ([db ^Keyword prop default ^Long id & ids]
-   (apply db/get-cached-prop-or-default props-cache info-getter-coll
+   (apply db/get-cached-prop-or-default props-cache props-getter-coll
           db prop default id ids)))
 
 (defn props-by-id
   "Returns user properties for the given user ID (cached)."
   ([db ^Long user-id]
-   (if user-id (db/get-cached props-cache info-getter db user-id)))
+   (if user-id (db/get-cached props-cache props-getter db user-id)))
   ([db ^Long user-id & ids]
-   (db/get-cached-coll props-cache info-getter-coll db (cons user-id ids))))
+   (db/get-cached-coll props-cache props-getter-coll db (cons user-id ids))))
 
 (defn seq-props-by-id
   "Returns user properties for each of the given user IDs (cached)."
   [db ids]
-  (db/get-cached-coll props-cache info-getter-coll db ids))
+  (db/get-cached-coll props-cache props-getter-coll db ids))
 
 (defn props-by-ids
   "Returns user properties for each of the given user IDs (cached)."
@@ -393,9 +385,9 @@
   then performs a SQL query `query` with the obtained value as a parameter. Returns
   query result as vector."
   {:see-also ["query-id"]}
-  [db query user-identity]
-  (if-some [dbs (identity/->db user-identity)]
-    (first (jdbc/execute-one! db [query dbs] db/opts-simple-vec))))
+  [db colspec query user-identity]
+  (if-some [dbs (db/<- colspec user-identity)]
+    (first (db/execute-one! db [query dbs] db/opts-simple-vec))))
 
 (defn get-id
   "Takes a user identity and a database connectable object and returns a numerical user
@@ -413,8 +405,8 @@
   "Converts the given user identities `user-identities` to a database-suitable values
   and then performs a SQL query `query` with the obtained value as parameters added
   using \"IN(...)\" clause. Returns query result as vector."
-  [db query user-identities]
-  (let [db-ids (map identity/->db user-identities)]
+  [db colspec query user-identities]
+  (let [db-ids (db/<-seq colspec user-identities)]
     (->> db/opts-simple-vec
          (sql/query db (cons (str query " " (db/braced-join-? db-ids)) db-ids))
          next)))
@@ -460,7 +452,7 @@
    (if db
      (if-some [user-ids (some-identities identity-type user-identities)]
        (if (and trust? (identical? :id identity-type))
-         (->> user-ids (map (juxt identity identity/value)) (into {}))
+         (->> user-ids (map (juxt identity identity/->db)) (into {}))
          (let [looked-up (cache-lookup-user-ids identity-cache user-ids)
                missing   (seq (get looked-up ::db/not-found))]
            (if-not missing
@@ -633,7 +625,7 @@
   [db token]
   (let [token (some-str token)]
     (if token
-      (if-some [r (jdbc/execute-one! db [create-with-token-query token] db/opts-simple-map)]
+      (if-some [r (db/execute-one! db [create-with-token-query token])]
         (qassoc r :created? true :uid (identity/parse-uid (get r :uid)) :identity (get r :email))
         (let [errs (confirmation/report-errors db token "creation" true)]
           {:created? false
@@ -1169,15 +1161,42 @@
 
 ;; ID database getters for common identities
 
-(defmethod query-id  :email [db _ i] (query-id-std  db "SELECT id FROM users WHERE email = ?" i))
-(defmethod query-id  :phone [db _ i] (query-id-std  db "SELECT id FROM users WHERE phone = ?" i))
-(defmethod query-id  :uid   [db _ i] (query-id-std  db "SELECT id FROM users WHERE uid   = ?" i))
-(defmethod query-id  :id    [db _ i] (query-id-std  db "SELECT id FROM users WHERE id    = ?" i))
+(defmethod query-id  :email [db _ i] (query-id-std  db :users/email "SELECT id FROM users WHERE email = ?" i))
+(defmethod query-id  :phone [db _ i] (query-id-std  db :users/phone "SELECT id FROM users WHERE phone = ?" i))
+(defmethod query-id  :uid   [db _ i] (query-id-std  db :users/uid   "SELECT id FROM users WHERE uid   = ?" i))
+(defmethod query-id  :id    [db _ i] (query-id-std  db :users/id    "SELECT id FROM users WHERE id    = ?" i))
 
-(defmethod query-ids :email [db _ i] (query-ids-std db "SELECT email, id FROM users WHERE email IN" i))
-(defmethod query-ids :phone [db _ i] (query-ids-std db "SELECT phone, id FROM users WHERE phone IN" i))
-(defmethod query-ids :uid   [db _ i] (query-ids-std db "SELECT uid,   id FROM users WHERE uid   IN" i))
-(defmethod query-ids :id    [db _ i] (query-ids-std db "SELECT id,    id FROM users WHERE id    IN" i))
+(defmethod query-ids :email [db _ i] (query-ids-std db :users/email "SELECT email, id FROM users WHERE email IN" i))
+(defmethod query-ids :phone [db _ i] (query-ids-std db :users/phone "SELECT phone, id FROM users WHERE phone IN" i))
+(defmethod query-ids :uid   [db _ i] (query-ids-std db :users/uid   "SELECT uid,   id FROM users WHERE uid   IN" i))
+(defmethod query-ids :id    [db _ i] (query-ids-std db :users/id    "SELECT id,    id FROM users WHERE id    IN" i))
+
+;; Coercion
+
+(defn- as-uuid         ^UUID    [u] (if (uuid? u) u (if u (uuid/as-uuid u))))
+(defn- long-or-zero    ^Long    [n] (if n (long n) 0))
+(defn- long-or-nil     ^Long    [n] (if n (long n)))
+(defn- to-long-or-zero ^Long    [n] (safe-parse-long n 0))
+(defn- to-instant      ^Instant [t] (if (t/instant? t) t (time/parse-dt t)))
+
+(db/defcoercions :users
+  :id             #(identity/->db :id    %)    long
+  :created-by     #(identity/->db :id    %)    long-or-nil
+  :uid            #(identity/->db :uid   %)    as-uuid
+  :email          #(identity/->db :email %)    some-str
+  :phone          #(identity/->db :phone %)    identity/preparse-phone
+  :account-type   some-str                     some-keyword
+  :first-name     some-str                     some-str
+  :middle-name    some-str                     some-str
+  :last-name      some-str                     some-str
+  :login-attempts to-long-or-zero              long-or-zero
+  :last-ok-ip     ip/to-address                ip/string-to-address
+  :last-failed-ip ip/to-address                ip/string-to-address
+  :last-login     to-instant                   identity
+  :last-attempt   to-instant                   identity
+  :soft-locked    to-instant                   identity
+  :locked         to-instant                   identity
+  :created        to-instant                   identity)
 
 ;; Wrappers for commonly used properties
 

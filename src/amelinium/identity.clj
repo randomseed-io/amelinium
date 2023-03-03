@@ -66,20 +66,30 @@
 
 ;; Standard identity parsers
 
-(defn parse-email
-  ^Identity [v]
+(defn preparse-email
+  ^String [v]
   (if-some [^String v (some-str v)]
     (let [l (unchecked-int (.length v))]
       (if (> l 2)
         (if-some [idx ^long (str/index-of v \@ 1)]
           (if (and (> (unchecked-dec-int l) idx 0))
-            (Identity. :email (str (subs v 0 idx) (str/lower-case (subs v idx l))))))))))
+            (str (subs v 0 idx) (str/lower-case (subs v idx l)))))))))
+
+(defn parse-email
+  ^Identity [v]
+  (if-some [^String v (preparse-email v)]
+    (Identity. :email v)))
+
+(defn preparse-id
+  ^Long [v]
+  (if-let [v (safe-parse-long v)]
+    (if (pos-int? v)
+      v)))
 
 (defn parse-id
   ^Identity [v]
-  (if-let [v (safe-parse-long v)]
-    (if (pos-int? v)
-      (Identity. :id v))))
+  (if-some [^Long v (preparse-id v)]
+    (Identity. :id v)))
 
 (defn preparse-phone
   "Tries to create an object representing phone number. Returns `nil` if the input

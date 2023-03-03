@@ -8,15 +8,18 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [clojure.string          :as       str]
-            [tongue.core             :as    tongue]
-            [io.randomseed.utils     :refer   :all]
-            [io.randomseed.utils.var :as       var]
-            [io.randomseed.utils.map :as       map]
-            [amelinium.app           :as       app]
-            [amelinium.system        :as    system]
-            [amelinium.logging       :as       log]
-            [amelinium.http          :as      http]))
+  (:require [clojure.string          :as                 str]
+            [tongue.core             :as              tongue]
+            [io.randomseed.utils     :refer             :all]
+            [io.randomseed.utils.var :as                 var]
+            [io.randomseed.utils.map :as                 map]
+            [amelinium.app           :as                 app]
+            [amelinium.system        :as              system]
+            [amelinium.logging       :as                 log]
+            [amelinium.http          :as                http]
+            [amelinium.db            :refer [idname make-kw
+                                             idname-simple
+                                             make-kw-simple]]))
 
 (defonce ^:redef translations nil)
 
@@ -27,55 +30,9 @@
 (defn lang
   "Tries to obtain a language from a request map (`:language/id` key). Falls back to a
   default language (`:language/default`) if the first one is `nil`. Returns a keyword."
-  [req]
+  ^clojure.lang.Keyword [req]
   (or (get req :language/id)
       (get req :language/default)))
-
-(defn idname
-  "If the given value `v` is an ident, it returns its (optional) namespace and name
-  joined with a dot character. Otherwise it returns the string representation of
-  the given object."
-  [v]
-  (if (ident? v)
-    (if-some [nsp (namespace v)]
-      (str nsp "." (name v))
-      (str/replace (name v) \/ \.))
-    (str/replace (str v) \/ \.)))
-
-(defn idname-simple
-  "If the given value `v` is an ident, it returns its name. Otherwise it returns the
-  string representation of the given object."
-  [v]
-  (if (ident? v) (name v) (str v)))
-
-(defn make-kw
-  "Creates a keyword with the given name and namespace which both can be expressed as
-  strings or idents. If the second argument is `nil` then a keyword is created using
-  the first argument by simply converting it with the `keyword` function. If both
-  `ns` and `name` are given then the following is applied: if `ns` or `name` is a
-  qualified ident, its name and namespace will be joined with a dot character before
-  producing a keyword; additionally, if `ns` or `name` is a simple ident, any slash
-  character in its name will be replaced with a dot. If `ns` or `name` is not an
-  ident then any slash character in its string representation will be replaced with a
-  dot before creating a keyword."
-  ([name]
-   (if (keyword? name) name (keyword name)))
-  ([ns name]
-   (if name
-     (keyword (idname ns) (idname name))
-     (if (keyword? ns) ns (keyword ns)))))
-
-(defn make-kw-simple
-  "Creates a keyword with the given name and namespace which both can be expressed as
-  strings or idents. If the second argument is `nil` then a keyword is created using
-  the first argument by simply converting it with the `keyword` function. If any
-  given ident is namespaced, only its name is used."
-  ([name]
-   (if (keyword? name) name (keyword name)))
-  ([ns name]
-   (if name
-     (keyword (idname-simple ns) (idname-simple name))
-     (if (keyword? ns) ns (keyword ns)))))
 
 (defn translation-fn
   "Tries to obtain translation function from a route data in a request map or a `Match`
@@ -164,10 +121,10 @@
   or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
   or `nil` then it will always return `nil` when a key is missing, regardless of
   current value of `*handle-missing-keys*` in the calling context."
-  ([tf locale key]            (tf (make-kw-simple locale) key))
-  ([tf locale key x]          (tf (make-kw-simple locale) key x))
-  ([tf locale key x y]        (tf (make-kw-simple locale) key x y))
-  ([tf locale key x y & more] (apply tf (make-kw-simple locale) key x y more)))
+  (^String [tf locale key]            (tf (make-kw-simple locale) key))
+  (^String [tf locale key x]          (tf (make-kw-simple locale) key x))
+  (^String [tf locale key x y]        (tf (make-kw-simple locale) key x y))
+  (^String [tf locale key x y & more] (apply tf (make-kw-simple locale) key x y more)))
 
 (defn translate-sub-with
   "Returns a translation string for the given `locale` (language ID), the namespace
@@ -183,10 +140,10 @@
   or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
   or `nil` then it will always return `nil` when a key is missing, regardless of
   current value of `*handle-missing-keys*` in the calling context."
-  ([tf locale key-ns key-name]            (tf (make-kw-simple locale) (make-kw key-ns key-name)))
-  ([tf locale key-ns key-name x]          (tf (make-kw-simple locale) (make-kw key-ns key-name) x))
-  ([tf locale key-ns key-name x y]        (tf (make-kw-simple locale) (make-kw key-ns key-name) x y))
-  ([tf locale key-ns key-name x y & more] (apply tf (make-kw-simple locale) (make-kw key-ns key-name) x y more)))
+  (^String [tf locale key-ns key-name]            (tf (make-kw-simple locale) (make-kw key-ns key-name)))
+  (^String [tf locale key-ns key-name x]          (tf (make-kw-simple locale) (make-kw key-ns key-name) x))
+  (^String [tf locale key-ns key-name x y]        (tf (make-kw-simple locale) (make-kw key-ns key-name) x y))
+  (^String [tf locale key-ns key-name x y & more] (apply tf (make-kw-simple locale) (make-kw key-ns key-name) x y more)))
 
 (defn translate
   "Returns a translation string for the given `locale` (language ID) and the keyword
@@ -202,10 +159,10 @@
   or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
   or `nil` then it will always return `nil` when a key is missing, regardless of
   current value of `*handle-missing-keys*` in the calling context."
-  ([req locale key]            ((translator req (make-kw-simple locale)) key))
-  ([req locale key x]          ((translator req (make-kw-simple locale)) key x))
-  ([req locale key x y]        ((translator req (make-kw-simple locale)) key x y))
-  ([req locale key x y & more] (apply (translator req (make-kw-simple locale)) key x y more)))
+  (^String [req locale key]            ((translator req (make-kw-simple locale)) key))
+  (^String [req locale key x]          ((translator req (make-kw-simple locale)) key x))
+  (^String [req locale key x y]        ((translator req (make-kw-simple locale)) key x y))
+  (^String [req locale key x y & more] (apply (translator req (make-kw-simple locale)) key x y more)))
 
 (defn translate-sub
   "Returns a translation string for the given `locale` (language ID), the namespace
@@ -222,10 +179,10 @@
   or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
   or `nil` then it will always return `nil` when a key is missing, regardless of
   current value of `*handle-missing-keys*` in the calling context."
-  ([req locale key-ns key-name]            ((translator req (make-kw-simple locale)) (make-kw key-ns key-name)))
-  ([req locale key-ns key-name x]          ((translator req (make-kw-simple locale)) (make-kw key-ns key-name) x))
-  ([req locale key-ns key-name x y]        ((translator req (make-kw-simple locale)) (make-kw key-ns key-name) x y))
-  ([req locale key-ns key-name x y & more] (apply (translator req (make-kw-simple locale)) (make-kw key-ns key-name) x y more)))
+  (^String [req locale key-ns key-name]            ((translator req (make-kw-simple locale)) (make-kw key-ns key-name)))
+  (^String [req locale key-ns key-name x]          ((translator req (make-kw-simple locale)) (make-kw key-ns key-name) x))
+  (^String [req locale key-ns key-name x y]        ((translator req (make-kw-simple locale)) (make-kw key-ns key-name) x y))
+  (^String [req locale key-ns key-name x y & more] (apply (translator req (make-kw-simple locale)) (make-kw key-ns key-name) x y more)))
 
 (defn tr
   "Returns a translation string for the given locale (obtained from a request map)
@@ -240,10 +197,10 @@
   or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
   or `nil` then it will always return `nil` when a key is missing, regardless of
   current value of `*handle-missing-keys*` in the calling context."
-  ([req key]            ((translator req) key))
-  ([req key x]          ((translator req) key x))
-  ([req key x y]        ((translator req) key x y))
-  ([req key x y & more] (apply (translator req) key x y more)))
+  (^String [req key]            ((translator req) key))
+  (^String [req key x]          ((translator req) key x))
+  (^String [req key x y]        ((translator req) key x y))
+  (^String [req key x y & more] (apply (translator req) key x y more)))
 
 (defn tr-sub
   "Returns a translation string for the given locale (obtained from a request map),
@@ -260,10 +217,10 @@
   or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
   or `nil` then it will always return `nil` when a key is missing, regardless of
   current value of `*handle-missing-keys*` in the calling context."
-  ([req key-ns key-name]            ((translator req) (make-kw key-ns key-name)))
-  ([req key-ns key-name x]          ((translator req) (make-kw key-ns key-name) x))
-  ([req key-ns key-name x y]        ((translator req) (make-kw key-ns key-name) x y))
-  ([req key-ns key-name x y & more] (apply (translator req) (make-kw key-ns key-name) x y more)))
+  (^String [req key-ns key-name]            ((translator req) (make-kw key-ns key-name)))
+  (^String [req key-ns key-name x]          ((translator req) (make-kw key-ns key-name) x))
+  (^String [req key-ns key-name x y]        ((translator req) (make-kw key-ns key-name) x y))
+  (^String [req key-ns key-name x y & more] (apply (translator req) (make-kw key-ns key-name) x y more)))
 
 (defmacro no-default
   "Sets `*handle-missing-keys*` dynamic variable to `false`, causing translation
@@ -286,19 +243,19 @@
 (defn wrap-translate
   [f]
   (fn translate
-    ([locale k]
+    (^String [locale k]
      (if (keyword? k)
        (or (f locale k) (missing-key f locale k))
        (if-some [k (keyword k)] (or (f locale k) (missing-key f locale k)))))
-    ([locale k a]
+    (^String [locale k a]
      (if (keyword? k)
        (or (f locale k a) (missing-key f locale k))
        (if-some [k (keyword k)] (or (f locale k a) (missing-key f locale k)))))
-    ([locale k a b]
+    (^String [locale k a b]
      (if (keyword? k)
        (or (f locale k a b) (missing-key f locale k))
        (if-some [k (keyword k)] (or (f locale k a b) (missing-key f locale k)))))
-    ([locale k a b & more]
+    (^String [locale k a b & more]
      (if (keyword? k)
        (or (apply f locale k a b more) (missing-key f locale k))
        (if-some [k (keyword k)] (or (apply f locale k a b more) (missing-key f locale k)))))))
