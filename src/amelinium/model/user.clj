@@ -657,7 +657,7 @@
   (let [token (some-str token)]
     (if token
       (if-some [r (db/execute-one! db [create-with-token-query token])]
-        (qassoc r :created? true :uid (identity/parse-uid (get r :uid)) :identity (get r :email))
+        (qassoc r :created? true :identity (identity/of-type :email (get r :email)))
         (let [errs (confirmation/report-errors db token "creation" true)]
           {:created? false
            :errors   errs})))))
@@ -678,8 +678,8 @@
   (let [code  (some-str code)
         email (some-str email)]
     (if (and code email)
-      (if-some [r (jdbc/execute-one! db [create-with-code-query code email] db/opts-simple-map)]
-        (qassoc r :created? true :uid (identity/parse-uid (get r :uid)) :identity (get r :email))
+      (if-some [r (db/execute-one! db [create-with-code-query code email])]
+        (qassoc r :created? true :identity (identity/of-type (get r :email)))
         (let [errs (confirmation/report-errors db email code "creation" true)]
           {:created? false
            :errors   errs})))))
@@ -714,8 +714,8 @@
   [db token]
   (let [token (some-str token)]
     (if token
-      (if-some [r (jdbc/execute-one! db [update-email-with-token-query token] db/opts-simple-map)]
-        (qassoc r :updated? true :uid (identity/parse-uid (get r :uid)) :identity (get r :email))
+      (if-some [r (db/execute-one! db [update-email-with-token-query token])]
+        (qassoc r :updated? true :identity (identity/of-type :email (get r :email)))
         (let [errs (confirmation/report-errors db token "change" true)]
           {:updated? false
            :errors   errs})))))
@@ -724,8 +724,8 @@
   [db token]
   (let [token (some-str token)]
     (if token
-      (if-some [r (jdbc/execute-one! db [update-phone-with-token-query token] db/opts-simple-map)]
-        (qassoc r :updated? true :uid (identity/parse-uid (get r :uid)) :identity (get r :phone))
+      (if-some [r (db/execute-one! db [update-phone-with-token-query token])]
+        (qassoc r :updated? true :identity (identity/of-type :phone (get r :phone)))
         (let [errs (confirmation/report-errors db token "change" true)]
           {:updated? false
            :errors   errs})))))
