@@ -334,11 +334,89 @@
   ([col-spec col-id]
    [(table-kw col-spec) (col-kw col-id)]))
 
-(defmulti in-coercer
+;; SQL query preparation
+
 (defn quoted
   ^String [s]
   (if-some [^String s (some-str s)]
     (quoted/mysql s)))
+
+(defn- interpolate-tag
+  [substitutions [_ quote? ^String modifier ^String tag]]
+  (if-some [tag (and tag (get substitutions (keyword tag)))]
+    (let [msym (and modifier (symbol modifier))
+          f    (or (if msym (var/deref-symbol
+                             (if (nil? (namespace msym))
+                               (symbol "amelinium.db" modifier)
+                               msym)))
+                   identity)]
+      (if-some [^String v (some-str (f tag))]
+        (if quote? (quoted v) v)
+        ""))
+    ""))
+
+(defn- interpolate-tags
+  [substitutions q]
+  (if substitutions
+    (str/replace q #"%(%)?([^\}]+)?\{([^\}]+)?\}" #(interpolate-tag substitutions %))
+    q))
+
+(def ^{:tag    String
+       :no-doc true}
+  build-query-core
+  "For the given SQL query `q` and substitution map performs pattern interpolation."
+  (clojure.core/memoize
+   (fn build-query-fn
+     (^String []                "")
+     (^String [q]                q)
+     (^String [q substitutions] (if q (interpolate-tags substitutions q))))))
+
+(defmacro build-query
+  "For the given SQL query `q` and substitution map performs pattern interpolation.
+  If multiple arguments are given the last one will be treated as substitution map.
+
+  Tries to convert possible literals given as query parts to strings and then trim
+  them while squeezing repeated spaces at compile time. If some operation cannot be
+  performed in that phase, it generates code which will convert an expression to a
+  string at runtime. Then pattern interpolation is performed on the resulting string,
+  using the provided `substitutions` map.
+
+  If a source string contains `%{tag-name}` special pattern, `tag-name` will be
+  looked up in substitution map and the whole pattern will be replaced by the
+  corresponding value.
+
+  If a tag name from pattern cannot be found in a substitution map, the pattern will
+  be replaced by an empty string.
+
+  A pattern may have a form of `%%{tag-name}`. In such case any non-`nil` value being
+  a result of tag name resolution will be quoted using `amelinium.db/quote`.
+
+  A pattern may have additional modifier before the opening brace. It will be
+  resolved as a symbolic function name to be called in order to transform a value
+  associated with a tag name. If the name is not fully-qualified (does not contain a
+  namespace part) its default namespace will be set to `amelinium.db`.
+
+  Example:
+
+  `(build-query \"select * from %%table{users}\"
+                \"where\" :points '> 100
+                {:users :users/id})`
+
+  The above call will generate the following result:
+
+  \"select * from `users` where points > 100\".
+
+  This macro should NOT be used to dynamically generate queries having dozens of "
+  {:arglists '([] [q] [q substitution-map] [& query-parts substitution-map])}
+  ([] "")
+  ([q]               (#'strspc-squeezed &form &env q))
+  ([q substitutions] `(build-query-core (strspc-squeezed ~q) ~substitutions))
+  ([a b & args]
+   (let [v# (vec args)
+         l# (peek v#)
+         r# (subvec v# 0 (unchecked-dec-int (count v#)))]
+     `(build-query-core (strspc-squeezed ~a ~b ~@r#) ~l#))))
+(defmulti in-coercer
   "Returns a coercer suitable for transforming the given argument `v` to a
   database-suitable value, assuming table and column specified by the given qualified
   keyword `table-column`."
