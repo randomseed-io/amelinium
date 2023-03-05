@@ -220,7 +220,7 @@
    (keyword (db/to-snake name)))
   (^clojure.lang.Keyword [ns name]
    (if name
-     (keyword (db/to-snake-simple (idname-simple ns)) (db/to-snake-simple (idname-simple name)))
+     (keyword (db/to-snake (idname-simple ns)) (db/to-snake (idname-simple name)))
      (keyword (db/to-snake ns)))))
 
 (defn make-kw-lisp
@@ -233,10 +233,105 @@
    (keyword (db/to-lisp name)))
   (^clojure.lang.Keyword [ns name]
    (if name
-     (keyword (db/to-lisp-simple (idname-simple ns)) (db/to-lisp-simple (idname-simple name)))
+     (keyword (db/to-lisp (idname-simple ns)) (db/to-lisp (idname-simple name)))
      (keyword (db/to-lisp ns)))))
 
-;; Coercion
+;; Tables and columns
+
+(defn colspec
+  "Converts a `table/column` identifier `table-col` into a snake-cased string. If
+  `table-id` and `col-id` are given, it creates a string of those parts joined with a
+  slash character. If identifier is given, it uses its namespace and name."
+  (^String [col-spec]
+   (db/to-snake col-spec))
+  (^String [table-id col-id]
+   (if col-id
+     (db/to-snake (str (idname table-id) "/" (idname col-id)))
+     (colspec table-id))))
+
+(defn colspec-kw
+  "Converts a `table/column` identifier `col-spec` into a lisp-cased keyword,
+  qualified if possible. If `table-id` and `col-id` are given, it creates a keyword of
+  those parts, `table-id` being its namespace and `col-id` being its name."
+  (^String [col-spec]
+   (some-keyword (db/to-lisp col-spec)))
+  (^String [table-id col-id]
+   (if col-id
+     (keyword (db/to-lisp (idname table-id)) (db/to-lisp (idname col-id)))
+     (colspec-kw table-id))))
+
+(defn table
+  "Extracts table name as a snake-cased string from `col-spec` which may be an
+  identifier or a string. If the identifier has a namespace, it will be used,
+  otherwise its name will be used. For strings, it will look for a slash separator to
+  detect namespace (a table name) and name (a column name), to pick a table name. If
+  two arguments are given, the second one is ignored."
+  (^String [col-spec]
+   (if (ident? col-spec)
+     (db/to-snake (or (namespace col-spec) (name col-spec)))
+     (if (some? col-spec) (table (some-keyword col-spec)))))
+  (^String [col-spec _] (table col-spec)))
+
+(defn col
+  "Extracts column name as a snake-cased string from `col-spec` which may be an
+  identifier or a string. If the identifier has a name, it will be used. For strings,
+  it will look for a slash separator to detect namespace (a table name) and name (a
+  column name), to pick a column name. If two arguments are given, the first one is
+  ignored."
+  (^String [col-spec]
+   (if (ident? col-spec)
+     (db/to-snake (name col-spec))
+     (if (some? col-spec) (col (some-keyword col-spec)))))
+  (^String [_ col-spec] (col col-spec)))
+
+(defn table-col
+  "Extracts table and column names from `col-spec` (which may be an identifier or a
+  string) as snake-cased strings of a 2-element vector (first element being a table
+  name, second a column name). If `col-spec` is an identifier, its namespace and name
+  will be used. If two arguments are given, names are extracted separately using
+  `table` and `col` functions)."
+  ([col-spec]
+   (if (ident? col-spec)
+     [(db/to-snake (namespace col-spec)) (db/to-snake (name col-spec))]
+     (if (some? col-spec) (table-col (some-keyword col-spec)))))
+  ([col-spec col-id]
+   [(table col-spec) (col col-id)]))
+
+(defn table-kw
+  "Extracts table name as a lisp-cased keyword from `col-spec` which may be an
+  identifier or a string. If the identifier has a namespace, it will be used,
+  otherwise its name will be used. For strings, it will first transform them into
+  keywords (detecting slash character as a separator of a namespace and name) to pick
+  a table name. If two arguments are given, the second one is ignored."
+  (^clojure.lang.Keyword [table-id]
+   (if (ident? table-id)
+     (some-keyword (db/to-lisp (or (namespace table-id) (name table-id))))
+     (if (some? table-id) (table-kw (some-keyword table-id)))))
+  (^clojure.lang.Keyword [table-id _] (table-kw table-id)))
+
+(defn col-kw
+  "Extracts column name as a lisp-cased keyword from `col-spec` which may be an
+  identifier or a string. If the identifier has a name, it will be used. For strings,
+  it will first transform them into keywords (detecting slash character as a
+  separator of a namespace and name) to pick a column name. If two arguments are
+  given, the first one is ignored."
+  (^clojure.lang.Keyword [col-id]
+   (if (ident? col-id)
+     (some-keyword (db/to-lisp (name col-id)))
+     (if (some? col-id) (col-kw (some-keyword col-id)))))
+  (^clojure.lang.Keyword [_ col-id] (col-kw col-id)))
+
+(defn table-col-kw
+  "Extracts table and column names from `col-spec` (which may be an identifier or a
+  string) as lisp-cased keywords of a 2-element vector (first element being a table
+  name, second a column name). If `col-spec` is an identifier, its namespace and name
+  will be used. If two arguments are given, names are extracted separately using
+  `table-kw` and `col-kw` functions)."
+  ([col-spec]
+   (let [k (some-keyword (db/to-lisp col-spec))]
+     [(some-keyword (namespace k)) (some-keyword (name k))]))
+  ([col-spec col-id]
+   [(table-kw col-spec) (col-kw col-id)]))
 
 (defmulti in-coercer
   "Returns a coercer suitable for transforming the given argument `v` to a
