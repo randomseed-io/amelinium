@@ -138,30 +138,6 @@
 
 (defn list-caches [] (print-caches))
 
-;; Keywordized properties mapping
-
-(defn key-as-keyword
-  [m k]
-  (map/update-existing m k keyword))
-
-;; IP properties mapping
-
-(defn key-as-ip
-  [m k]
-  (map/update-existing m k ip/string-to-address))
-
-;; Phone number mapping
-
-(defn key-as-phone
-  [m k]
-  (map/update-existing m k identity/preparse-phone))
-
-;; UUID mapping
-
-(defn key-as-uuid
-  [m k]
-  (map/update-existing m k identity/preparse-uid))
-
 ;; Memoization
 
 (defn mem-assoc-existing!
