@@ -1219,23 +1219,24 @@
 (defn- to-instant      ^Instant [t] (if (t/instant? t) t (time/parse-dt t)))
 
 (db/defcoercions :users
-  :id             #(identity/->db :id    %)    long
-  :created-by     #(identity/->db :id    %)    long-or-nil
-  :uid            #(identity/->db :uid   %)    as-uuid
-  :email          #(identity/->db :email %)    some-str
-  :phone          #(identity/->db :phone %)    identity/preparse-phone
-  :account-type   some-str                     some-keyword
-  :first-name     some-str                     some-str
-  :middle-name    some-str                     some-str
-  :last-name      some-str                     some-str
-  :login-attempts to-long-or-zero              long-or-zero
-  :last-ok-ip     ip/to-address                ip/string-to-address
-  :last-failed-ip ip/to-address                ip/string-to-address
-  :last-login     to-instant                   identity
-  :last-attempt   to-instant                   identity
-  :soft-locked    to-instant                   identity
-  :locked         to-instant                   identity
-  :created        to-instant                   identity)
+  :id                #(identity/->db :id    %)    long
+  :created-by        #(identity/->db :id    %)    long-or-nil
+  :uid               #(identity/->db :uid   %)    as-uuid
+  :email             #(identity/->db :email %)    some-str
+  :phone             #(identity/->db :phone %)    identity/preparse-phone
+  :account-type      some-str                     some-keyword
+  :first-name        some-str                     some-str
+  :middle-name       some-str                     some-str
+  :last-name         some-str                     some-str
+  :login-attempts    to-long-or-zero              long-or-zero
+  :last-ok-ip        ip/to-address                ip/string-to-address
+  :last-failed-ip    ip/to-address                ip/string-to-address
+  :last-login        to-instant                   identity
+  :last-attempt      to-instant                   identity
+  :soft-locked       to-instant                   identity
+  :locked            to-instant                   identity
+  :created           to-instant                   identity
+  :password-suite-id safe-parse-long              long-or-nil)
 
 ;; Wrappers for commonly used properties
 
