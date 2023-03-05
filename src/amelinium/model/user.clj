@@ -307,14 +307,6 @@
 
 ;; Getting attribute by identity
 
-(defn- some-identities
-  "Tries to coerce identities to `amelinium.Identity` objects and filters out those who
-  could not be coerced."
-  ([user-identities]
-   (->> (identity/of-seq user-identities) (filter identity) seq))
-  ([^Keyword identity-type user-identities]
-   (->> (identity/of-seq identity-type user-identities) (filter identity) seq)))
-
 (defn- cache-lookup-user-id
   "Performs a cache lookup of user identity `user-identity` using a cache object
   `cache`. Returns a value being a result of a cache lookup and, if the entry
@@ -417,12 +409,12 @@
   {:see-also ["query-ids" "get-id"]}
   ([db user-identities]
    (if db
-     (->> (some-identities user-identities)
+     (->> (identity/some-seq user-identities)
           (group-by identity/type)
-          (reduce-kv (ids-updater get-ids db) {}))))
+          (reduce-kv (db/groups-inverter get-ids db) {}))))
   ([db ^Keyword identity-type user-identities]
    (if db
-     (if-some [user-ids (some-identities identity-type user-identities)]
+     (if-some [user-ids (identity/some-seq identity-type user-identities)]
        (->> (query-ids db identity-type user-ids)
             (map #(vector (identity/of-type identity-type (nth % 0)) (nth % 1)))
             (into {}))))))
@@ -444,12 +436,12 @@
 (defn- ids-core
   ([^Boolean trust? db user-identities]
    (if db
-     (->> (some-identities user-identities)
+     (->> (identity/some-seq user-identities)
           (group-by identity/type)
-          (reduce-kv (ids-updater ids-core trust? db) {}))))
+          (reduce-kv (db/groups-inverter ids-core trust? db) {}))))
   ([^Boolean trust? db ^Keyword identity-type user-identities]
    (if db
-     (if-some [user-ids (some-identities identity-type user-identities)]
+     (if-some [user-ids (identity/some-seq identity-type user-identities)]
        (if (and trust? (identical? :id identity-type))
          (->> user-ids (map (juxt identity identity/->db)) (into {}))
          (let [looked-up (cache-lookup-user-ids identity-cache user-ids)

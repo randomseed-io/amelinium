@@ -365,6 +365,14 @@
    (if-some [identity-type (some-keyword identity-type)]
      (map #(p/make % identity-type) user-identities))))
 
+(defn some-seq
+  "Tries to coerce identities to `amelinium.Identity` objects and filters out those who
+  could not be coerced."
+  ([user-identities]
+   (->> (of-seq user-identities) (filter identity) seq))
+  ([^Keyword identity-type user-identities]
+   (->> (of-seq identity-type user-identities) (filter identity) seq)))
+
 ;; Standard class-based matchers and getters
 
 (extend-protocol p/Identifiable
