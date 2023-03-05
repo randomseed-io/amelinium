@@ -371,6 +371,16 @@
      (^String [q]                q)
      (^String [q substitutions] (if q (interpolate-tags substitutions q))))))
 
+(def ^{:tag    String
+       :no-doc true}
+  build-query-dynamic-core
+  "For the given SQL query `q` and substitution map performs pattern interpolation."
+  (memoize
+   (fn build-query-fn
+     (^String []                "")
+     (^String [q]                q)
+     (^String [q substitutions] (if q (interpolate-tags substitutions q))))))
+
 (defmacro build-query
   "For the given SQL query `q` and substitution map performs pattern interpolation.
   If multiple arguments are given the last one will be treated as substitution map.
@@ -406,7 +416,10 @@
 
   \"select * from `users` where points > 100\".
 
-  This macro should NOT be used to dynamically generate queries having dozens of "
+  This macro should NOT be used to dynamically generate queries having thousands of
+  variant substitution parameters as it uses unlimited underlying cache. For such
+  purposes please use `build-query-dynamic`, or simply utilize parameters of prepared
+  statements."
   {:arglists '([] [q] [q substitution-map] [& query-parts substitution-map])}
   ([] "")
   ([q]               (#'strspc-squeezed &form &env q))
@@ -416,6 +429,53 @@
          l# (peek v#)
          r# (subvec v# 0 (unchecked-dec-int (count v#)))]
      `(build-query-core (strspc-squeezed ~a ~b ~@r#) ~l#))))
+
+(defmacro build-query-dynamic
+  "For the given SQL query `q` and substitution map performs pattern interpolation.
+  If multiple arguments are given the last one will be treated as substitution map.
+
+  Tries to convert possible literals given as query parts to strings and then trim
+  them while squeezing repeated spaces at compile time. If some operation cannot be
+  performed in that phase, it generates code which will convert an expression to a
+  string at runtime. Then pattern interpolation is performed on the resulting string,
+  using the provided `substitutions` map.
+
+  If a source string contains `%{tag-name}` special pattern, `tag-name` will be
+  looked up in substitution map and the whole pattern will be replaced by the
+  corresponding value.
+
+  If a tag name from pattern cannot be found in a substitution map, the pattern will
+  be replaced by an empty string.
+
+  A pattern may have a form of `%%{tag-name}`. In such case any non-`nil` value being
+  a result of tag name resolution will be quoted using `amelinium.db/quote`.
+
+  A pattern may have additional modifier before the opening brace. It will be
+  resolved as a symbolic function name to be called in order to transform a value
+  associated with a tag name. If the name is not fully-qualified (does not contain a
+  namespace part) its default namespace will be set to `amelinium.db`.
+
+  Example:
+
+  `(build-query-dynamic \"select * from %%table{users}\"
+                        \"where\" :points '> 100
+                        {:users :users/id})`
+
+  The above call will generate the following result:
+
+  \"select * from `users` where points > 100\".
+
+  This macro should be used to dynamically generate queries having thousands of
+  variant substitution parameters."
+  {:arglists '([] [q] [q substitution-map] [& query-parts substitution-map])}
+  ([] "")
+  ([q]               (#'strspc-squeezed &form &env q))
+  ([q substitutions] `(build-query-dynamic-core (strspc-squeezed ~q) ~substitutions))
+  ([a b & args]
+   (let [v# (vec args)
+         l# (peek v#)
+         r# (subvec v# 0 (unchecked-dec-int (count v#)))]
+     `(build-query-dynamic-core (strspc-squeezed ~a ~b ~@r#) ~l#))))
 
 ;; Grouped sequences processing
 
