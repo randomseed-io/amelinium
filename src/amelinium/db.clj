@@ -474,6 +474,9 @@
      (fn [m ^clojure.lang.Keyword id-type ids]
        (if id-type
          (or (some->> (not-empty ids) (conj fargs id-type) (apply f) (into m)) m) m)))))
+
+;; Coercion
+
 (defmulti in-coercer
   "Returns a coercer suitable for transforming the given argument `v` to a
   database-suitable value, assuming table and column specified by the given qualified
@@ -588,8 +591,8 @@
 (defn- column-by-index-fn
   "Adds coercion to a database result set `rs` handled by builder `builder` with result
   index `i`. For each result it reads its table name and column label (or name, if
-  label is not set), and calls output coercer using `amelinium.db/->` passing to it the
-  mentioned names and a value."
+  label is not set), and calls output coercer using `amelinium.db/->` passing to it
+  the mentioned names and a value."
   [builder ^ResultSet rs ^Integer i]
   (let [^ResultSetMetaData rsm (.getMetaData rs)]
     (rs/read-column-by-index (-> (.getTableName   rsm i)
