@@ -117,52 +117,6 @@
   (if (seq args)
     (apply array-map (map #(%1 %2) (cycle [common/keyword-from-param identity]) args))))
 
-(defn strb
-  "Like `clojure.core/str` but faster. Be aware that all arguments except first must be
-  of type `String` or `nil`."
-  (^String [^Object a]
-   (if a (.toString ^Object a) ""))
-  (^String [^String a ^String b]
-   (.toString ^StringBuilder (.append ^StringBuilder (StringBuilder. (or a "")) (or b ""))))
-  (^String [^String a ^String b ^String c]
-   (.toString
-    ^StringBuilder (doto (StringBuilder. (or a ""))
-                     (.append (or b ""))
-                     (.append (or c "")))))
-  (^String [^String a ^String b ^String c ^String d]
-   (.toString
-    ^StringBuilder (doto (StringBuilder. (or a ""))
-                     (.append (or b ""))
-                     (.append (or c ""))
-                     (.append (or d "")))))
-  (^String [^String a ^String b ^String c ^String d ^String e]
-   (.toString
-    ^StringBuilder (doto (StringBuilder. (or a ""))
-                     (.append (or b ""))
-                     (.append (or c ""))
-                     (.append (or d ""))
-                     (.append (or e "")))))
-  (^String [^String a ^String b ^String c ^String d ^String e & more]
-   (.toString
-    ^StringBuilder (doto (StringBuilder. (or a ""))
-                     (.append (or b ""))
-                     (.append (or c ""))
-                     (.append (or d ""))
-                     (.append (or e ""))
-                     (.append (apply strb more))))))
-
-(defmacro strs
-  "Converts all arguments to strings and concatenates them. Neighbouring literal
-  strings will be concatenated at compile time."
-  ([]
-   "")
-  ([a]
-   (if (string? a) `~a `(strb ~a)))
-  ([a & more]
-   `(strb ~@(->> (cons a more)
-                 (partition-by string?)
-                 (mapcat #(if (string? (first %)) (cons (apply strb %) nil) %))))))
-
 (defn anti-spam-code
   "Generates anti-spam HTML string containing randomly selected fields and values using
   `validators/gen-required`."
