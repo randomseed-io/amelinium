@@ -309,58 +309,6 @@
 
 ;; Getting attribute by identity
 
-(defn- ids-updater
-  "Helper function which takes a function `f` and additional arguments (zero or more),
-  and returns a function which takes a map `m`, identity type `id-type` and a
-  sequence of identifiers `ids`, and calls `f` with all arguments and `id-type`
-  passed on the sequence. Then it calls `clojure.core/into` to put the result of
-  calling `f` into a map `m`.
-
-  Example: `(ids-updater get-ids db)
-
-  In this example `get-ids` the function similar to presented below will be returned:
-
-  `(fn [m id-type ids] (into m (get-ids db id-type)))`.
-
-  Used mainly as a transformer in `reduce-kv` when dealing with multiple user
-  identifiers grouped by identity type. Having a map of vectors grouped by identity
-  type like the one below:
-
-  `{:email [#amelinium.Identity {:id-type :email :value \"pw@gnu.org\"}],
-    :id    [#amelinium.Identity {:id-type :id    :value 1}
-            #amelinium.Identity {:id-type :id,   :value 42}]}`
-
-  We can call `(reduce-kv (ids-updater get-ids db) {})` to get:
-
-  `{#amelinium.Identity{:id-type :id,    :value 1}               1
-    #amelinium.Identity{:id-type :id,    :value 42}             42
-    #amelinium.Identity{:id-type :email, :value \"pw@gnu.org\"}  1}`.
-
-  The `get-ids` will be called for each identity group, receiving a list of
-  identities and passed arguments to get the numerical user identifiers which then
-  will be assigned to identity objects in a map."
-  ([f]
-   (fn [m ^Keyword id-type ids]
-     (if id-type
-       (or (some->> (not-empty ids) (f id-type) (into m)) m) m)))
-  ([f a]
-   (fn [m ^Keyword id-type ids]
-     (if id-type
-       (or (some->> (not-empty ids) (f a id-type) (into m)) m) m)))
-  ([f a b]
-   (fn [m ^Keyword id-type ids]
-     (if id-type
-       (or (some->> (not-empty ids) (f a b id-type) (into m)) m) m)))
-  ([f a b c]
-   (fn [m ^Keyword id-type ids]
-     (if id-type
-       (or (some->> (not-empty ids) (f a b c id-type) (into m)) m) m)))
-  ([f a b c & more]
-   (let [fargs (apply vector a b c more)]
-     (fn [m ^Keyword id-type ids]
-       (if id-type
-         (or (some->> (not-empty ids) (conj fargs id-type) (apply f) (into m)) m) m)))))
-
 (defn- some-identities
   "Tries to coerce identities to `amelinium.Identity` objects and filters out those who
   could not be coerced."

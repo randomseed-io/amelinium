@@ -416,6 +416,64 @@
          l# (peek v#)
          r# (subvec v# 0 (unchecked-dec-int (count v#)))]
      `(build-query-core (strspc-squeezed ~a ~b ~@r#) ~l#))))
+
+;; Grouped sequences processing
+
+(defn groups-inverter
+  "Helper function for transforming a map of sequences keyed with keywords into a map
+  of elements found in those sequences (as keys) associated with results of calling a
+  function on them with additional arguments, including original map's keys.
+
+  In other words: transforms results of `clojure.core/group-by` into a single map,
+  changing values found in sequences into keys, and associating values to those keys
+  resulting from calling a function.
+
+  Takes a function `f` and additional arguments (zero or more), and returns a
+  function which takes a map `m`, identity type `id-type` and a sequence of
+  identifiers `ids`, and calls `f` with all arguments and `id-type` passed on the
+  sequence. Then it calls `clojure.core/into` to put the result of calling `f` into a
+  map `m`.
+
+  Example: `(groups-inverter get-ids db)
+
+  In this example a function will be returned, similar to the below:
+
+  `(fn [m id-type ids] (into m (get-ids db id-type)))`.
+
+  It is used mainly as a transformer in `reduce-kv` when dealing with multiple user
+  identifiers grouped by identity type. Having a map of vectors grouped by identity
+  type:
+
+  `{:email [#amelinium.Identity {:id-type :email :value \"pw@gnu.org\"}],
+    :id    [#amelinium.Identity {:id-type :id :value 1}
+            #amelinium.Identity {:id-type :id, :value 42}]}`
+
+  we can call `(reduce-kv (groups-inverter get-ids db) {})` to get:
+
+  `{#amelinium.Identity{:id-type :id, :value 1}                 1
+    #amelinium.Identity{:id-type :id, :value 42}                42
+    #amelinium.Identity{:id-type :email, :value \"pw@gnu.org\"} 1}`.
+
+  The `get-ids` will be called for each identity group, receiving a list of
+  identities and passed arguments with identity type. After getting numerical user
+  identifiers it will associate them with identity objects in a map."
+  ([f]
+   (fn [m ^clojure.lang.Keyword id-type ids]
+     (if id-type (or (some->> (not-empty ids) (f id-type) (into m)) m) m)))
+  ([f a]
+   (fn [m ^clojure.lang.Keyword id-type ids]
+     (if id-type (or (some->> (not-empty ids) (f a id-type) (into m)) m) m)))
+  ([f a b]
+   (fn [m ^clojure.lang.Keyword id-type ids]
+     (if id-type (or (some->> (not-empty ids) (f a b id-type) (into m)) m) m)))
+  ([f a b c]
+   (fn [m ^clojure.lang.Keyword id-type ids]
+     (if id-type (or (some->> (not-empty ids) (f a b c id-type) (into m)) m) m)))
+  ([f a b c & more]
+   (let [fargs (apply vector a b c more)]
+     (fn [m ^clojure.lang.Keyword id-type ids]
+       (if id-type
+         (or (some->> (not-empty ids) (conj fargs id-type) (apply f) (into m)) m) m)))))
 (defmulti in-coercer
   "Returns a coercer suitable for transforming the given argument `v` to a
   database-suitable value, assuming table and column specified by the given qualified
