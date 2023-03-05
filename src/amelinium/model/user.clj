@@ -89,7 +89,7 @@
   (^PasswordData [auth-src ^String password account-type]
    (let [^AuthConfig auth-config (auth/config auth-src account-type)
          ^SuitesJSON pwd-chains  (if password (auth/make-password-json password auth-config))
-         ^String     pwd-shared  (if pwd-chains (.shared pwd-chains))
+         ^String     pwd-shared  (if pwd-chains  (.shared pwd-chains))
          ^DataSource db          (if auth-config (.db auth-config))
          ^Long       suite-id    (if (and db pwd-shared) (create-or-get-shared-suite-id db pwd-shared))]
      (if suite-id
@@ -210,27 +210,25 @@
    :last_attempt :last_login :created :created_by
    :soft_locked :locked])
 
-(def ^:const prop-get-query
-  (str-spc "SELECT" (db/join-col-names prop-cols) "FROM users WHERE id = ?"))
-
-(def ^:const props-get-query
-  (str-spc "SELECT" (db/join-col-names prop-cols) "FROM users WHERE id IN"))
-
-(def ^{:arglists '([db ids] [db _ ids])}
+(def ^{:private  true
+       :arglists '([db ids] [db _ ids])}
   props-getter-coll
   (db/make-getter-coll db/lazy-execute! db/opts-lazy-simple-map
                        :users :id prop-cols))
 
-(def ^{:arglists '([db id] [db _ id] [db _ id & ids])}
+(def ^{:private  true
+       :arglists '([db id] [db _ id] [db _ id & ids])}
   props-getter
   (db/make-getter db/lazy-execute-one! db/opts-lazy-simple-map
                   :users :id prop-cols props-getter-coll))
 
-(def ^{:arglists '([db id keys-vals])}
+(def ^{:private  true
+       :arglists '([db id keys-vals])}
   props-setter
   (db/make-setter :users :id))
 
-(def ^{:arglists '([db id])}
+(def ^{:private  true
+       :arglists '([db id])}
   props-deleter
   (db/make-deleter :users :id))
 
