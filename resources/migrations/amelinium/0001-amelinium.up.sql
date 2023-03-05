@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS confirmations (
   user_id           INTEGER UNSIGNED NULL,
   user_uid          UUID NULL,
   requester_id      INTEGER UNSIGNED NULL,
-  code              CHAR(16) NULL,
+  code              INT(8) UNSIGNED NULL,
   token             CHAR(128) NULL,
   reason            ENUM('creation', 'recovery', 'unlock', 'change') NOT NULL,
   id_type           ENUM('email', 'phone') NULL,
