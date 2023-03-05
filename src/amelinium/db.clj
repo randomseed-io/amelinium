@@ -714,10 +714,10 @@
          cols   (if (map? cols) (keys cols) cols)
          cols   (if (coll? cols) (seq cols) cols)
          cols   (if (coll? cols) cols [(or cols "*")])
-         table  (to-snake-simple table)
+         table  (db/to-snake-simple table)
          q      (str-spc "SELECT" (join-col-names cols)
                          "FROM"   (or table "?")
-                         "WHERE"  (to-snake-simple id-col)
+                         "WHERE"  (db/to-snake-simple id-col)
                          "IN (")]
      (if table
        (fn db-getter-coll
@@ -729,7 +729,7 @@
        (fn [db table ids]
          (if-some [ids (seq ids)]
            (let [ids   (map id-to-db ids)
-                 table (to-snake-simple table)
+                 table (db/to-snake-simple table)
                  query (str q (join-? ids) ")")]
              (->> (f db (cons query (cons table ids)) opts)
                   (reduce #(qassoc %1 (get %2 id-col) %2) {})))))))))
