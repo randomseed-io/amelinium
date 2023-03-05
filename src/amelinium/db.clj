@@ -17,6 +17,7 @@
             [clj-uuid                      :as                   uuid]
             [next.jdbc                     :as                   jdbc]
             [next.jdbc.sql                 :as                    sql]
+            [next.jdbc.quoted              :as                 quoted]
             [next.jdbc.connection          :as             connection]
             [next.jdbc.result-set          :as                     rs]
             [next.jdbc.prepare             :as                     jp]
@@ -334,6 +335,10 @@
    [(table-kw col-spec) (col-kw col-id)]))
 
 (defmulti in-coercer
+(defn quoted
+  ^String [s]
+  (if-some [^String s (some-str s)]
+    (quoted/mysql s)))
   "Returns a coercer suitable for transforming the given argument `v` to a
   database-suitable value, assuming table and column specified by the given qualified
   keyword `table-column`."
