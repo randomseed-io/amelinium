@@ -10,7 +10,6 @@
 
   (:require [clojure.set                  :as         set]
             [clojure.string               :as         str]
-            [clojure.core.memoize         :as         mem]
             [clj-uuid                     :as        uuid]
             [amelinium.proto.identity     :as           p]
             [amelinium.types.identity     :refer     :all]
@@ -67,6 +66,7 @@
 ;; Standard identity parsers
 
 (defn preparse-email
+  "Parses e-mail by doing basic checks and transforming it to a string."
   ^String [v]
   (if-some [^String v (some-str v)]
     (let [l (unchecked-int (.length v))]
@@ -76,17 +76,20 @@
             (str (subs v 0 idx) (str/lower-case (subs v idx l)))))))))
 
 (defn parse-email
+  "Parses e-mail by doing basic checks and transforming it to an Identity object."
   ^Identity [v]
   (if-some [^String v (preparse-email v)]
     (Identity. :email v)))
 
 (defn preparse-id
+  "Parses user ID by doing basic checks and transforming it to a long number."
   ^Long [v]
   (if-let [v (safe-parse-long v)]
     (if (pos-int? v)
       v)))
 
 (defn parse-id
+  "Parses user ID by doing basic checks and transforming it to an Identity record."
   ^Identity [v]
   (if-some [^Long v (preparse-id v)]
     (Identity. :id v)))
@@ -99,8 +102,7 @@
    (phone/number-optraw v)))
 
 (defn parse-phone
-  "Tries to interpret `v` as a phone number and returns `amelinium.Identity` record
-  with it."
+  "Tries to interpret `v` as a phone number and returns an Identity record."
   ^Identity [v]
   (if-some [v (preparse-phone v)]
     (Identity. :phone v)))
@@ -113,7 +115,7 @@
         (uuid/as-uuid v))))
 
 (defn parse-uid
-  "Tries to interpret `v` as a UUID and returns `amelinium.Identity` record with it."
+  "Tries to interpret `v` as a UUID and returns an Identity record."
   ^Identity [v]
   (if-some [u (preparse-uid v)]
     (Identity. :uid u)))
