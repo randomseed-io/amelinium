@@ -594,6 +594,121 @@
   ([table column coll] (if-some [f (out-coercer (make-kw-simple table column))] (map f coll) coll))
   ([table-column coll] (if-some [f (out-coercer table-column)] (map f coll) coll)))
 
+(defn- ex-nm
+  [v]
+  (if (= \! (first (name v))) (subs (name v) 1)))
+
+(defn- pre-parse-conv-specs
+  "Used to pre-parse conversion specifications at compile-time."
+  [coll]
+  (first
+   (reduce
+    (fn [[done cs table pval?] cur]
+      (cond
+        (nil?    cur)                             [(conj done cur) nil table true]
+        (list?   cur)                             [(conj done cur) nil table true]
+        (vector? cur)                             [(conj done cur) nil table true]
+        (and (simple-keyword? cur) (ex-nm cur))   [done nil (table-kw (ex-nm cur)) pval?]
+        (and pval? (simple-keyword? cur) table)   [done (colspec-kw table cur) table false]
+        (and pval? (simple-keyword? cur))         [done nil (col-kw cur) false]
+        (and pval? (qualified-keyword? cur))      [done (colspec-kw cur) (table-kw cur) false]
+        (and cs (symbol? cur))                    [(conj done [cs cur]) nil table true]
+        (and (simple-symbol? cur) (not cs) table) [(conj done [(colspec-kw table cur) cur]) nil table true]
+        :else                                     [(apply conj done (remove nil? [(or cs table) cur]))
+                                                   nil nil true]))
+    [[] nil nil true] coll)))
+
+(defn- spec-convert
+  "Used to parse conversion specifications at run-time."
+  ^PersistentVector [[^PersistentVector done ^Keyword colspec ^Keyword table ^Boolean pval?] cur]
+  (if (vector? cur)
+    (let [[^Keyword k v ^Boolean pval?] cur] [(conj done (<- k v)) nil nil true])
+    (if (and pval? (keyword? cur))
+      (if-some [^String n (namespace cur)]
+        [done (colspec-kw n (name cur)) (table-kw n) false]
+        (if table
+          [done (colspec-kw table cur) table false]
+          [done nil (col-kw cur) false]))
+      (if colspec
+        [(conj done (<- colspec cur)) nil table true]
+        [(conj done cur) nil table true]))))
+
+(defmacro <<-
+  "Magical macro which converts a sequence of values with optional table and column
+  specifications to a database-suitable forms. Pre-processing of arguments is
+  executed at compile-time, processing is performed at run-time.
+
+  First appearance of a simple keyword when there was no keyword encountered before
+  will set the table name for future reference.
+
+  Any fully-qualified keyword placed before a value will make that value converted
+  using a `<-` (`in-coercer` multimethod), and also store the table name for future
+  reference.
+
+  Any value preceded by a simple keyword when there is a table memorized will be
+  converted using `<-` with its first argument set to a keyword (having a namespace
+  set to a table name, and its name set to a name of that keyword).
+
+  Any value, other than one expressed with a simple symbolic identifier, preceded by
+  a simple keyword, when there is no table memorized yet, will be left as is. After
+  that operation a table name will be updated for future reference.
+
+  Any value expressed with a simple symbolic identifier, preceded by a simple
+  keyword, when there is no table memorized yet, will be converted using `<-` with
+  its first argument set to a keyword (having namespace set to this keyword and name
+  set to a name of the symbol expressing some value). After that operation a table
+  name will be updated for future reference.
+
+  Any value expressed with a simple symbolic identifier, not preceded by a keyword,
+  when there is a table memorized, will be converted using `<-` with its first
+  argument set to a keyword (having namespace set to the table name and name set to a
+  name of the symbol expressing some value).
+
+  To enforce table name reset when it has already been set, without explicitly
+  specifying coercer for the consecutive form, prepend the exclamation mark to a
+  simple keyword's name. This only works for literal keywords given as arguments
+  since it is detected at compile-time (macro expansion phase).
+
+  Examples:
+
+  `(<<- :users id email)`
+
+  The above will convert values of `id` and `email` symbol forms using coercion
+  multimethod variant registered for `:users/id` and `:users/email` keywords,
+  accordingly.
+
+  `(<<- :users id :email e)`
+
+  The above will convert values of `id` and `e` symbol forms using coercion
+  multimethod variant registered for `:users/id` and `:users/email` keywords,
+  accordingly. Note that by placing `:email` keyword before `e` we are not setting
+  new table name but instead we are specifying coercion dispatch value which will be
+  a keyword built with `:users` (a table) and `:email` (a column).
+
+  `(<<- :users id :confirmations/email email expires)`
+
+  The above will convert values of `id`, `email` and `expires` symbol forms using
+  coercion multimethod variant registered for `:users/id`, `:confirmations/email`,
+  and `:confirmations/expires` keywords, accordingly. Note that by placing
+  `:confirmations/email` keyword before `email` we are setting a table name to
+  `:confirmations` and also hinting the engine to apply
+  `:confirmations/email`-dispatched transformation to a value of `email`. Also, note
+  that coercion of an `expiration` value will rely on memorized table name
+  `:confirmations` and its symbolic name.
+
+  `(<<- :users id :!confirmations email expires)`.
+
+  The above has the same effect as the previous example but uses table resetting
+  feature without explicitly specifying the coercer for a value behind the `email`
+  symbol."
+  [spec & more]
+  (if more
+    (let [specs# (cons spec more)]
+      `(nth (reduce ~#'spec-convert [[] nil nil true] ~(#'pre-parse-conv-specs specs#)) 0))
+    (let [spec# (if (list? spec) (cons spec nil) spec)
+          spec# (if (map? spec#) (mapcat identity spec#) spec#)]
+      `(nth (reduce ~#'spec-convert [[] nil nil true]  ~(#'pre-parse-conv-specs spec#)) 0))))
+
 (defn simple->
   [table m]
   (let [table (some-str table)]
