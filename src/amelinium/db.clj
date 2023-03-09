@@ -47,6 +47,10 @@
 
   (:import (amelinium         DBConfig)
            (lazy_map.core     LazyMap)
+           (clojure.lang      IPersistentMap
+                              PersistentVector
+                              Keyword
+                              Fn)
            (com.zaxxer.hikari HikariConfig
                               HikariDataSource
                               HikariPoolMXBean)
@@ -192,9 +196,9 @@
   character in its name will be replaced with a dot. If `ns` or `name` is not an
   ident then any slash character in its string representation will be replaced with a
   dot before creating a keyword."
-  (^clojure.lang.Keyword [name]
+  (^Keyword [name]
    (if (keyword? name) name (keyword name)))
-  (^clojure.lang.Keyword [ns name]
+  (^Keyword [ns name]
    (if name
      (keyword (idname ns) (idname name))
      (if (keyword? ns) ns (keyword ns)))))
@@ -204,9 +208,9 @@
   strings or idents. If the second argument is `nil` then a keyword is created using
   the first argument by simply converting it with the `keyword` function. If any
   given ident is namespaced, only its name is used."
-  (^clojure.lang.Keyword [name]
+  (^Keyword [name]
    (if (keyword? name) name (keyword name)))
-  (^clojure.lang.Keyword [ns name]
+  (^Keyword [ns name]
    (if name
      (keyword (idname-simple ns) (idname-simple name))
      (if (keyword? ns) ns (keyword ns)))))
@@ -217,9 +221,9 @@
   second argument is `nil` then a keyword is created using the first argument by
   simply converting it with the `keyword` function. If any given ident is namespaced,
   only its name is used."
-  (^clojure.lang.Keyword [name]
+  (^Keyword [name]
    (keyword (db/to-snake name)))
-  (^clojure.lang.Keyword [ns name]
+  (^Keyword [ns name]
    (if name
      (keyword (db/to-snake (idname-simple ns)) (db/to-snake (idname-simple name)))
      (keyword (db/to-snake ns)))))
@@ -230,9 +234,9 @@
   second argument is `nil` then a keyword is created using the first argument by
   simply converting it with the `keyword` function. If any given ident is namespaced,
   only its name is used."
-  (^clojure.lang.Keyword [name]
+  (^Keyword [name]
    (keyword (db/to-lisp name)))
-  (^clojure.lang.Keyword [ns name]
+  (^Keyword [ns name]
    (if name
      (keyword (db/to-lisp (idname-simple ns)) (db/to-lisp (idname-simple name)))
      (keyword (db/to-lisp ns)))))
@@ -304,11 +308,11 @@
   otherwise its name will be used. For strings, it will first transform them into
   keywords (detecting slash character as a separator of a namespace and name) to pick
   a table name. If two arguments are given, the second one is ignored."
-  (^clojure.lang.Keyword [table-id]
+  (^Keyword [table-id]
    (if (ident? table-id)
      (some-keyword (db/to-lisp (or (namespace table-id) (name table-id))))
      (if (some? table-id) (table-kw (some-keyword table-id)))))
-  (^clojure.lang.Keyword [table-id _] (table-kw table-id)))
+  (^Keyword [table-id _] (table-kw table-id)))
 
 (defn col-kw
   "Extracts column name as a lisp-cased keyword from `col-spec` which may be an
@@ -316,11 +320,11 @@
   it will first transform them into keywords (detecting slash character as a
   separator of a namespace and name) to pick a column name. If two arguments are
   given, the first one is ignored."
-  (^clojure.lang.Keyword [col-id]
+  (^Keyword [col-id]
    (if (ident? col-id)
      (some-keyword (db/to-lisp (name col-id)))
      (if (some? col-id) (col-kw (some-keyword col-id)))))
-  (^clojure.lang.Keyword [_ col-id] (col-kw col-id)))
+  (^Keyword [_ col-id] (col-kw col-id)))
 
 (defn table-col-kw
   "Extracts table and column names from `col-spec` (which may be an identifier or a
@@ -518,20 +522,20 @@
   identities and passed arguments with identity type. After getting numerical user
   identifiers it will associate them with identity objects in a map."
   ([f]
-   (fn [m ^clojure.lang.Keyword id-type ids]
+   (fn [m ^Keyword id-type ids]
      (if id-type (or (some->> (not-empty ids) (f id-type) (into m)) m) m)))
   ([f a]
-   (fn [m ^clojure.lang.Keyword id-type ids]
+   (fn [m ^Keyword id-type ids]
      (if id-type (or (some->> (not-empty ids) (f a id-type) (into m)) m) m)))
   ([f a b]
-   (fn [m ^clojure.lang.Keyword id-type ids]
+   (fn [m ^Keyword id-type ids]
      (if id-type (or (some->> (not-empty ids) (f a b id-type) (into m)) m) m)))
   ([f a b c]
-   (fn [m ^clojure.lang.Keyword id-type ids]
+   (fn [m ^Keyword id-type ids]
      (if id-type (or (some->> (not-empty ids) (f a b c id-type) (into m)) m) m)))
   ([f a b c & more]
    (let [fargs (apply vector a b c more)]
-     (fn [m ^clojure.lang.Keyword id-type ids]
+     (fn [m ^Keyword id-type ids]
        (if id-type
          (or (some->> (not-empty ids) (conj fargs id-type) (apply f) (into m)) m) m)))))
 
@@ -1055,12 +1059,12 @@
            db-key   (db-key-name k db-props config)
            db-props (map/assoc-missing db-props :name db-name :dbkey db-key)]
        (log/msg "Configuring database" db-name (str "(" db-key ")"))
-       (DBConfig. ^clojure.lang.Fn      ds-getter
-                  ^clojure.lang.Fn      ds-closer
-                  ^clojure.lang.Fn      ds-suspender
-                  ^clojure.lang.Fn      ds-resumer
-                  ^clojure.lang.Keyword db-key
-                  ^String               db-name
+       (DBConfig. ^Fn      ds-getter
+                  ^Fn      ds-closer
+                  ^Fn      ds-suspender
+                  ^Fn      ds-resumer
+                  ^Keyword db-key
+                  ^String  db-name
                   (ds-getter db-props))))))
 
 (defn close-db
