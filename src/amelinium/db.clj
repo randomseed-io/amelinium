@@ -432,7 +432,9 @@
    (let [v# (vec args)
          l# (peek v#)
          r# (subvec v# 0 (unchecked-dec-int (count v#)))]
-     `(build-query-core (strspc-squeezed ~a ~b ~@r#) ~l#))))
+     (if (str-convertable? l#)
+       `(build-query-core (strspc-squeezed ~a ~b ~@v#))
+       `(build-query-core (strspc-squeezed ~a ~b ~@r#) ~l#)))))
 
 (defmacro build-query-dynamic
   "For the given SQL query `q` and substitution map performs pattern interpolation.
@@ -479,7 +481,9 @@
    (let [v# (vec args)
          l# (peek v#)
          r# (subvec v# 0 (unchecked-dec-int (count v#)))]
-     `(build-query-dynamic-core (strspc-squeezed ~a ~b ~@r#) ~l#))))
+     (if (str-convertable? l#)
+       `(build-query-dynamic-core (strspc-squeezed ~a ~b ~@v#))
+       `(build-query-dynamic-core (strspc-squeezed ~a ~b ~@r#) ~l#)))))
 
 ;; Grouped sequences processing
 
