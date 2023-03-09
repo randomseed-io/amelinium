@@ -165,6 +165,25 @@
      (if-some [t (some-keyword identity-type)]
        (if (identical? t (p/type user-identity)) t)))))
 
+(defn type-opt
+  "Returns a keyword describing identity type detected by analyzing the given user
+  identity `user-identity` and optional identity type `identity-type` given
+  explicitly (e.g. `:phone` for a phone number, `:email` for e-mail address, `:id`
+  for numeric user ID, `:uid` for UUID). If the type is not given or it is `nil`,
+  analysis of the given identity will be performed.
+
+  Does not perform full validation of identities, just detection.
+
+  Value of the given identity type `identity-type` must match the identity type. If
+  it does not, `nil` will be returned."
+  (^Keyword [user-identity]
+   (if user-identity (p/type user-identity)))
+  (^Keyword [^Keyword identity-type user-identity]
+   (if user-identity
+     (if-some [t (some-keyword identity-type)]
+       (if (identical? t (p/type user-identity)) t)
+       (p/type user-identity)))))
+
 (defn acceptable-type
   "Returns a keyword describing identity type detected by analyzing the given user
   identity `user-identity` and optional identity type `identity-type` given
@@ -348,6 +367,25 @@
   ([identity-type user-identity & ids]
    (let [identity-type (some-keyword identity-type)]
      (map #(p/make % identity-type) (cons user-identity ids)))))
+
+(defn opt-type
+  "For the given user identity `user-identity` and identity type `identity-type` it
+  tries to parse the identity and return an `amelinium.Identity` record containing an
+  identity type and identity value in a form it expresses it best. If the identity
+  type is `nil` or empty then any identity type is accepted.
+
+  If multiple identities are given it will return a sequence of these identities
+  parsed with parsing functions chosen for the given identity type. If the identity
+  type is not valid or the parsing cannot be applied for an input value, `nil` will
+  be inserted into corresponding location of the output sequence."
+  {:see-also ["of" "of-value" "of-seq"]}
+  (^Identity [identity-type user-identity]
+   (p/make user-identity  (or (some-keyword identity-type) ::any)))
+  ([identity-type user-identity & ids]
+   (let [identity-type (some-keyword identity-type)]
+     (if identity-type
+       (map #(p/make % identity-type) (cons user-identity ids))
+       (map p/make (cons user-identity ids))))))
 
 (defn of-seq
   "For the given user identities `user-identities` tries to parse each identity and
