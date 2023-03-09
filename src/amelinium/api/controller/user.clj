@@ -395,11 +395,11 @@
   ([req session-invalidator]
    (api/response
     req
-    (let [form-params  (get (get req :parameters) :form)
-          to-change    (select-keys form-params [:user/email :user/phone])
-          token        (get form-params :token)
-          code         (get form-params :code)
-          [id-type id] (first to-change)]
+    (let [form-params       (get (get req :parameters) :form)
+          to-change         (select-keys form-params [:user/email :user/phone])
+          token             (get form-params :token)
+          code              (get form-params :code)
+          [id-type-long id] (first to-change)]
       (if-not (or token (and code id))
         (api/render-error req :parameters/error)
         (if (> (count to-change) 1)
@@ -407,8 +407,8 @@
           (let [db           (auth/db req)
                 confirmation (confirmation/establish db id code token one-minute "change")
                 confirmed?   (get confirmation :confirmed?)
-                id-type      (common/guess-identity-type confirmation id id-type)
-                updated      (if confirmed? (user/update-identity-with-token-or-code id-type db id token code))
+                id-type      (common/guess-identity-type confirmation id id-type-long)
+                updated      (if confirmed? (user/update-identity id-type db token code id))
                 updated?     (:updated? updated)
                 bad-result?  (or (nil? confirmation) (and confirmed? (nil? updated)))]
             (cond
