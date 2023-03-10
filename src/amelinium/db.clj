@@ -420,14 +420,22 @@
 
   \"select * from `users` where points > 100\".
 
+  This macro can optionally be called with a single literal sequence given as its
+  first and only argument. In such cache the sequence should contain all arguments,
+  including a substitution map, if applicable.
+
   This macro should NOT be used to dynamically generate queries having thousands of
   variant substitution parameters as it uses unlimited underlying cache. For such
   purposes please use `build-query-dynamic`, or simply utilize parameters of prepared
   statements."
-  {:arglists '([] [q] [q substitution-map] [& query-parts substitution-map])}
+  {:arglists '([] [q] [q substitution-map] [coll] [& query-parts substitution-map])}
   ([] "")
-  ([q]               (#'strspc-squeezed &form &env q))
-  ([q substitutions] `(build-query-core (strspc-squeezed ~q) ~substitutions))
+  ([q]
+   (if (sequential? q)
+     `(build-query ~@q)
+     (#'strspc-squeezed &form &env q)))
+  ([q substitutions]
+   `(build-query-core (strspc-squeezed ~q) ~substitutions))
   ([a b & args]
    (let [v# (vec args)
          l# (peek v#)
@@ -471,12 +479,20 @@
 
   \"select * from `users` where points > 100\".
 
+  This macro can optionally be called with a single literal sequence given as its
+  first and only argument. In such cache the sequence should contain all arguments,
+  including a substitution map, if applicable.
+
   This macro should be used to dynamically generate queries having thousands of
   variant substitution parameters."
-  {:arglists '([] [q] [q substitution-map] [& query-parts substitution-map])}
+  {:arglists '([] [q] [q substitution-map] [coll] [& query-parts substitution-map])}
   ([] "")
-  ([q]               (#'strspc-squeezed &form &env q))
-  ([q substitutions] `(build-query-dynamic-core (strspc-squeezed ~q) ~substitutions))
+  ([q]
+   (if (sequential? q)
+     `(build-query ~@q)
+     (#'strspc-squeezed &form &env q)))
+  ([q substitutions]
+   `(build-query-dynamic-core (strspc-squeezed ~q) ~substitutions))
   ([a b & args]
    (let [v# (vec args)
          l# (peek v#)
@@ -636,7 +652,8 @@
 (defmacro <<-
   "Magical macro which converts a sequence of values with optional table and column
   specifications to a database-suitable forms. Pre-processing of arguments is
-  executed at compile-time, processing is performed at run-time.
+  executed at compile-time, processing is performed at run-time. Any literal keywords
+  given as arguments will be normalized by transforming to lisp case.
 
   First appearance of a simple keyword when there was no keyword encountered before
   will set the table name for future reference.
@@ -669,26 +686,30 @@
   simple keyword's name. This only works for literal keywords given as arguments
   since it is detected at compile-time (macro expansion phase).
 
+  If the one and only argument is a map, it will be transformed to a sequence of keys
+  interleaved with values. Obviously, the order of pairs in such operation cannot be
+  determined.
+
   Examples:
 
   `(<<- :users id email)`
 
-  The above will convert values of `id` and `email` symbol forms using coercion
-  multimethod variant registered for `:users/id` and `:users/email` keywords,
-  accordingly.
+  The above will convert values expressed by `id` and `email` symbol forms using a
+  variant of coercion multimethod registered for `:users/id` and `:users/email`
+  keywords, accordingly.
 
   `(<<- :users id :email e)`
 
-  The above will convert values of `id` and `e` symbol forms using coercion
-  multimethod variant registered for `:users/id` and `:users/email` keywords,
+  The above will convert values of `id` and `e` symbol forms using a variant of
+  coercion multimethod registered for `:users/id` and `:users/email` keywords,
   accordingly. Note that by placing `:email` keyword before `e` we are not setting
   new table name but instead we are specifying coercion dispatch value which will be
   a keyword built with `:users` (a table) and `:email` (a column).
 
   `(<<- :users id :confirmations/email email expires)`
 
-  The above will convert values of `id`, `email` and `expires` symbol forms using
-  coercion multimethod variant registered for `:users/id`, `:confirmations/email`,
+  The above will convert values of `id`, `email` and `expires` symbol forms using a
+  variant of coercion multimethod registered for `:users/id`, `:confirmations/email`,
   and `:confirmations/expires` keywords, accordingly. Note that by placing
   `:confirmations/email` keyword before `email` we are setting a table name to
   `:confirmations` and also hinting the engine to apply
@@ -698,7 +719,7 @@
 
   `(<<- :users id :!confirmations email expires)`.
 
-  The above has the same effect as the previous example but uses table resetting
+   The above has the same effect as the previous example but uses table resetting
   feature without explicitly specifying the coercer for a value behind the `email`
   symbol."
   [spec & more]
