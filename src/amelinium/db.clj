@@ -412,7 +412,8 @@
 (def ^{:tag    String
        :no-doc true}
   build-query-core
-  "For the given SQL query `q` and substitution map performs pattern interpolation."
+  "For the given SQL query `q` and substitution map performs pattern
+  interpolation. Uses memoization with underlying map encapsulated in an atom."
   (clojure.core/memoize
    (fn build-query-fn
      (^String []                "")
@@ -422,7 +423,8 @@
 (def ^{:tag    String
        :no-doc true}
   build-query-dynamic-core
-  "For the given SQL query `q` and substitution map performs pattern interpolation."
+  "For the given SQL query `q` and substitution map performs pattern
+  interpolation. Uses memoization with underlying FIFO cache."
   (memoize
    (fn build-query-fn
      (^String []                "")
@@ -449,6 +451,9 @@
   A pattern may have a form of `%%{tag-name}`. In such case any non-`nil` value being
   a result of tag name resolution will be quoted using `amelinium.db/quote`.
 
+  There is a synonym to `%%table{tag-name}` which is `%[table-name]`.
+  There is a synonym to `%%column{tag-name}` which is `%(column-name)`.
+
   A pattern may have additional modifier before the opening brace. It will be
   resolved as a symbolic function name to be called in order to transform a value
   associated with a tag name. If the name is not fully-qualified (does not contain a
@@ -456,13 +461,25 @@
 
   Example:
 
-  `(build-query \"select * from %%table{users}\"
-                \"where\" :points '> 100
-                {:users :users/id})`
+  ```
+  (build-query \"select %%column{id} from %%table{users}\"
+               \"where\" :points '> 100
+               {:id    :users/id
+                :users :users/id})
+  ```
 
   The above call will generate the following result:
 
-  \"select * from `users` where points > 100\".
+  `\"select `id` from `users` where points > 100\"`.
+
+  This is synonymous to:
+
+  ```
+  (build-query \"select %(id) from %[users]\"
+               \"where\" :points '> 100
+               {:id    :users/id
+                :users :users/id})
+  ```
 
   This macro can optionally be called with a single literal sequence given as its
   first and only argument. In such cache the sequence should contain all arguments,
@@ -471,7 +488,10 @@
   This macro should NOT be used to dynamically generate queries having thousands of
   variant substitution parameters as it uses unlimited underlying cache. For such
   purposes please use `build-query-dynamic`, or simply utilize parameters of prepared
-  statements."
+  statements.
+
+  WARNING: Interpolation pattern may execute arbitrary code since it allows for any
+  function name."
   {:arglists '([] [q] [q substitution-map] [coll] [& query-parts substitution-map])}
   ([] "")
   ([q]
@@ -515,20 +535,34 @@
 
   Example:
 
-  `(build-query-dynamic \"select * from %%table{users}\"
-                        \"where\" :points '> 100
-                        {:users :users/id})`
+  ```
+  (build-query-dynamic \"select %%column{id} from %%table{users}\"
+                       \"where\" :points '> 100
+                       {:id    :users/id
+                        :users :users/id})
+  ```
 
   The above call will generate the following result:
 
-  \"select * from `users` where points > 100\".
+  `\"select `id` from `users` where points > 100\"`.
+
+  This is synonymous to:
+
+  ```
+  (build-query-dynamic \"select %%column{id} from %[users]\"
+                       \"where\" :points '> 100
+                       {:users :users/id})
+  ```
 
   This macro can optionally be called with a single literal sequence given as its
   first and only argument. In such cache the sequence should contain all arguments,
   including a substitution map, if applicable.
 
   This macro should be used to dynamically generate queries having thousands of
-  variant substitution parameters."
+  variant substitution parameters.
+
+  WARNING: Interpolation pattern may execute arbitrary code since it allows for any
+  function name."
   {:arglists '([] [q] [q substitution-map] [coll] [& query-parts substitution-map])}
   ([] "")
   ([q]
@@ -562,7 +596,7 @@
   sequence. Then it calls `clojure.core/into` to put the result of calling `f` into a
   map `m`.
 
-  Example: `(groups-inverter get-ids db)
+  Example: `(groups-inverter get-ids db)`
 
   In this example a function will be returned, similar to the below:
 
@@ -572,15 +606,19 @@
   identifiers grouped by identity type. Having a map of vectors grouped by identity
   type:
 
-  `{:email [#amelinium.Identity {:id-type :email :value \"pw@gnu.org\"}],
-    :id    [#amelinium.Identity {:id-type :id :value 1}
-            #amelinium.Identity {:id-type :id, :value 42}]}`
+  ```
+  {:email [#amelinium.Identity {:id-type :email :value \"pw@gnu.org\"}],
+   :id    [#amelinium.Identity {:id-type :id :value 1}
+           #amelinium.Identity {:id-type :id, :value 42}]}
+  ```
 
   we can call `(reduce-kv (groups-inverter get-ids db) {})` to get:
 
-  `{#amelinium.Identity{:id-type :id, :value 1}                 1
-    #amelinium.Identity{:id-type :id, :value 42}                42
-    #amelinium.Identity{:id-type :email, :value \"pw@gnu.org\"} 1}`.
+  ```
+  {#amelinium.Identity{:id-type :id, :value 1}                 1
+   #amelinium.Identity{:id-type :id, :value 42}                42
+   #amelinium.Identity{:id-type :email, :value \"pw@gnu.org\"} 1}
+  ```
 
   The `get-ids` will be called for each identity group, receiving a list of
   identities and passed arguments with identity type. After getting numerical user
@@ -763,7 +801,7 @@
 
   `(<<- :users id :!confirmations email expires)`.
 
-   The above has the same effect as the previous example but uses table resetting
+  The above has the same effect as the previous example but uses table resetting
   feature without explicitly specifying the coercer for a value behind the `email`
   symbol."
   [spec & more]
@@ -805,10 +843,12 @@
 
   The above will expand the following code:
 
-  - `(defmethod amelinium.db/in-coercer  :users/some-identifier [_] str)`
-  - `(defmethod amelinium.db/in-coercer  :users/some_identifier [_] str)`
-  - `(defmethod amelinium.db/out-coercer :users/some-identifier [_] keyword)`,
-  - `(defmethod amelinium.db/out-coercer :users/some_identifier [_] keyword)`.
+  ```
+  (defmethod amelinium.db/in-coercer  :users/some-identifier [_] str)
+  (defmethod amelinium.db/in-coercer  :users/some_identifier [_] str)
+  (defmethod amelinium.db/out-coercer :users/some-identifier [_] keyword)
+  (defmethod amelinium.db/out-coercer :users/some_identifier [_] keyword)
+  ```
 
   This will allow specialized database coercion functions to transformed values which
   are exchanged with a database."
@@ -885,13 +925,25 @@
 
   Produces a sequence suitable to be used with `execute-*` family of functions (a
   parameterized query as its first element and coerced query parameters as other
-  elements)."
+  elements).
+
+  Example:
+
+  ```
+  (<q [\"select %(id) from %[users] where %(id) = ?\"
+       {:id :users/id, :users :users/id, :email :users/email}]
+      :users/id \"42\")
+  ```
+
+  The above will return:
+
+  `(\"select `id` from `users` where `id` = ?\" 42)`"
   [query & params]
   `(cons (build-query ~query) (<<- ~@params)))
 
-(defmacro <dq
+  (defmacro <dq
   "Simple wrapper around `build-query-dynamic` and `<<-` macros. First argument should
-  be a query (possibly grouped with a vector, if multiple arguments need to be
+be a query (possibly grouped with a vector, if multiple arguments need to be
   passed), all other arguments are passed to `<<-`.
 
   Produces a sequence suitable to be used with `execute-*` family of functions (a
