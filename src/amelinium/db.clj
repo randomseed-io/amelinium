@@ -708,12 +708,12 @@
         (vector? cur)                             [(conj done cur) nil table true]
         (and (simple-keyword? cur) (ex-nm cur))   [done nil (table-kw (ex-nm cur)) pval?]
         (and pval? (simple-keyword? cur) table)   [done (colspec-kw table cur) table false]
-        (and pval? (simple-keyword? cur))         [done nil (column-kw cur) false]
+        (and pval? (simple-keyword? cur))         [done nil (column-kw cur) true]
         (and pval? (qualified-keyword? cur))      [done (colspec-kw cur) (table-kw cur) false]
         (and cs (symbol? cur))                    [(conj done [cs cur]) nil table true]
         (and (simple-symbol? cur) (not cs) table) [(conj done [(colspec-kw table cur) cur]) nil table true]
         :else                                     [(apply conj done (remove nil? [(or cs table) cur]))
-                                                   nil nil true]))
+                                                   nil table true]))
     [[] nil nil true] coll)))
 
 (defn- spec-convert
@@ -726,7 +726,7 @@
         [done (colspec-kw n (name cur)) (table-kw n) false]
         (if table
           [done (colspec-kw table cur) table false]
-          [done nil (column-kw cur) false]))
+          [done nil (column-kw cur) true]))
       (if colspec
         [(conj done (<- colspec cur)) nil table true]
         [(conj done cur) nil table true]))))
