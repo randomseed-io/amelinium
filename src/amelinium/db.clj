@@ -832,6 +832,33 @@
 (def opts-lazy-simple-map   (update db/opts-simple-map  :builder-fn gen-builder-delayed))
 (def opts-lazy-slashed-map  (update db/opts-slashed-map :builder-fn gen-builder-delayed))
 
+;; Query params
+
+(defmacro <q
+  "Simple wrapper around `build-query` and `<<-` macros. First argument should be a
+  query (possibly grouped with a vector, if multiple arguments need to be passed),
+  all other arguments are passed to `<<-`.
+
+  Produces a sequence suitable to be used with `execute-*` family of functions (a
+  parameterized query as its first element and coerced query parameters as other
+  elements)."
+  [query & params]
+  `(cons (build-query ~query) (<<- ~@params)))
+
+(defmacro <dq
+  "Simple wrapper around `build-query-dynamic` and `<<-` macros. First argument should
+  be a query (possibly grouped with a vector, if multiple arguments need to be
+  passed), all other arguments are passed to `<<-`.
+
+  Produces a sequence suitable to be used with `execute-*` family of functions (a
+  parameterized query as its first element and coerced query parameters as other
+  elements).
+
+  Intended to be used for dynamically generated database queries. Uses a bit slower
+  but safer FIFO cache of default size (about 150k items)."
+  [query & params]
+  `(cons (build-query-dynamic ~query) (<<- ~@params)))
+
 ;; Main wrappers
 
 (defn lazy-execute-one!
