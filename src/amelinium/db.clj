@@ -470,7 +470,9 @@
 
   The above call will generate the following result:
 
-  `\"select `id` from `users` where points > 100\"`.
+  ```
+  \"select `id` from `users` where points > 100\"
+  ```
 
   This is synonymous to:
 
@@ -544,7 +546,9 @@
 
   The above call will generate the following result:
 
-  `\"select `id` from `users` where points > 100\"`.
+  ```
+  \"select `id` from `users` where points > 100\"
+  ```
 
   This is synonymous to:
 
@@ -615,8 +619,8 @@
   we can call `(reduce-kv (groups-inverter get-ids db) {})` to get:
 
   ```
-  {#amelinium.Identity{:id-type :id, :value 1}                 1
-   #amelinium.Identity{:id-type :id, :value 42}                42
+  {#amelinium.Identity{:id-type :id, :value 1}               1
+   #amelinium.Identity{:id-type :id, :value 42}             42
    #amelinium.Identity{:id-type :email, :value \"pw@gnu.org\"} 1}
   ```
 
@@ -930,20 +934,27 @@
   Example:
 
   ```
-  (<q [\"select %(id) from %[users] where %(id) = ?\"
-       {:id :users/id, :users :users/id, :email :users/email}]
-      :users/id \"42\")
+  (<q [\"select %(id) from %[u] where %(id) = ? AND %(t) = ?\"
+       {:id :users/id, :u :users/id, :t :users/account-type}]
+      :users :id \"42\" :account-type :user)
   ```
 
   The above will return:
 
-  `(\"select `id` from `users` where `id` = ?\" 42)`"
+  ```
+  (\"select `id` from `users` where `id` = ? AND `account_type` = ?\" 42 \"user\")
+  ```
+
+  Note that `\"42\"` and `:user` are values which are to be coerced (first with a
+  coercer registered for `:users/id` and second with a coercer registered for
+  `:users/account-type`). After the coercion resulting values (`42` and `\"user\"`)
+  are placed in a sequence to become query parameters."
   [query & params]
   `(cons (build-query ~query) (<<- ~@params)))
 
   (defmacro <dq
   "Simple wrapper around `build-query-dynamic` and `<<-` macros. First argument should
-be a query (possibly grouped with a vector, if multiple arguments need to be
+  be a query (possibly grouped with a vector, if multiple arguments need to be
   passed), all other arguments are passed to `<<-`.
 
   Produces a sequence suitable to be used with `execute-*` family of functions (a
@@ -951,7 +962,26 @@ be a query (possibly grouped with a vector, if multiple arguments need to be
   elements).
 
   Intended to be used for dynamically generated database queries. Uses a bit slower
-  but safer FIFO cache of default size (about 150k items)."
+  but safer FIFO cache of default size (about 150k items).
+
+  Example:
+
+  ```
+  (<q [\"select %(id) from %[u] where %(id) = ? AND %(t) = ?\"
+       {:id :users/id, :u :users/id, :t :users/account-type}]
+      :users :id \"42\" :account-type :user)
+  ```
+
+  The above will return:
+
+  ```
+  (\"select `id` from `users` where `id` = ? AND `account_type` = ?\" 42 \"user\")
+  ```
+
+  Note that `\"42\"` and `:user` are values which are to be coerced (first with a
+  coercer registered for `:users/id` and second with a coercer registered for
+  `:users/account-type`). After the coercion resulting values (`42` and `\"user\"`)
+  are placed in a sequence to become query parameters."
   [query & params]
   `(cons (build-query-dynamic ~query) (<<- ~@params)))
 
