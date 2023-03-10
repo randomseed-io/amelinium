@@ -400,9 +400,13 @@
     ""))
 
 (defn- interpolate-tags
+  "Tag interpolation for substitution patterns."
   [substitutions q]
   (if substitutions
-    (str/replace q #"%(%)?([^\}]+)?\{([^\}]+)?\}" #(interpolate-tag substitutions %))
+    (c/-> q
+          (str/replace #"%\[([^\]]+)\]" "%%table{$1}")
+          (str/replace #"%\(([^\(]+)\)" "%%column{$1}")
+          (str/replace #"%(%)?([^\{\s]+)?\{([^\}]+)?\}" #(interpolate-tag substitutions %)))
     q))
 
 (def ^{:tag    String
