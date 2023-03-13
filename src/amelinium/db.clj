@@ -31,7 +31,7 @@
             [io.randomseed.utils.fs        :as                     fs]
             [io.randomseed.utils.var       :as                    var]
             [io.randomseed.utils.map       :as                    map]
-            [io.randomseed.utils.map       :refer            [qassoc]]
+            [io.randomseed.utils.map       :refer    [qassoc qupdate]]
             [phone-number.util             :as                 phutil]
             [phone-number.core             :as                  phone]
             [taoensso.nippy                :as                  nippy]
@@ -752,125 +752,170 @@
   ([table column coll] (if-some [f (out-coercer (colspec-kw table column))] (map f coll) coll))
   ([table-column coll] (if-some [f (out-coercer table-column)] (map f coll) coll)))
 
-(defn- ex-nm
-  [v]
-  (if (= \! (first (name v))) (subs (name v) 1)))
+(defrecord QSlot [^Keyword t ^Keyword c v])
 
-(defn- pre-parse-conv-specs
-  "Used to pre-parse conversion specifications at compile-time."
+(defn- not-empty-qslot?
+  [e]
+  (and (instance? QSlot e) (.t ^QSlot e) (.c ^QSlot e) (.v ^QSlot e)))
+
+(defn- statically-convertable?
+  ([v]       (or (nil? v) (keyword? v) (string? v) (number? v) (boolean? v)))
+  ([v ts cs] (and (string? ts) (string? cs)
+                  (or (nil? v) (keyword? v) (string? v) (number? v) (boolean? v)))))
+
+(defn- join-qslots
+  "Joins consecutive `QSlot` records if their column and table fields are equal."
+  [done qs]
+  (let [prev (peek done)]
+    (if (and (not-empty-qslot? qs) (not-empty-qslot? prev))
+      (if (and (= (.t ^QSlot prev) (.t ^QSlot qs))
+               (= (.c ^QSlot prev) (.c ^QSlot qs)))
+        (conj (pop done) (qupdate prev :v into (.v ^QSlot qs)))
+        (conj done qs))
+      (conj done qs))))
+
+(defn- c-t
+  "Extracts column and table specs as a vector from the given control keyword and
+  predefined hints for table and column spec."
+  [ctrl table-spec column-spec]
+  (if (keyword? ctrl)
+    (let [[c t] (column-table ctrl)]
+      (if c (if t [c t] (if table-spec [c table-spec] [table-spec c])) [column-spec table-spec]))))
+
+(defn- pp-conv-specs
+  "Pre-parses table/column conversion specifications."
+  ([coll]
+   (->> (mapcat #(pp-conv-specs % nil nil) coll)
+        (reduce join-qslots [])))
+  ([e tspec cspec]
+   (if (vector? e)
+     ;; control structure, a vector
+     (let [ctrl (nth e 0 nil)
+           coll (subvec e 1)]
+       (if (keyword? ctrl)
+         ;; static table/column name
+         (let [[c t] (c-t ctrl tspec cspec)] (mapcat #(pp-conv-specs % t c) coll))
+         ;; dynamic table/column name
+         (let [[c t] (if tspec [ctrl tspec] [nil ctrl])] (mapcat #(pp-conv-specs % t c) coll))))
+     ;; regular element
+     (if (and tspec cspec)
+       ;; memorized table and column specs
+       (if (statically-convertable? e tspec cspec)
+         ;; regular statically-convertable element
+         (cons (<- tspec cspec e) nil)
+         ;; regular dynamically-convertable element
+         (cons (QSlot. tspec cspec [e]) nil))
+       ;; no full spec information to convert
+       (if (and tspec (simple-symbol? e))
+         ;; column name derived from a symbolic name
+         (cons (QSlot. tspec (name e) [e]) nil)
+         ;; no usable spec information
+         (cons e nil))))))
+
+(defn- parse-conv-specs
+  "Parses table/column conversion specifications to produce a source code."
   [coll]
-  (first
-   (reduce
-    (fn [[done cs table pval?] cur]
-      (cond
-        (nil?    cur)                             [(conj done cur) nil table true]
-        (list?   cur)                             [(conj done cur) nil table true]
-        (vector? cur)                             [(conj done cur) nil table true]
-        (and (simple-keyword? cur) (ex-nm cur))   [done nil (table-kw (ex-nm cur)) pval?]
-        (and pval? (simple-keyword? cur) table)   [done (colspec-kw table cur) table false]
-        (and pval? (simple-keyword? cur))         [done nil (column-kw cur) true]
-        (and pval? (qualified-keyword? cur))      [done (colspec-kw cur) (table-kw cur) false]
-        (and cs (symbol? cur))                    [(conj done [cs cur]) nil table true]
-        (and (simple-symbol? cur) (not cs) table) [(conj done [(colspec-kw table cur) cur]) nil table true]
-        :else                                     [(apply conj done (remove nil? [(or cs table) cur]))
-                                                   nil table true]))
-    [[] nil nil true] coll)))
-
-(defn- spec-convert
-  "Used to parse conversion specifications at run-time."
-  ^PersistentVector [[^PersistentVector done ^Keyword colspec ^Keyword table ^Boolean pval?] cur]
-  (if (vector? cur)
-    (let [[^Keyword k v ^Boolean pval?] cur] [(conj done (<- k v)) nil nil true])
-    (if (and pval? (keyword? cur))
-      (if-some [^String n (namespace cur)]
-        [done (colspec-kw n (name cur)) (table-kw n) false]
-        (if table
-          [done (colspec-kw table cur) table false]
-          [done nil (column-kw cur) true]))
-      (if colspec
-        [(conj done (<- colspec cur)) nil table true]
-        [(conj done cur) nil table true]))))
+  (some->>
+   coll
+   (pp-conv-specs)
+   (mapv
+    (fn [v]
+      (if-not (instance? QSlot v) v
+              (let [t (.t ^QSlot v)
+                    c (.c ^QSlot v)
+                    v (.v ^QSlot v)]
+                (cond
+                  (nil? t)                v
+                  (and (or (string?  t)
+                           (keyword? t))
+                       (or (string?  c)
+                           (keyword? c))) (let [cs (colspec-kw t c)]
+                                            (if (= (count v) 1)
+                                              (if (statically-convertable? (nth v 0))
+                                                (<- cs (nth v 0))
+                                                `(<- ~cs ~(nth v 0)))
+                                              `(<-seq ~cs ~v)))
+                  (nil? c)                v
+                  :else                   (if (= (count v) 1)
+                                            `(<- ~t ~c ~(nth v 0))
+                                            `(<-seq ~t ~c ~v)))))))))
 
 (defmacro <<-
   "Magical macro which converts a sequence of values with optional table and column
-  specifications to a database-suitable forms. Pre-processing of arguments is
-  executed at compile-time, processing is performed at run-time. Any literal keywords
-  given as arguments will be normalized by transforming to lisp case.
+  specifications to a database-suitable formats. Pre-processing of arguments is
+  executed at compile-time, further processing is performed at run-time. Any literal
+  keywords given as arguments will be normalized by transforming to a lisp case.
 
-  First appearance of a simple keyword when there was no keyword encountered before
-  will set the table name for future reference.
+  All arguments are sequentially transformed with the following rules:
 
-  Any fully-qualified keyword placed before a value will make that value converted
-  using a `<-` (`in-coercer` multimethod), and also store the table name for future
-  reference.
+  - If there is a **literal vector** at **1st level**, its first element should be a
+  table name. All elements of that vector will inherit that table name during
+  conversion to a database-suitable format.
 
-  Any value preceded by a simple keyword when there is a table memorized will be
-  converted using `<-` with its first argument set to a keyword (having a namespace
-  set to a table name, and its name set to a name of that keyword).
+  - If there is a **literal vector** nested within existing vector its first element
+  will be considered a **column name**. All elements of that vector will inherit that
+  column name during conversion to a database-suitable format.
 
-  Any value, other than one expressed with a simple symbolic identifier, preceded by
-  a simple keyword, when there is no table memorized yet, will be left as is. After
-  that operation a table name will be updated for future reference.
+  - If the given literal vector contains a **fully-qualified keyword** at its first
+  position then both **table** and **column** will be memorized to be applied during
+  conversion of elements contained in that vector (table taken from a namespace and
+  column from a name of the keyword).
 
-  Any value expressed with a simple symbolic identifier, preceded by a simple
-  keyword, when there is no table memorized yet, will be converted using `<-` with
-  its first argument set to a keyword (having namespace set to this keyword and name
-  set to a name of the symbol expressing some value). After that operation a table
-  name will be updated for future reference.
+  - If there is a table inherited but there is no column specified, a value is not
+  converted but returned as is. The only exception is when the value is expressed as
+  a **literal, simple symbol**. In such case a column name will be derived from it.
 
-  Any value expressed with a simple symbolic identifier, not preceded by a keyword,
-  when there is a table memorized, will be converted using `<-` with its first
-  argument set to a keyword (having namespace set to the table name and name set to a
-  name of the symbol expressing some value).
+  - A sub-vector may begin with an unspecified value `nil`. In such case it will
+  group values to be converted but column name will not be set. The values will be
+  left unconverted unless they are simple symbol forms; in such case column names
+  will be derived from their names.
 
-  To enforce table name reset when it has already been set, without explicitly
-  specifying coercer for the consecutive form, prepend the exclamation mark to a
-  simple keyword's name. This only works for literal keywords given as arguments
-  since it is detected at compile-time (macro expansion phase).
+  Values used to set column and table names at the beginnings of vectors can be
+  expressed with any valid code. However, literal strings or literal keywords (or
+  symbols in case of identifier-derived column names) will be pre-processed at
+  compile time. So, if both column and table name are expressed that way, the
+  conversion specifier will be generated ahead.
 
-  If the one and only argument is a map, it will be transformed to a sequence of keys
-  interleaved with values. Obviously, the order of pairs in such operation cannot be
-  determined.
+  Moreover, if apart from the above, a value to be converted is a literal number,
+  string, keyword, boolean, or a `nil`, it will be converted at compile-time.
 
   Examples:
 
-  `(<<- :users id email)`
+  `(<<- [:users [:id id] [:email email]])`
 
   The above will convert values expressed by `id` and `email` symbol forms using a
   variant of coercion multimethod registered for `:users/id` and `:users/email`
   keywords, accordingly.
 
-  `(<<- :users id :email e)`
+  `(<<- [:users/id id [:email e]])`
 
   The above will convert values of `id` and `e` symbol forms using a variant of
   coercion multimethod registered for `:users/id` and `:users/email` keywords,
-  accordingly. Note that by placing `:email` keyword before `e` we are not setting
-  new table name but instead we are specifying coercion dispatch value which will be
-  a keyword built with `:users` (a table) and `:email` (a column).
+  accordingly.
 
-  `(<<- :users id :confirmations/email email expires)`
+  `(<<- [:users [:id id] [:confirmations/email email [:expires expires]])`
 
   The above will convert values of `id`, `email` and `expires` symbol forms using a
   variant of coercion multimethod registered for `:users/id`, `:confirmations/email`,
-  and `:confirmations/expires` keywords, accordingly. Note that by placing
-  `:confirmations/email` keyword before `email` we are setting a table name to
-  `:confirmations` and also hinting the engine to apply
-  `:confirmations/email`-dispatched transformation to a value of `email`. Also, note
-  that coercion of an `expiration` value will rely on memorized table name
-  `:confirmations` and its symbolic name.
+  and `:confirmations/expires` keywords, accordingly. We can see that second vector
+  changes the table name to `confirmations` in its scope so later `expires` derives
+  it and is converted with `:confirmations/expires` specification.
 
-  `(<<- :users id :!confirmations email expires)`.
+  This is synonymous to:
 
-  The above has the same effect as the previous example but uses table resetting
-  feature without explicitly specifying the coercer for a value behind the `email`
-  symbol."
-  [spec & more]
-  (if more
-    (let [specs# (cons spec more)]
-      `(nth (reduce ~#'spec-convert [[] nil nil true] ~(#'pre-parse-conv-specs specs#)) 0))
-    (let [spec# (if (list? spec) (cons spec nil) spec)
-          spec# (if (map? spec#) (mapcat identity spec#) spec#)]
-      `(nth (reduce ~#'spec-convert [[] nil nil true]  ~(#'pre-parse-conv-specs spec#)) 0))))
+  `(<<- [:users id] [:confirmations email expires])`
+
+  As we can see, the `id` symbolic identifier is used to set the column name, same as
+  `email` and `expires` symbols. The above code will be expanded to:
+
+  ```
+  [(amelinium.db/<- :users/id id)
+   (amelinium.db/<- :confirmations/email email)
+   (amelinium.db/<- :confirmations/expires expires)]
+  ```."
+  [& specs]
+  (if specs
+    (parse-conv-specs specs)))
 
 (defn simple->
   [table m]
