@@ -303,11 +303,14 @@
   "Extracts table and column names from `col-spec` (which may be an identifier or a
   string) as snake-cased strings of a 2-element vector (first element being a table
   name, second a column name). If `col-spec` is an identifier, its namespace and name
-  will be used. If two arguments are given, names are extracted separately using
-  `table` and `column` functions)."
+  will be used. If there is no namespace, it will be considered a table name. If two
+  arguments are given, names are extracted separately using `table` and `column`
+  functions)."
   ([col-spec]
    (if (ident? col-spec)
-     [(db/to-snake (namespace col-spec)) (db/to-snake (name col-spec))]
+     (if-some [n (namespace col-spec)]
+       [(db/to-snake n) (db/to-snake (name col-spec))]
+       [(db/to-snake (name col-spec)) nil])
      (if (some? col-spec) (table-column (some-keyword col-spec)))))
   ([col-spec col-id]
    [(table col-spec) (column col-id)]))
@@ -317,8 +320,9 @@
   "Alias for `table-column`. Extracts table and column names from `col-spec` (which may
   be an identifier or a string) as snake-cased strings of a 2-element vector (first
   element being a table name, second a column name). If `col-spec` is an identifier,
-  its namespace and name will be used. If two arguments are given, names are
-  extracted separately using `table` and `column` functions)."
+  its namespace and name will be used. If there is no namespace, it will be
+  considered a column name. If two arguments are given, names are extracted
+  separately using `table` and `column` functions)."
   table-column)
 
 (defn column-table
@@ -383,22 +387,26 @@
   "Extracts table and column names from `col-spec` (which may be an identifier or a
   string) as lisp-cased keywords of a 2-element vector (first element being a table
   name, second a column name). If `col-spec` is an identifier, its namespace and name
-  will be used. If two arguments are given, names are extracted separately using
-  `table-kw` and `column-kw` functions)."
+  will be used. If there is no namespace, it will be considered a table name. If two
+  arguments are given, names are extracted separately using `table-kw` and
+  `column-kw` functions)."
   ([col-spec]
    (let [k (some-keyword (db/to-lisp col-spec))]
-     [(some-keyword (namespace k)) (some-keyword (name k))]))
+     (if-some [n (namespace k)]
+       [(some-keyword (namespace k)) (some-keyword (name k))]
+       [(some-keyword (name k)) nil])))
   ([col-spec col-id]
    [(table-kw col-spec) (column-kw col-id)]))
 
-(def ^{:tag Keyword
-       :arglists '(^Keyword [col-id] ^Keyword [_ col-id])}
+(def ^{:tag      Keyword
+       :arglists '(^Keyword [col-id] ^Keyword [col-spec col-id])}
   table-col-kw
   "Alias for `table-column-kw`. Extracts table and column names from `col-spec` (which
   may be an identifier or a string) as lisp-cased keywords of a 2-element
   vector (first element being a table name, second a column name). If `col-spec` is
-  an identifier, its namespace and name will be used. If two arguments are given,
-  names are extracted separately using `table-kw` and `column-kw` functions)."
+  an identifier, its namespace and name will be used. If there is no namespace, it
+  will be considered a table name. If two arguments are given, names are extracted
+  separately using `table-kw` and `column-kw` functions)."
   table-column-kw)
 
 ;; SQL query preparation
