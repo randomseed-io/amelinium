@@ -27,12 +27,18 @@
             [io.randomseed.utils.map  :refer   [qassoc]]
             [io.randomseed.utils      :refer       :all])
 
-  (:import [clojure.lang             Keyword]
-           [phone_number.core        Phoneable]
-           [amelinium                Suites SuitesJSON PasswordData]
-           [amelinium                Identity Session UserData AuthQueries DBPassword]
-           [java.util                UUID]
-           [java.time                Duration Instant]))
+  (:import (clojure.lang      Keyword)
+           (phone_number.core Phoneable)
+           (amelinium         Suites
+                              SuitesJSON
+                              PasswordData)
+           (amelinium         Identity
+                              Session
+                              UserData
+                              AuthQueries
+                              DBPassword)
+           (java.util         UUID)
+           (java.time         Duration Instant)))
 
 (def ten-minutes
   (t/new-duration 10 :minutes))
@@ -88,7 +94,7 @@
   "Generates a confirmation query for an e-mail or a phone used during registration of
   a NEW USER."
   [id-column dec-att?]
-  (str-squeeze-spc
+  (db/build-query
    "INSERT INTO confirmations(id,code,token,reason,id_type,expires,confirmed,user_id,user_uid,"
    "attempts,account_type,first_name,middle_name,last_name,password,password_suite_id)"
    (str "SELECT ?,?,?,?,?,?,0,"

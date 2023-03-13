@@ -37,19 +37,30 @@
             [io.randomseed.utils.ip            :as            ip]
             [io.randomseed.utils.map           :as           map]
             [io.randomseed.utils.map           :refer   [qassoc]]
-            [io.randomseed.utils               :refer       :all])
+            [io.randomseed.utils               :refer       :all]
+            [puget.printer :refer [cprint]])
 
-  (:import [clojure.lang             Keyword]
-           [phone_number.core        Phoneable]
-           [amelinium.proto.auth     Authorizable]
-           [amelinium.proto.identity Identifiable]
-           [amelinium.proto.session  Sessionable]
-           [amelinium                Suites SuitesJSON PasswordData]
-           [amelinium                Identity Session UserData AuthQueries DBPassword]
-           [amelinium                AuthConfig AuthSettings AuthLocking AuthConfirmation AccountTypes]
-           [java.util                UUID]
-           [javax.sql                DataSource]
-           [java.time                Duration Instant]))
+  (:import (clojure.lang             Keyword)
+           (phone_number.core        Phoneable)
+           (amelinium.proto.auth     Authorizable)
+           (amelinium.proto.identity Identifiable)
+           (amelinium.proto.session  Sessionable)
+           (amelinium                Suites
+                                     SuitesJSON
+                                     PasswordData
+                                     Identity
+                                     Session
+                                     UserData
+                                     AuthQueries
+                                     DBPassword
+                                     AuthConfig
+                                     AuthSettings
+                                     AuthLocking
+                                     AuthConfirmation
+                                     AccountTypes)
+           (java.util                UUID)
+           (javax.sql                DataSource)
+           (java.time                Duration Instant)))
 
 (defonce ^:redef props-cache    (atom nil))
 (defonce ^:redef settings-cache (atom nil))
@@ -642,7 +653,7 @@
 ;; Creation
 
 (def ^:const create-with-token-query
-  (str-squeeze-spc
+  (db/build-query
    "INSERT IGNORE INTO users(email,uid,account_type,first_name,middle_name,last_name,"
    "                         password,password_suite_id)"
    "SELECT id,UUID(),account_type,first_name,middle_name,last_name,"
@@ -663,7 +674,7 @@
            :errors   errs})))))
 
 (def ^:const create-with-code-query
-  (str-squeeze-spc
+  (db/build-query
    "INSERT IGNORE INTO users(email,uid,account_type,first_name,middle_name,last_name,"
    "                         password,password_suite_id)"
    "SELECT id,UUID(),account_type,first_name,middle_name,last_name,"
@@ -814,39 +825,39 @@
 ;; Passwords and login data
 
 (def ^:const password-query
-  (str-spc "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
-           "WHERE users.email = ? AND password_suites.id = users.password_suite_id"))
+  (db/build-query "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
+                  "WHERE users.email = ? AND password_suites.id = users.password_suite_id"))
 
 (def ^:const password-query-atypes-pre
-  (str-spc "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
-           "WHERE users.email = ? AND users.account_type"))
+  (db/build-query "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
+                  "WHERE users.email = ? AND users.account_type"))
 
 (def ^:const password-query-atypes-post
   " AND password_suites.id = users.password_suite_id")
 
 (def ^:const password-query-atypes-single
-  (str-spc "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
-           "WHERE users.email = ? AND users.account_type = ?"
-           "AND password_suites.id = users.password_suite_id"))
+  (db/build-query "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
+                  "WHERE users.email = ? AND users.account_type = ?"
+                  "AND password_suites.id = users.password_suite_id"))
 
 (def ^:const login-query
-  (str-spc "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
-           "FROM users, password_suites"
-           "WHERE users.email = ? AND password_suites.id = users.password_suite_id"))
+  (db/build-query "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
+                  "FROM users, password_suites"
+                  "WHERE users.email = ? AND password_suites.id = users.password_suite_id"))
 
 (def ^:const login-query-atypes-pre
-  (str-spc "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
-           "FROM users, password_suites"
-           "WHERE users.email = ? AND users.account_type"))
+  (db/build-query "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
+                  "FROM users, password_suites"
+                  "WHERE users.email = ? AND users.account_type"))
 
 (def ^:const login-query-atypes-post
   " AND password_suites.id = users.password_suite_id")
 
 (def ^:const login-query-atypes-single
-  (str-spc "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
-           "FROM users, password_suites"
-           "WHERE users.email = ? AND users.account_type = ?"
-           "AND password_suites.id = users.password_suite_id"))
+  (db/build-query "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
+                  "FROM users, password_suites"
+                  "WHERE users.email = ? AND users.account_type = ?"
+                  "AND password_suites.id = users.password_suite_id"))
 
 (def ^:const ^AuthQueries login-data-queries
   (->AuthQueries login-query
@@ -932,7 +943,7 @@
    (pauth/get-user-auth-data auth-source email account-type password-data-queries)))
 
 (def ^:const insert-shared-suite-query
-  (str-spc
+  (db/build-query
    "INSERT INTO password_suites(suite) VALUES(?)"
    "ON DUPLICATE KEY UPDATE id=id"
    "RETURNING id"))
@@ -1026,7 +1037,7 @@
                    {:id id}))))
 
 (def ^:const login-failed-update-query
-  (str-spc
+  (db/build-query
    "UPDATE users"
    "SET"
    "last_failed_ip = ?,"
@@ -1038,7 +1049,7 @@
    "WHERE id = ?"))
 
 (def ^:const soft-lock-update-query
-  (str-spc
+  (db/build-query
    "UPDATE users"
    "SET soft_locked = NOW()"
    "WHERE id = ? AND login_attempts > ?"))
