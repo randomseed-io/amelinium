@@ -783,6 +783,7 @@
   :reason            some-str                   some-keyword
   :id-type           some-str                   some-keyword
   :attempts          to-long-or-zero            long-or-zero
+  :max-attempts      to-long-or-zero            long-or-zero
   :created           to-instant                 to-instant
   :expires           to-instant                 to-instant
   :confirmed         to-bin-num                 num-to-boolean
@@ -791,4 +792,8 @@
   :first-name        some-str                   some-str
   :middle-name       some-str                   some-str
   :last-name         some-str                   some-str
-  :password-suite-id safe-parse-long            long-or-nil)
+  :password-suite-id safe-parse-long            long-or-nil
+  :no-attempts       to-bin-num                 num-to-boolean
+  :bad-reason        to-bin-num                 num-to-boolean
+  :expired           to-bin-num                 num-to-boolean
+  :present           to-bin-num                 num-to-boolean)
