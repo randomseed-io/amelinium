@@ -185,12 +185,6 @@
 (def ^:const phone-confirmation-query-without-attempt-nouser
   (gen-confirmation-query :phone false false))
 
-(defn- parse-id-type
-  "Parses identity type, guessing it when necessary. Returns its string
-  representation. If the type cannot be established, falls back to \"email\"."
-  ^String [id id-type]
-  (or (some-str (identity/type id-type id)) "email"))
-
 (defn- gen-full-confirmation-core
   "Creates a confirmation code for the given identity (an e-mail address or a
   phone).
