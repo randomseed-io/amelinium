@@ -788,57 +788,49 @@
    (->> (mapcat #(pp-conv-specs % nil nil) coll)
         (reduce join-qslots [])))
   ([e tspec cspec]
-   (if (vector? e)
-     ;; control structure, a vector
-     (let [ctrl (nth e 0 nil)
-           coll (subvec e 1)]
-       (if (keyword? ctrl)
-         ;; static table/column name
-         (let [[c t] (c-t ctrl tspec cspec)] (mapcat #(pp-conv-specs % t c) coll))
-         ;; dynamic table/column name
-         (let [[c t] (if tspec [ctrl tspec] [nil ctrl])] (mapcat #(pp-conv-specs % t c) coll))))
-     ;; regular element
-     (if (and tspec cspec)
-       ;; memorized table and column specs
-       (if (statically-convertable? e tspec cspec)
-         ;; regular statically-convertable element
-         (cons (<- tspec cspec e) nil)
-         ;; regular dynamically-convertable element
-         (cons (QSlot. tspec cspec [e]) nil))
-       ;; no full spec information to convert
-       (if (and tspec (simple-symbol? e))
-         ;; column name derived from a symbolic name
-         (cons (QSlot. tspec (name e) [e]) nil)
-         ;; no usable spec information
-         (cons e nil))))))
+   (cond
+     (vector? e)              (let [ctrl (nth e 0 nil), coll (subvec e 1)]
+                                (if (keyword? ctrl)
+                                  ;; static table/column name
+                                  (let [[c t] (c-t ctrl tspec cspec)]
+                                    (mapcat #(pp-conv-specs % t c) coll))
+                                  ;; dynamic table/column name
+                                  (let [[c t] (if tspec [ctrl tspec] [nil ctrl])]
+                                    (mapcat #(pp-conv-specs % t c) coll))))
+     (and tspec cspec)        (if (statically-convertable? e tspec cspec)
+                                ;; memorized column and table
+                                ;; regular statically-convertable element
+                                (cons (<- tspec cspec e) nil)
+                                ;; memorized column and table
+                                ;; regular dynamically-convertable element
+                                (cons (QSlot. tspec cspec [e]) nil))
+     (and tspec
+          (simple-symbol? e)) (cons (QSlot. tspec (name e) [e]) nil)
+     :else                    (cons e nil))))
 
-(defn- parse-conv-specs
-  "Parses table/column conversion specifications to produce a source code."
-  [coll]
-  (some->>
-   coll
-   (pp-conv-specs)
-   (mapv
-    (fn [v]
-      (if-not (instance? QSlot v) v
-              (let [t (.t ^QSlot v)
-                    c (.c ^QSlot v)
-                    v (.v ^QSlot v)]
-                (cond
-                  (nil? t)                v
-                  (and (or (string?  t)
-                           (keyword? t))
-                       (or (string?  c)
-                           (keyword? c))) (let [cs (colspec-kw t c)]
-                                            (if (= (count v) 1)
-                                              (if (statically-convertable? (nth v 0))
-                                                (<- cs (nth v 0))
-                                                `(<- ~cs ~(nth v 0)))
-                                              `(<-seq ~cs ~v)))
-                  (nil? c)                v
-                  :else                   (if (= (count v) 1)
-                                            `(<- ~t ~c ~(nth v 0))
-                                            `(<-seq ~t ~c ~v)))))))))
+(defn- parse-conv-spec
+  "Parses value with optional table/column conversion specification to produce a source
+  code."
+  [v]
+  (if (instance? QSlot v)
+    (let [t (.t ^QSlot v)
+          c (.c ^QSlot v)
+          v (.v ^QSlot v)]
+      (cond
+        (nil? t)                v
+        (and (or (string?  t)
+                 (keyword? t))
+             (or (string?  c)
+                 (keyword? c))) (let [cs (colspec-kw t c)]
+                                  (if (= (count v) 1)
+                                    (if (statically-convertable? (nth v 0))
+                                      (<- cs (nth v 0))
+                                      `(<- ~cs ~(nth v 0)))
+                                    `(<-seq ~cs ~v)))
+        (nil? c)                v
+        :else                   (if (= (count v) 1)
+                                  `(<- ~t ~c ~(nth v 0))
+                                  `(<-seq ~t ~c ~v)))) v))
 
 (defmacro <<-
   "Magical macro which converts a sequence of values with optional table and column
@@ -917,8 +909,7 @@
   Rule of a thumb is: if you can express certain values or specifications with
   literal strings or keywords, it may speed things up."
   [& specs]
-  (if specs
-    (parse-conv-specs specs)))
+  (some->> specs (pp-conv-specs) (mapv parse-conv-spec)))
 
 (defn simple->
   [table m]
