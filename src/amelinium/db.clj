@@ -321,6 +321,30 @@
   extracted separately using `table` and `column` functions)."
   table-column)
 
+(defn column-table
+  "Extracts column and table names from `col-spec` (which may be an identifier or a
+  string) as snake-cased strings of a 2-element vector (first element being a column
+  name, second a table name). If `col-spec` is an identifier, its namespace and name
+  will be used. If there is no namespace, it will be considered a column name. If two
+  arguments are given, names are extracted separately using `column` and `table`
+  functions)."
+  ([col-spec]
+   (if (ident? col-spec)
+     [(db/to-snake (name col-spec)) (db/to-snake (namespace col-spec))]
+     (if (some? col-spec) (column-table (some-keyword col-spec)))))
+  ([col-id col-spec]
+   [(column col-id) (table col-spec)]))
+
+(def ^{:arglists '([col-spec] [col-id col-spec])}
+  col-table
+  "Alias for `column-table`. Extracts column and table names from `col-spec` (which may
+  be an identifier or a string) as snake-cased strings of a 2-element vector (first
+  element being a column name, second a table name). If `col-spec` is an identifier,
+  its namespace and name will be used. If there is no namespace, it will be
+  considered a column name. If two arguments are given, names are extracted
+  separately using `column` and `table` functions)."
+  column-table)
+
 (defn table-kw
   "Extracts table name as a lisp-cased keyword from `col-spec` which may be an
   identifier or a string. If the identifier has a namespace, it will be used,
