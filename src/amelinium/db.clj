@@ -912,7 +912,10 @@
   [(amelinium.db/<- :users/id id)
    (amelinium.db/<- :confirmations/email email)
    (amelinium.db/<- :confirmations/expires expires)]
-  ```."
+  ```
+
+  Rule of a thumb is: if you can express certain values or specifications with
+  literal strings or keywords, it may speed things up."
   [& specs]
   (if specs
     (parse-conv-specs specs)))
@@ -1037,7 +1040,7 @@
   ```
   (<q [\"select %(id) from %[u] where %(id) = ? AND %(t) = ?\"
        {:id :users/id, :u :users/id, :t :users/account-type}]
-      :users :id \"42\" :account-type :user)
+      [:users [:id \"42\" :account-type :user]])
   ```
 
   The above will return:
@@ -1053,7 +1056,7 @@
   [query & params]
   `(cons (build-query ~query) (<<- ~@params)))
 
-  (defmacro <dq
+(defmacro <dq
   "Simple wrapper around `build-query-dynamic` and `<<-` macros. First argument should
   be a query (possibly grouped with a vector, if multiple arguments need to be
   passed), all other arguments are passed to `<<-`.
@@ -1070,7 +1073,7 @@
   ```
   (<q [\"select %(id) from %[u] where %(id) = ? AND %(t) = ?\"
        {:id :users/id, :u :users/id, :t :users/account-type}]
-      :users :id \"42\" :account-type :user)
+      [:users [:id \"42\"] [:account-type :user]])
   ```
 
   The above will return:
