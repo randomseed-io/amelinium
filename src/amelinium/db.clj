@@ -725,7 +725,7 @@
   `amelinium.db/in-coercer` multimethod on a qualified keyword `table-column` (or a
   qualified keyword made out of `table` and `column`). If there is no coercer
   attached for the keyword, returns unchanged `v`."
-  ([table column v] (if-some [f (in-coercer (make-kw-simple table column))] (f v) v))
+  ([table column v] (if-some [f (in-coercer (colspec-kw table column))] (f v) v))
   ([table-column v] (if-some [f (in-coercer table-column)] (f v) v)))
 
 (defn ->
@@ -733,7 +733,7 @@
   `amelinium.db/out-coercer` multimethod on a qualified keyword `table-column` (or a
   qualified keyword made out of `table` and `column`). If there is no coercer
   attached for the keyword, returns unchanged `v`."
-  ([table column v] (if-some [f (out-coercer (make-kw-simple table column))] (f v) v))
+  ([table column v] (if-some [f (out-coercer (colspec-kw table column))] (f v) v))
   ([table-column v] (if-some [f (out-coercer table-column)] (f v) v)))
 
 (defn <-seq
@@ -741,7 +741,7 @@
   by invoking `amelinium.db/in-coercer` multimethod on a qualified keyword
   `table-column` (or a qualified keyword made out of `table` and `column`). If there
   is no coercer attached for the keyword, returns unchanged `coll`."
-  ([table column coll] (if-some [f (in-coercer (make-kw-simple table column))] (map f coll) coll))
+  ([table column coll] (if-some [f (in-coercer (colspec-kw table column))] (map f coll) coll))
   ([table-column coll] (if-some [f (in-coercer table-column)] (map f coll) coll)))
 
 (defn seq->
@@ -749,7 +749,7 @@
   returned by invoking `amelinium.db/out-coercer` multimethod on a qualified keyword
   `table-column` (or a qualified keyword made out of `table` and `column`). If there
   is no coercer attached for the keyword, returns unchanged `coll`."
-  ([table column coll] (if-some [f (out-coercer (make-kw-simple table column))] (map f coll) coll))
+  ([table column coll] (if-some [f (out-coercer (colspec-kw table column))] (map f coll) coll))
   ([table-column coll] (if-some [f (out-coercer table-column)] (map f coll) coll)))
 
 (defn- ex-nm
