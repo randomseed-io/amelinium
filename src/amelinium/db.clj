@@ -461,8 +461,8 @@
   (if substitutions
     (c/-> q
           (str/replace #"%\[([^\]]+)\]" "%%table{$1}")
-          (str/replace #"%\(([^\(]+)\)" "%%column{$1}")
-          (str/replace #"%(%)?([^\{\s]+)?\{([^\}]+)?\}" #(interpolate-tag substitutions %)))
+          (str/replace #"%\(([^\)]+)\)" "%%column{$1}")
+          (str/replace #"%(%)?([^\{\}\[\]\s]+)?\{([^\}]+)?\}" #(interpolate-tag substitutions %)))
     q))
 
 (def ^{:tag    String
