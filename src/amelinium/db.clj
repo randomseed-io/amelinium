@@ -409,6 +409,30 @@
   separately using `table-kw` and `column-kw` functions)."
   table-column-kw)
 
+(defn column-table-kw
+  "Extracts column and table names from `col-spec` (which may be an identifier or a
+  string) as lisp-cased keywords of a 2-element vector (first element being a column
+  name, second a table name). If `col-spec` is an identifier, its namespace and name
+  will be used. If there is no namespace, it will be considered a column name. If two
+  arguments are given, names are extracted separately using `column-kw` and
+  `table-kw` functions)."
+  ([col-spec]
+   (let [k (some-keyword (db/to-lisp col-spec))]
+     [(some-keyword (name k)) (some-keyword (namespace k))]))
+  ([col-id col-spec]
+   [(column-kw col-id) (table-kw col-spec)]))
+
+(def ^{:tag      Keyword
+       :arglists '(^Keyword [col-spec] ^Keyword [col-id col-spec])}
+  col-table-kw
+  "Alias for `column-table-kw`. Extracts column and table names from `col-spec` (which
+  may be an identifier or a string) as lisp-cased keywords of a 2-element
+  vector (first element being a column name, second a table name). If `col-spec` is
+  an identifier, its namespace and name will be used. If there is no namespace, it
+  will be considered a column name. If two arguments are given, names are extracted
+  separately using `column-kw` and `table-kw` functions)."
+  column-table-kw)
+
 ;; SQL query preparation
 
 (defn quoted
