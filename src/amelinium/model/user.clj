@@ -695,7 +695,11 @@
           {:created? false
            :errors   errs})))))
 
-(defn create-with-token-or-code
+(defn create
+  "Creates new user account identified with the given e-mail `email` by checking if it
+  was successfully confirmed. Token (`token`) or code (`code`) must be provided to
+  authorize operation. Returns a map with `:created?` set to `true` if user account
+  is created."
   [db email token code]
   (if-some [token (some-str token)]
     (create-with-token db token)
@@ -703,124 +707,61 @@
 
 ;; Identity management
 
-(def ^:const update-email-with-token-query
-  (str-squeeze-spc
-   "INSERT IGNORE INTO users (id,email)"
+(def update-identity-query-token
+  (db/build-query
+   "INSERT IGNORE INTO users (id, %(identity))"
    "SELECT requester_id,id FROM confirmations"
-   "WHERE token = ? AND confirmed = TRUE AND user_id IS NULL AND user_uid IS NULL"
-   "                AND reason = 'change' AND expires >= NOW()"
-   "ON DUPLICATE KEY UPDATE email = VALUE(email)"
-   "RETURNING id,uid,email,phone"))
-
-(def ^:const update-phone-with-token-query
-  (str-squeeze-spc
-   "INSERT IGNORE INTO users (id,phone)"
-   "SELECT requester_id,id FROM confirmations"
-   "WHERE token = ? AND confirmed = TRUE AND user_id IS NULL AND user_uid IS NULL"
-   "                AND reason = 'change' AND expires >= NOW()"
-   "ON DUPLICATE KEY UPDATE phone = VALUE(phone)"
-   "RETURNING id,uid,email,phone"))
-
-(defn update-email-with-token
-  [db token]
-  (let [token (some-str token)]
-    (if token
-      (if-some [r (db/execute-one! db [update-email-with-token-query token])]
-        (qassoc r :updated? true :identity (identity/of-type :email (get r :email)))
-        (let [errs (confirmation/report-errors db token "change" true)]
-          {:updated? false
-           :errors   errs})))))
-
-(defn update-phone-with-token
-  [db token]
-  (let [token (some-str token)]
-    (if token
-      (if-some [r (db/execute-one! db [update-phone-with-token-query token])]
-        (qassoc r :updated? true :identity (identity/of-type :phone (get r :phone)))
-        (let [errs (confirmation/report-errors db token "change" true)]
-          {:updated? false
-           :errors   errs})))))
-
-(def ^:const update-email-with-code-query
-  (str-squeeze-spc
-   "INSERT IGNORE INTO users (id,email)"
-   "SELECT requester_id,id FROM confirmations"
-   "WHERE code = ? AND id = ?"
-   "               AND confirmed = TRUE AND user_id IS NULL AND user_uid IS NULL"
-   "               AND reason = 'change' AND expires >= NOW()"
-   "ON DUPLICATE KEY UPDATE email = VALUE(email)"
-   "RETURNING id,uid,email,phone"))
-
-(def ^:const update-phone-with-code-query
-  (str-squeeze-spc
-   "INSERT IGNORE INTO users (id,phone)"
-   "SELECT requester_id,id FROM confirmations"
-   "WHERE code = ? AND id = ?"
-   "               AND confirmed = TRUE AND user_id IS NULL AND user_uid IS NULL"
-   "               AND reason = 'change' AND expires >= NOW()"
-   "ON DUPLICATE KEY UPDATE phone = VALUE(phone)"
-   "RETURNING id,uid,email,phone"))
-
-(defn update-email-with-code
-  [db email code]
-  (let [code  (some-str code)
-        email (some-str email)]
-    (if (and code email)
-      (if-some [r (jdbc/execute-one! db [update-email-with-code-query code email] db/opts-simple-map)]
-        (qassoc r :updated? true :uid (identity/parse-uid (get r :uid)) :identity (get r :email))
-        (let [errs (confirmation/report-errors db email code "change" true)]
-          {:updated? false
-           :errors   errs})))))
-
-(defn update-phone-with-code
-  [db phone code]
-  (let [code  (some-str code)
-        phone (identity/->db phone)]
-    (if (and code phone)
-      (if-some [r (jdbc/execute-one! db [update-phone-with-code-query code phone] db/opts-simple-map)]
-        (qassoc r :updated? true :uid (identity/parse-uid (get r :uid)) :identity (get r :phone))
-        (let [errs (confirmation/report-errors db phone code "change" true)]
-          {:updated? false
-           :errors   errs})))))
-
-(defn update-email-with-token-or-code
-  [db email token code]
-  (if-some [token (some-str token)]
-    (update-email-with-token db token)
-    (update-email-with-code  db email code)))
-
-(defn update-phone-with-token-or-code
-  [db phone token code]
-  (if-some [token (some-str token)]
-    (update-phone-with-token db token)
-    (update-phone-with-code  db phone code)))
+   "WHERE token = ?"
+   "      AND confirmed = TRUE AND user_id IS NULL AND user_uid IS NULL"
+   "      AND reason    = 'change' AND expires >= NOW()"
+   "ON DUPLICATE KEY UPDATE  %(identity) = VALUE(%(identity))"
+   "RETURNING id,uid,%(identity)"))
 
 (defn update-identity-with-token
-  [id-type db id token]
-  (case id-type
-    :email      (update-email-with-token db token)
-    :phone      (update-phone-with-token db token)
-    :user/email (update-email-with-token db token)
-    :user/phone (update-phone-with-token db token)
-    (update-email-with-token db token)))
+  [identity-type db token]
+  (if-some [identity-col (db/column-kw identity-type)]
+    (if-some [r (db/<exec-one! db
+                               [update-identity-query-token {:identity identity-col}]
+                               [:confirmations token])]
+      (qassoc r
+              :updated? true
+              :identity (identity/opt-type identity-type (get r identity-col)))
+      {:updated? false
+       :errors   (confirmation/report-errors db token "change" true)})))
+
+(def update-identity-query-code
+  (db/build-query
+   "INSERT IGNORE INTO users (id, %(identity))"
+   "SELECT requester_id,id FROM confirmations"
+   "WHERE code      = ?"
+   "  AND id        = ?"
+   "  AND confirmed = TRUE AND user_id IS NULL AND user_uid IS NULL"
+   "  AND reason    = 'change' AND expires >= NOW()"
+   "ON DUPLICATE KEY UPDATE %(identity) = VALUE(%(identity))"
+   "RETURNING id,uid,%(identity)"))
 
 (defn update-identity-with-code
-  [id-type db id code]
-  (case id-type
-    :email      (update-email-with-code db id code)
-    :phone      (update-phone-with-code db id code)
-    :user/email (update-email-with-code db id code)
-    :user/phone (update-phone-with-code db id code)
-    (update-email-with-code db id code)))
+  [identity-type db code user-identity]
+  (if-some [id (identity/opt-type identity-type user-identity)]
+    (if-some [identity-col (db/column-kw identity-type)]
+      (if-some [r (db/<exec-one! db
+                                 [update-identity-query-code {:identity identity-col}]
+                                 [:confirmations code id])]
+        (qassoc r
+                :updated? true
+                :identity (identity/opt-type identity-type (get r identity-col)))
+        {:updated? false
+         :errors   (confirmation/report-errors db id code "change" true)}))))
 
-(defn update-identity-with-token-or-code
-  [id-type db id token code]
-  (case id-type
-    :email      (update-email-with-token-or-code db id token code)
-    :phone      (update-phone-with-token-or-code db id token code)
-    :user/email (update-email-with-token-or-code db id token code)
-    :user/phone (update-phone-with-token-or-code db id token code)
-    (update-email-with-token-or-code db id token code)))
+(defn update-identity
+  "Updates user's identity identified by `user-identity` and `code`, or by
+  `token`. Code or token must exist in a database."
+  ([identity-type db token]
+   (update-identity-with-token identity-type db token))
+  ([identity-type db code user-identity]
+   (if user-identity
+     (update-identity-with-code identity-type db code user-identity)
+     (update-identity identity-type db code))))
 
 ;; Passwords and login data
 
