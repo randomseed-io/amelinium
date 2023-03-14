@@ -1080,6 +1080,30 @@
   [query & params]
   `(cons (build-query-dynamic ~query) (<<- ~@params)))
 
+(defmacro <d-do!
+  [f db query & params]
+  `(~f ~db (cons (build-query-dynamic ~query) (<<- ~@params))))
+
+(defmacro <d-exec!
+  [db query & params]
+  `(execute! ~db (cons (build-query-dynamic ~query) (<<- ~@params))))
+
+(defmacro <d-exec-one!
+  [db query & params]
+  `(execute-one! ~db (cons (build-query-dynamic ~query) (<<- ~@params))))
+
+(defmacro <do!
+  [f db query & params]
+  `(~f ~db (cons (build-query ~query) (<<- ~@params))))
+
+(defmacro <exec!
+  [db query & params]
+  `(execute! ~db (cons (build-query ~query) (<<- ~@params))))
+
+(defmacro <exec-one!
+  [db query & params]
+  `(execute-one! ~db (cons (build-query ~query) (<<- ~@params))))
+
 ;; Main wrappers
 
 (defn lazy-execute-one!
