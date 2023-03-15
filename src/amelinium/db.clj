@@ -167,24 +167,72 @@
   (set-parameter [^amelinium.Identity v ^PreparedStatement ps ^long i]
     (jp/set-parameter (identity/->db v) ps i)))
 
-;; Keyword processing
+;; Column and table names processing
+
+(defn quoted
+  "Quotes the given string according to MySQL / MariaDB quoting rules."
+  ^String [s]
+  (if-some [^String s (some-str s)]
+    (quoted/mysql s)))
 
 (defn idname
   "If the given value `v` is an ident, it returns its (optional) namespace and name
   joined with a dot character. Otherwise it returns the string representation of
-  the given object."
+  the given object with slashes replaced by dot characters."
   ^String [v]
   (if (ident? v)
-    (if-some [nsp (namespace v)]
+    (if-some [^String nsp (namespace v)]
       (str nsp "." (name v))
-      (str/replace (name v) \/ \.))
-    (str/replace (str v) \/ \.)))
+      (name v))
+    (if-some [^String v (some-str v)]
+      (str/replace v \/ \.))))
 
 (defn idname-simple
   "If the given value `v` is an ident, it returns its name. Otherwise it returns the
   string representation of the given object."
   ^String [v]
   (if (ident? v) (name v) (str v)))
+
+(defn dbname
+  "If the given value `v` is an ident, it returns its (optional) namespace and name
+  joined with a dot character. Otherwise it returns a string representation of the
+  given object with a first slash replaced by a dot."
+  ^String [v]
+  (if (ident? v)
+    (if-some [^String nsp (namespace v)]
+      (strb nsp "." (name v))
+      (name v))
+    (if-some [^String v (some-str v)]
+      (str/replace-first v \/ \.))))
+
+(defn dbname-quoted
+  "If the given value `v` is an ident, it returns its (optional) namespace and name
+  joined with a dot character. Otherwise it returns a string representation of the
+  given object with a first slash replaced by a dot. Each part of a name will be
+  quoted."
+  ^String [v]
+  (if (ident? v)
+    (if-some [^String nsp (namespace v)]
+      (strb (quoted nsp) "." (quoted (name v)))
+      (name v))
+    (if-some [^String v (some-str v)]
+      (if (str/index-of v \/)
+        (dbname-quoted (keyword v))
+        (if (str/index-of v \.)
+          (dbname-quoted (keyword (str/replace-first v \. \/)))
+          (quoted v))))))
+
+(defn dbname-kw
+  "If the given value `v` is an ident, it returns its keyword representation. Otherwise
+  it returns a string representation of the given object with dots replaced by
+  slashes."
+  ^String [v]
+  (if (ident? v)
+    (keyword v)
+    (if-some [^String v (some-str v)]
+      (if (str/index-of v \/)
+        (keyword v)
+        (keyword (str/replace-first v \. \/))))))
 
 (defn make-kw
   "Creates a keyword with the given name and namespace which both can be expressed as
@@ -244,26 +292,69 @@
 ;; Tables and columns
 
 (defn colspec
-  "Converts a `table/column` identifier `table-col` into a snake-cased string. If
-  `table-id` and `col-id` are given, it creates a string of those parts joined with a
-  slash character. If identifier is given, it uses its namespace and name."
+  "Converts a `table/column`-formatted identifier `table-col` into a snake-cased
+  string. If `table-id` and `col-id` are given, it creates a string of those parts
+  joined with a dot character. If identifier is given, it uses its namespace and
+  name."
   (^String [col-spec]
-   (db/to-snake col-spec))
+   (if (ident? col-spec)
+     (colspec (namespace col-spec) (name col-spec))
+     (if-some [^String col-spec (db/to-snake col-spec)]
+       (str/replace-first col-spec \/ \.))))
   (^String [table-id col-id]
-   (if col-id
-     (db/to-snake (str (idname table-id) "/" (idname col-id)))
-     (colspec table-id))))
+   (if-some [^String table-id (some-str table-id)]
+     (if-some [^String col-id (some-str col-id)]
+       (db/to-snake (strb table-id "." col-id))
+       (db/to-snake table-id))
+     (if-some [^String col-id (some-str col-id)]
+       (db/to-snake col-id)))))
+
+(defn colspec-quoted
+  "Converts a `table/column`-formatted identifier `table-col` into a snake-cased
+  string. If `table-id` and `col-id` are given, it creates a string of those parts
+  joined with a dot character. If identifier is given, it uses its namespace and
+  name. Each part of the name will be quoted."
+  (^String [col-spec]
+   (if (ident? col-spec)
+     (colspec-quoted (namespace col-spec) (name col-spec))
+     (if-some [^String col-spec (some-str col-spec)]
+       (if (str/index-of col-spec \/)
+         (colspec-quoted (keyword col-spec))
+         (if (str/index-of col-spec \.)
+           (colspec-quoted (keyword (str/replace-first col-spec \. \/)))
+           (quoted (db/to-snake col-spec)))))))
+  (^String [table-id col-id]
+   (if-some [^String table-id (some-str table-id)]
+     (if-some [^String col-id (some-str col-id)]
+       (db/to-snake (strb (quoted table-id) "." (quoted col-id)))
+       (quoted (db/to-snake table-id)))
+     (if-some [^String col-id (some-str col-id)]
+       (quoted (db/to-snake col-id))))))
 
 (defn colspec-kw
-  "Converts a `table/column` identifier `col-spec` into a lisp-cased keyword,
-  qualified if possible. If `table-id` and `col-id` are given, it creates a keyword of
-  those parts, `table-id` being its namespace and `col-id` being its name."
+  "Converts a `table/column` or `table.column`-formatted identifier `table-col` into a
+  lisp-cased keyword. If `table-id` and `col-id` are given, it creates a string of
+  those parts joined with a dot character. If identifier is given, it uses its
+  namespace and name.
+
+  If the `col-spec` is a string and there is a slash character present in it, it will
+  not be checked for a dot character presence."
   (^String [col-spec]
-   (some-keyword (db/to-lisp col-spec)))
+   (if (ident? col-spec)
+     (colspec-kw (namespace col-spec) (name col-spec))
+     (if-some [col-spec (some-str col-spec)]
+       (if (str/index-of col-spec \/)
+         (keyword (db/to-lisp col-spec))
+         (if (str/index-of col-spec \.)
+           (keyword (db/to-lisp (str/replace-first col-spec \. \/)))
+           (keyword (db/to-lisp col-spec)))))))
   (^String [table-id col-id]
-   (if col-id
-     (keyword (db/to-lisp (idname table-id)) (db/to-lisp (idname col-id)))
-     (colspec-kw table-id))))
+   (if-some [^String table-id (some-str table-id)]
+     (if-some [^String col-id (some-str col-id)]
+       (keyword (db/to-lisp (strb table-id "/" col-id)))
+       (keyword (db/to-lisp table-id)))
+     (if-some [^String col-id (some-str col-id)]
+       (keyword (db/to-lisp col-id))))))
 
 (defn table
   "Extracts table name as a snake-cased string from `col-spec` which may be an
@@ -274,7 +365,12 @@
   (^String [col-spec]
    (if (ident? col-spec)
      (db/to-snake (or (namespace col-spec) (name col-spec)))
-     (if (some? col-spec) (table (some-keyword col-spec)))))
+     (if-some [col-spec (some-str col-spec)]
+       (if (str/index-of col-spec \.)
+         (table (keyword (str/replace-first col-spec \. \/)))
+         (if (str/index-of col-spec \/)
+           (table (keyword col-spec))
+           (db/to-snake col-spec))))))
   (^String [col-spec _] (table col-spec)))
 
 (defn column
@@ -286,7 +382,12 @@
   (^String [col-spec]
    (if (ident? col-spec)
      (db/to-snake (name col-spec))
-     (if (some? col-spec) (column (some-keyword col-spec)))))
+     (if-some [col-spec (some-str col-spec)]
+       (if (str/index-of col-spec \.)
+         (column (keyword (str/replace-first col-spec \. \/)))
+         (if (str/index-of col-spec \/)
+           (column (keyword col-spec))
+           (db/to-snake col-spec))))))
   (^String [_ col-spec] (column col-spec)))
 
 (def ^{:tag String
@@ -308,10 +409,12 @@
   functions)."
   ([col-spec]
    (if (ident? col-spec)
-     (if-some [n (namespace col-spec)]
-       [(db/to-snake n) (db/to-snake (name col-spec))]
-       [(db/to-snake (name col-spec)) nil])
-     (if (some? col-spec) (table-column (some-keyword col-spec)))))
+     (table-column (some-str col-spec))
+     (if-some [col-spec (some-str col-spec)]
+       (if-some [col-spec (keyword (db/to-snake (str/replace-first col-spec \. \/)))]
+         (if-some [n (namespace col-spec)]
+           [n (name col-spec)]
+           [(name col-spec) nil])))))
   ([col-spec col-id]
    [(table col-spec) (column col-id)]))
 
@@ -334,8 +437,10 @@
   functions)."
   ([col-spec]
    (if (ident? col-spec)
-     [(db/to-snake (name col-spec)) (db/to-snake (namespace col-spec))]
-     (if (some? col-spec) (column-table (some-keyword col-spec)))))
+     (column-table (some-str col-spec))
+     (if-some [col-spec (some-str col-spec)]
+       (if-some [col-spec (keyword (db/to-snake (str/replace-first col-spec \. \/)))]
+         [(name col-spec) (namespace col-spec)]))))
   ([col-id col-spec]
    [(column col-id) (table col-spec)]))
 
@@ -357,8 +462,13 @@
   a table name. If two arguments are given, the second one is ignored."
   (^Keyword [table-id]
    (if (ident? table-id)
-     (some-keyword (db/to-lisp (or (namespace table-id) (name table-id))))
-     (if (some? table-id) (table-kw (some-keyword table-id)))))
+     (keyword (db/to-lisp (or (namespace table-id) (name table-id))))
+     (if-some [table-id (some-str table-id)]
+       (if (str/index-of table-id \.)
+         (table-kw (keyword (str/replace-first table-id \. \/)))
+         (if (str/index-of table-id \/)
+           (table-kw (keyword table-id))
+           (keyword (db/to-lisp table-kw)))))))
   (^Keyword [table-id _] (table-kw table-id)))
 
 (defn column-kw
@@ -369,8 +479,13 @@
   given, the first one is ignored."
   (^Keyword [col-id]
    (if (ident? col-id)
-     (some-keyword (db/to-lisp (name col-id)))
-     (if (some? col-id) (column-kw (some-keyword col-id)))))
+     (keyword (db/to-lisp (name col-id)))
+     (if-some [col-id (some-str col-id)]
+       (if (str/index-of col-id \.)
+         (column-kw (keyword (str/replace-first col-id \. \/)))
+         (if (str/index-of col-id \/)
+           (column-kw (keyword col-id))
+           (keyword (db/to-lisp col-id)))))))
   (^Keyword [_ col-id] (column-kw col-id)))
 
 (def ^{:tag Keyword
@@ -391,10 +506,11 @@
   arguments are given, names are extracted separately using `table-kw` and
   `column-kw` functions)."
   ([col-spec]
-   (let [k (some-keyword (db/to-lisp col-spec))]
-     (if-some [n (namespace k)]
-       [(some-keyword (namespace k)) (some-keyword (name k))]
-       [(some-keyword (name k)) nil])))
+   (if-some [col-spec (some-str col-spec)]
+     (let [k (keyword (db/to-lisp (str/replace-first col-spec \. \/)))]
+       (if-some [n (namespace k)]
+         [(keyword (namespace k)) (keyword (name k))]
+         [(keyword (name k)) nil]))))
   ([col-spec col-id]
    [(table-kw col-spec) (column-kw col-id)]))
 
@@ -417,8 +533,9 @@
   arguments are given, names are extracted separately using `column-kw` and
   `table-kw` functions)."
   ([col-spec]
-   (let [k (some-keyword (db/to-lisp col-spec))]
-     [(some-keyword (name k)) (some-keyword (namespace k))]))
+   (if-some [col-spec (some-str col-spec)]
+     (let [k (keyword (db/to-lisp (str/replace-first col-spec \. \/)))]
+       [(keyword (name k)) (keyword (namespace k))])))
   ([col-id col-spec]
    [(column-kw col-id) (table-kw col-spec)]))
 
@@ -434,12 +551,6 @@
   column-table-kw)
 
 ;; SQL query preparation
-
-(defn quoted
-  "Quotes the given string according to MySQL / MariaDB quoting rules."
-  ^String [s]
-  (if-some [^String s (some-str s)]
-    (quoted/mysql s)))
 
 (defn- interpolate-tag
   [substitutions [_ quote? ^String modifier ^String tag]]
