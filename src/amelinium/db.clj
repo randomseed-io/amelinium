@@ -902,24 +902,40 @@
         (reduce join-qslots [])))
   ([e tspec cspec]
    (cond
-     (vector? e)              (let [ctrl (nth e 0 nil), coll (subvec e 1)]
-                                (if (keyword? ctrl)
-                                  ;; static table/column name
-                                  (let [[c t] (c-t ctrl tspec cspec)]
-                                    (mapcat #(pp-conv-specs % t c) coll))
-                                  ;; dynamic table/column name
-                                  (let [[c t] (if tspec [ctrl tspec] [nil ctrl])]
-                                    (mapcat #(pp-conv-specs % t c) coll))))
-     (and tspec cspec)        (if (statically-convertable? e tspec cspec)
-                                ;; memorized column and table
-                                ;; regular statically-convertable element
-                                (cons (<- tspec cspec e) nil)
-                                ;; memorized column and table
-                                ;; regular dynamically-convertable element
-                                (cons (QSlot. tspec cspec [e]) nil))
-     (and tspec
-          (simple-symbol? e)) (cons (QSlot. tspec (name e) [e]) nil)
-     :else                    (cons e nil))))
+
+     ;; control vector
+     ;; (group of values followed by table or column spec)
+
+     (vector? e)
+     (let [ctrl (nth e 0 nil), coll (subvec e 1)]
+       (if (keyword? ctrl)
+         ;; static table/column name
+         (let [[c t] (c-t ctrl tspec cspec)]
+           (mapcat #(pp-conv-specs % t c) coll))
+         ;; dynamic table/column name
+         (let [[c t] (if tspec [ctrl tspec] [nil ctrl])]
+           (mapcat #(pp-conv-specs % t c) coll))))
+
+     ;; single value
+     ;; (known table and column)
+
+     (and tspec cspec)
+     (if (statically-convertable? e tspec cspec)
+       ;; regular statically-convertable element
+       (cons (<- tspec cspec e) nil)
+       ;; regular dynamically-convertable element
+       (cons (QSlot. tspec cspec [e]) nil))
+
+
+     ;; single value expressed with a simple symbol
+     ;; (known table)
+
+     (and tspec (simple-symbol? e))
+     (cons (QSlot. tspec (name e) [e]) nil)
+
+     ;; any value
+
+     :else (cons e nil))))
 
 (defn- parse-conv-spec
   "Parses value with optional table/column conversion specification to produce a source

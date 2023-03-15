@@ -720,8 +720,7 @@
 (defn update-identity-with-token
   [identity-type db token]
   (if-some [identity-col (db/column-kw identity-type)]
-    (if-some [r (db/<exec-one! db
-                               [update-identity-query-token {:identity identity-col}]
+    (if-some [r (db/<exec-one! db [update-identity-query-token {:identity identity-col}]
                                [:confirmations token])]
       (qassoc r
               :updated? true
@@ -744,8 +743,7 @@
   [identity-type db code user-identity]
   (if-some [id (identity/opt-type identity-type user-identity)]
     (if-some [identity-col (db/column-kw identity-type)]
-      (if-some [r (db/<exec-one! db
-                                 [update-identity-query-code {:identity identity-col}]
+      (if-some [r (db/<exec-one! db [update-identity-query-code {:identity identity-col}]
                                  [:confirmations code id])]
         (qassoc r
                 :updated? true
