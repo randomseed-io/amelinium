@@ -573,7 +573,8 @@
     (c/-> q
           (str/replace #"%\[([^\]]+)\]" "%%table{$1}")
           (str/replace #"%\(([^\)]+)\)" "%%column{$1}")
-          (str/replace #"%(%)?([^\{\}\[\]\s]+)?\{([^\}]+)?\}" #(interpolate-tag substitutions %)))
+          (str/replace #"%\<([^\>]+)\>" "%colspec-quoted{$1}")
+          (str/replace #"%(%)?([^\<\>\{\}\[\]\s]+)?\{([^\}]+)?\}" #(interpolate-tag substitutions %)))
     q))
 
 (def ^{:tag    String
@@ -618,8 +619,9 @@
   A pattern may have a form of `%%{tag-name}`. In such case any non-`nil` value being
   a result of tag name resolution will be quoted using `amelinium.db/quote`.
 
-  There is a synonym to `%%table{tag-name}` which is `%[table-name]`.
-  There is a synonym to `%%column{tag-name}` which is `%(column-name)`.
+  A synonym of `%%table{tag-name}` is `%[table-name]`.
+  A synonym of `%%column{tag-name}` is `%(column-name)`.
+  A synonym of `%%colspec{tag-name}` is `%<column-table-specification>`.
 
   A pattern may have additional modifier before the opening brace. It will be
   resolved as a symbolic function name to be called in order to transform a value
