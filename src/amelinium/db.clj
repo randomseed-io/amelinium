@@ -1108,31 +1108,42 @@
                  (partition 3 specs))
        nil)))
 
+(defn- get-coercer
+  "Get database output coercer on a basis of table name and column label from a result
+  set metadata object (`rsm`) and index number (`i`). If there is no coercer found
+  and column label differs from column name, tries with table and column
+  name. Returns a function or `nil`."
+  [^ResultSetMetaData rsm ^Integer i]
+  (let [tab-name  (.getTableName   rsm i)
+        col-label (.getColumnLabel rsm i)]
+    (or (out-coercer (make-kw-simple tab-name col-label))
+        (let [col-name (.getColumnName rsm i)]
+          (if (identical? col-label col-name) nil
+              (out-coercer (make-kw-simple tab-name col-name)))))))
+
 (defn- delayed-column-by-index-fn
   "Adds coercion to a database result set `rs` handled by builder `builder` with result
   index `i`. For each result it reads its table name and column label (or name, if
-  label is not set), and calls output coercer obtained using
-  `amelinium.db/out-coercer`. Each result is wrapped in a Delay object unless it does
-  not require coercion."
+  label is not set or is different from label but no coercer has been found), and
+  calls output coercer obtained using `amelinium.db/out-coercer`. Each result is
+  wrapped in a Delay object unless it does not require coercion."
   [builder ^ResultSet rs ^Integer i]
   (let [^ResultSetMetaData rsm (.getMetaData rs)
-        coercer-fn             (out-coercer (make-kw-simple (.getTableName   rsm i)
-                                                            (.getColumnLabel rsm i)))
-        v                      (.getObject rs i)]
+        v                      (.getObject rs i)
+        coercer-fn             (get-coercer rsm i)]
     (rs/read-column-by-index (if coercer-fn (delay (coercer-fn v)) v) rsm i)))
 
 (defn- column-by-index-fn
   "Adds coercion to a database result set `rs` handled by builder `builder` with result
   index `i`. For each result it reads its table name and column label (or name, if
-  label is not set), and calls output coercer using `amelinium.db/->` passing to it
-  the mentioned names and a value."
+  label is not set or is different from label but no coercer has been found), and
+  calls output coercer using `amelinium.db/->` passing to it the mentioned names and
+  a value."
   [builder ^ResultSet rs ^Integer i]
-  (let [^ResultSetMetaData rsm (.getMetaData rs)]
-    (rs/read-column-by-index (-> (.getTableName   rsm i)
-                                 (.getColumnLabel rsm i)
-                                 (.getObject      rs  i))
-                             rsm
-                             i)))
+  (let [^ResultSetMetaData rsm (.getMetaData rs)
+        v                      (.getObject rs i)
+        coercer-fn             (get-coercer rsm i)]
+    (rs/read-column-by-index (if coercer-fn (coercer-fn v) v) rsm i)))
 
 (defn gen-builder
   "Generates result set builder on a basis of the given builder `rs-builder`. Uses
