@@ -553,7 +553,7 @@
 ;; SQL query preparation
 
 (defn- interpolate-tag
-  [substitutions [_ quote? ^String modifier ^String tag]]
+  ^String [substitutions [_ quote? ^String modifier ^String tag]]
   (if-some [tag (and tag (get substitutions (keyword tag)))]
     (let [msym (and modifier (symbol modifier))
           f    (or (if msym (var/deref-symbol
@@ -566,16 +566,23 @@
         ""))
     ""))
 
+(defn- quote-tag
+  ^String [[_ ^String tag]]
+  (or (colspec-quoted tag) ""))
+
 (defn- interpolate-tags
   "Tag interpolation for substitution patterns."
-  [substitutions q]
-  (if substitutions
-    (c/-> q
-          (str/replace #"%\[([^\]]+)\]" "%%table{$1}")
-          (str/replace #"%\(([^\)]+)\)" "%%column{$1}")
-          (str/replace #"%\<([^\>]+)\>" "%colspec-quoted{$1}")
-          (str/replace #"%(%)?([^\<\>\{\}\[\]\s]+)?\{([^\}]+)?\}" #(interpolate-tag substitutions %)))
-    q))
+  (^String [substitutions ^String q]
+   (if substitutions
+     (c/-> q
+           (str/replace #"%\[([^\]]+)\]" "%%table{$1}")
+           (str/replace #"%\(([^\)]+)\)" "%%column{$1}")
+           (str/replace #"%\<([^\>]+)\>" "%colspec-quoted{$1}")
+           (str/replace #"%\'([^\']+)\'" quote-tag)
+           (str/replace #"%(%)?([^\<\>\{\}\[\]\s]+)?\{([^\}]+)?\}" #(interpolate-tag substitutions %)))
+     (interpolate-tags q)))
+  (^String [^String q]
+   (str/replace q #"%\'([^\']+)\'" quote-tag)))
 
 (def ^{:tag    String
        :no-doc true}
@@ -585,8 +592,8 @@
   (clojure.core/memoize
    (fn build-query-fn
      (^String []                "")
-     (^String [q]                q)
-     (^String [q substitutions] (if q (interpolate-tags substitutions q))))))
+     (^String [q]               (if q (interpolate-tags q) ""))
+     (^String [q substitutions] (if q (interpolate-tags substitutions q) "")))))
 
 (def ^{:tag    String
        :no-doc true}
@@ -596,8 +603,8 @@
   (memoize
    (fn build-query-fn
      (^String []                "")
-     (^String [q]                q)
-     (^String [q substitutions] (if q (interpolate-tags substitutions q))))))
+     (^String [q]               (if q (interpolate-tags q) ""))
+     (^String [q substitutions] (if q (interpolate-tags substitutions q) "")))))
 
 (defmacro build-query
   "For the given SQL query `q` and substitution map performs pattern interpolation.
@@ -627,6 +634,9 @@
   resolved as a symbolic function name to be called in order to transform a value
   associated with a tag name. If the name is not fully-qualified (does not contain a
   namespace part) its default namespace will be set to `amelinium.db`.
+
+  There is also additional pattern `%'column-table-specification'` which is a
+  quotation pattern. It uses `colspec-quoted` function on a given text.
 
   Example:
 
@@ -668,7 +678,7 @@
   ([q]
    (if (sequential? q)
      `(build-query ~@q)
-     (#'strspc-squeezed &form &env q)))
+     `(build-query-core (strspc-squeezed ~q))))
   ([q substitutions]
    `(build-query-core (strspc-squeezed ~q) ~substitutions))
   ([a b & args]
@@ -699,10 +709,17 @@
   A pattern may have a form of `%%{tag-name}`. In such case any non-`nil` value being
   a result of tag name resolution will be quoted using `amelinium.db/quote`.
 
+  A synonym of `%%table{tag-name}` is `%[table-name]`.
+  A synonym of `%%column{tag-name}` is `%(column-name)`.
+  A synonym of `%%colspec{tag-name}` is `%<column-table-specification>`.
+
   A pattern may have additional modifier before the opening brace. It will be
   resolved as a symbolic function name to be called in order to transform a value
   associated with a tag name. If the name is not fully-qualified (does not contain a
   namespace part) its default namespace will be set to `amelinium.db`.
+
+  There is also additional pattern `%'column-table-specification'` which is a
+  quotation pattern. It uses `colspec-quoted` function on a given text.
 
   Example:
 
@@ -741,7 +758,7 @@
   ([q]
    (if (sequential? q)
      `(build-query ~@q)
-     (#'strspc-squeezed &form &env q)))
+     `(build-query-core (strspc-squeezed ~q))))
   ([q substitutions]
    `(build-query-dynamic-core (strspc-squeezed ~q) ~substitutions))
   ([a b & args]
