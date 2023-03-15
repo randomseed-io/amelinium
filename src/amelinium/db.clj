@@ -1068,9 +1068,9 @@
   (let [t# (some-str table)]
     `(do
        ~@(mapcat (fn [[c# in# out#]]
-                   `((defmethod  in-coercer ~(make-kw-lisp  t# c#) [~'_] ~in#)
+                   `((defmethod  in-coercer ~(colspec-kw    t# c#) [~'_] ~in#)
                      (defmethod  in-coercer ~(make-kw-snake t# c#) [~'_] ~in#)
-                     (defmethod out-coercer ~(make-kw-lisp  t# c#) [~'_] ~out#)
+                     (defmethod out-coercer ~(colspec-kw    t# c#) [~'_] ~out#)
                      (defmethod out-coercer ~(make-kw-snake t# c#) [~'_] ~out#)))
                  (partition 3 specs))
        nil)))
