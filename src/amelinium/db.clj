@@ -850,23 +850,83 @@
 (defmethod in-coercer  :default [_] nil)
 (defmethod out-coercer :default [_] nil)
 
-(defn <-
+(defn- statically-convertable?
+  "Returns `true` if `v` can be statically handled at compile-time, `false` otherwise."
+  ([v]
+   (or (nil? v) (keyword? v) (string? v) (number? v) (boolean? v)))
+  ([v ts cs]
+   (and (string? ts) (string? cs)
+        (or (nil? v) (keyword? v) (string? v) (number? v) (boolean? v)))))
+
+(defn coerce-in
   "Coerces value `v` to a database type by calling a function returned by invoking
   `amelinium.db/in-coercer` multimethod on a qualified keyword `table-column` (or a
   qualified keyword made out of `table` and `column`). If there is no coercer
   attached for the keyword, returns unchanged `v`."
   ([table column v] (if-some [f (in-coercer (colspec-kw table column))] (f v) v))
-  ([table-column v] (if-some [f (in-coercer table-column)] (f v) v)))
+  ([table-column v] (if-some [f (in-coercer (colspec-kw table-column))] (f v) v)))
 
-(defn ->
+(defn coerce-out
   "Coerces value `v` from a database type by calling a function returned by invoking
   `amelinium.db/out-coercer` multimethod on a qualified keyword `table-column` (or a
   qualified keyword made out of `table` and `column`). If there is no coercer
   attached for the keyword, returns unchanged `v`."
   ([table column v] (if-some [f (out-coercer (colspec-kw table column))] (f v) v))
-  ([table-column v] (if-some [f (out-coercer table-column)] (f v) v)))
+  ([table-column v] (if-some [f (out-coercer (colspec-kw table-column))] (f v) v)))
 
-(defn <-seq
+(defmacro <-
+  "Coerces value `v` to a database type by calling a function returned by invoking
+  `amelinium.db/in-coercer` multimethod on a qualified keyword `table-column` (or a
+  qualified keyword made out of `table` and `column`). If there is no coercer
+  attached for the keyword, returns unchanged `v`.
+
+  If a coercer can be obtained at compile-time, a coercion function-call form will be
+  generated. If a coercer can be obtained at compile-time and the given value is
+  statically convertable, value resulting from applying coercion function will be
+  generated immediately."
+  ([table column v]
+   (if (and (or (keyword? table)  (string? table))
+            (or (keyword? column) (string? column)))
+     (let [tc (colspec-kw table column)]
+       (if-some [coercer-fn (in-coercer tc)]
+         (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+         `(coerce-in ~tc ~v)))
+     `(coerce-in ~table ~column ~v)))
+  ([table-column v]
+   (if (or (keyword? table-column) (string? table-column))
+     (let [tc (colspec-kw table-column)]
+       (if-some [coercer-fn (in-coercer tc)]
+         (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+         `(coerce-in ~tc ~v)))
+     `(coerce-in ~table-column ~v))))
+
+(defn ->
+  "Coerces value `v` from a database type by calling a function returned by invoking
+  `amelinium.db/out-coercer` multimethod on a qualified keyword `table-column` (or a
+  qualified keyword made out of `table` and `column`). If there is no coercer
+  attached for the keyword, returns unchanged `v`.
+
+  If a coercer can be obtained at compile-time, a coercion function-call form will be
+  generated. If a coercer can be obtained at compile-time and the given value is
+  statically convertable, value resulting from applying coercion function will be
+  generated immediately."
+  ([table column v]
+   (if (and (or (keyword? table)  (string? table))
+            (or (keyword? column) (string? column)))
+     (let [tc (colspec-kw table column)]
+       (if-some [coercer-fn (out-coercer tc)]
+         (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+         `(coerce-out ~tc ~v)))
+     `(coerce-out ~table ~column ~v)))
+  ([table-column v]
+   (if (or (keyword? table-column) (string? table-column))
+     (let [tc (colspec-kw table-column)]
+       (if-some [coercer-fn (out-coercer tc)]
+         (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+         `(coerce-out ~tc ~v)))
+     `(coerce-out ~table-column ~v))))
+
+(defn coerce-seq-in
   "Coerces a sequence of values `coll` to database types by calling a function returned
   by invoking `amelinium.db/in-coercer` multimethod on a qualified keyword
   `table-column` (or a qualified keyword made out of `table` and `column`). If there
@@ -874,7 +934,7 @@
   ([table column coll] (if-some [f (in-coercer (colspec-kw table column))] (map f coll) coll))
   ([table-column coll] (if-some [f (in-coercer table-column)] (map f coll) coll)))
 
-(defn seq->
+(defn coerce-seq-out
   "Coerces a sequence of values `coll` from database types by calling a function
   returned by invoking `amelinium.db/out-coercer` multimethod on a qualified keyword
   `table-column` (or a qualified keyword made out of `table` and `column`). If there
@@ -882,16 +942,59 @@
   ([table column coll] (if-some [f (out-coercer (colspec-kw table column))] (map f coll) coll))
   ([table-column coll] (if-some [f (out-coercer table-column)] (map f coll) coll)))
 
+(defmacro <-seq
+  "Coerces a sequence of values `coll` to database types by calling a function returned
+  by invoking `amelinium.db/in-coercer` multimethod on a qualified keyword
+  `table-column` (or a qualified keyword made out of `table` and `column`). If there
+  is no coercer attached for the keyword, returns unchanged `coll`.
+
+  If both, a table and a column can be used to establish coercion function at
+  compile-time, a mapping form will be generated which uses that function."
+  ([table column coll]
+   (if (and (or (keyword? table)  (string? table))
+            (or (keyword? column) (string? column)))
+     (let [tc (colspec-kw table column)]
+       (if-some [coercer-fn (in-coercer tc)]
+         (list `map `~coercer-fn `~coll)
+         `(coerce-seq-in ~tc ~coll)))
+     `(coerce-seq-in ~table ~column ~coll)))
+  ([table-column coll]
+   (if (or (keyword? table-column) (string? table-column))
+     (let [tc (colspec-kw table-column)]
+       (if-some [coercer-fn (in-coercer tc)]
+         (list `map `~coercer-fn `~coll)
+         `(coerce-seq-in ~tc ~coll)))
+     `(coerce-seq-in ~table-column ~coll))))
+
+(defmacro seq->
+  "Coerces a sequence of values `coll` from database types by calling a function
+  returned by invoking `amelinium.db/out-coercer` multimethod on a qualified keyword
+  `table-column` (or a qualified keyword made out of `table` and `column`). If there
+  is no coercer attached for the keyword, returns unchanged `coll`.
+
+  If both, a table and a column can be used to establish coercion function at
+  compile-time, a mapping form will be generated which uses that function."
+  ([table column coll]
+   (if (and (or (keyword? table)  (string? table))
+            (or (keyword? column) (string? column)))
+     (let [tc (colspec-kw table column)]
+       (if-some [coercer-fn (out-coercer tc)]
+         (list `map `~coercer-fn `~coll)
+         `(coerce-seq-out ~tc ~coll)))
+     `(coerce-seq-out ~table ~column ~coll)))
+  ([table-column coll]
+   (if (or (keyword? table-column) (string? table-column))
+     (let [tc (colspec-kw table-column)]
+       (if-some [coercer-fn (out-coercer tc)]
+         (list `map `~coercer-fn `~coll)
+         `(coerce-seq-out ~tc ~coll)))
+     `(coerce-seq-out ~table-column ~coll))))
+
 (defrecord QSlot [^Keyword t ^Keyword c v])
 
 (defn- not-empty-qslot?
   [e]
   (and (instance? QSlot e) (.t ^QSlot e) (.c ^QSlot e) (.v ^QSlot e)))
-
-(defn- statically-convertable?
-  ([v]       (or (nil? v) (keyword? v) (string? v) (number? v) (boolean? v)))
-  ([v ts cs] (and (string? ts) (string? cs)
-                  (or (nil? v) (keyword? v) (string? v) (number? v) (boolean? v)))))
 
 (defn- join-qslots
   "Joins consecutive `QSlot` records if their column and table fields are equal."
