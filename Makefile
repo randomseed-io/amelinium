@@ -11,6 +11,7 @@ lint:
 docs:
 			echo "# Introduction" > doc/10_introduction.md
 			tail -n +2 README.md >> doc/10_introduction.md
+			cp -r docs/img docs/docs
 			bin/docs "$(VERSION)"
 
 push-docs:
