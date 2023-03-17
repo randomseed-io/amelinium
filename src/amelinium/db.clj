@@ -1102,7 +1102,6 @@
   (->> (filter #(instance? QSlot %) coll)
        (remove #(or (nil? (.t ^QSlot %)) (nil? (.c ^QSlot %)) (list? (.t ^QSlot %)) (list? (.c ^QSlot %))))
        (mapcat #(map (fn [v] (qassoc % :v v)) (.v ^QSlot %)))
-       (remove #(statically-convertable? (.v ^QSlot %) (.t ^QSlot %) (.c ^QSlot %)))
        (frequencies) (seq)
        (filter #(> (val %) 1))
        (map (juxt #(gen-qs-keyword (key %)) #(qupdate (key %) :v vector)))
