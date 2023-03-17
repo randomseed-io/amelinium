@@ -1254,7 +1254,7 @@
   And generated Clojure code (phase 1):
 
   ```
-  (clojure.core/let [DB__confirmations_id_id_54377141 (amelinium.db/<- :confirmations/id id)]
+  (let [DB__confirmations_id_id_54377141 (amelinium.db/<- :confirmations/id id)]
     [DB__confirmations_id_id_54377141
      (amelinium.db/<- :confirmations/code       code)
      (amelinium.db/<- :confirmations/token     token)
@@ -1270,23 +1270,23 @@
   ```
   (let* [DB__confirmations_id_id_54377141 (#<Fn@5a424a5a amelinium.identity/__GT_db> id)]
     [DB__confirmations_id_id_54377141
-    (#<Fn@279d4dd9 io.randomseed.utils/safe_parse_long>       code)
-    (#<Fn@7f1abd95 io.randomseed.utils/some_str>             token)
-    (#<Fn@7f1abd95 io.randomseed.utils/some_str>            reason)
-    (#<Fn@7f1abd95 io.randomseed.utils/some_str>           id-type)
-    (#<Fn@4ac5d426 amelinium.model.confirmation/to_expiry> expires)
-    DB__confirmations_id_id_54377141
-    DB__confirmations_id_id_54377141])
+     (#<Fn@279d4dd9 io.randomseed.utils/safe_parse_long>       code)
+     (#<Fn@7f1abd95 io.randomseed.utils/some_str>             token)
+     (#<Fn@7f1abd95 io.randomseed.utils/some_str>            reason)
+     (#<Fn@7f1abd95 io.randomseed.utils/some_str>           id-type)
+     (#<Fn@4ac5d426 amelinium.model.confirmation/to_expiry> expires)
+     DB__confirmations_id_id_54377141
+     DB__confirmations_id_id_54377141])
   ```
 
-  A SQL query which uses the sequence of values presented above needs one of them to
-  be repeated; the one identified with the `id` symbol. We can observe that the macro
-  generated `let` binding for it, in which it assigns the result of calling
-  `amelinium.identity/->db` on its value to auto-generated symbol named
+  A SQL query which uses the sequence of values presented above needs one of
+  them (identified with the `id`) to be repeated. We can observe that the macro
+  generated `let` binding for it to assign the result of calling
+  `amelinium.identity/->db` on `id` to auto-generated symbol named
   `DB__confirmations_id_id_54377141`. This symbol is then re-used in output vector
   multiple times so the calculation is performed just once.
 
-  Other coercers were successfully resolved to function objects during macro
+  Also, other coercers were successfully resolved to function objects during macro
   expansion since we have static table and column specifiers given.
 
   Rule of a thumb is: if you can express certain values or specifications with
