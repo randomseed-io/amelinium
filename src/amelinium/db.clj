@@ -1060,27 +1060,15 @@
 
 (defn- parse-conv-spec
   "Parses value with optional table/column conversion specification to produce a source
-  code."
-  [v]
-  (if (instance? QSlot v)
-    (let [t (.t ^QSlot v)
-          c (.c ^QSlot v)
-          v (.v ^QSlot v)]
-      (cond
-        (nil? t)                v
-        (and (or (string?  t)
-                 (keyword? t))
-             (or (string?  c)
-                 (keyword? c))) (let [cs (colspec-kw t c)]
-                                  (if (= (count v) 1)
-                                    (if (statically-convertable? (nth v 0))
-                                      (<- cs (nth v 0))
-                                      `(<- ~cs ~(nth v 0)))
-                                    `(<-seq ~cs ~v)))
-        (nil? c)                v
-        :else                   (if (= (count v) 1)
-                                  `(<- ~t ~c ~(nth v 0))
-                                  `(<-seq ~t ~c ~v)))) v))
+  code. Expects values or `QSlot` records."
+  [e]
+  (if (or (not (instance? QSlot e)) (nil? (.t ^QSlot e))) e
+      (let [t (.t ^QSlot e)
+            c (.c ^QSlot e)
+            v (.v ^QSlot e)]
+        (if (= (count v) 1)
+          `(<- ~t ~c ~(nth v 0))
+          `(<-seq ~t ~c ~v)))))
 
 (defmacro <<-
   "Magical macro which converts a sequence of values with optional table and column
