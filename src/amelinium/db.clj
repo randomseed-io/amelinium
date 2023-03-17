@@ -1064,13 +1064,22 @@
   "Parses value with optional table/column conversion specification to produce a source
   code. Expects values or `QSlot` records."
   [e]
-  (if (or (not (instance? QSlot e)) (nil? (.t ^QSlot e))) e
-      (let [t (.t ^QSlot e)
-            c (.c ^QSlot e)
-            v (.v ^QSlot e)]
-        (if (= (count v) 1)
-          `(<- ~t ~c ~(nth v 0))
-          `(<-seq ~t ~c ~v)))))
+  (if (or (not (instance? QSlot e)) (nil? (.t ^QSlot e)))
+    (cons e nil)
+    (let [t  (.t ^QSlot e)
+          c  (.c ^QSlot e)
+          v  (.v ^QSlot e)
+          tc (if (and (or (keyword? t) (string? t))
+                      (or (keyword? c) (string? c))) (colspec-kw t c))]
+      (if (= (count v) 1)
+        (if tc
+          (cons `(<- ~tc   ~(nth v 0)) nil)
+          (cons `(<- ~t ~c ~(nth v 0)) nil))
+        (if tc
+          (if-some [coercer-fn (in-coercer tc)]
+            (map (fn [e] `(~coercer-fn ~e)) v)
+            (map (fn [e] `(<- ~tc ~e)) v))
+          (map (fn [e] `(<- ~t ~c ~e)) v))))))
 
 (defn gen-qs-keyword
   "Generates unique but deterministic symbolic name for `t` (presumably table name),
@@ -1098,7 +1107,7 @@
        (filter #(> (val %) 1))
        (map (juxt #(gen-qs-keyword (key %)) #(qupdate (key %) :v vector)))
        (into {})
-       (map/map-vals parse-conv-spec)))
+       (map/map-vals (comp first parse-conv-spec))))
 
 (defn bindable-sym
   "Returns a bindable, auto-generated symbol for the table/column (from `qs`, which
@@ -1115,7 +1124,7 @@
   [bindings ^QSlot qs v]
   (contains? bindings (gen-qs-keyword qs v)))
 
-(defn replace-bindable
+(defn- replace-bindable
   "Replaces bindable expressions from `:v` fields of `QSlot` records present in `coll`
   by unique symbols corresponding to them, with names created with `gen-qs-keyword`
   which exist as keys in `bindings` map."
@@ -1221,10 +1230,73 @@
    (amelinium.db/<- :confirmations/expires expires)]
   ```
 
+  And then to:
+
+  ```
+  [(#<Fn@4d7e49d amelinium.model.user/id_to_db> id)
+   (amelinium.db/coerce-in :confirmations/email email)
+   (#<Fn@3bf6fdc6 amelinium.model.confirmation/to_expiry> expires)]
+  ```
+
+  We can see that coerces for `id` and `expires` symbols were resolved and function
+  call forms were created at compile-time. That's because `:users/id` and
+  `:confirmations/expires` were recognized as existing dispatch values when calling
+  `in-coercer` internally. A coercer for the `email` symbol (using
+  `:confirmations/email` dispatch value) was not recognized at compile-time so
+  the call to `amelinium.db/coerce-in` was generated instead.
+
+  Let's have a quick look at some real-world example:
+
+  ```
+ (amelinium.db/<<-  [:confirmations id code token reason id-type expires id id])
+  ```
+
+  And generated Clojure code (phase 1):
+
+  ```
+  (clojure.core/let [DB__confirmations_id_id_54377141 (amelinium.db/<- :confirmations/id id)]
+    [DB__confirmations_id_id_54377141
+     (amelinium.db/<- :confirmations/code       code)
+     (amelinium.db/<- :confirmations/token     token)
+     (amelinium.db/<- :confirmations/reason   reason)
+     (amelinium.db/<- :confirmations/id-type id-type)
+     (amelinium.db/<- :confirmations/expires expires)
+     DB__confirmations_id_id_54377141
+     DB__confirmations_id_id_54377141])
+  ```
+
+  And fully expanded:
+
+  ```
+  (let* [DB__confirmations_id_id_54377141 (#<Fn@5a424a5a amelinium.identity/__GT_db> id)]
+    [DB__confirmations_id_id_54377141
+    (#<Fn@279d4dd9 io.randomseed.utils/safe_parse_long>       code)
+    (#<Fn@7f1abd95 io.randomseed.utils/some_str>             token)
+    (#<Fn@7f1abd95 io.randomseed.utils/some_str>            reason)
+    (#<Fn@7f1abd95 io.randomseed.utils/some_str>           id-type)
+    (#<Fn@4ac5d426 amelinium.model.confirmation/to_expiry> expires)
+    DB__confirmations_id_id_54377141
+    DB__confirmations_id_id_54377141])
+  ```
+
+  A SQL query which uses the sequence of values presented above needs one of them to
+  be repeated; the one identified with the `id` symbol. We can observe that the macro
+  generated `let` binding for it, in which it assigns the result of calling
+  `amelinium.identity/->db` on its value to auto-generated symbol named
+  `DB__confirmations_id_id_54377141`. This symbol is then re-used in output vector
+  multiple times so the calculation is performed just once.
+
+  Other coercers were successfully resolved to function objects during macro
+  expansion since we have static table and column specifiers given.
+
   Rule of a thumb is: if you can express certain values or specifications with
   literal strings or keywords, it may speed things up."
   [& specs]
-  (some->> specs (pp-conv-specs) (mapv parse-conv-spec)))
+  (let [pre-converted (pp-conv-specs specs)
+        bindings      (repeating-qslot-bindings pre-converted)]
+    (->> (replace-bindable bindings pre-converted)
+         (mapcat parse-conv-spec) vec
+         (prepend-qslot-bindings bindings))))
 
 (defn simple->
   [table m]
