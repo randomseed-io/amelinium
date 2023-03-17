@@ -1044,10 +1044,15 @@
      ;; (known table and column)
 
      (and tspec cspec)
-     (if (statically-convertable? e tspec cspec)
+     (if-let [coercer-fn (and (statically-convertable? e tspec cspec)
+                              (in-coercer (colspec-kw tspec cspec)))]
+
        ;; regular statically-convertable element
-       (cons (<- tspec cspec e) nil)
+
+       (cons (coercer-fn e) nil)
+
        ;; regular dynamically-convertable element
+
        (cons (QSlot. tspec cspec [e]) nil))
 
      ;; single value expressed with a simple symbol
