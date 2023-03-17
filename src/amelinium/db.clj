@@ -1113,6 +1113,32 @@
   [bindings ^QSlot qs v]
   (contains? bindings (gen-qs-keyword qs v)))
 
+(defn replace-bindable
+  "Replaces bindable expressions from `:v` fields of `QSlot` records present in `coll`
+  by unique symbols corresponding to them, with names created with `gen-qs-keyword`
+  which exist as keys in `bindings` map."
+  [bindings coll]
+  (vec
+   (mapcat
+    (fn [qs]
+      (if (instance? QSlot qs)
+        (let [parts    (partition-by #(bindable-sym? bindings qs %) (.v ^QSlot qs))
+              first-b? (bindable-sym? bindings qs (ffirst parts))]
+          (mapcat (fn [qvals bindable?]
+                    (if bindable?
+                      (map #(bindable-sym bindings qs %) qvals)
+                      (cons (qassoc qs :v (vec qvals)) nil)))
+                  parts (iterate not first-b?)))
+        (cons qs nil)))
+    coll)))
+
+(defn prepend-qslot-bindings
+  "Wraps the given `coll` in a `let` block with `bindings`."
+  [bindings coll]
+  (if-some [bindings (seq bindings)]
+    (list `let (vec (mapcat #(update % 0 symbol) bindings)) coll)
+    coll))
+
 (defmacro <<-
   "Magical macro which converts a sequence of values with optional table and column
   specifications to a database-suitable formats. Pre-processing of arguments is
