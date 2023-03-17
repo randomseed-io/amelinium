@@ -874,6 +874,22 @@
   ([table column v] (if-some [f (out-coercer (colspec-kw table column))] (f v) v))
   ([table-column v] (if-some [f (out-coercer (colspec-kw table-column))] (f v) v)))
 
+(defn coerce-seq-in
+  "Coerces a sequence of values `coll` to database types by calling a function returned
+  by invoking `amelinium.db/in-coercer` multimethod on a qualified keyword
+  `table-column` (or a qualified keyword made out of `table` and `column`). If there
+  is no coercer attached for the keyword, returns unchanged `coll`."
+  ([table column coll] (if-some [f (in-coercer (colspec-kw table column))] (map f coll) coll))
+  ([table-column coll] (if-some [f (in-coercer table-column)] (map f coll) coll)))
+
+(defn coerce-seq-out
+  "Coerces a sequence of values `coll` from database types by calling a function
+  returned by invoking `amelinium.db/out-coercer` multimethod on a qualified keyword
+  `table-column` (or a qualified keyword made out of `table` and `column`). If there
+  is no coercer attached for the keyword, returns unchanged `coll`."
+  ([table column coll] (if-some [f (out-coercer (colspec-kw table column))] (map f coll) coll))
+  ([table-column coll] (if-some [f (out-coercer table-column)] (map f coll) coll)))
+
 (defmacro <-
   "Coerces value `v` to a database type by calling a function returned by invoking
   `amelinium.db/in-coercer` multimethod on a qualified keyword `table-column` (or a
@@ -926,22 +942,6 @@
          `(coerce-out ~tc ~v)))
      `(coerce-out ~table-column ~v))))
 
-(defn coerce-seq-in
-  "Coerces a sequence of values `coll` to database types by calling a function returned
-  by invoking `amelinium.db/in-coercer` multimethod on a qualified keyword
-  `table-column` (or a qualified keyword made out of `table` and `column`). If there
-  is no coercer attached for the keyword, returns unchanged `coll`."
-  ([table column coll] (if-some [f (in-coercer (colspec-kw table column))] (map f coll) coll))
-  ([table-column coll] (if-some [f (in-coercer table-column)] (map f coll) coll)))
-
-(defn coerce-seq-out
-  "Coerces a sequence of values `coll` from database types by calling a function
-  returned by invoking `amelinium.db/out-coercer` multimethod on a qualified keyword
-  `table-column` (or a qualified keyword made out of `table` and `column`). If there
-  is no coercer attached for the keyword, returns unchanged `coll`."
-  ([table column coll] (if-some [f (out-coercer (colspec-kw table column))] (map f coll) coll))
-  ([table-column coll] (if-some [f (out-coercer table-column)] (map f coll) coll)))
-
 (defmacro <-seq
   "Coerces a sequence of values `coll` to database types by calling a function returned
   by invoking `amelinium.db/in-coercer` multimethod on a qualified keyword
@@ -990,9 +990,11 @@
          `(coerce-seq-out ~tc ~coll)))
      `(coerce-seq-out ~table-column ~coll))))
 
-(defrecord QSlot [^Keyword t ^Keyword c v])
+(defrecord QSlot [^String t ^String c v])
 
 (defn- not-empty-qslot?
+  "Returns `true` if the given `e` is of type `QSlot` and all of its essential fields
+  are not empty."
   [e]
   (and (instance? QSlot e) (.t ^QSlot e) (.c ^QSlot e) (.v ^QSlot e)))
 
@@ -1073,7 +1075,7 @@
 (defn gen-qs-keyword
   "Generates unique but deterministic symbolic name for `t` (presumably table name),
   `c` (column name) and `v` (value, being an identifier). Returns a keyword named
-  like `G__[t]_[c]_[v]_[nnnnnnn]` where `[t]`, `[c]` and `v` are string
+  like `DB__[t]_[c]_[v]_[nnnnnnn]` where `[t]`, `[c]` and `v` are string
   representations of the given values, and `[nnnnnnn]` is a numeric representation of
   combined hash of all values given as arguments."
   ([^QSlot qs]   (gen-qs-keyword (.t qs) (.c qs) (.v qs)))
@@ -1081,12 +1083,12 @@
   ([t c v]
    (let [^String h (c/-> (hash t) (hash-combine (hash c)) (hash-combine (hash v)) strb)
          ^String h (if (identical? \- (.charAt h 0)) (strb "0" (subs h 1)) h)]
-     (keyword (strb "G__" (some-str t) "_" (some-str c) "_" (some-str v) "_" h)))))
+     (keyword (strb "DB__" (some-str t) "_" (some-str c) "_" (some-str v) "_" h)))))
 
 (defn- repeating-qslot-bindings
-  "Returns a sequence of vectors with first elements being keywords representing unique
-  table/column/value names identifying repeated, single-valued `QSlot` elements from
-  the given `coll`, and with second elements being `QSlot` records identified."
+  "Returns a map with keys being keywords representing unique table/column/value names
+  identifying repeated, single-valued `QSlot` elements from the given `coll`, and
+  with associated values being expressions for performing output database coercion."
   [coll]
   (->> (filter #(instance? QSlot %) coll)
        (remove #(or (nil? (.t ^QSlot %)) (nil? (.c ^QSlot %)) (list? (.t ^QSlot %)) (list? (.c ^QSlot %))))
@@ -1132,7 +1134,7 @@
         (cons qs nil)))
     coll)))
 
-(defn prepend-qslot-bindings
+(defn- prepend-qslot-bindings
   "Wraps the given `coll` in a `let` block with `bindings`."
   [bindings coll]
   (if-some [bindings (seq bindings)]
@@ -1175,8 +1177,14 @@
   compile time. So, if both column and table name are expressed that way, the
   conversion specifier will be generated ahead.
 
-  Moreover, if apart from the above, a value to be converted is a literal number,
-  string, keyword, boolean, or a `nil`, it will be converted at compile-time.
+  Moreover, if apart from the above, a value to be coerced is expressed as a literal
+  number, string, keyword, boolean, or a `nil`, it will be converted at compile-time.
+
+  Conversion of repeating atomic expressions sharing the same table and column name
+  identifiers (including symbolic identifiers) will be performed in ad-hoc created
+  `let` block, and the results will be referenced using auto-generated symbols
+  replacing the original expressions. Therefore, conversion for repeated symbols (and
+  other atomic expressions) will be performed just once.
 
   Examples:
 
