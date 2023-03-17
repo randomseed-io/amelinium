@@ -880,7 +880,7 @@
   `table-column` (or a qualified keyword made out of `table` and `column`). If there
   is no coercer attached for the keyword, returns unchanged `coll`."
   ([table column coll] (if-some [f (in-coercer (colspec-kw table column))] (map f coll) coll))
-  ([table-column coll] (if-some [f (in-coercer table-column)] (map f coll) coll)))
+  ([table-column coll] (if-some [f (in-coercer (colspec-kw table-column))] (map f coll) coll)))
 
 (defn coerce-seq-out
   "Coerces a sequence of values `coll` from database types by calling a function
@@ -888,7 +888,7 @@
   `table-column` (or a qualified keyword made out of `table` and `column`). If there
   is no coercer attached for the keyword, returns unchanged `coll`."
   ([table column coll] (if-some [f (out-coercer (colspec-kw table column))] (map f coll) coll))
-  ([table-column coll] (if-some [f (out-coercer table-column)] (map f coll) coll)))
+  ([table-column coll] (if-some [f (out-coercer (colspec-kw table-column))] (map f coll) coll)))
 
 (defmacro <-
   "Coerces value `v` to a database type by calling a function returned by invoking
