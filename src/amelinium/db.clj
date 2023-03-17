@@ -1013,7 +1013,9 @@
   [ctrl table-spec column-spec]
   (if (keyword? ctrl)
     (let [[c t] (column-table ctrl)]
-      (if c (if t [c t] (if table-spec [c table-spec] [table-spec c])) [column-spec table-spec]))))
+      (if c
+        (if t [c t] (if table-spec [c table-spec] [table-spec c]))
+        [column-spec table-spec]))))
 
 (defn- pp-conv-specs
   "Pre-parses table/column conversion specifications."
@@ -1046,9 +1048,8 @@
        ;; regular dynamically-convertable element
        (cons (QSlot. tspec cspec [e]) nil))
 
-
      ;; single value expressed with a simple symbol
-     ;; (known table)
+     ;; (known table, missing column)
 
      (and tspec (simple-symbol? e))
      (cons (QSlot. tspec (name e) [e]) nil)
