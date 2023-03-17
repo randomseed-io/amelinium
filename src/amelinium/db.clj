@@ -1070,6 +1070,49 @@
           `(<- ~t ~c ~(nth v 0))
           `(<-seq ~t ~c ~v)))))
 
+(defn gen-qs-keyword
+  "Generates unique but deterministic symbolic name for `t` (presumably table name),
+  `c` (column name) and `v` (value, being an identifier). Returns a keyword named
+  like `G__[t]_[c]_[v]_[nnnnnnn]` where `[t]`, `[c]` and `v` are string
+  representations of the given values, and `[nnnnnnn]` is a numeric representation of
+  combined hash of all values given as arguments."
+  ([^QSlot qs]   (gen-qs-keyword (.t qs) (.c qs) (.v qs)))
+  ([^QSlot qs v] (gen-qs-keyword (.t qs) (.c qs) v))
+  ([t c v]
+   (let [^String h (c/-> (hash t) (hash-combine (hash c)) (hash-combine (hash v)) strb)
+         ^String h (if (identical? \- (.charAt h 0)) (strb "0" (subs h 1)) h)]
+     (keyword (strb "G__" (some-str t) "_" (some-str c) "_" (some-str v) "_" h)))))
+
+(defn- repeating-qslot-bindings
+  "Returns a sequence of vectors with first elements being keywords representing unique
+  table/column/value names identifying repeated, single-valued `QSlot` elements from
+  the given `coll`, and with second elements being `QSlot` records identified."
+  [coll]
+  (->> (filter #(instance? QSlot %) coll)
+       (remove #(or (nil? (.t ^QSlot %)) (nil? (.c ^QSlot %)) (list? (.t ^QSlot %)) (list? (.c ^QSlot %))))
+       (mapcat #(map (fn [v] (qassoc % :v v)) (.v ^QSlot %)))
+       (remove #(statically-convertable? (.v ^QSlot %) (.t ^QSlot %) (.c ^QSlot %)))
+       (frequencies) (seq)
+       (filter #(> (val %) 1))
+       (map (juxt #(gen-qs-keyword (key %)) #(qupdate (key %) :v vector)))
+       (into {})
+       (map/map-vals parse-conv-spec)))
+
+(defn bindable-sym
+  "Returns a bindable, auto-generated symbol for the table/column (from `qs`, which
+  should be a `QSlot` record) and a value `v`. The unique identifier (obtained using
+  `gen-qs-keyword`) must exists in `bindings` map. Otherwise, `nil` is returned."
+  [bindings ^QSlot qs v]
+  (let [h (gen-qs-keyword qs v)]
+    (if (contains? bindings h) (symbol h))))
+
+(defn bindable-sym?
+  "Returns `true` if a bindable, auto-generated symbol for the table/column (from `qs`,
+  which should be a `QSlot` record) and a value `v` exists in `bindings`
+  map. Otherwise it returns `false`."
+  [bindings ^QSlot qs v]
+  (contains? bindings (gen-qs-keyword qs v)))
+
 (defmacro <<-
   "Magical macro which converts a sequence of values with optional table and column
   specifications to a database-suitable formats. Pre-processing of arguments is
