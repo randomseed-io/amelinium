@@ -1084,9 +1084,9 @@
 (defn gen-qs-keyword
   "Generates unique but deterministic symbolic name for `t` (presumably table name),
   `c` (column name) and `v` (value, being an identifier). Returns a keyword named
-  like `DB__[t]_[c]_[v]_[nnnnnnn]` where `[t]`, `[c]` and `v` are string
-  representations of the given values, and `[nnnnnnn]` is a numeric representation of
-  combined hash of all values given as arguments."
+  like `DB__[t]_[c]_[v]_[nnnnnnn]` where `[t]`, `[c]` and `[v]` are string
+  representations of the given argument values, and `[nnnnnnn]` is a numeric
+  representation of combined hash of all values given as arguments."
   ([^QSlot qs]   (gen-qs-keyword (.t qs) (.c qs) (.v qs)))
   ([^QSlot qs v] (gen-qs-keyword (.t qs) (.c qs) v))
   ([t c v]
