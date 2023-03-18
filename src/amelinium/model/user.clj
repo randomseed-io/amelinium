@@ -95,7 +95,8 @@
   :soft-locked       to-instant                   nil
   :locked            to-instant                   nil
   :created           to-instant                   nil
-  :password-suite-id safe-parse-long              long-or-nil)
+  :password-suite-id safe-parse-long              long-or-nil
+  :password          nil                          nil)
 
 ;; User data initialization
 
