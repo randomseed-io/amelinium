@@ -1335,6 +1335,9 @@
   lisp case. Two multimethod definitions will be created for
   `amelinium.db/in-coercer` and two for `amelinium.db/out-coercer`.
 
+  If the given coercer is a literal `nil` value, it will not be created. It is
+  advised to use that approach instead of assigning `identity` function.
+
   Example:
 
   `(defcoercions :users :some-identifier str keyword)`
@@ -1353,12 +1356,13 @@
   [table & specs]
   (let [t# (some-str table)]
     `(do
-       ~@(mapcat (fn [[c# in# out#]]
-                   `((defmethod  in-coercer ~(colspec-kw    t# c#) [~'_] ~in#)
-                     (defmethod  in-coercer ~(make-kw-snake t# c#) [~'_] ~in#)
-                     (defmethod out-coercer ~(colspec-kw    t# c#) [~'_] ~out#)
-                     (defmethod out-coercer ~(make-kw-snake t# c#) [~'_] ~out#)))
-                 (partition 3 specs))
+       ~@(mapcat
+          (fn [[c# in# out#]]
+            `((if (some? ~in#)  (defmethod  in-coercer ~(colspec-kw    t# c#) [~'_] ~in#))
+              (if (some? ~in#)  (defmethod  in-coercer ~(make-kw-snake t# c#) [~'_] ~in#))
+              (if (some? ~out#) (defmethod out-coercer ~(colspec-kw    t# c#) [~'_] ~out#))
+              (if (some? ~out#) (defmethod out-coercer ~(make-kw-snake t# c#) [~'_] ~out#))))
+          (partition 3 specs))
        nil)))
 
 (defn- get-coercer
