@@ -1163,10 +1163,21 @@
 (defmacro <<-
   "Magical macro which converts a sequence of values with optional table and column
   specifications to a database-suitable formats. Pre-processing of arguments is
-  executed at compile-time, further processing is performed at run-time. Any literal
-  keywords given as arguments will be normalized by transforming to a lisp case.
+  executed at compile-time, further processing is performed at run-time.
 
-  All arguments are sequentially transformed with the following rules:
+  Any type of argument is accepted but literal vectors, including nested vectors, are
+  **control structures**. Their first elements are table names (for the first one),
+  column names (for nested vectors) or both (when expressed using fully-qualified
+  keywords).
+
+  Example: `(<<- 1 2 3 [:table-name [:column-name :val1 val2 (exp3) \"val4\"])`
+
+  `1`, `2` and `3` are regular values, `:table-name` is literally expressed table
+  name for coercer, `:column-name` is literally expressed column name for coercer,
+  other expressions are values to be coerced. Table and column names can be dynamic,
+  expressed with symbols or call forms.
+
+  All macro arguments are sequentially transformed with the following rules:
 
   - If there is a **literal vector** at **1st level**, its first element should be a
   table name. All elements of that vector will inherit that table name during
@@ -1181,9 +1192,9 @@
   conversion of elements contained in that vector (table taken from a namespace and
   column from a name of the keyword).
 
-  - If there is a table inherited but there is no column specified, a value is not
-  converted but returned as is. The only exception is when the value is expressed as
-  a **literal, simple symbol**. In such case a column name will be derived from it.
+  - If there is a table name inherited but no column specified, a value is not
+  converted but returned as is, with the exception: when the value is expressed as a
+  **literal, simple symbol** then a column name will be derived from its name.
 
   - A sub-vector may begin with an unspecified value `nil`. In such case it will
   group values to be converted but column name will not be set. The values will be
