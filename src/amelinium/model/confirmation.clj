@@ -20,7 +20,6 @@
             [amelinium.db             :as            db]
             [amelinium.identity       :as      identity]
             [amelinium.common         :as        common]
-            [phone-number.core        :as         phone]
             [io.randomseed.utils.time :as          time]
             [io.randomseed.utils.ip   :as            ip]
             [io.randomseed.utils.map  :as           map]
@@ -28,7 +27,6 @@
             [io.randomseed.utils      :refer       :all])
 
   (:import (clojure.lang      Keyword)
-           (phone_number.core Phoneable)
            (amelinium         Suites
                               SuitesJSON
                               PasswordData)
@@ -60,8 +58,6 @@
     (vector?     t) (t/hence (time/parse-duration t))
     :else           (time/parse-dt t)))
 
-(def ^:const email-exists-query
-  "SELECT uid FROM users WHERE email = ?")
 (db/defcoercions :confirmations
   :id                identity/->db              identity/of
   :user-id           id-to-db                   long-or-nil
@@ -87,37 +83,24 @@
   :expired           to-bin-num                 num-to-boolean
   :present           to-bin-num                 num-to-boolean)
 
-(def ^:const phone-exists-query
-  "SELECT uid FROM users WHERE phone = ?")
 ;; Helper functions
 
 (def ten-minutes
   (t/new-duration 10 :minutes))
 
 (defn gen-code
-  []
+  "Generates pseudo-random, 7-digits confirmation code. Returns a number."
+  ^Long []
   (let [code (format "%07d" (unchecked-int (rand 9999999)))]
-    (if (= (first code) \0)
-      (str (inc (rand-int 8)) (subs code 1))
-      code)))
+    (Long/parseUnsignedLong
+     (if (= (first code) \0)
+       (str (inc (rand-int 8)) (subs code 1))
+       code))))
 
 (defn gen-token
-  []
+  "Generates random confirmation token. Returns a string."
+  ^String []
   (-> (random-uuid) uuid/to-byte-array hash/md5 codecs/bytes->hex))
-
-(defn phone-exists?
-  [db phone]
-  (if db
-    (if-some [phone (identity/->db :phone phone)]
-      (-> (jdbc/execute-one! db [phone-exists-query phone] db/opts-simple-vec)
-          first some?))))
-
-(defn email-exists?
-  [db email]
-  (if db
-    (if-some [email (identity/->db :email email)]
-      (-> (jdbc/execute-one! db [email-exists-query email] db/opts-simple-vec)
-          first some?))))
 
 (def ^:const ^:private
   phone-id-types
