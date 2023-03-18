@@ -37,8 +37,7 @@
             [io.randomseed.utils.ip            :as            ip]
             [io.randomseed.utils.map           :as           map]
             [io.randomseed.utils.map           :refer   [qassoc]]
-            [io.randomseed.utils               :refer       :all]
-            [puget.printer :refer [cprint]])
+            [io.randomseed.utils               :refer       :all])
 
   (:import (clojure.lang             Keyword)
            (phone_number.core        Phoneable)
@@ -73,10 +72,10 @@
 (defn- long-or-nil     ^Long    [n] (if n (long n)))
 (defn- to-long-or-zero ^Long    [n] (safe-parse-long n 0))
 (defn- to-instant      ^Instant [t] (if (t/instant? t) t (time/parse-dt t)))
-(defn- id-to-db         ^Long   [v] (identity/to-db :id    v))
-(defn- uid-to-db        ^UUID   [v] (identity/to-db :uid   v))
-(defn- email-to-db      ^String [v] (identity/to-db :email v))
-(defn- phone-to-db      ^String [v] (identity/to-db :phone v))
+(defn- id-to-db        ^Long    [v] (identity/to-db :id    v))
+(defn- uid-to-db       ^UUID    [v] (identity/to-db :uid   v))
+(defn- email-to-db     ^String  [v] (identity/to-db :email v))
+(defn- phone-to-db     ^String  [v] (identity/to-db :phone v))
 
 (db/defcoercions :users
   :id                id-to-db                     long
