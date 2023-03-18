@@ -77,6 +77,7 @@
   :first-name        some-str                   some-str
   :middle-name       some-str                   some-str
   :last-name         some-str                   some-str
+  :password          nil                        nil
   :password-suite-id safe-parse-long            long-or-nil
   :no-attempts       to-bin-num                 num-to-boolean
   :bad-reason        to-bin-num                 num-to-boolean

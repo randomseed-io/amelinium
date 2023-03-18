@@ -862,32 +862,32 @@
   `amelinium.db/in-coercer` multimethod on a qualified keyword `table-column` (or a
   qualified keyword made out of `table` and `column`). If there is no coercer
   attached for the keyword, returns unchanged `v`."
-  ([table column v] (if-some [f (in-coercer (colspec-kw table column))] (f v) v))
-  ([table-column v] (if-some [f (in-coercer (colspec-kw table-column))] (f v) v)))
+  ([table column v] (if-let [f (in-coercer (colspec-kw table column))] (f v) v))
+  ([table-column v] (if-let [f (in-coercer (colspec-kw table-column))] (f v) v)))
 
 (defn coerce-out
   "Coerces value `v` from a database type by calling a function returned by invoking
   `amelinium.db/out-coercer` multimethod on a qualified keyword `table-column` (or a
   qualified keyword made out of `table` and `column`). If there is no coercer
   attached for the keyword, returns unchanged `v`."
-  ([table column v] (if-some [f (out-coercer (colspec-kw table column))] (f v) v))
-  ([table-column v] (if-some [f (out-coercer (colspec-kw table-column))] (f v) v)))
+  ([table column v] (if-let [f (out-coercer (colspec-kw table column))] (f v) v))
+  ([table-column v] (if-let [f (out-coercer (colspec-kw table-column))] (f v) v)))
 
 (defn coerce-seq-in
   "Coerces a sequence of values `coll` to database types by calling a function returned
   by invoking `amelinium.db/in-coercer` multimethod on a qualified keyword
   `table-column` (or a qualified keyword made out of `table` and `column`). If there
   is no coercer attached for the keyword, returns unchanged `coll`."
-  ([table column coll] (if-some [f (in-coercer (colspec-kw table column))] (map f coll) coll))
-  ([table-column coll] (if-some [f (in-coercer (colspec-kw table-column))] (map f coll) coll)))
+  ([table column coll] (if-let [f (in-coercer (colspec-kw table column))] (map f coll) coll))
+  ([table-column coll] (if-let [f (in-coercer (colspec-kw table-column))] (map f coll) coll)))
 
 (defn coerce-seq-out
   "Coerces a sequence of values `coll` from database types by calling a function
   returned by invoking `amelinium.db/out-coercer` multimethod on a qualified keyword
   `table-column` (or a qualified keyword made out of `table` and `column`). If there
   is no coercer attached for the keyword, returns unchanged `coll`."
-  ([table column coll] (if-some [f (out-coercer (colspec-kw table column))] (map f coll) coll))
-  ([table-column coll] (if-some [f (out-coercer (colspec-kw table-column))] (map f coll) coll)))
+  ([table column coll] (if-let [f (out-coercer (colspec-kw table column))] (map f coll) coll))
+  ([table-column coll] (if-let [f (out-coercer (colspec-kw table-column))] (map f coll) coll)))
 
 (defmacro <-
   "Coerces value `v` to a database type by calling a function returned by invoking
@@ -904,14 +904,18 @@
             (or (keyword? column) (string? column)))
      (let [tc (colspec-kw table column)]
        (if-some [coercer-fn (in-coercer tc)]
-         (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+         (if coercer-fn
+           (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+           `~v)
          `(coerce-in ~tc ~v)))
      `(coerce-in ~table ~column ~v)))
   ([table-column v]
    (if (or (keyword? table-column) (string? table-column))
      (let [tc (colspec-kw table-column)]
        (if-some [coercer-fn (in-coercer tc)]
-         (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+         (if coercer-fn
+           (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+           `~v)
          `(coerce-in ~tc ~v)))
      `(coerce-in ~table-column ~v))))
 
@@ -930,14 +934,18 @@
             (or (keyword? column) (string? column)))
      (let [tc (colspec-kw table column)]
        (if-some [coercer-fn (out-coercer tc)]
-         (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+         (if coercer-fn
+           (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+           `~v)
          `(coerce-out ~tc ~v)))
      `(coerce-out ~table ~column ~v)))
   ([table-column v]
    (if (or (keyword? table-column) (string? table-column))
      (let [tc (colspec-kw table-column)]
        (if-some [coercer-fn (out-coercer tc)]
-         (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+         (if coercer-fn
+           (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+           `~v)
          `(coerce-out ~tc ~v)))
      `(coerce-out ~table-column ~v))))
 
@@ -954,14 +962,14 @@
             (or (keyword? column) (string? column)))
      (let [tc (colspec-kw table column)]
        (if-some [coercer-fn (in-coercer tc)]
-         (list `map `~coercer-fn `~coll)
+         (if coercer-fn (list `map `~coercer-fn `~coll) `~coll)
          `(coerce-seq-in ~tc ~coll)))
      `(coerce-seq-in ~table ~column ~coll)))
   ([table-column coll]
    (if (or (keyword? table-column) (string? table-column))
      (let [tc (colspec-kw table-column)]
        (if-some [coercer-fn (in-coercer tc)]
-         (list `map `~coercer-fn `~coll)
+         (if coercer-fn (list `map `~coercer-fn `~coll) `~coll)
          `(coerce-seq-in ~tc ~coll)))
      `(coerce-seq-in ~table-column ~coll))))
 
@@ -978,14 +986,14 @@
             (or (keyword? column) (string? column)))
      (let [tc (colspec-kw table column)]
        (if-some [coercer-fn (out-coercer tc)]
-         (list `map `~coercer-fn `~coll)
+         (if coercer-fn (list `map `~coercer-fn `~coll) `~coll)
          `(coerce-seq-out ~tc ~coll)))
      `(coerce-seq-out ~table ~column ~coll)))
   ([table-column coll]
    (if (or (keyword? table-column) (string? table-column))
      (let [tc (colspec-kw table-column)]
        (if-some [coercer-fn (out-coercer tc)]
-         (list `map `~coercer-fn `~coll)
+         (if coercer-fn (list `map `~coercer-fn `~coll) `~coll)
          `(coerce-seq-out ~tc ~coll)))
      `(coerce-seq-out ~table-column ~coll))))
 
@@ -1042,17 +1050,16 @@
      ;; single value
      ;; (known table and column)
 
-     (and tspec cspec)
-     (if-let [coercer-fn (and (statically-convertable? e tspec cspec)
-                              (in-coercer (colspec-kw tspec cspec)))]
-
-       ;; regular statically-convertable element
-
-       (cons (coercer-fn e) nil)
-
-       ;; regular dynamically-convertable element
-
+     (and tspec cspec (statically-convertable? e tspec cspec))
+     (if-some [coercer-fn (in-coercer (colspec-kw tspec cspec))]
+       (cons (if coercer-fn (coercer-fn e) e) nil)
        (cons (QSlot. tspec cspec [e]) nil))
+
+     ;; regular dynamically-convertable element
+     ;; (known table and column)
+
+     (and tspec cspec)
+     (cons (QSlot. tspec cspec [e]) nil)
 
      ;; single value expressed with a simple symbol
      ;; (known table, missing column)
@@ -1081,7 +1088,7 @@
           (cons `(<- ~t ~c ~(nth v 0)) nil))
         (if tc
           (if-some [coercer-fn (in-coercer tc)]
-            (map (fn [e] `(~coercer-fn ~e)) v)
+            (if coercer-fn (map (fn [e] `(~coercer-fn ~e)) v) `~v)
             (map (fn [e] `(<- ~tc ~e)) v))
           (map (fn [e] `(<- ~t ~c ~e)) v))))))
 
@@ -1335,8 +1342,11 @@
   lisp case. Two multimethod definitions will be created for
   `amelinium.db/in-coercer` and two for `amelinium.db/out-coercer`.
 
-  If the given coercer is a literal `nil` value, it will not be created. It is
-  advised to use that approach instead of assigning `identity` function.
+  If the given coercer is a literal `nil` or `false` value, it will be marked as
+  undefined using `false` value. It is advised to use that approach instead of
+  assigning `identity` function to express that coercion is not needed since it can
+  cause compile-time calculations to short-circuit instead of generating fallback
+  code.
 
   Example:
 
@@ -1358,10 +1368,10 @@
     `(do
        ~@(mapcat
           (fn [[c# in# out#]]
-            `((if (some? ~in#)  (defmethod  in-coercer ~(colspec-kw    t# c#) [~'_] ~in#))
-              (if (some? ~in#)  (defmethod  in-coercer ~(make-kw-snake t# c#) [~'_] ~in#))
-              (if (some? ~out#) (defmethod out-coercer ~(colspec-kw    t# c#) [~'_] ~out#))
-              (if (some? ~out#) (defmethod out-coercer ~(make-kw-snake t# c#) [~'_] ~out#))))
+            `((defmethod  in-coercer ~(colspec-kw    t# c#) [~'_] (or ~in#  false))
+              (defmethod  in-coercer ~(make-kw-snake t# c#) [~'_] (or ~in#  false))
+              (defmethod out-coercer ~(colspec-kw    t# c#) [~'_] (or ~out# false))
+              (defmethod out-coercer ~(make-kw-snake t# c#) [~'_] (or ~out# false))))
           (partition 3 specs))
        nil)))
 
