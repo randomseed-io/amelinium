@@ -86,8 +86,16 @@
 
 ;; Helper functions
 
-(def ten-minutes
+(def ^:private ten-minutes
   (t/new-duration 10 :minutes))
+
+(def ^:const ^:private
+  phone-id-types
+  #{:phone :user/phone "phone" "user/phone"})
+
+(defn- phone?
+  ^Boolean [id-type]
+  (contains? phone-id-types id-type))
 
 (defn gen-code
   "Generates pseudo-random, 7-digits confirmation code. Returns a number."
@@ -102,14 +110,6 @@
   "Generates random confirmation token. Returns a string."
   ^String []
   (-> (random-uuid) uuid/to-byte-array hash/md5 codecs/bytes->hex))
-
-(def ^:const ^:private
-  phone-id-types
-  #{:phone :user/phone "phone" "user/phone"})
-
-(defn- phone?
-  ^Boolean [id-type]
-  (contains? phone-id-types id-type))
 
 ;; Generation of confirmation tokens and codes
 
