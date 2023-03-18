@@ -66,6 +66,38 @@
 (defonce ^:redef settings-cache (atom nil))
 (defonce ^:redef identity-cache (atom nil))
 
+;; Coercion
+
+(defn- as-uuid         ^UUID    [u] (if (uuid? u) u (if u (uuid/as-uuid u))))
+(defn- long-or-zero    ^Long    [n] (if n (long n) 0))
+(defn- long-or-nil     ^Long    [n] (if n (long n)))
+(defn- to-long-or-zero ^Long    [n] (safe-parse-long n 0))
+(defn- to-instant      ^Instant [t] (if (t/instant? t) t (time/parse-dt t)))
+(defn- id-to-db         ^Long   [v] (identity/to-db :id    v))
+(defn- uid-to-db        ^UUID   [v] (identity/to-db :uid   v))
+(defn- email-to-db      ^String [v] (identity/to-db :email v))
+(defn- phone-to-db      ^String [v] (identity/to-db :phone v))
+
+(db/defcoercions :users
+  :id                id-to-db                     long
+  :created-by        id-to-db                     long-or-nil
+  :uid               uid-to-db                    as-uuid
+  :email             email-to-db                  some-str
+  :phone             phone-to-db                  identity/preparse-phone
+  :account-type      some-str                     some-keyword
+  :first-name        some-str                     some-str
+  :middle-name       some-str                     some-str
+  :last-name         some-str                     some-str
+  :login-attempts    to-long-or-zero              long-or-zero
+  :last-ok-ip        ip/to-address                ip/string-to-address
+  :last-failed-ip    ip/to-address                ip/string-to-address
+  :last-login        to-instant                   nil
+  :last-attempt      to-instant                   nil
+  :soft-locked       to-instant                   nil
+  :locked            to-instant                   nil
+  :created           to-instant                   nil
+  :password-suite-id safe-parse-long              long-or-nil)
+
 ;; User data initialization
 
 (declare create-or-get-shared-suite-id)
@@ -1151,34 +1183,6 @@
 (defmethod query-ids :phone [db _ i] (query-ids-std db :users/phone "SELECT phone, id FROM users WHERE phone IN" i))
 (defmethod query-ids :uid   [db _ i] (query-ids-std db :users/uid   "SELECT uid,   id FROM users WHERE uid   IN" i))
 (defmethod query-ids :id    [db _ i] (query-ids-std db :users/id    "SELECT id,    id FROM users WHERE id    IN" i))
-
-;; Coercion
-
-(defn- as-uuid         ^UUID    [u] (if (uuid? u) u (if u (uuid/as-uuid u))))
-(defn- long-or-zero    ^Long    [n] (if n (long n) 0))
-(defn- long-or-nil     ^Long    [n] (if n (long n)))
-(defn- to-long-or-zero ^Long    [n] (safe-parse-long n 0))
-(defn- to-instant      ^Instant [t] (if (t/instant? t) t (time/parse-dt t)))
-
-(db/defcoercions :users
-  :id                #(identity/->db :id    %)    long
-  :created-by        #(identity/->db :id    %)    long-or-nil
-  :uid               #(identity/->db :uid   %)    as-uuid
-  :email             #(identity/->db :email %)    some-str
-  :phone             #(identity/->db :phone %)    identity/preparse-phone
-  :account-type      some-str                     some-keyword
-  :first-name        some-str                     some-str
-  :middle-name       some-str                     some-str
-  :last-name         some-str                     some-str
-  :login-attempts    to-long-or-zero              long-or-zero
-  :last-ok-ip        ip/to-address                ip/string-to-address
-  :last-failed-ip    ip/to-address                ip/string-to-address
-  :last-login        to-instant                   identity
-  :last-attempt      to-instant                   identity
-  :soft-locked       to-instant                   identity
-  :locked            to-instant                   identity
-  :created           to-instant                   identity
-  :password-suite-id safe-parse-long              long-or-nil)
 
 ;; Wrappers for commonly used properties
 

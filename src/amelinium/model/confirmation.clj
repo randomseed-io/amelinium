@@ -40,14 +40,59 @@
            (java.util         UUID)
            (java.time         Duration Instant)))
 
-(def ten-minutes
-  (t/new-duration 10 :minutes))
+;; Coercion
+
+(defn- as-uuid         ^UUID    [u] (if (uuid? u) u (if u (uuid/as-uuid u))))
+(defn- long-or-zero    ^Long    [n] (if n (long n) 0))
+(defn- long-or-nil     ^Long    [n] (if n (long n)))
+(defn- to-long-or-zero ^Long    [n] (safe-parse-long n 0))
+(defn- to-instant      ^Instant [t] (if (t/instant? t) t (time/parse-dt t)))
+(defn- to-bin-num      ^Integer [n] (if n 1 0))
+(defn- num-to-boolean  ^Boolean [n] (or (pos-int? n) (true? n)))
+(defn- id-to-db         ^Long   [v] (identity/to-db :id    v))
+(defn- uid-to-db        ^UUID   [v] (identity/to-db :uid   v))
+
+(defn- to-expiry
+  ^Instant [t]
+  (cond
+    (t/instant?  t) t
+    (t/duration? t) (t/hence t)
+    (vector?     t) (t/hence (time/parse-duration t))
+    :else           (time/parse-dt t)))
 
 (def ^:const email-exists-query
   "SELECT uid FROM users WHERE email = ?")
+(db/defcoercions :confirmations
+  :id                identity/->db              identity/of
+  :user-id           id-to-db                   long-or-nil
+  :user-uid          uid-to-db                  as-uuid
+  :requester-id      id-to-db                   long-or-nil
+  :code              safe-parse-long            long-or-nil
+  :token             some-str                   some-str
+  :reason            some-str                   some-keyword
+  :id-type           some-str                   some-keyword
+  :attempts          to-long-or-zero            long-or-zero
+  :max-attempts      to-long-or-zero            long-or-zero
+  :created           to-expiry                  to-instant
+  :expires           to-expiry                  to-instant
+  :confirmed         to-bin-num                 num-to-boolean
+  :req-id            some-str                   some-str
+  :account-type      some-str                   some-keyword
+  :first-name        some-str                   some-str
+  :middle-name       some-str                   some-str
+  :last-name         some-str                   some-str
+  :password-suite-id safe-parse-long            long-or-nil
+  :no-attempts       to-bin-num                 num-to-boolean
+  :bad-reason        to-bin-num                 num-to-boolean
+  :expired           to-bin-num                 num-to-boolean
+  :present           to-bin-num                 num-to-boolean)
 
 (def ^:const phone-exists-query
   "SELECT uid FROM users WHERE phone = ?")
+;; Helper functions
+
+(def ten-minutes
+  (t/new-duration 10 :minutes))
 
 (defn gen-code
   []
@@ -762,38 +807,3 @@
    (if-some [token (some-str token)]
      (update-request-id db token request-id)
      (update-request-id db id code request-id))))
-
-;; Coercion
-
-(defn- as-uuid         ^UUID    [u] (if (uuid? u) u (if u (uuid/as-uuid u))))
-(defn- long-or-zero    ^Long    [n] (if n (long n) 0))
-(defn- long-or-nil     ^Long    [n] (if n (long n)))
-(defn- to-long-or-zero ^Long    [n] (safe-parse-long n 0))
-(defn- to-instant      ^Instant [t] (if (t/instant? t) t (time/parse-dt t)))
-(defn- to-bin-num      ^Integer [n] (if n 1 0))
-(defn- num-to-boolean  ^Boolean [n] (or (pos-int? n) (true? n)))
-
-(db/defcoercions :confirmations
-  :id                identity/->db              identity/of
-  :user-id           #(identity/->db :id  %)    long-or-nil
-  :user-uid          #(identity/->db :uid %)    as-uuid
-  :requester-id      #(identity/->db :id  %)    long-or-nil
-  :code              safe-parse-long            long-or-nil
-  :token             some-str                   some-str
-  :reason            some-str                   some-keyword
-  :id-type           some-str                   some-keyword
-  :attempts          to-long-or-zero            long-or-zero
-  :max-attempts      to-long-or-zero            long-or-zero
-  :created           to-instant                 to-instant
-  :expires           to-instant                 to-instant
-  :confirmed         to-bin-num                 num-to-boolean
-  :req-id            some-str                   some-str
-  :account-type      some-str                   some-keyword
-  :first-name        some-str                   some-str
-  :middle-name       some-str                   some-str
-  :last-name         some-str                   some-str
-  :password-suite-id safe-parse-long            long-or-nil
-  :no-attempts       to-bin-num                 num-to-boolean
-  :bad-reason        to-bin-num                 num-to-boolean
-  :expired           to-bin-num                 num-to-boolean
-  :present           to-bin-num                 num-to-boolean)
