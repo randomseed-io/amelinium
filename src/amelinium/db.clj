@@ -42,8 +42,7 @@
             [amelinium.logging             :as                    log]
             [amelinium.types.db            :refer                :all]
             [amelinium.types.identity      :refer                :all]
-            [amelinium.identity            :as               identity]
-            [puget.printer :refer [cprint]])
+            [amelinium.identity            :as               identity])
 
   (:import (amelinium         DBConfig)
            (lazy_map.core     LazyMap)
@@ -1252,7 +1251,7 @@
   Let's have a quick look at some real-world example:
 
   ```
- (amelinium.db/<<-  [:confirmations id code token reason id-type expires id id])
+  (amelinium.db/<<-  [:confirmations id code token reason id-type expires id id])
   ```
 
   And generated Clojure code (phase 1):
@@ -1301,6 +1300,15 @@
     (->> (replace-bindable bindings pre-converted)
          (mapcat parse-conv-spec) vec
          (prepend-qslot-bindings bindings))))
+
+(defmacro <<-*
+  "Same as `<<-` but its last argument should be a sequence to be concatenated with the
+  results without any pre-processing."
+  {:see-also ["<<-"]}
+  ([spec]
+   `(<<- ~spec))
+  ([spec & specs]
+   `(into (or (<<- ~@(cons spec (butlast specs))) []) ~(last specs))))
 
 (defn simple->
   [table m]
