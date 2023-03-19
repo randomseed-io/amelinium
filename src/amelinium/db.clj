@@ -843,14 +843,14 @@
   "Returns a coercer suitable for transforming the given argument `v` to a
   database-suitable value, assuming table and column specified by the given qualified
   keyword `table-column`."
-  {:arglists '([table-column v])}
+  {:arglists '([^Keyword table-column v] [^Keyword column v])}
   identity)
 
 (defmulti out-coercer
   "Returns a coercer suitable for transforming the given argument `v` read from a
   database, assuming table and column specified by the given qualified keyword
   `table-column`."
-  {:arglists '([table-column v])}
+  {:arglists '([^Keyword table-column v] [^Keyword column v])}
   identity)
 
 (defmethod in-coercer  :default [_] nil)
