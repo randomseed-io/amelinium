@@ -164,7 +164,7 @@
   amelinium.Identity
 
   (set-parameter [^amelinium.Identity v ^PreparedStatement ps ^long i]
-    (jp/set-parameter (identity/->db v) ps i)))
+    (jp/set-parameter (identity/to-db v) ps i)))
 
 ;; Column and table names processing
 
@@ -553,7 +553,7 @@
 
 (defn- interpolate-tag
   ^String [substitutions [_ quote? ^String modifier ^String tag]]
-  (if-some [tag (and tag (get substitutions (keyword tag)))]
+  (if-some [tag (and tag (get substitutions (some-keyword tag)))]
     (let [msym (and modifier (symbol modifier))
           f    (or (if msym (var/deref-symbol
                              (if (nil? (namespace msym))
