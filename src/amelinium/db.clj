@@ -1457,9 +1457,12 @@
   ```
 
   This will allow specialized database coercion functions to transformed values which
-  are exchanged with a database."
+  are exchanged with a database.
+
+  Optionally coercions can be defined without a table name. In such case the table
+  should be set to either `nil`, `false` or `:amelinium.db/any`."
   [table & specs]
-  (let [t# (some-str table)]
+  (let [t# (if (identical? table ::any) nil (some-str table))]
     `(do
        ~@(mapcat
           (fn [[c# in# out#]]
@@ -1470,18 +1473,20 @@
           (partition 3 specs))
        nil)))
 
-(defn- get-coercer
-  "Get database output coercer on a basis of table name and column label from a result
+(defn- get-db-out-coercer
+  "Gets database output coercer on a basis of table name and column label from a result
   set metadata object (`rsm`) and index number (`i`). If there is no coercer found
   and column label differs from column name, tries with table and column
-  name. Returns a function or `nil`."
+  name. Returns a function (coercer found), `false` (coercer found but value should
+  remain as-is) or `nil` (coercer not found)."
   [^ResultSetMetaData rsm ^Integer i]
   (let [tab-name  (.getTableName   rsm i)
         col-label (.getColumnLabel rsm i)]
-    (or (out-coercer (make-kw-simple tab-name col-label))
-        (let [col-name (.getColumnName rsm i)]
-          (if (identical? col-label col-name) nil
-              (out-coercer (make-kw-simple tab-name col-name)))))))
+    (if-some [coercer-fn (get-out-coercer* (make-kw-simple tab-name col-label))]
+      coercer-fn
+      (let [col-name (.getColumnName rsm i)]
+        (if (identical? col-label col-name)
+          (get-out-coercer* (make-kw-simple tab-name col-name)))))))
 
 (defn- delayed-column-by-index-fn
   "Adds coercion to a database result set `rs` handled by builder `builder` with result
@@ -1492,7 +1497,7 @@
   [builder ^ResultSet rs ^Integer i]
   (let [^ResultSetMetaData rsm (.getMetaData rs)
         v                      (.getObject rs i)
-        coercer-fn             (get-coercer rsm i)]
+        coercer-fn             (get-db-out-coercer rsm i)]
     (rs/read-column-by-index (if coercer-fn (delay (coercer-fn v)) v) rsm i)))
 
 (defn- column-by-index-fn
@@ -1504,7 +1509,7 @@
   [builder ^ResultSet rs ^Integer i]
   (let [^ResultSetMetaData rsm (.getMetaData rs)
         v                      (.getObject rs i)
-        coercer-fn             (get-coercer rsm i)]
+        coercer-fn             (get-db-out-coercer rsm i)]
     (rs/read-column-by-index (if coercer-fn (coercer-fn v) v) rsm i)))
 
 (defn gen-builder
@@ -2089,3 +2094,21 @@
 (derive ::main.props          ::properties)
 (derive ::main-migrator.props ::properties)
 (derive ::main-migrator       ::migrator)
+
+;; Generic coercers
+
+(defn- email-to-db ^String [v] (identity/to-db :email v))
+(defn- phone-to-db ^String [v] (identity/to-db :phone v))
+(defn- long-or-nil ^Long   [n] (if n (long n)))
+
+(defcoercions ::any
+  :email             email-to-db                  some-str
+  :phone             phone-to-db                  identity/preparse-phone
+  :account-type      some-str                     some-keyword
+  :first-name        some-str                     some-str
+  :middle-name       some-str                     some-str
+  :last-name         some-str                     some-str
+  :ip                ip/to-address                ip/string-to-address
+  :ip-address        ip/to-address                ip/string-to-address
+  :password-suite-id safe-parse-long              long-or-nil
+  :password          nil                          nil)
