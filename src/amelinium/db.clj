@@ -856,6 +856,50 @@
 (defmethod in-coercer  :default [_] nil)
 (defmethod out-coercer :default [_] nil)
 
+(defn get-in-coercer*
+  "Same as `get-in-coercer` but trusts that `table-column` is a fully-qualified,
+  lisp-cased keyword (already a result of `colspec-kw`)."
+  {:see-also ["get-in-coercer"]}
+  [table-column]
+  (if-some [f (in-coercer table-column)] f
+           (if (namespace table-column)
+             (in-coercer (keyword (name table-column))))))
+
+(defn get-in-coercer
+  "Tries to obtain a database coercion function by calling `in-coercer` multimethod for
+  column and table specified with `table` and `column`, or by a single
+  `table-column`. Transforms arguments to a lisp-cased keyword. If there is no
+  coercer for table and column, tries to getting one using the column alone.
+
+  Returns coercer when it is found. Returns `false` when a coercer is found but
+  explicitly set to undefined. Returns `nil` when there is no coercer."
+  ([table column]
+   (if-some [f (in-coercer (colspec-kw table column))] f (in-coercer (column-kw column))))
+  ([table-column]
+   (get-in-coercer* (colspec-kw table-column))))
+
+(defn get-out-coercer*
+  "Same as `get-out-coercer` but trusts that `table-column` is a lisp-cased
+  keyword (already a result of `colspec-kw`)."
+  {:see-also ["get-out-coercer"]}
+  [table-column]
+  (if-some [f (out-coercer table-column)] f
+           (if (namespace table-column)
+             (out-coercer (keyword (name table-column))))))
+
+(defn get-out-coercer
+  "Tries to obtain a database coercion function by calling `out-coercer` multimethod
+  for column and table specified with `table` and `column`, or by a single
+  `table-column`. Transforms arguments to a lisp-cased keyword. If there is no
+  coercer for table and column, falls back to getting one using the column alone.
+
+  Returns coercer when it is found. Returns `false` when a coercer is found but
+  explicitly set to undefined. Returns `nil` when there is no coercer."
+  ([table column]
+   (if-some [f (out-coercer (colspec-kw table column))] f (out-coercer (column-kw column))))
+  ([table-column]
+   (get-out-coercer* (colspec-kw table-column))))
+
 (defn- statically-convertable?
   "Returns `true` if `v` can be statically handled at compile-time, `false` otherwise."
   ([v]
@@ -865,36 +909,69 @@
         (or (nil? v) (keyword? v) (string? v) (number? v) (boolean? v)))))
 
 (defn coerce-in
-  "Coerces value `v` to a database type by calling a function returned by invoking
-  `amelinium.db/in-coercer` multimethod on a qualified keyword `table-column` (or a
-  qualified keyword made out of `table` and `column`). If there is no coercer
-  attached for the keyword, returns unchanged `v`."
-  ([table column v] (if-let [f (in-coercer (colspec-kw table column))] (f v) v))
-  ([table-column v] (if-let [f (in-coercer (colspec-kw table-column))] (f v) v)))
+  "Coerces the given value `v` to a database type by calling a function returned by
+  invoking `amelinium.db/in-coercer` multimethod on a qualified keyword
+  `table-column` (or a qualified keyword made out of `table` and `column`). If there
+  is no coercer attached for the keyword, tries with a keyword created using the
+  `column-kw` function. If there is no coercer, returns unchanged `v`.
+
+  Will immediately return the given value `v` if the coercer exists but it is set to
+  `false`."
+  ([table column v] (if-let [f (get-in-coercer table column)] (f v) v))
+  ([table-column v] (if-let [f (get-in-coercer table-column)] (f v) v)))
+
+(defn coerce-in*
+  "Same as `coerce-in` but `table-column` must be a lisp-cased keyword (already a
+  result of `colspec-kw` or `column-kw`)."
+  [table-column v] (if-let [f (get-in-coercer* table-column)] (f v) v))
 
 (defn coerce-out
-  "Coerces value `v` from a database type by calling a function returned by invoking
-  `amelinium.db/out-coercer` multimethod on a qualified keyword `table-column` (or a
-  qualified keyword made out of `table` and `column`). If there is no coercer
-  attached for the keyword, returns unchanged `v`."
-  ([table column v] (if-let [f (out-coercer (colspec-kw table column))] (f v) v))
-  ([table-column v] (if-let [f (out-coercer (colspec-kw table-column))] (f v) v)))
+  "Coerces the given value `v` from a database type by calling a function returned by
+  invoking `amelinium.db/out-coercer` multimethod on a qualified keyword
+  `table-column` (or a qualified keyword made out of `table` and `column`). If there
+  is no coercer attached for the keyword, tries with a keyword created using the
+  `column-kw` function (to use column alone). If there is no coercer, returns
+  unchanged `v`.
+
+  Will immediately return the given value `v` if the coercer exists but it is
+  set to `false`."
+  ([table column v] (if-let [f (get-out-coercer table column)] (f v) v))
+  ([table-column v] (if-let [f (get-out-coercer table-column)] (f v) v)))
+
+(defn coerce-out*
+  "Same as `coerce-out` but `table-column` must be a lisp-cased keyword (already a
+  result of `colspec-kw` or `column-kw`)."
+  [table-column v] (if-let [f (get-out-coercer* table-column)] (f v) v))
 
 (defn coerce-seq-in
   "Coerces a sequence of values `coll` to database types by calling a function returned
   by invoking `amelinium.db/in-coercer` multimethod on a qualified keyword
   `table-column` (or a qualified keyword made out of `table` and `column`). If there
-  is no coercer attached for the keyword, returns unchanged `coll`."
-  ([table column coll] (if-let [f (in-coercer (colspec-kw table column))] (map f coll) coll))
-  ([table-column coll] (if-let [f (in-coercer (colspec-kw table-column))] (map f coll) coll)))
+  is no coercer attached for the keyword, tries with a keyword created using the
+  `column-kw` function (to use column alone). If there is no coercer, returns
+  unchanged `coll`."
+  ([table column coll] (if-let [f (get-in-coercer table column)] (map f coll) coll))
+  ([table-column coll] (if-let [f (get-in-coercer table-column)] (map f coll) coll)))
+
+(defn coerce-seq-in*
+  "Same as `coerce-seq-in` but `table-column` must be a lisp-cased keyword (already a
+  result of `colspec-kw` or `column-kw`)."
+  [table-column coll] (if-let [f (get-in-coercer* table-column)] (map f coll) coll))
 
 (defn coerce-seq-out
   "Coerces a sequence of values `coll` from database types by calling a function
   returned by invoking `amelinium.db/out-coercer` multimethod on a qualified keyword
   `table-column` (or a qualified keyword made out of `table` and `column`). If there
-  is no coercer attached for the keyword, returns unchanged `coll`."
-  ([table column coll] (if-let [f (out-coercer (colspec-kw table column))] (map f coll) coll))
-  ([table-column coll] (if-let [f (out-coercer (colspec-kw table-column))] (map f coll) coll)))
+  is no coercer attached for the keyword, tries with a keyword created using the
+  `column-kw` function (to use column alone). If there is no coercer, returns
+  unchanged `coll`."
+  ([table column coll] (if-let [f (get-out-coercer table column)] (map f coll) coll))
+  ([table-column coll] (if-let [f (get-out-coercer table-column)] (map f coll) coll)))
+
+(defn coerce-seq-out*
+  "Same as `coerce-seq-out` but `table-column` must be a lisp-cased keyword (already a
+  result of `colspec-kw` or `column-kw`)."
+  [table-column coll] (if-let [f (get-out-coercer* table-column)] (map f coll) coll))
 
 (defmacro <-
   "Coerces value `v` to a database type by calling a function returned by invoking
@@ -910,20 +987,20 @@
    (if (and (or (keyword? table)  (string? table))
             (or (keyword? column) (string? column)))
      (let [tc (colspec-kw table column)]
-       (if-some [coercer-fn (in-coercer tc)]
+       (if-some [coercer-fn (get-in-coercer* tc)]
          (if coercer-fn
            (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
            `~v)
-         `(coerce-in ~tc ~v)))
+         `(coerce-in* ~tc ~v)))
      `(coerce-in ~table ~column ~v)))
   ([table-column v]
    (if (or (keyword? table-column) (string? table-column))
      (let [tc (colspec-kw table-column)]
-       (if-some [coercer-fn (in-coercer tc)]
+       (if-some [coercer-fn (get-in-coercer* tc)]
          (if coercer-fn
            (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
            `~v)
-         `(coerce-in ~tc ~v)))
+         `(coerce-in* ~tc ~v)))
      `(coerce-in ~table-column ~v))))
 
 (defn ->
@@ -940,20 +1017,20 @@
    (if (and (or (keyword? table)  (string? table))
             (or (keyword? column) (string? column)))
      (let [tc (colspec-kw table column)]
-       (if-some [coercer-fn (out-coercer tc)]
+       (if-some [coercer-fn (get-out-coercer* tc)]
          (if coercer-fn
            (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
            `~v)
-         `(coerce-out ~tc ~v)))
+         `(coerce-out* ~tc ~v)))
      `(coerce-out ~table ~column ~v)))
   ([table-column v]
    (if (or (keyword? table-column) (string? table-column))
      (let [tc (colspec-kw table-column)]
-       (if-some [coercer-fn (out-coercer tc)]
+       (if-some [coercer-fn (get-out-coercer* tc)]
          (if coercer-fn
            (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
            `~v)
-         `(coerce-out ~tc ~v)))
+         `(coerce-out* ~tc ~v)))
      `(coerce-out ~table-column ~v))))
 
 (defmacro <-seq
@@ -968,16 +1045,16 @@
    (if (and (or (keyword? table)  (string? table))
             (or (keyword? column) (string? column)))
      (let [tc (colspec-kw table column)]
-       (if-some [coercer-fn (in-coercer tc)]
+       (if-some [coercer-fn (get-in-coercer* tc)]
          (if coercer-fn (list `map `~coercer-fn `~coll) `~coll)
-         `(coerce-seq-in ~tc ~coll)))
+         `(coerce-seq-in* ~tc ~coll)))
      `(coerce-seq-in ~table ~column ~coll)))
   ([table-column coll]
    (if (or (keyword? table-column) (string? table-column))
      (let [tc (colspec-kw table-column)]
-       (if-some [coercer-fn (in-coercer tc)]
+       (if-some [coercer-fn (get-in-coercer* tc)]
          (if coercer-fn (list `map `~coercer-fn `~coll) `~coll)
-         `(coerce-seq-in ~tc ~coll)))
+         `(coerce-seq-in* ~tc ~coll)))
      `(coerce-seq-in ~table-column ~coll))))
 
 (defmacro seq->
@@ -992,16 +1069,16 @@
    (if (and (or (keyword? table)  (string? table))
             (or (keyword? column) (string? column)))
      (let [tc (colspec-kw table column)]
-       (if-some [coercer-fn (out-coercer tc)]
+       (if-some [coercer-fn (get-out-coercer* tc)]
          (if coercer-fn (list `map `~coercer-fn `~coll) `~coll)
-         `(coerce-seq-out ~tc ~coll)))
+         `(coerce-seq-out* ~tc ~coll)))
      `(coerce-seq-out ~table ~column ~coll)))
   ([table-column coll]
    (if (or (keyword? table-column) (string? table-column))
      (let [tc (colspec-kw table-column)]
-       (if-some [coercer-fn (out-coercer tc)]
+       (if-some [coercer-fn (get-out-coercer* tc)]
          (if coercer-fn (list `map `~coercer-fn `~coll) `~coll)
-         `(coerce-seq-out ~tc ~coll)))
+         `(coerce-seq-out* ~tc ~coll)))
      `(coerce-seq-out ~table-column ~coll))))
 
 (defrecord QSlot [^String t ^String c v])
@@ -1058,7 +1135,7 @@
      ;; (known table and column)
 
      (and tspec cspec (statically-convertable? e tspec cspec))
-     (if-some [coercer-fn (in-coercer (colspec-kw tspec cspec))]
+     (if-some [coercer-fn (get-in-coercer tspec cspec)]
        (cons (if coercer-fn (coercer-fn e) e) nil)
        (cons (QSlot. tspec cspec [e]) nil))
 
@@ -1094,7 +1171,7 @@
           (cons `(<- ~tc   ~(nth v 0)) nil)
           (cons `(<- ~t ~c ~(nth v 0)) nil))
         (if tc
-          (if-some [coercer-fn (in-coercer tc)]
+          (if-some [coercer-fn (get-in-coercer* tc)]
             (if coercer-fn (map (fn [e] `(~coercer-fn ~e)) v) `~v)
             (map (fn [e] `(<- ~tc ~e)) v))
           (map (fn [e] `(<- ~t ~c ~e)) v))))))
@@ -1262,7 +1339,7 @@
 
   ```
   [(#<Fn@4d7e49d amelinium.model.user/id_to_db> id)
-   (amelinium.db/coerce-in :confirmations/email email)
+   (amelinium.db/coerce-in* :confirmations/email email)
    (#<Fn@3bf6fdc6 amelinium.model.confirmation/to_expiry> expires)]
   ```
 
@@ -1271,7 +1348,7 @@
   `:confirmations/expires` were recognized as existing dispatch values when calling
   `in-coercer` internally. A coercer for the `email` symbol (using
   `:confirmations/email` dispatch value) was not recognized at compile-time so
-  the call to `amelinium.db/coerce-in` was generated instead.
+  the call to `amelinium.db/coerce-in*` was generated instead.
 
   Let's have a quick look at some real-world example:
 
