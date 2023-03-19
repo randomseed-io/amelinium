@@ -565,6 +565,12 @@
         ""))
     ""))
 
+(defn- interpolate-some?
+  [substitutions [_ ^String tag ^String on-true ^String on-false]]
+  (if-let [tag (and tag (get substitutions (some-keyword tag)))]
+    (str (some-str on-true))
+    (str (some-str on-false))))
+
 (defn- quote-tag
   ^String [[_ ^String tag]]
   (or (colspec-quoted tag) ""))
@@ -574,6 +580,7 @@
   (^String [substitutions ^String q]
    (if substitutions
      (c/-> q
+           (str/replace #"%SOME\? +([^ \:]+): *([^#]*)#(?:([^#]*)#)?" #(interpolate-some? substitutions %))
            (str/replace #"%\[([^\]]+)\]" "%%table{$1}")
            (str/replace #"%\(([^\)]+)\)" "%%column{$1}")
            (str/replace #"%\<([^\>]+)\>" "%colspec-quoted{$1}")
