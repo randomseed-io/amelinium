@@ -22,11 +22,14 @@
             [io.randomseed.utils.map      :refer [qassoc]]
             [io.randomseed.utils          :refer     :all])
 
-  (:import  [amelinium                    Identity]
-            [amelinium.proto.identity     Identifiable]
-            [java.util                    UUID]
-            [clojure.lang                 Symbol Keyword PersistentVector IPersistentMap]
-            [com.google.i18n.phonenumbers Phonenumber$PhoneNumber]))
+  (:import  (amelinium                    Identity)
+            (amelinium.proto.identity     Identifiable)
+            (java.util                    UUID)
+            (clojure.lang                 Symbol
+                                          Keyword
+                                          PersistentVector
+                                          IPersistentMap)
+            (com.google.i18n.phonenumbers Phonenumber$PhoneNumber)))
 
 ;; Standard identity types
 
@@ -300,6 +303,61 @@
 (defmethod parser ::any    [_] parse)
 (defmethod parser :default [_] (constantly nil))
 
+(def identity-map-keys
+  "Commonly known map keys which may contain user identity."
+  [[:identity       ::any]
+   [:user/identity  ::any]
+   [:id               :id]
+   [:user-id          :id]
+   [:phone         :phone]
+   [:email         :email]
+   [:uid             :uid]
+   [:login          ::any]
+   [:user/id          :id]
+   [:user/phone    :phone]
+   [:user/email    :email]
+   [:user/uid        :uid]
+   [:user/login     ::any]
+   [:id             ::any]
+   [:user-identity  ::any]
+   [:user           ::any]])
+
+(def identity-map-keys-by-type
+  "Commonly known map keys which may contain user identity grouped by identity types."
+  (map/map-vals-by-k
+   #(->> identity-map-keys
+         (filter (comp #{% ::any} second))
+         (map first)
+         (distinct)
+         (vec))
+   (dissoc (group-by second identity-map-keys) ::any)))
+
+(defn parse-map
+  "Tries to extract identity from a map `m` by searching of commonly known identity
+  keys. Optional identity type `identity-type` will be used to constrain the
+  conversion. If a known key is found but its associated value cannot be converted to
+  `Identity` object, process continues and other keys are tried.
+
+  Uses `identity-map-keys-by-type` when an identity type is given to select a group
+  of keys to be tried out and such group exists.
+
+  Uses `identity-map-keys` when an identity type is not given, or it is not found in
+  `identity-map-keys-by-type`."
+  ([m]
+   (if (seq m)
+     (some (fn [[k t]]
+             (if-let [i (get m k)]
+               (if (map? i) nil (p/make i t))))
+           identity-map-keys)))
+  ([identity-type m]
+   (if-some [ks (get identity-map-keys-by-type identity-type)]
+     (if (seq m)
+       (some (fn [k]
+               (if-let [i (get m k)]
+                 (if (map? i) nil (p/make i identity-type))))
+             ks))
+     (parse-map m))))
+
 ;; Creating identities
 
 (defn of
@@ -449,6 +507,22 @@
      (if (not-empty-string? v) (parse v)))
     (^Identity [v ^Keyword identity-type]
      (if (not-empty-string? v) (parse identity-type v))))
+
+  clojure.lang.IPersistentMap
+
+  (type ^Keyword [v]
+    (p/type (parse-map v)))
+
+  (value
+    ([v] (p/value (parse-map v)))
+    ([v ^Keyword identity-type]
+     (p/value (parse-map identity-type v))))
+
+  (make
+    (^Identity [v]
+     (parse-map v))
+    (^Identity [v ^Keyword identity-type]
+     (parse-map identity-type v)))
 
   Keyword
 
