@@ -243,7 +243,7 @@
                    [path lang suffix])}
   path-variants
   "Generates a list of all possible language variants of a path."
-  (mem/fifo path-variants-core :fifo/threshold 2048))
+  (db/memoize+ path-variants-core 2048 256))
 
 (defn path-param
   "Returns a parameter if the given path contains it and it is set. Otherwise it

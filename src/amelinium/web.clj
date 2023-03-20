@@ -17,6 +17,7 @@
             [ring.util.http-response              :as            resp]
             [ring.util.request                    :as             req]
             [selmer.parser                        :as          selmer]
+            [amelinium.db                         :as              db]
             [amelinium.i18n                       :as            i18n]
             [amelinium.common                     :as          common]
             [amelinium.errors                     :as          errors]
@@ -351,7 +352,7 @@
 
 (def ^{:arglists '([uri pre dir lang core])}
   resolve-cached
-  (mem/fifo resolve-generic :fifo/threshold 2048))
+  (db/memoize+ resolve-generic 2048 256))
 
 (defn resolve-layout
   [req lang layout]

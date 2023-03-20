@@ -96,7 +96,8 @@
 
 ;; Memoization
 
-(p/import-vars [io.randomseed.utils.db memoize memoizer invalidate! invalidator])
+(p/import-vars [io.randomseed.utils.db
+                memoize+ memoize memoizer invalidate! invalidate+! invalidator])
 
 ;; Generic getters and setters
 
