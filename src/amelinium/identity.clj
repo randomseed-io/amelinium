@@ -691,7 +691,7 @@
     (^Keyword [identity-type ^Identifiable user-identity] identity-type))
   :hierarchy #'p/type-hierarchy)
 
-(defn ->db
+(defmacro ->db
   "For the given user identity `user-identity` and optional identity type
   `identity-type` tries to express the given identity's value in a database suitable
   format.
@@ -704,10 +704,25 @@
   the function to treat the given identity as of this type. If the identity is an
   `amelinium.Identity` record but its type is different, `nil` will be returned."
   {:see-also ["->str" "of"]}
-  (^Keyword [^Identifiable user-identity]
-   (to-db user-identity))
-  (^Keyword [identity-type ^Identifiable user-identity]
-   (to-db (some-keyword identity-type) user-identity)))
+  ([user-identity]
+   (if (nil? user-identity)
+     nil
+     (or (if (p/literal? user-identity)
+           (if-some [s (to-db `~user-identity)] (if (p/literal? s) s)))
+         `(to-db ~user-identity))))
+  ([identity-type user-identity]
+   (if (nil? user-identity)
+     nil
+     (let [identity-type (if (or (keyword? identity-type) (string? identity-type))
+                           (some-keyword identity-type)
+                           identity-type)]
+       (or (if (or (nil? identity-type) (keyword? identity-type))
+             (if (p/literal? user-identity)
+               (if-some [s (to-db `~identity-type `~user-identity)] (if (p/literal? s) s))
+               (if-some [f (get (methods to-db) `~identity-type)] `(~f ~user-identity))))
+           (if (or (nil? identity-type) (keyword? identity-type))
+             `(to-db ~identity-type ~user-identity)
+             `(to-db (some-keyword ~identity-type) ~user-identity)))))))
 
 (defmethod to-db :email
   (^String [^Identifiable user-identity]

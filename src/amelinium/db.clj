@@ -2117,11 +2117,13 @@
 
 ;; Generic coercers
 
-(defn- email-to-db ^String [v] (identity/to-db :email v))
-(defn- phone-to-db ^String [v] (identity/to-db :phone v))
-(defn- long-or-nil ^Long   [n] (if n (long n)))
+(defn- email-to-db    ^String [v] (identity/->db :email v))
+(defn- phone-to-db    ^String [v] (identity/->db :phone v))
+(defn- long-or-nil    ^Long   [n] (if n (long n)))
+(defn- identity-to-db         [v] (identity/->db v))
 
 (defcoercions ::any
+  :identity          identity-to-db               identity/of
   :email             email-to-db                  some-str
   :phone             phone-to-db                  identity/preparse-phone
   :account-type      some-str                     some-keyword

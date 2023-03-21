@@ -45,10 +45,12 @@
 (defn- long-or-nil     ^Long    [n] (if n (long n)))
 (defn- to-long-or-zero ^Long    [n] (safe-parse-long n 0))
 (defn- to-instant      ^Instant [t] (if (t/instant? t) t (time/parse-dt t)))
+(defn- to-exp-minutes  ^Long    [t] (time/minutes t 1))
 (defn- to-bin-num      ^Integer [n] (if n 1 0))
 (defn- num-to-boolean  ^Boolean [n] (or (pos-int? n) (true? n)))
-(defn- id-to-db         ^Long   [v] (identity/to-db :id    v))
-(defn- uid-to-db        ^UUID   [v] (identity/to-db :uid   v))
+(defn- id-to-db         ^Long   [v] (identity/->db :id  v))
+(defn- uid-to-db        ^UUID   [v] (identity/->db :uid v))
+(defn- identity-to-db           [v] (identity/->db v))
 
 (defn- to-expiry
   ^Instant [t]
@@ -59,7 +61,7 @@
     :else           (time/parse-dt t)))
 
 (db/defcoercions :confirmations
-  :id                identity/->db              identity/of
+  :id                identity-to-db             identity/of
   :user-id           id-to-db                   long-or-nil
   :user-uid          uid-to-db                  as-uuid
   :requester-id      id-to-db                   long-or-nil
@@ -82,7 +84,8 @@
   :no-attempts       to-bin-num                 num-to-boolean
   :bad-reason        to-bin-num                 num-to-boolean
   :expired           to-bin-num                 num-to-boolean
-  :present           to-bin-num                 num-to-boolean)
+  :present           to-bin-num                 num-to-boolean
+  :exp-minutes       to-exp-minutes             nil)
 
 ;; Helper functions
 

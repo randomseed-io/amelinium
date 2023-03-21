@@ -72,10 +72,10 @@
 (defn- long-or-nil     ^Long    [n] (if n (long n)))
 (defn- to-long-or-zero ^Long    [n] (safe-parse-long n 0))
 (defn- to-instant      ^Instant [t] (if (t/instant? t) t (time/parse-dt t)))
-(defn- id-to-db        ^Long    [v] (identity/to-db :id    v))
-(defn- uid-to-db       ^UUID    [v] (identity/to-db :uid   v))
-(defn- email-to-db     ^String  [v] (identity/to-db :email v))
-(defn- phone-to-db     ^String  [v] (identity/to-db :phone v))
+(defn- id-to-db        ^Long    [v] (identity/->db :id    v))
+(defn- uid-to-db       ^UUID    [v] (identity/->db :uid   v))
+(defn- email-to-db     ^String  [v] (identity/->db :email v))
+(defn- phone-to-db     ^String  [v] (identity/->db :phone v))
 
 (db/defcoercions :users
   :id                id-to-db                     long
@@ -486,7 +486,7 @@
    (if db
      (if-some [user-ids (identity/some-seq identity-type user-identities)]
        (if (and trust? (identical? :id identity-type))
-         (->> user-ids (map (juxt identity identity/->db)) (into {}))
+         (->> user-ids (map (juxt identity #(identity/->db %))) (into {}))
          (let [looked-up (cache-lookup-user-ids identity-cache user-ids)
                missing   (seq (get looked-up ::db/not-found))]
            (if-not missing
