@@ -911,6 +911,14 @@
    (and (string? ts) (string? cs)
         (or (nil? v) (keyword? v) (string? v) (number? v) (boolean? v)))))
 
+(defmacro literal-result
+  "Returns a value of the given argument `v` if it is statically convertable value (and
+  it is ok to be put into a source code in literal form) or a function. Otherwise
+  returns `alt` or `nil` (if `alt` is not given)."
+  {:no-doc true}
+  ([v]     `(let [v# ~v] (if (or (fn? v#) (statically-convertable? v#)) v#)))
+  ([v alt] `(let [v# ~v] (if (or (fn? v#) (statically-convertable? v#)) v# ~alt))))
+
 (defn coerce-in
   "Coerces the given value `v` to a database type by calling a function returned by
   invoking `amelinium.db/in-coercer` multimethod on a qualified keyword
@@ -989,19 +997,23 @@
   ([table column v]
    (if (and (or (keyword? table)  (string? table))
             (or (keyword? column) (string? column)))
-     (let [tc (colspec-kw table column)]
-       (if-some [coercer-fn (get-in-coercer* tc)]
+     (let [tc (literal-result (colspec-kw table column))]
+       (if-some [coercer-fn (literal-result (get-in-coercer* tc))]
          (if coercer-fn
-           (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+           (if (statically-convertable? v)
+             (literal-result (coercer-fn v) (list `~coercer-fn `~v))
+             (list `~coercer-fn `~v))
            `~v)
          `(coerce-in* ~tc ~v)))
      `(coerce-in ~table ~column ~v)))
   ([table-column v]
    (if (or (keyword? table-column) (string? table-column))
-     (let [tc (colspec-kw table-column)]
-       (if-some [coercer-fn (get-in-coercer* tc)]
+     (let [tc (literal-result (colspec-kw table-column))]
+       (if-some [coercer-fn (literal-result (get-in-coercer* tc))]
          (if coercer-fn
-           (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+           (if (statically-convertable? v)
+             (literal-result (coercer-fn v) (list `~coercer-fn `~v))
+             (list `~coercer-fn `~v))
            `~v)
          `(coerce-in* ~tc ~v)))
      `(coerce-in ~table-column ~v))))
@@ -1019,19 +1031,23 @@
   ([table column v]
    (if (and (or (keyword? table)  (string? table))
             (or (keyword? column) (string? column)))
-     (let [tc (colspec-kw table column)]
-       (if-some [coercer-fn (get-out-coercer* tc)]
+     (let [tc (literal-result (colspec-kw table column))]
+       (if-some [coercer-fn (literal-result (get-out-coercer* tc))]
          (if coercer-fn
-           (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+           (if (statically-convertable? v)
+             (literal-result (coercer-fn v) (list `~coercer-fn `~v))
+             (list `~coercer-fn `~v))
            `~v)
          `(coerce-out* ~tc ~v)))
      `(coerce-out ~table ~column ~v)))
   ([table-column v]
    (if (or (keyword? table-column) (string? table-column))
-     (let [tc (colspec-kw table-column)]
-       (if-some [coercer-fn (get-out-coercer* tc)]
+     (let [tc (literal-result (colspec-kw table-column))]
+       (if-some [coercer-fn (literal-result (get-out-coercer* tc))]
          (if coercer-fn
-           (if (statically-convertable? v) (coercer-fn v) (list `~coercer-fn `~v))
+           (if (statically-convertable? v)
+             (literal-result (coercer-fn v) (list `~coercer-fn `~v))
+             (list `~coercer-fn `~v))
            `~v)
          `(coerce-out* ~tc ~v)))
      `(coerce-out ~table-column ~v))))
@@ -1047,15 +1063,15 @@
   ([table column coll]
    (if (and (or (keyword? table)  (string? table))
             (or (keyword? column) (string? column)))
-     (let [tc (colspec-kw table column)]
-       (if-some [coercer-fn (get-in-coercer* tc)]
+     (let [tc (literal-result (colspec-kw table column))]
+       (if-some [coercer-fn (literal-result (get-in-coercer* tc))]
          (if coercer-fn (list `map `~coercer-fn `~coll) `~coll)
          `(coerce-seq-in* ~tc ~coll)))
      `(coerce-seq-in ~table ~column ~coll)))
   ([table-column coll]
    (if (or (keyword? table-column) (string? table-column))
-     (let [tc (colspec-kw table-column)]
-       (if-some [coercer-fn (get-in-coercer* tc)]
+     (let [tc (literal-result (colspec-kw table-column))]
+       (if-some [coercer-fn (literal-result (get-in-coercer* tc))]
          (if coercer-fn (list `map `~coercer-fn `~coll) `~coll)
          `(coerce-seq-in* ~tc ~coll)))
      `(coerce-seq-in ~table-column ~coll))))
@@ -1071,15 +1087,15 @@
   ([table column coll]
    (if (and (or (keyword? table)  (string? table))
             (or (keyword? column) (string? column)))
-     (let [tc (colspec-kw table column)]
-       (if-some [coercer-fn (get-out-coercer* tc)]
+     (let [tc (literal-result (colspec-kw table column))]
+       (if-some [coercer-fn (literal-result (get-out-coercer* tc))]
          (if coercer-fn (list `map `~coercer-fn `~coll) `~coll)
          `(coerce-seq-out* ~tc ~coll)))
      `(coerce-seq-out ~table ~column ~coll)))
   ([table-column coll]
    (if (or (keyword? table-column) (string? table-column))
-     (let [tc (colspec-kw table-column)]
-       (if-some [coercer-fn (get-out-coercer* tc)]
+     (let [tc (literal-result (colspec-kw table-column))]
+       (if-some [coercer-fn (literal-result (get-out-coercer* tc))]
          (if coercer-fn (list `map `~coercer-fn `~coll) `~coll)
          `(coerce-seq-out* ~tc ~coll)))
      `(coerce-seq-out ~table-column ~coll))))
@@ -1138,8 +1154,8 @@
      ;; (known table and column)
 
      (and tspec cspec (statically-convertable? e tspec cspec))
-     (if-some [coercer-fn (get-in-coercer tspec cspec)]
-       (cons (if coercer-fn (coercer-fn e) e) nil)
+     (if-some [coercer-fn (literal-result (get-in-coercer tspec cspec))]
+       (cons (if coercer-fn (literal-result (coercer-fn e) e) e) nil)
        (cons (QSlot. tspec cspec [e]) nil))
 
      ;; regular dynamically-convertable element
@@ -1168,13 +1184,14 @@
           c  (.c ^QSlot e)
           v  (.v ^QSlot e)
           tc (if (and (or (keyword? t) (string? t))
-                      (or (keyword? c) (string? c))) (colspec-kw t c))]
+                      (or (keyword? c) (string? c)))
+               (literal-result (colspec-kw t c)))]
       (if (= (count v) 1)
         (if tc
           (cons `(<- ~tc   ~(nth v 0)) nil)
           (cons `(<- ~t ~c ~(nth v 0)) nil))
         (if tc
-          (if-some [coercer-fn (get-in-coercer* tc)]
+          (if-some [coercer-fn (literal-result (get-in-coercer* tc))]
             (if coercer-fn (map (fn [e] `(~coercer-fn ~e)) v) `~v)
             (map (fn [e] `(<- ~tc ~e)) v))
           (map (fn [e] `(<- ~t ~c ~e)) v))))))
