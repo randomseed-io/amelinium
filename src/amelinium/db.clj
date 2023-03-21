@@ -940,26 +940,44 @@
   `(cons (sql/build-query-dynamic ~query) (<<- ~@params)))
 
 (defmacro <d-do!
+  "Calls function `f`, passing `db` as a first argument and a sequence of:
+  - a query (being a result of transforming `query` with `amelinium.db.sql/build-query-dynamic`),
+  - coerced parameters (being a result of transforming `params` with `<<-`)."
   [f db query & params]
   `(~f ~db (cons (sql/build-query-dynamic ~query) (<<- ~@params))))
 
 (defmacro <d-exec!
+  "Calls `execute!`, passing `db` as a first argument and a sequence of:
+  - a query (being a result of transforming `query` with `amelinium.db.sql/build-query-dynamic`),
+  - coerced parameters (being a result of transforming `params` with `<<-`)."
   [db query & params]
   `(execute! ~db (cons (sql/build-query-dynamic ~query) (<<- ~@params))))
 
 (defmacro <d-exec-one!
+  "Calls `execute-one!`, passing `db` as a first argument and a sequence of:
+  - a query (being a result of transforming `query` with `amelinium.db.sql/build-query-dynamic`),
+  - coerced parameters (being a result of transforming `params` with `<<-`)."
   [db query & params]
   `(execute-one! ~db (cons (sql/build-query-dynamic ~query) (<<- ~@params))))
 
 (defmacro <do!
+  "Calls function `f` passing `db` as a first argument and a sequence of:
+  - a query (being a result of transforming `query` with `amelinium.db.sql/build-query`),
+  - coerced parameters (being a result of transforming `params` with `<<-`)."
   [f db query & params]
   `(~f ~db (cons (sql/build-query ~query) (<<- ~@params))))
 
 (defmacro <exec!
+  "Calls `execute!`, passing `db` as a first argument and a sequence of:
+  - a query (being a result of transforming `query` with `amelinium.db.sql/build-query`),
+  - coerced parameters (being a result of transforming `params` with `<<-`)."
   [db query & params]
   `(execute! ~db (cons (sql/build-query ~query) (<<- ~@params))))
 
 (defmacro <exec-one!
+  "Calls `execute-one!`, passing `db` as a first argument and a sequence of:
+  - a query (being a result of transforming `query` with `amelinium.db.sql/build-query`),
+  - coerced parameters (being a result of transforming `params` with `<<-`)."
   [db query & params]
   `(execute-one! ~db (cons (sql/build-query ~query) (<<- ~@params))))
 
@@ -1085,7 +1103,10 @@
 
 ;; Configuration helpers
 
-(def dbname-key-finder
+(def ^{:arglists '([m] [v])}
+  dbname-key-finder
+  "Finds a database identifier in the given map `m` or by taking it from `v` if it is a
+  string or ident."
   (some-fn (comp some-str :orig-key)
            #(if (or (string? %) (ident? %)) (some-str %))
            (comp some-str :dbkey)
@@ -1099,7 +1120,10 @@
            (comp some-str :dbkey :properties :datasource)
            (comp some-str :dbkey :properties :datastore)))
 
-(def dbname-finder
+(def ^{:arglists '([m] [v])}
+  dbname-finder
+  "Finds a database name in the given map `m` or by taking it from `v` if it is a
+  string or ident."
   (some-fn #(if (or (string? %) (ident? %)) (some-str %))
            (comp some-str :dbname :properties)
            (comp some-str :dbname :datasource)
@@ -1150,16 +1174,21 @@
 (declare close-mig)
 
 (defn migration
+  "Calls `migrator-obj` function without any arguments."
   ([migrator-obj]
    (migrator-obj)))
 
 (defn migrations
+  "Takes a migrators vector (`migrators-vec`) or uses a default migrators vector (from
+  a global variable `amelinium.db/migrators`) and calls all of them (without passing
+  any arguments) gathering returned results in a vector."
   ([]
    (migrations migrators))
   ([migrators-vec]
    ((apply juxt migrators-vec))))
 
 (defn try-initialize-db
+  "Tries to create a database described by `config` map if it does not exist yet."
   [config]
   (let [db-spec (merge (:properties config) (:datasource (:datastore config)))
         db-name (or (db-name db-spec) (db-name config))]
@@ -1167,6 +1196,9 @@
       (jdbc/execute! (dissoc db-spec :dbname) [(str-spc "CREATE DATABASE IF NOT EXISTS" db-name)]))))
 
 (defn migration-databases
+  "Returns distinct identifiers of all migration databases found in `config` sequence
+  of functions by calling each function and extracting a value under `:dbkey` key of
+  a returned map."
   [config]
   (if (and config (sequential? config) (seq config))
     (->> (filter fn? config)
@@ -1263,6 +1295,9 @@
   (and (= "close" (.getName met)) (nil? (seq (.getParameterTypes met)))))
 
 (defn close!
+  "Calls `.close` on `obj` if it implements `java.io.Closeable` interface. Otherwise
+  uses reflection to check if there is unary `.close` method, and if it is found,
+  calls it passing `obj`."
   [obj]
   (if obj
     (if (isa? (class obj) Closeable)
@@ -1276,6 +1311,7 @@
 ;; Connection pool (HikariCP)
 
 (defn pool-datasource
+  "Returns connection pool (`HikariDataSource`) object obtained from `db-props`."
   ^HikariDataSource [db-props]
   (when-some [^HikariDataSource ds (connection/->pool HikariDataSource db-props)]
     (.setPoolName ^HikariDataSource ds (db-key-name db-props))
@@ -1284,14 +1320,17 @@
     ds))
 
 (defn close-pool
+  "Closes connection pool `ds`."
   [^HikariDataSource ds]
   (.close ^HikariDataSource ds))
 
 (defn suspend-pool
+  "Suspends connection pool `ds`."
   [^HikariDataSource ds]
   (.suspendPool ^HikariPoolMXBean (.getHikariPoolMXBean ^HikariDataSource ds)))
 
 (defn resume-pool
+  "Resumes connection pool `ds`."
   [^HikariDataSource ds]
   (.resumePool ^HikariPoolMXBean (.getHikariPoolMXBean ^HikariDataSource ds))
   (close! (jdbc/get-connection ^HikariDataSource ds)))
@@ -1299,6 +1338,7 @@
 ;; Configuration initializers
 
 (defn prep-db
+  "Prepares database configuration."
   [config]
   (if-not (map? config)
     config
@@ -1311,6 +1351,7 @@
           (map/dissoc-if      :user            nil?))))
 
 (defn init-db
+  "Initializes database configuration `config` for the configuration key `k`."
   ([k config]
    (init-db k config
             (var/deref-symbol (:initializer config))
@@ -1339,6 +1380,8 @@
                   (ds-getter db-props))))))
 
 (defn close-db
+  "Closes the database connection. Calls configured finalized (`:finalizer` key)
+  before."
   [k config]
   (when config
     (log/msg "Closing database connection to" (db-name config k) (str "(" (db-key-name k config) ")"))
@@ -1348,6 +1391,7 @@
       nil)))
 
 (defn suspend-db
+  "Suspends the database connection."
   [k config]
   (if-some [ds-suspender (:suspender config)]
     (when-some [ds (:datasource config)]
@@ -1356,6 +1400,7 @@
     (system/halt-key! k config)))
 
 (defn resume-db
+  "Resumes the database connection."
   [k config old-config old-impl]
   (let [ds-resumer (or (:resumer old-impl) (:resumer config) (:resumer old-config))]
     (if (and ds-resumer (= (dissoc config :initializer :finalizer :suspender :resumer)
@@ -1365,6 +1410,8 @@
           (system/init-key k config)))))
 
 (defn default-reporter
+  "Logs database migration event described by database identifier `db-k-name`, data
+  source `ds`, operation (`:up` or `:down`) and migration identifier `id`."
   [db-k-name ds op id]
   (case op
     :up   (log/msg "Applying DB migration"     id "on" (db-key-name db-k-name ds))
@@ -1394,11 +1441,15 @@
       (migrator-config config loader migdir))))
 
 (defn init-migrators
+  "Initializes migrators given in a `config` sequence. Calls each function found or
+  `init-mig` if it's not a function but migration configuration map."
   [config]
   (if (and config (sequential? config) (seq config))
     (mapv #(if (fn? %) % (init-mig nil %)) config)))
 
 (defn close-mig
+  "Closes database connection used for migration. Expects `config` to be an
+  argument-less function returning database configuration."
   [k config]
   (if (and (ident? k) (fn? config))
     (when-some [config (config)]
