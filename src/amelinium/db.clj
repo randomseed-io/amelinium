@@ -146,9 +146,10 @@
 ;; Memoization
 
 (defn mem-assoc-existing!
-  "Set a key `k` to a value `v` in a map being a cached result of prior calling
-  memoized function `f`. Will not associate anything if the destination does not
-  exist. The caching key should be given as a `key` vector."
+  "Manual cache updater for functions memoized with `clojure.core.memoize`. Sets a key
+  `k` to a value `v` in a map being a cached result of prior calling memoized
+  function `f`. Will not associate any value if the caching key does not exist. The
+  key should be passed as a vector in `key`."
   ([f key k v]
    (mem/memo-swap! f #(if-some [e (cache/lookup %1 %2)]
                         (cache/miss %1 %2 (delay (map/qassoc @e k v))) %1)
@@ -161,6 +162,10 @@
 ;; Settable parameters
 
 (extend-protocol jp/SettableParameter
+
+  ;; Adds generic coercion support for Identity objects
+  ;; when they are being sent to a database using next-jdbc operations.
+  ;; Uses amelinium.identity/to-db.
 
   amelinium.Identity
 
@@ -292,10 +297,12 @@
 ;; Tables and columns
 
 (defn colspec
-  "Converts a `table/column`-formatted identifier `table-col` into a snake-cased
-  string. If `table-id` and `col-id` are given, it creates a string of those parts
-  joined with a dot character. If identifier is given, it uses its namespace and
-  name."
+  "Converts a `table/column`-formatted identifier `col-spec` into a snake-cased string
+  with first slash replaced by a dot character. If `table-id` and `col-id` are given,
+  creates a string of those parts joined with a dot character. If single identifier
+  is given, it uses its namespace and name.
+
+  Example results: `\"table_name.column_name\"` or `\"simple_name\"`"
   (^String [col-spec]
    (if (ident? col-spec)
      (colspec (namespace col-spec) (name col-spec))
@@ -310,10 +317,15 @@
        (db/to-snake col-id)))))
 
 (defn colspec-quoted
-  "Converts a `table/column`-formatted identifier `table-col` into a snake-cased
-  string. If `table-id` and `col-id` are given, it creates a string of those parts
-  joined with a dot character. If identifier is given, it uses its namespace and
-  name. Each part of the name will be quoted."
+  "Converts a `table/column`-formatted identifier `col-spec` into a snake-cased string
+  with first slash replaced by a dot character. If `table-id` and `col-id` are given,
+  creates a string of those parts joined with a dot character. If identifier is
+  given, it uses its namespace and name. Each part of the name will be quoted.
+
+  If the `col-spec` is a string and there is a slash character present in it, it will
+  not be checked for a dot character presence.
+
+  Example results: ``\"`table_name`.`column_name`\"`` or ``\"`simple_name`\"``"
   (^String [col-spec]
    (if (ident? col-spec)
      (colspec-quoted (namespace col-spec) (name col-spec))
@@ -337,8 +349,11 @@
   those parts joined with a dot character. If identifier is given, it uses its
   namespace and name.
 
-  If the `col-spec` is a string and there is a slash character present in it, it will
-  not be checked for a dot character presence."
+  For strings and objects convertable to a string, first slash or dot character will
+  be used as a split point. If the `col-spec` is a string and there is a slash
+  character present in it, it will not be checked for a dot character presence.
+
+  Example results: `:table-name/column-name` or `:simple-name`"
   (^String [col-spec]
    (if (ident? col-spec)
      (colspec-kw (namespace col-spec) (name col-spec))
@@ -359,9 +374,11 @@
 (defn table
   "Extracts table name as a snake-cased string from `col-spec` which may be an
   identifier or a string. If the identifier has a namespace, it will be used,
-  otherwise its name will be used. For strings, it will look for a slash separator to
-  detect namespace (a table name) and name (a column name), to pick a table name. If
-  two arguments are given, the second one is ignored."
+  otherwise its name will be used. For string, it will look for a slash or dot
+  character used as a separator between a table and a column name, to extract
+  the table name. If two arguments are given, the second one is ignored.
+
+  Example result: `\"table_name\"`"
   (^String [col-spec]
    (if (ident? col-spec)
      (db/to-snake (or (namespace col-spec) (name col-spec)))
@@ -375,10 +392,12 @@
 
 (defn column
   "Extracts column name as a snake-cased string from `col-spec` which may be an
-  identifier or a string. If the identifier has a name, it will be used. For strings,
-  it will look for a slash separator to detect namespace (a table name) and name (a
-  column name), to pick a column name. If two arguments are given, the first one is
-  ignored."
+  identifier or a string. If the identifier has a name and a namespace, its name will
+  be used. For string, it will look for a slash or dot character used as a separator
+  between a table and a column name, to extract the column name. If two arguments are
+  given, the first one is ignored.
+
+  Example result: `\"column_name\"`"
   (^String [col-spec]
    (if (ident? col-spec)
      (db/to-snake (name col-spec))
@@ -390,14 +409,16 @@
            (db/to-snake col-spec))))))
   (^String [_ col-spec] (column col-spec)))
 
-(def ^{:tag String
+(def ^{:tag      String
        :arglists '(^String [col-spec] ^String [_ col-spec])}
   col
   "Alias for `column`. Extracts column name as a snake-cased string from `col-spec`
   which may be an identifier or a string. If the identifier has a name, it will be
-  used. For strings, it will look for a slash separator to detect namespace (a table
-  name) and name (a column name), to pick a column name. If two arguments are given,
-  the first one is ignored."
+  used. For string, it will look for a slash or dot character used as a separator
+  between a table and a column name, to extract the column name. If two arguments are
+  given, the first one is ignored.
+
+  Example result: `\"column_name\"`"
   column)
 
 (defn table-column
@@ -406,7 +427,11 @@
   name, second a column name). If `col-spec` is an identifier, its namespace and name
   will be used. If there is no namespace, it will be considered a table name. If two
   arguments are given, names are extracted separately using `table` and `column`
-  functions)."
+  functions). If string is given (or an object convertable to a string), a dot or
+  slash character will be used as a splitting point to extract table and column name.
+  Single string without any separator character will be considered a table name.
+
+  Example results: `[\"table_name\" \"column_name\"]`,  `[\"table_name\" nil]`"
   ([col-spec]
    (if (ident? col-spec)
      (table-column (some-str col-spec))
@@ -424,8 +449,13 @@
   be an identifier or a string) as snake-cased strings of a 2-element vector (first
   element being a table name, second a column name). If `col-spec` is an identifier,
   its namespace and name will be used. If there is no namespace, it will be
-  considered a column name. If two arguments are given, names are extracted
-  separately using `table` and `column` functions)."
+  considered a table name. If two arguments are given, names are extracted separately
+  using `table` and `column` functions). If string is given (or an object convertable
+  to a string), a dot or slash character will be used as a splitting point to extract
+  table and column name.  Single string without any separator character will be
+  considered a table name.
+
+  Example results: `[\"table_name\" \"column_name\"]`, `[\"table_name\" nil]`"
   table-column)
 
 (defn column-table
@@ -434,7 +464,11 @@
   name, second a table name). If `col-spec` is an identifier, its namespace and name
   will be used. If there is no namespace, it will be considered a column name. If two
   arguments are given, names are extracted separately using `column` and `table`
-  functions)."
+  functions). If string is given (or an object convertable to a string), a dot or
+  slash character will be used as a splitting point to extract table and column name.
+  Single string without any separator character will be considered a table name.
+
+  Example results: `[\"column_name\" \"table_name\"]`, `[\"column_name\" nil]`"
   ([col-spec]
    (if (ident? col-spec)
      (column-table (some-str col-spec))
@@ -451,51 +485,62 @@
   element being a column name, second a table name). If `col-spec` is an identifier,
   its namespace and name will be used. If there is no namespace, it will be
   considered a column name. If two arguments are given, names are extracted
-  separately using `column` and `table` functions)."
+  separately using `column` and `table` functions). If string is given (or an object
+  convertable to a string), a dot or slash character will be used as a splitting
+  point to extract table and column name.  Single string without any separator
+  character will be considered a table name.
+
+  Example results: `[\"column_name\" \"table_name\"]`, `[\"column_name\" nil]`"
   column-table)
 
 (defn table-kw
   "Extracts table name as a lisp-cased keyword from `col-spec` which may be an
   identifier or a string. If the identifier has a namespace, it will be used,
-  otherwise its name will be used. For strings, it will first transform them into
-  keywords (detecting slash character as a separator of a namespace and name) to pick
-  a table name. If two arguments are given, the second one is ignored."
-  (^Keyword [table-id]
-   (if (ident? table-id)
-     (keyword (db/to-lisp (or (namespace table-id) (name table-id))))
-     (if-some [table-id (some-str table-id)]
-       (if (str/index-of table-id \.)
-         (table-kw (keyword (str/replace-first table-id \. \/)))
-         (if (str/index-of table-id \/)
-           (table-kw (keyword table-id))
+  otherwise its name will be used. For strings (or objects convertable to strings),
+  it will detect slash and dot characters as separators of a namespace and name to
+  pick a table name. If two arguments are given, the second one is ignored.
+
+  Example result: `:table-name`"
+  (^Keyword [col-spec]
+   (if (ident? col-spec)
+     (keyword (db/to-lisp (or (namespace col-spec) (name col-spec))))
+     (if-some [col-spec (some-str col-spec)]
+       (if (str/index-of col-spec \.)
+         (table-kw (keyword (str/replace-first col-spec \. \/)))
+         (if (str/index-of col-spec \/)
+           (table-kw (keyword col-spec))
            (keyword (db/to-lisp table-kw)))))))
   (^Keyword [table-id _] (table-kw table-id)))
 
 (defn column-kw
   "Extracts column name as a lisp-cased keyword from `col-spec` which may be an
-  identifier or a string. If the identifier has a name, it will be used. For strings,
-  it will first transform them into keywords (detecting slash character as a
-  separator of a namespace and name) to pick a column name. If two arguments are
-  given, the first one is ignored."
-  (^Keyword [col-id]
-   (if (ident? col-id)
-     (keyword (db/to-lisp (name col-id)))
-     (if-some [col-id (some-str col-id)]
-       (if (str/index-of col-id \.)
-         (column-kw (keyword (str/replace-first col-id \. \/)))
-         (if (str/index-of col-id \/)
-           (column-kw (keyword col-id))
-           (keyword (db/to-lisp col-id)))))))
+  identifier or a string. If the identifier has a name, it will be used. For
+  strings (or objects convertable to strings), it will detect slash and dot
+  characters as separators of a namespace and name to pick a column name. If two
+  arguments are given, the first one is ignored.
+
+  Example result: `:column-name`"
+  (^Keyword [col-spec]
+   (if (ident? col-spec)
+     (keyword (db/to-lisp (name col-spec)))
+     (if-some [col-spec (some-str col-spec)]
+       (if (str/index-of col-spec \.)
+         (column-kw (keyword (str/replace-first col-spec \. \/)))
+         (if (str/index-of col-spec \/)
+           (column-kw (keyword col-spec))
+           (keyword (db/to-lisp col-spec)))))))
   (^Keyword [_ col-id] (column-kw col-id)))
 
-(def ^{:tag Keyword
-       :arglists '(^Keyword [col-id] ^Keyword [_ col-id])}
+(def ^{:tag      Keyword
+       :arglists '(^Keyword [col-spec] ^Keyword [_ col-id])}
   col-kw
   "Alias for `column-kw`. Extracts column name as a lisp-cased keyword from `col-spec`
   which may be an identifier or a string. If the identifier has a name, it will be
-  used. For strings, it will first transform them into keywords (detecting slash
-  character as a separator of a namespace and name) to pick a column name. If two
-  arguments are given, the first one is ignored."
+  used. For strings (or objects convertable to strings), it will detect slash and dot
+  characters as separators of a namespace and name to pick a column name. If two
+  arguments are given, the first one is ignored.
+
+  Example result: `:column-name`"
   column-kw)
 
 (defn table-column-kw
@@ -504,7 +549,10 @@
   name, second a column name). If `col-spec` is an identifier, its namespace and name
   will be used. If there is no namespace, it will be considered a table name. If two
   arguments are given, names are extracted separately using `table-kw` and
-  `column-kw` functions)."
+  `column-kw` functions). For strings (or objects convertable to strings), it will
+  detect slash and dot characters as separators of a namespace and a name.
+
+  Example results: `[:table-name :column-name]`, `[:table-name nil]`"
   ([col-spec]
    (if-some [col-spec (some-str col-spec)]
      (let [k (keyword (db/to-lisp (str/replace-first col-spec \. \/)))]
@@ -522,7 +570,11 @@
   vector (first element being a table name, second a column name). If `col-spec` is
   an identifier, its namespace and name will be used. If there is no namespace, it
   will be considered a table name. If two arguments are given, names are extracted
-  separately using `table-kw` and `column-kw` functions)."
+  separately using `table-kw` and `column-kw` functions). For strings (or objects
+  convertable to strings), it will detect slash and dot characters as separators of a
+  namespace and a name.
+
+  Example results: `[:table-name :column-name]`, `[:table-name nil]`"
   table-column-kw)
 
 (defn column-table-kw
@@ -531,7 +583,10 @@
   name, second a table name). If `col-spec` is an identifier, its namespace and name
   will be used. If there is no namespace, it will be considered a column name. If two
   arguments are given, names are extracted separately using `column-kw` and
-  `table-kw` functions)."
+  `table-kw` functions). For strings (or objects convertable to strings), it will
+  detect slash and dot characters as separators of a namespace and a name.
+
+  Example results: `[:column-name :table-name]`, `[:column-name nil]`"
   ([col-spec]
    (if-some [col-spec (some-str col-spec)]
      (let [k (keyword (db/to-lisp (str/replace-first col-spec \. \/)))]
@@ -547,12 +602,17 @@
   vector (first element being a column name, second a table name). If `col-spec` is
   an identifier, its namespace and name will be used. If there is no namespace, it
   will be considered a column name. If two arguments are given, names are extracted
-  separately using `column-kw` and `table-kw` functions)."
+  separately using `column-kw` and `table-kw` functions). For strings (or objects
+  convertable to strings), it will detect slash and dot characters as separators of a
+  namespace and a name.
+
+  Example results: `[:column-name :table-name]`, `[:column-name nil]`"
   column-table-kw)
 
 ;; SQL query preparation
 
 (defn- interpolate-tag
+  "Interpolates tags with extracted values when building query."
   ^String [substitutions [_ quote? ^String modifier ^String tag]]
   (if-some [tag (and tag (get substitutions (some-keyword tag)))]
     (let [msym (and modifier (symbol modifier))
@@ -567,12 +627,14 @@
     ""))
 
 (defn- interpolate-some?
+  "Interpolates `%SOME` tag with the given substitution value when building query."
   [substitutions [_ ^String tag ^String on-true ^String on-false]]
   (if-let [tag (and tag (get substitutions (some-keyword tag)))]
     (str (some-str on-true))
     (str (some-str on-false))))
 
 (defn- quote-tag
+  "Quotes tag's value during pattern interpolation when building query."
   ^String [[_ ^String tag]]
   (or (colspec-quoted tag) ""))
 
