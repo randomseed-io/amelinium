@@ -377,6 +377,11 @@
 (p/import-vars [amelinium.common
                 add-header add-headers add-status remove-status])
 
+(defn response-status?
+  "Returns `true` if the response status of the given `req` is equal to `k`."
+  [req k]
+  (identical? (some-keyword k) (get req :response/status)))
+
 (defn update-status
   ([req status lang status-key title-key description-key]
    (if status
