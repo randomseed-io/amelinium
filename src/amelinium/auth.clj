@@ -9,6 +9,7 @@
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require [amelinium.db             :as        db]
+            [amelinium.db.sql         :as       sql]
             [amelinium.logging        :as       log]
             [amelinium.auth.pwd       :as       pwd]
             [amelinium.http           :as      http]
@@ -22,11 +23,16 @@
             [io.randomseed.utils.map  :as       map]
             [tick.core                :as         t])
 
-  (:import [amelinium    AccountTypes AuthLocking AuthConfirmation AuthPasswords AuthConfig AuthSettings]
-           [clojure.lang Keyword]
-           [javax.sql    DataSource]
-           [java.time    Duration]
-           [reitit.core  Match]))
+  (:import (amelinium    AccountTypes
+                         AuthLocking
+                         AuthConfirmation
+                         AuthPasswords
+                         AuthConfig
+                         AuthSettings)
+           (clojure.lang Keyword)
+           (javax.sql    DataSource)
+           (java.time    Duration)
+           (reitit.core  Match)))
 
 (defonce ^:redef setup nil)
 
@@ -290,7 +296,7 @@
          ids (if dfl (conj ids dfl))
          ids (if ids (set ids))
          nms (if ids (mapv name ids))
-         sql (if ids (if (= 1 (count nms)) " = ?" (str " IN " (db/braced-join-? nms))))]
+         sql (if ids (if (= 1 (count nms)) " = ?" (str " IN " (sql/braced-join-? nms))))]
      (->AccountTypes sql ids nms dfl dfn))))
 
 (defn make-account-types

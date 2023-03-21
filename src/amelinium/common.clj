@@ -33,12 +33,12 @@
             [amelinium.common.oplog.auth           :as      oplog-auth]
             [amelinium.i18n                        :as            i18n]
             [amelinium.logging                     :as             log]
-            [amelinium.db                          :as              db]
             [phone-number.core                     :as           phone]
             [io.randomseed.utils.time              :as            time]
             [io.randomseed.utils.vec               :as             vec]
             [io.randomseed.utils.map               :as             map]
             [io.randomseed.utils.map               :refer     [qassoc]]
+            [io.randomseed.utils.db                :as              db]
             [io.randomseed.utils                   :refer         :all])
 
   (:import [java.time        Duration]

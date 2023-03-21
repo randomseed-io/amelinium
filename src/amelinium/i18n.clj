@@ -17,7 +17,7 @@
             [amelinium.system        :as              system]
             [amelinium.logging       :as                 log]
             [amelinium.http          :as                http]
-            [amelinium.db            :refer [idname make-kw
+            [amelinium.db.sql        :refer [idname make-kw
                                              idname-simple
                                              make-kw-simple]]))
 

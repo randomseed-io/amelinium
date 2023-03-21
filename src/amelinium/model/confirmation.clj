@@ -10,7 +10,6 @@
 
   (:require [clojure.string           :as           str]
             [next.jdbc                :as          jdbc]
-            [next.jdbc.sql            :as           sql]
             [next.jdbc.types          :refer [as-other]]
             [taoensso.nippy           :as         nippy]
             [tick.core                :as             t]
@@ -18,6 +17,7 @@
             [buddy.core.codecs        :as        codecs]
             [clj-uuid                 :as          uuid]
             [amelinium.db             :as            db]
+            [amelinium.db.sql         :as           sql]
             [amelinium.identity       :as      identity]
             [amelinium.common         :as        common]
             [io.randomseed.utils.time :as          time]
@@ -26,17 +26,18 @@
             [io.randomseed.utils.map  :refer   [qassoc]]
             [io.randomseed.utils      :refer       :all])
 
-  (:import (clojure.lang      Keyword)
-           (amelinium         Suites
-                              SuitesJSON
-                              PasswordData)
-           (amelinium         Identity
-                              Session
-                              UserData
-                              AuthQueries
-                              DBPassword)
-           (java.util         UUID)
-           (java.time         Duration Instant)))
+  (:import (clojure.lang Keyword)
+           (java.util    UUID)
+           (java.time    Duration
+                         Instant)
+           (amelinium    Suites
+                         SuitesJSON
+                         PasswordData
+                         Identity
+                         Session
+                         UserData
+                         AuthQueries
+                         DBPassword)))
 
 ;; Coercion
 
@@ -138,7 +139,7 @@
   "Generates a confirmation query for an e-mail or a phone used during registration of
   a NEW USER account."
   [identity-type]
-  (db/build-query
+  (sql/build-query
    "INSERT INTO confirmations(id,code,token,reason,id_type,expires,confirmed,"
    "                          user_id,user_uid,attempts,account_type,first_name,"
    "                          middle_name,last_name,password,password_suite_id)"
@@ -177,7 +178,7 @@
   Note: it may return a query giving an empty result set if there is no requesting
   user in a database."
   [identity-type user-required?]
-  (db/build-query
+  (sql/build-query
    "INSERT INTO confirmations(id,code,token,reason,id_type,expires,confirmed,attempts,"
    "                          requester_id,user_id,user_uid)"
    "SELECT ?,?,?,?,?,?,0,?,?,"
@@ -470,7 +471,7 @@
     (-> (qassoc r :confirmed? confirmed?) (dissoc :confirmed))))
 
 (def confirm-token-query
-  (db/build-query
+  (sql/build-query
    "INSERT IGNORE INTO confirmations(id,reason,expires,confirmed)"
    "SELECT id,reason,expires,confirmed FROM confirmations"
    "WHERE token = ? AND reason = ? AND expires >= NOW()"
@@ -480,7 +481,7 @@
    "RETURNING id AS identity,id_type,reason,confirmed,token,code,requester_id"))
 
 (def confirm-code-query
-  (db/build-query
+  (sql/build-query
    "INSERT IGNORE INTO confirmations(id,reason,expires,confirmed)"
    "SELECT id,reason,expires,confirmed FROM confirmations"
    "WHERE id = ? AND code = ? AND reason = ? AND expires >= NOW()"
@@ -560,7 +561,7 @@
 ;; Updating attempts
 
 (def ^:const decrease-attempts-query
-  (db/build-query
+  (sql/build-query
    "INSERT IGNORE INTO confirmations"
    "SELECT * FROM confirmations"
    "WHERE id = ? AND reason = ? AND expires > NOW()"

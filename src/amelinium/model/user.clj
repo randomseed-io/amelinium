@@ -11,13 +11,10 @@
   (:require [clojure.string                    :as           str]
             [clojure.core.cache.wrapped        :as           cwr]
             [next.jdbc                         :as          jdbc]
-            [next.jdbc.sql                     :as           sql]
-            [next.jdbc.types                   :refer [as-other]]
             [clj-uuid                          :as          uuid]
-            [buddy.core.hash                   :as          hash]
-            [buddy.core.codecs                 :as        codecs]
             [tick.core                         :as             t]
             [amelinium.db                      :as            db]
+            [amelinium.db.sql                  :as           sql]
             [amelinium.auth                    :as          auth]
             [amelinium.auth.pwd                :as           pwd]
             [amelinium.identity                :as      identity]
@@ -32,7 +29,6 @@
             [amelinium.types.auth              :refer       :all]
             [amelinium.types.identity          :refer       :all]
             [amelinium.types.session           :refer       :all]
-            [phone-number.core                 :as         phone]
             [io.randomseed.utils.time          :as          time]
             [io.randomseed.utils.ip            :as            ip]
             [io.randomseed.utils.map           :as           map]
@@ -434,7 +430,7 @@
   [db colspec query user-identities]
   (let [db-ids (db/<-seq colspec user-identities)]
     (->> db/opts-simple-vec
-         (sql/query db (cons (str query " " (db/braced-join-? db-ids)) db-ids))
+         (sql/query db (cons (str query " " (sql/braced-join-? db-ids)) db-ids))
          next)))
 
 (defn get-ids
@@ -454,7 +450,7 @@
    (if db
      (->> (identity/some-seq user-identities)
           (group-by identity/type)
-          (reduce-kv (db/groups-inverter get-ids db) {}))))
+          (reduce-kv (sql/groups-inverter get-ids db) {}))))
   ([db ^Keyword identity-type user-identities]
    (if db
      (if-some [user-ids (identity/some-seq identity-type user-identities)]
@@ -481,7 +477,7 @@
    (if db
      (->> (identity/some-seq user-identities)
           (group-by identity/type)
-          (reduce-kv (db/groups-inverter ids-core trust? db) {}))))
+          (reduce-kv (sql/groups-inverter ids-core trust? db) {}))))
   ([^Boolean trust? db ^Keyword identity-type user-identities]
    (if db
      (if-some [user-ids (identity/some-seq identity-type user-identities)]
@@ -685,7 +681,7 @@
 ;; Creation
 
 (def ^:const create-with-token-query
-  (db/build-query
+  (sql/build-query
    "INSERT IGNORE INTO users(email,uid,account_type,first_name,middle_name,last_name,"
    "                         password,password_suite_id)"
    "SELECT id,UUID(),account_type,first_name,middle_name,last_name,"
@@ -706,7 +702,7 @@
            :errors   errs})))))
 
 (def ^:const create-with-code-query
-  (db/build-query
+  (sql/build-query
    "INSERT IGNORE INTO users(email,uid,account_type,first_name,middle_name,last_name,"
    "                         password,password_suite_id)"
    "SELECT id,UUID(),account_type,first_name,middle_name,last_name,"
@@ -740,7 +736,7 @@
 ;; Identity management
 
 (def update-identity-query-token
-  (db/build-query
+  (sql/build-query
    "INSERT IGNORE INTO users (id, %(identity))"
    "SELECT requester_id,id FROM confirmations"
    "WHERE token = ?"
@@ -751,7 +747,7 @@
 
 (defn update-identity-with-token
   [identity-type db token]
-  (if-some [identity-col (db/column-kw identity-type)]
+  (if-some [identity-col (sql/column-kw identity-type)]
     (if-some [r (db/<exec-one! db [update-identity-query-token {:identity identity-col}]
                                [:confirmations token])]
       (qassoc r
@@ -761,7 +757,7 @@
        :errors   (confirmation/report-errors db token "change" true)})))
 
 (def update-identity-query-code
-  (db/build-query
+  (sql/build-query
    "INSERT IGNORE INTO users (id, %(identity))"
    "SELECT requester_id,id FROM confirmations"
    "WHERE code      = ?"
@@ -774,7 +770,7 @@
 (defn update-identity-with-code
   [identity-type db code user-identity]
   (if-some [id (identity/opt-type identity-type user-identity)]
-    (if-some [identity-col (db/column-kw identity-type)]
+    (if-some [identity-col (sql/column-kw identity-type)]
       (if-some [r (db/<exec-one! db [update-identity-query-code {:identity identity-col}]
                                  [:confirmations code id])]
         (qassoc r
@@ -796,39 +792,39 @@
 ;; Passwords and login data
 
 (def ^:const password-query
-  (db/build-query "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
-                  "WHERE users.email = ? AND password_suites.id = users.password_suite_id"))
+  (sql/build-query "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
+                   "WHERE users.email = ? AND password_suites.id = users.password_suite_id"))
 
 (def ^:const password-query-atypes-pre
-  (db/build-query "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
-                  "WHERE users.email = ? AND users.account_type"))
+  (sql/build-query "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
+                   "WHERE users.email = ? AND users.account_type"))
 
 (def ^:const password-query-atypes-post
   " AND password_suites.id = users.password_suite_id")
 
 (def ^:const password-query-atypes-single
-  (db/build-query "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
-                  "WHERE users.email = ? AND users.account_type = ?"
-                  "AND password_suites.id = users.password_suite_id"))
+  (sql/build-query "SELECT password AS intrinsic, suite AS shared FROM users, password_suites"
+                   "WHERE users.email = ? AND users.account_type = ?"
+                   "AND password_suites.id = users.password_suite_id"))
 
 (def ^:const login-query
-  (db/build-query "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
-                  "FROM users, password_suites"
-                  "WHERE users.email = ? AND password_suites.id = users.password_suite_id"))
+  (sql/build-query "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
+                   "FROM users, password_suites"
+                   "WHERE users.email = ? AND password_suites.id = users.password_suite_id"))
 
 (def ^:const login-query-atypes-pre
-  (db/build-query "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
-                  "FROM users, password_suites"
-                  "WHERE users.email = ? AND users.account_type"))
+  (sql/build-query "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
+                   "FROM users, password_suites"
+                   "WHERE users.email = ? AND users.account_type"))
 
 (def ^:const login-query-atypes-post
   " AND password_suites.id = users.password_suite_id")
 
 (def ^:const login-query-atypes-single
-  (db/build-query "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
-                  "FROM users, password_suites"
-                  "WHERE users.email = ? AND users.account_type = ?"
-                  "AND password_suites.id = users.password_suite_id"))
+  (sql/build-query "SELECT password AS intrinsic, suite AS shared, users.id AS id, soft_locked, locked, account_type"
+                   "FROM users, password_suites"
+                   "WHERE users.email = ? AND users.account_type = ?"
+                   "AND password_suites.id = users.password_suite_id"))
 
 (def ^:const ^AuthQueries login-data-queries
   (->AuthQueries login-query
@@ -853,7 +849,7 @@
          (if-some [db (.db ^AuthConfig src)]
            (let [ac-names (.names ^AccountTypes ac-types)
                  ac-sql   (.sql   ^AccountTypes ac-types)
-                 ac-sql   (if ac-sql ac-sql (str " IN " (db/braced-join-? ac-names)))
+                 ac-sql   (if ac-sql ac-sql (str " IN " (sql/braced-join-? ac-names)))
                  query    (str (.pre ^AuthQueries queries) ac-sql (.post ^AuthQueries queries))]
              (jdbc/execute-one! db (cons query (cons email ac-names)) db/opts-simple-map))))))
     ([^AuthConfig src email ac-type ^AuthQueries queries]
@@ -914,7 +910,7 @@
    (pauth/get-user-auth-data auth-source email account-type password-data-queries)))
 
 (def ^:const insert-shared-suite-query
-  (db/build-query
+  (sql/build-query
    "INSERT INTO password_suites(suite) VALUES(?)"
    "ON DUPLICATE KEY UPDATE id=id"
    "RETURNING id"))
@@ -1008,7 +1004,7 @@
                    {:id id}))))
 
 (def ^:const login-failed-update-query
-  (db/build-query
+  (sql/build-query
    "UPDATE users"
    "SET"
    "last_failed_ip = ?,"
@@ -1020,7 +1016,7 @@
    "WHERE id = ?"))
 
 (def ^:const soft-lock-update-query
-  (db/build-query
+  (sql/build-query
    "UPDATE users"
    "SET soft_locked = NOW()"
    "WHERE id = ? AND login_attempts > ?"))
