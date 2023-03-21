@@ -595,23 +595,25 @@
        :no-doc true}
   build-query-core
   "For the given SQL query `q` and substitution map performs pattern
-  interpolation. Uses memoization with underlying map encapsulated in an atom."
-  (clojure.core/memoize
+  interpolation. Uses `memoize+` memoization."
+  (db/memoize+
    (fn build-query-fn
      (^String []                "")
      (^String [q]               (if q (interpolate-tags q) ""))
-     (^String [q substitutions] (if q (interpolate-tags substitutions q) "")))))
+     (^String [q substitutions] (if q (interpolate-tags substitutions q) "")))
+   2048 1024))
 
 (def ^{:tag    String
        :no-doc true}
   build-query-dynamic-core
   "For the given SQL query `q` and substitution map performs pattern
-  interpolation. Uses memoization with underlying FIFO cache."
-  (memoize
+  interpolation. Uses `memoize+` memoization."
+  (db/memoize+
    (fn build-query-fn
      (^String []                "")
      (^String [q]               (if q (interpolate-tags q) ""))
-     (^String [q substitutions] (if q (interpolate-tags substitutions q) "")))))
+     (^String [q substitutions] (if q (interpolate-tags substitutions q) "")))
+   1024 4096))
 
 (defmacro build-query
   "For the given SQL query `q` and substitution map performs pattern interpolation.
