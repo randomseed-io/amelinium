@@ -22,13 +22,13 @@
             [io.randomseed.utils.map      :refer [qassoc]]
             [io.randomseed.utils          :refer     :all])
 
-  (:import  (amelinium                    Identity)
-            (amelinium.proto.identity     Identifiable)
-            (java.util                    UUID)
+  (:import  (java.util                    UUID)
             (clojure.lang                 Symbol
                                           Keyword
                                           PersistentVector
                                           IPersistentMap)
+            (amelinium                    Identity)
+            (amelinium.proto.identity     Identifiable)
             (com.google.i18n.phonenumbers Phonenumber$PhoneNumber)))
 
 ;; Standard identity types
@@ -485,13 +485,15 @@
   (value
     ([v] (.value ^Identity v))
     ([v ^Keyword identity-type]
-     (if (identical? identity-type (.id-type ^Identity v))
+     (if (or (identical? ::any identity-type)
+             (identical? identity-type (.id-type ^Identity v)))
        (.value ^Identity v))))
 
   (make
     (^Identity [v] v)
     (^Identity [v ^Keyword identity-type]
-     (if (identical? identity-type (.id-type ^Identity v)) v)))
+     (if (or (identical? ::any identity-type)
+             (identical? identity-type (.id-type ^Identity v))) v)))
 
   String
 
@@ -577,7 +579,9 @@
     (^Long [v]
      (if (pos-int? v) (long v)))
     (^Long [v ^Keyword identity-type]
-     (if (and (pos-int? v) (identical? :id identity-type))
+     (if (and (pos-int? v)
+              (or (identical? :id identity-type)
+                  (identical? ::any identity-type)))
        (long v))))
 
   (make
@@ -586,7 +590,8 @@
        (Identity. :id (long v))))
     (^Identity [v ^Keyword identity-type]
      (if (and (pos-int? v)
-              (identical? :id identity-type))
+              (or (identical? :id identity-type)
+                  (identical? ::any identity-type)))
        (Identity. :id (long v)))))
 
   Phonenumber$PhoneNumber
@@ -598,12 +603,14 @@
   (value
     (^Phonenumber$PhoneNumber [v] v)
     (^Phonenumber$PhoneNumber [v ^Keyword identity-type]
-     (if (identical? :phone identity-type) v)))
+     (if (or (identical? :phone identity-type)
+             (identical? ::any identity-type)) v)))
 
   (make
     (^Identity [v] (Identity. :phone v))
     (^Identity [v ^Keyword identity-type]
-     (if (identical? :phone identity-type)
+     (if (or (identical? :phone identity-type)
+             (identical? ::any identity-type))
        (Identity. :phone v))))
 
   UUID
@@ -615,12 +622,14 @@
   (value
     (^UUID [v] v)
     (^UUID [v ^Keyword identity-type]
-     (if (identical? :uid identity-type) v)))
+     (if (or (identical? :uid identity-type)
+             (identical? ::any identity-type)) v)))
 
   (make
     (^Identity [v] (Identity. :uid v))
     (^Identity [v ^Keyword identity-type]
-     (if (identical? :uid identity-type)
+     (if (or (identical? :uid identity-type)
+             (identical? ::any identity-type))
        (Identity. :uid v))))
 
   Character
