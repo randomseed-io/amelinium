@@ -154,7 +154,12 @@
   called explicitly.
 
   For the `Identity` record it simply returns it unless the `identity-type` is given
-  and it differs from a value of its `:id-type` field."))
+  and it differs from a value of its `:id-type` field.")
+
+  (^{:tag Boolean}
+   literal?
+   [user-identity]
+   "Returns `true` if the given literal can express identity."))
 
 (defn add-type-string-matcher!
   "Adds new identity type string matcher to a global chain. Multiple functions may be

@@ -477,6 +477,8 @@
 
   Identity
 
+  (literal? ^Boolean [v] false)
+
   (type ^Keyword [v]
     (.id-type ^Identity v))
 
@@ -492,6 +494,8 @@
      (if (identical? identity-type (.id-type ^Identity v)) v)))
 
   String
+
+  (literal? ^Boolean [v] true)
 
   (type ^Keyword [v]
     (if (not-empty-string? v)
@@ -510,6 +514,8 @@
 
   clojure.lang.IPersistentMap
 
+  (literal? ^Boolean [v] false)
+
   (type ^Keyword [v]
     (p/type (parse-map v)))
 
@@ -525,6 +531,8 @@
      (parse-map identity-type v)))
 
   Keyword
+
+  (literal? ^Boolean [v] true)
 
   (type ^Keyword [v]
     (p/type (some-str v)))
@@ -542,6 +550,8 @@
 
   Symbol
 
+  (literal? ^Boolean [v] false)
+
   (type ^Keyword [v]
     (p/type (some-str v)))
 
@@ -557,6 +567,8 @@
      (p/make (some-str v) identity-type)))
 
   Number
+
+  (literal? ^Boolean [v] true)
 
   (type ^Keyword [v]
     (if (pos-int? v) :id))
@@ -579,6 +591,8 @@
 
   Phonenumber$PhoneNumber
 
+  (literal? ^Boolean [v] true)
+
   (type ^Keyword [v] :phone)
 
   (value
@@ -593,6 +607,8 @@
        (Identity. :phone v))))
 
   UUID
+
+  (literal? ^Boolean [v] true)
 
   (type ^Keyword [v] :uid)
 
@@ -609,6 +625,8 @@
 
   Character
 
+  (literal? ^Boolean [v] true)
+
   (type [v] nil)
 
   (value
@@ -621,6 +639,8 @@
 
   Boolean
 
+  (literal? ^Boolean [v] true)
+
   (type [v] nil)
 
   (value
@@ -632,6 +652,8 @@
     ([v identity-type] nil))
 
   nil
+
+  (literal? ^Boolean [v] true)
 
   (type [v] nil)
 
