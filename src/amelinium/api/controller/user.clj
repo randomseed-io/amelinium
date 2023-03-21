@@ -444,7 +444,7 @@
        (api/render-error req :parameters/error)
        (let [confirmation (confirmation/establish db login code token one-minute "creation")
              confirmed?   (get confirmation :confirmed?)
-             creation     (if confirmed? (user/create-with-token-or-code db login token code))
+             creation     (if confirmed? (user/create db login token code))
              created?     (if creation (get creation :created?))
              bad-result?  (or (nil? confirmation) (and confirmed? (nil? creation)))]
          (cond

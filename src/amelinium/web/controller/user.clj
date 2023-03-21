@@ -272,7 +272,7 @@
         login        (get params :login)
         confirmation (confirmation/establish db login code token one-minute "creation")
         confirmed?   (get confirmation :confirmed?)
-        creation     (if confirmed? (user/create-with-token-or-code db login token code))
+        creation     (if confirmed? (user/create db login token code))
         created?     (if creation (get creation :created?))
         bad-result?  (or (nil? confirmation) (and confirmed? (nil? creation)))]
     (cond
@@ -312,7 +312,7 @@
          [id id-type] (common/identity-and-type (get form-params id-type) id-type)
          confirmation (confirmation/establish db id code token one-minute "change")
          confirmed?   (get confirmation :confirmed?)
-         updated      (if confirmed? (user/update-identity-with-token-or-code id-type db id token code))
+         updated      (if confirmed? (user/update-identity id-type db token code id))
          updated?     (:updated? updated)
          bad-result?  (or (nil? confirmation) (and confirmed? (nil? updated)))]
      (cond
@@ -386,9 +386,9 @@
   or SMS message with a verification code or token."
   [req]
   (let [params  (get req :parameters)
-        id-type (common/acceptable-identity-type (get (get params :path) :id-type))
+        id-type (common/acceptable-identity-type (get-in params [:path :id-type]))
         email?  (or (identical? :email id-type) (identical? :user/email id-type))
-        phone?  (and id-type (not email?))
+        phone?  (or (identical? :phone id-type) (identical? :user/phone id-type))
         req     (web/assoc-app-data req :identity/type id-type :phone? phone? :email? email?)]
     (if-some [[id id-type] (common/identity-and-type (get-in params [:form id-type]) id-type)]
 
@@ -415,7 +415,7 @@
                                     :tpl/email-exists :recovery/verify})]
         (web/response
 
-         ;; verify! returned a response with some error
+         ;; verify! returned an error response, short-circuit
 
          req
 
@@ -462,9 +462,10 @@
         (let [db   (auth/db req)
               cfrm (confirmation/establish db id code token one-minute "recovery")]
           (if (get cfrm :confirmed?)
-            (do
-              (confirmation/delete db id "recovery")
-              (super/set-password! req (get cfrm :user/id) password))
+            (let [req (super/set-password! req (get cfrm :user/id) password)]
+              (if (web/response-status? req :pwd/created)
+                (confirmation/delete db (or cfrm id) "recovery"))
+              req)
             (web/render-error req (or (:errors cfrm) :verify/bad-result)))))
 
       ;; password not present, token or code received
@@ -512,4 +513,5 @@
              :app.url/recover         app-link))))
 
       ;; no token nor code
+
       :else req)))
