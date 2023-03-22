@@ -123,11 +123,12 @@
    (delete db id "creation"))
   ([db id reason]
    (println db id reason)
-   (if id
-     (sql/delete!
-      db :confirmations
-      {:id     (db/<- :confirmations/id id)
-       :reason (db/<- :confirmations/reason (or (some-str reason) "creation"))}))))
+   (if-some [id (db/<- :confirmations/id id)]
+     (do (println id)
+         (sql/delete!
+          db :confirmations
+          {:id     id
+           :reason (db/<- :confirmations/reason (or (some-str reason) "creation"))})))))
 
 ;; Generation of confirmation tokens and codes
 
@@ -524,15 +525,17 @@
              (if r
                {:confirmed? false
                 :id-type    id-type
-                :identity   (or (identity/of id) id)
+                :identity   id
                 :user/id    user-id
                 :code       code
                 :errors     errs}
-               {:confirmed? false
-                :identity   (or (identity/of id) id)
-                :user/id    nil
-                :code       code
-                :errors     errs})))))))
+               (let [i (identity/of id)]
+                 {:confirmed? false
+                  :id-type    (identity/type i)
+                  :identity   (or i id)
+                  :user/id    nil
+                  :code       code
+                  :errors     errs}))))))))
   ([db id code token exp-minutes reason]
    (if-some [token (some-str token)]
      (establish db token   exp-minutes reason)
