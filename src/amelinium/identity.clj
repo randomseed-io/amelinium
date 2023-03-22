@@ -744,8 +744,8 @@
   the identity is already an `amelinium.Identity` record but its type is different,
   `nil` will be returned.
 
-  If the `identity-type` is given as literal keyword, string or `nil` then a specific
-  conversion function will be obtained at compile-time.
+  If the `identity-type` is given as literal keyword, string or `nil`, then a
+  specific conversion function will be obtained at compile-time.
 
   If `identity-type` is an acceptable literal (or not given at all) and
   `user-identity` expression is a value for which the function
@@ -869,8 +869,8 @@
   the identity is already an `amelinium.Identity` record but its type is different,
   `nil` will be returned.
 
-  If the `identity-type` is given as literal keyword, string or `nil` then a specific
-  conversion function will be obtained at compile-time.
+  If the `identity-type` is given as literal keyword, string or `nil`, then a
+  specific conversion function will be obtained at compile-time.
 
   If `identity-type` is an acceptable literal (or not given at all) and
   `user-identity` expression is a value for which the function
