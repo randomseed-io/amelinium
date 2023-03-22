@@ -676,7 +676,11 @@
 
   (make
     ([v] nil)
-    ([v identity-type] nil)))
+    ([v identity-type] nil))
+
+  Object
+
+  (literal? [v] false))
 
 ;; DB conversions
 
