@@ -148,12 +148,12 @@
 
   ;; Adds generic coercion support for Identity objects
   ;; when they are being sent to a database using next-jdbc operations.
-  ;; Uses amelinium.identity/to-db.
+  ;; Uses amelinium.identity/to-db*.
 
   amelinium.Identity
 
   (set-parameter [^amelinium.Identity v ^PreparedStatement ps ^long i]
-    (jp/set-parameter (identity/to-db v) ps i)))
+    (jp/set-parameter (identity/to-db* v) ps i)))
 
 ;; Coercion
 
