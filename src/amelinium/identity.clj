@@ -333,16 +333,19 @@
    (dissoc (group-by second identity-map-keys) ::any)))
 
 (defn parse-map
-  "Tries to extract identity from a map `m` by searching of commonly known identity
-  keys. Optional identity type `identity-type` will be used to constrain the
-  conversion. If a known key is found but its associated value cannot be converted to
-  `Identity` object, process continues and other keys are tried.
+  "Tries to extract identity from a map `m` by searching for commonly known identity
+  keys.
+
+  Optional identity type `identity-type` will be used to constrain the conversion. If
+  a known key is found but its associated value cannot be converted to `Identity`
+  object, process continues and other keys are tried.
+
+  Uses `identity-map-keys` when no identity type is given, or it is set to
+  `:amelinium.identity/any`.
 
   Uses `identity-map-keys-by-type` when an identity type is given to select a group
-  of keys to be tried out and such group exists.
-
-  Uses `identity-map-keys` when an identity type is not given, or it is not found in
-  `identity-map-keys-by-type`."
+  of keys to be tried out. When the group is not found for the given identity type,
+  `nil` is returned."
   ([m]
    (if (seq m)
      (some (fn [[k t]]
@@ -356,7 +359,8 @@
                (if-let [i (get m k)]
                  (if (and (map? i) (not (record? i))) nil (p/make i identity-type))))
              ks))
-     (parse-map m))))
+     (if (identical? ::any identity-type)
+       (parse-map m)))))
 
 ;; Creating identities
 
