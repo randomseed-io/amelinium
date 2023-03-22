@@ -147,7 +147,7 @@
    (if-some [t (some-keyword id-type)]
      (if (isa? p/type-hierarchy t ::valid) t)))
   (^Keyword [id-type acceptable-tag]
-   (if-some [t (some-keyword id-type)]
+   (if-let [t (some-keyword id-type)]
      (if (and acceptable-tag (isa? p/type-hierarchy t acceptable-tag)) t))))
 
 (defn type
@@ -157,25 +157,25 @@
   for numeric user ID, `:uid` for UUID). If the type is not given, analysis of the
   given identity will be performed.
 
-  Does not perform full validation of identities, just detection.
-
   Value of the given identity type `identity-type` must match the identity type, and
   not be `nil` nor `false`. If any of these happens, `nil` will be returned."
   (^Keyword [user-identity]
    (if user-identity (p/type user-identity)))
   (^Keyword [^Keyword identity-type user-identity]
    (if user-identity
-     (if-some [t (some-keyword identity-type)]
-       (if (identical? t (p/type user-identity)) t)))))
+     (let [t (some-keyword identity-type)]
+       (if (identical? ::any t)
+         (p/type user-identity)
+         (if t (p/type (p/make user-identity t))))))))
 
 (defn type-opt
   "Returns a keyword describing identity type detected by analyzing the given user
   identity `user-identity` and optional identity type `identity-type` given
   explicitly (e.g. `:phone` for a phone number, `:email` for e-mail address, `:id`
-  for numeric user ID, `:uid` for UUID). If the type is not given or it is `nil`,
-  analysis of the given identity will be performed.
+  for numeric user ID, `:uid` for UUID).
 
-  Does not perform full validation of identities, just detection.
+  If the type is not given or it is `nil`, analysis of the given identity will be
+  performed.
 
   Value of the given identity type `identity-type` must match the identity type. If
   it does not, `nil` will be returned."
@@ -183,9 +183,10 @@
    (if user-identity (p/type user-identity)))
   (^Keyword [^Keyword identity-type user-identity]
    (if user-identity
-     (if-some [t (some-keyword identity-type)]
-       (if (identical? t (p/type user-identity)) t)
-       (p/type user-identity)))))
+     (let [t (some-keyword identity-type)]
+       (if (and t (not (identical? ::any identity-type)))
+         (p/type (p/make user-identity t))
+         (p/type user-identity))))))
 
 (defn acceptable-type
   "Returns a keyword describing identity type detected by analyzing the given user
