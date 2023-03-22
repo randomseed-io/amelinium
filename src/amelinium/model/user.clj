@@ -1079,6 +1079,8 @@
              (identical? ::identity/any identity-type))
        (Identity. :session session))))
 
+  (literal? ^Boolean [v] false))
+
 ;; Identity as a source of session
 
 (extend-protocol sid/Sessionable
