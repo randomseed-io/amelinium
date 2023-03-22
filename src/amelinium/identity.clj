@@ -192,10 +192,10 @@
   "Returns a keyword describing identity type detected by analyzing the given user
   identity `user-identity` and optional identity type `identity-type` given
   explicitly (e.g. `:phone` for a phone number, `:email` for e-mail address, `:id`
-  for numeric user ID, `:uid` for UUID). If the type is not given, or if it is `nil`
-  or `false`, analysis of the given identity will be performed.
+  for numeric user ID, `:uid` for UUID).
 
-  Does not perform full validation of identities, just detection.
+  If the type is not given, or if it is `nil` or `false`, analysis of the given
+  identity will be performed.
 
   The given identity type must always be valid (registered with
   `amelinium.proto.identity/add-type!`) and the identity must not be `nil` nor
@@ -211,10 +211,12 @@
        (if (and acceptable-tag (isa? p/type-hierarchy t acceptable-tag)) t))))
   (^Keyword [user-identity identity-type ^Keyword acceptable-tag]
    (if (and user-identity acceptable-tag)
-     (if-let [t (some-keyword identity-type)]
-       (if (and acceptable-tag (isa? p/type-hierarchy t acceptable-tag)) t)
-       (if-let [t (p/type user-identity)]
-         (if (and acceptable-tag (isa? p/type-hierarchy t acceptable-tag)) t))))))
+     (let [t (some-keyword identity-type)]
+       (if (and t (not (identical? ::any t)))
+         (if (and acceptable-tag
+                  (isa? p/type-hierarchy t acceptable-tag))
+           (p/type (p/make user-identity t)))
+         (acceptable-type user-identity acceptable-tag))))))
 
 (defn of-known-type?
   "Returns `true` if the given value `v` is a user identity of the known type.
