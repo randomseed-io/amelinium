@@ -810,8 +810,10 @@
    (p/value user-identity identity-type)))
 
 (defmethod to-db* :default
-  ([^Identity user-identity]                        nil)
-  ([^Keyword identity-type ^Identity user-identity] nil))
+  (^Long [^Identity user-identity]
+   (some-str (p/value user-identity)))
+  (^Long [^Keyword identity-type ^Identity user-identity]
+   (some-str (p/value user-identity identity-type))))
 
 ;; String conversions
 
