@@ -680,7 +680,7 @@
 
   Object
 
-  (literal? [v] false))
+  (literal? ^Boolean [v] false))
 
 ;; DB conversions
 
