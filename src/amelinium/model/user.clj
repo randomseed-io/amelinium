@@ -1067,13 +1067,17 @@
     (^Session [session]
      session)
     (^Session [session ^Keyword identity-type]
-     (if (identical? :session identity-type) session)))
+     (if (or (identical? :session identity-type)
+             (identical? ::identity/any identity-type))
+       session)))
 
   (make
     (^Identity [session]
      (Identity. :session session))
     (^Identity [session ^Keyword identity-type]
-     (if (identical? :session identity-type) (Identity. :session session)))))
+     (if (or (identical? :session identity-type)
+             (identical? ::identity/any identity-type))
+       (Identity. :session session))))
 
 ;; Identity as a source of session
 
