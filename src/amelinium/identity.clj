@@ -742,11 +742,14 @@
                            identity-type)]
        (or (if (or (nil? identity-type) (keyword? identity-type))
              (if (p/literal? user-identity)
-               (if-some [s (to-db `~identity-type `~user-identity)] (if (p/literal? s) s))
-               (if-some [f (get (methods to-db) `~identity-type)] `(~f ~user-identity))))
+               (if-some [s (to-db `~identity-type `~user-identity)]
+                 (if (p/literal? s) s))
+               (if-some [f (get (methods to-db*) `~identity-type)]
+                 `(~f (p/make ~user-identity ~identity-type)))))
            (if (or (nil? identity-type) (keyword? identity-type))
-             `(to-db ~identity-type ~user-identity)
-             `(to-db (some-keyword ~identity-type) ~user-identity)))))))
+             (if-some [f (get (methods to-db*) `~identity-type)]
+               `(~f (p/make ~user-identity ~identity-type))))
+           `(to-db ~identity-type ~user-identity))))))
 
 (defmethod to-db* :email
   (^String [^Identity user-identity]
