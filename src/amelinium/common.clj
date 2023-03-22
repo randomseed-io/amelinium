@@ -2311,16 +2311,39 @@
                       (or (if acceptable-tag (some-keyword acceptable-tag))
                           ::identity/standard)))))
 
+(defn acceptable-identity-type
+  ([identity-type]
+   (acceptable-identity-type identity-type nil))
+  ([identity-type acceptable-tag]
+   (if-some [id-type (some-keyword identity-type)]
+     (if (identity/type? id-type
+                         (or (if acceptable-tag (some-keyword acceptable-tag))
+                             ::identity/standard))
+       id-type))))
+
+
 (defn identity-and-type
   "Detects the identity type and checks if it is assigned to a tag
-  `:amelinium.identity/standard` or to a tag passed as `acceptable-tag` argument. To
-  accept any valid identity type the `:amelinium.identity/valid` must be explicitly
-  given. If `identity-type` is not given or is `nil` or `false`, it is guessed by
-  analyzing `user-identity`.
+  `:amelinium.identity/standard` or to a tag passed as `acceptable-tag` argument.
 
-  Returns a 2-element vector containing user identity and identity type. If user
-  identity is not given or identity type cannot be established or it is not
-  acceptable, returns `nil`."
+  To accept any valid identity type the `:amelinium.identity/valid` must be
+  explicitly given. If `identity-type` is not given or is `nil` or `false`, it is
+  guessed by analyzing `user-identity`.
+
+  Returns a 2-element vector containing user identity and identity type.
+
+  If `user-identity` is `nil` or `false` then only the given `identity-type` is
+  checked whether it is acceptable. If it is not, `nil` is returned instead of
+  vector.
+
+  If `user-identity` is given but it is not matching the given identity type or its
+  identity type is not acceptable, `nil` is returned instead of vector.
+
+  If `user-identity` is given but `identity-type` is `nil`, the type of user identity
+  is extracted and checked whether it is acceptable.
+
+  User identity is only tested, never transformed, even if it is not an `Identity`
+  object."
   ([user-identity]
    (if-some [id-type (identity/acceptable-type user-identity nil ::identity/standard)]
      [user-identity id-type]))
@@ -2331,19 +2354,11 @@
      (if-some [id-type (identity/acceptable-type
                         user-identity
                         identity-type
-                        (or (if acceptable-tag (some-keyword acceptable-tag))
-                            ::identity/standard))]
-       [user-identity id-type]))))
-
-(defn acceptable-identity-type
-  ([identity-type]
-   (acceptable-identity-type identity-type nil))
-  ([identity-type acceptable-tag]
-   (if-some [id-type (some-keyword identity-type)]
-     (if (identity/type? id-type
-                         (or (if acceptable-tag (some-keyword acceptable-tag))
-                             ::identity/standard))
-       id-type))))
+                        (or (some-keyword acceptable-tag) ::identity/standard))]
+       [user-identity id-type])
+     (if identity-type
+       (if-some [id-type (acceptable-identity-type identity-type acceptable-tag)]
+         [nil id-type])))))
 
 ;; Date and time
 
