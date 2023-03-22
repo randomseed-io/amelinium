@@ -1049,7 +1049,7 @@
 (defmethod query-id        :session [_ _ i] (session/user-id i))
 (defmethod query-ids       :session [_ _ i] (map session/user-id i))
 
-(defmethod identity/to-str :session
+(defmethod identity/to-str* :session
   ([user-identity]   (session/any-id (pid/value user-identity)))
   ([t user-identity] (session/any-id (pid/value user-identity t))))
 

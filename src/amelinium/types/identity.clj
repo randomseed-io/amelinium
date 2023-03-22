@@ -10,10 +10,10 @@
 
 (in-ns 'amelinium.identity)
 
-(clojure.core/declare ->str)
+(clojure.core/declare to-str*)
 
 (in-ns 'amelinium)
 
 (defrecord Identity [^clojure.lang.Keyword id-type value]
   Object
-  (toString ^String [^Identity i] (amelinium.identity/->str ^Identity i)))
+  (toString ^String [^Identity i] (amelinium.identity/to-str* ^Identity i)))

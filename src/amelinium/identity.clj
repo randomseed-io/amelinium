@@ -735,7 +735,7 @@
   Uses `to-db*` multimethod to perform `user-identity` transformation on a basis of
   its identity type.
 
-  If the given identity is not a kind of `amelinium.Identity` record it will be
+  If the given identity is not a kind of `amelinium.Identity` record, it will be
   converted to it first. If the given value cannot be used as valid identity, `nil`
   is returned.
 
@@ -815,30 +815,26 @@
 
 ;; String conversions
 
-(defmulti to-str
-  "Takes a user identity `user-identity` and converts it to a string.
+(defmulti to-str*
+  "Takes a user identity `user-identity` expressed as `Identity` record, and converts
+  it to a string.
 
-  If the given identity is not a kind of `amelinium.Identity` record it will be
-  converted to it first. If the given value cannot be used as valid identity, `nil`
-  is returned.
-
-  If the `identity-type` is given, it should be a valid identity type. It instructs
-  the function to treat the given identity as of this type. If the identity is an
-  `amelinium.Identity` record but its type is different, `nil` will be returned.
+  If the `identity-type` is given, it should be a valid identity type expressed with
+  a keyword. It instructs the function to treat the given identity as of this
+  type. If the identity type is different than in the given object, `nil` is
+  returned.
 
   This is internal multimethod which does not perform conversions or checks. Use
-  `->str` instead.
-
-  Caution: The identity type must be a keyword (it will not be coerced)."
-  {:arglists '(^String [^Identifiable user-identity]
-               ^String [^Keyword identity-type ^Identifiable user-identity])
-   :see-also ["->str"]}
+  `to-str` function or `->str` macro instead."
+  {:arglists '(^String [^Identity user-identity]
+               ^String [^Keyword identity-type ^Identity user-identity])
+   :see-also ["to-str" "->str"]}
   (fn
-    (^Keyword [^Identifiable user-identity] (p/type user-identity))
-    (^Keyword [^Keyword identity-type ^Identifiable user-identity] identity-type))
+    (^Keyword [^Identity user-identity] (p/type user-identity))
+    (^Keyword [^Keyword identity-type ^Identity user-identity] identity-type))
   :hierarchy #'p/type-hierarchy)
 
-(defn ->str
+(defn to-str
   "Takes a user identity `user-identity` and optional identity type `identity-type`,
   and converts it to a string.
 
@@ -848,44 +844,94 @@
 
   If the `identity-type` is given, it should be a valid identity type. It instructs
   the function to treat the given identity as of this type. If the identity is an
-  `amelinium.Identity` record but its type is different, `nil` will be returned.
-
-  This is internal multimethod which does not perform conversions or checks. Use
-  `->str` instead.
-
-  Caution: The identity type must be a keyword (it will not be coerced)."
-  {:see-also ["->db" "of"]}
+  `amelinium.Identity` record but its type is different, `nil` will be returned."
+  {:see-also ["->str" "->db" "of"]}
   (^String [^Identifiable user-identity]
-   (to-str user-identity))
+   (to-str* (p/make user-identity)))
   (^String [identity-type ^Identifiable user-identity]
-   (to-str (some-keyword identity-type) user-identity)))
+   (let [t (some-keyword identity-type)] (to-str* t (p/make user-identity t)))))
 
-(defmethod to-str :email
+(defmacro ->str
+  "For the given user identity `user-identity` and optional identity type
+  `identity-type` tries to express the given identity's value as a string.
+
+  Uses `to-str*` multimethod to perform `user-identity` transformation on a basis of
+  its identity type.
+
+  If the given identity is not a kind of `amelinium.Identity` record, it will be
+  converted to it first. If the given value cannot be used as valid identity, `nil`
+  is returned.
+
+  If the `identity-type` is given, it should be a valid identity type. It instructs
+  the function to treat the given identity as of this type during pre-conversion. If
+  the identity is already an `amelinium.Identity` record but its type is different,
+  `nil` will be returned.
+
+  If the `identity-type` is given as literal keyword, string or `nil` then a specific
+  conversion function will be obtained at compile-time.
+
+  If `identity-type` is an acceptable literal (or not given at all) and
+  `user-identity` expression is a value for which the function
+  `amelinium.proto.identity/literal?` returns `true` then the conversion is done
+  immediately, and its result replaces the macro call at compile-time.
+
+  However, if the immediate conversion result is `nil`, or it is not a value for
+  which the function `amelinium.proto.identity/literal?` returns `true`, an
+  expression with call to `to-str` or `to-str*` will be generated as fallback to
+  perform the conversion at run-time."
+  {:see-also ["->str" "of"]}
+  ([user-identity]
+   (if (nil? user-identity)
+     nil
+     (if-some [r (if (p/literal? user-identity)
+                   (let [r (to-str `~user-identity)]
+                     (if (p/literal? r) r)))]
+       r
+       `(to-str ~user-identity))))
+  ([identity-type user-identity]
+   (if (nil? user-identity)
+     nil
+     (let [identity-type (if (or (keyword? identity-type) (string? identity-type))
+                           (some-keyword identity-type)
+                           identity-type)]
+       (if-some [r (if (and (or (nil? identity-type) (keyword? identity-type))
+                            (p/literal? user-identity))
+                     (let [r (to-str `~identity-type `~user-identity)]
+                       (if (p/literal? r) r)))]
+         r
+         (or (if (nil? identity-type) (keyword? identity-type)
+                 (if (identical? :amelinium.identity/any identity-type)
+                   (#'->str &form &env user-identity)
+                   (if-some [f (get (methods to-str*) `~identity-type)]
+                     `(~f (p/make ~user-identity ~identity-type)))))
+             `(to-str ~identity-type ~user-identity)))))))
+
+(defmethod to-str* :email
   (^String [^Identifiable user-identity]
    (some-str (p/value user-identity)))
   (^String [^Keyword identity-type ^Identifiable user-identity]
    (some-str (p/value user-identity identity-type))))
 
-(defmethod to-str :uid
+(defmethod to-str* :uid
   (^String [^Identifiable user-identity]
    (some-str (p/value user-identity)))
   (^String [^Keyword identity-type ^Identifiable user-identity]
    (some-str (p/value user-identity identity-type))))
 
-(defmethod to-str :id
+(defmethod to-str* :id
   (^String [^Identifiable user-identity]
    (some-str (p/value user-identity)))
   (^String [^Keyword identity-type ^Identifiable user-identity]
    (some-str (p/value user-identity identity-type))))
 
-(defmethod to-str :phone
+(defmethod to-str* :phone
   (^String [^Identifiable user-identity]
-   (phone/format (p/value user-identity) nil
-                 :phone-number.format/e164))
+   (phone/format (p/value user-identity) nil :phone-number.format/e164))
   (^String [^Keyword identity-type ^Identifiable user-identity]
-   (phone/format (p/value user-identity identity-type) nil
-                 :phone-number.format/e164)))
+   (phone/format (p/value user-identity identity-type) nil :phone-number.format/e164)))
 
-(defmethod to-str :default
-  ([^Identifiable user-identity]                        nil)
-  ([^Keyword identity-type ^Identifiable user-identity] nil))
+(defmethod to-str* :default
+  (^String [^Identifiable user-identity]
+   (some-str (p/value user-identity)))
+  (^String [^Keyword identity-type ^Identifiable user-identity]
+   (some-str (p/value user-identity identity-type))))
