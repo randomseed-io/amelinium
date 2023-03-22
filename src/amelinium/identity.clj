@@ -347,14 +347,14 @@
    (if (seq m)
      (some (fn [[k t]]
              (if-let [i (get m k)]
-               (if (map? i) nil (p/make i t))))
+               (if (and (map? i) (not (record? i))) nil (p/make i t))))
            identity-map-keys)))
   ([identity-type m]
    (if-some [ks (get identity-map-keys-by-type identity-type)]
      (if (seq m)
        (some (fn [k]
                (if-let [i (get m k)]
-                 (if (map? i) nil (p/make i identity-type))))
+                 (if (and (map? i) (not (record? i))) nil (p/make i identity-type))))
              ks))
      (parse-map m))))
 
