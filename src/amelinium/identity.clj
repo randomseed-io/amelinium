@@ -676,7 +676,27 @@
 
 ;; DB conversions
 
-(defmulti to-db
+(defmulti to-db*
+  "For the given user identity `user-identity` which must be of type
+  `amelinium.Identity`, tries to express the identity in a database suitable format.
+
+  If the given value cannot be used as valid identity, `nil` is returned.
+
+  If the `identity-type` is given, it must be a keyword and it should be a valid
+  identity type. It instructs the function to treat the given identity as of this
+  type.
+
+  This is internal multimethod which does not perform conversions or checks. Use
+  `to-db` or `->db` instead."
+  {:arglists '([^Identifiable user-identity]
+               [identity-type ^Identifiable user-identity])
+   :see-also ["to-db" "->db"]}
+  (fn
+    (^Keyword [^Identity user-identity] (p/type user-identity))
+    (^Keyword [^Keyword identity-type ^Identity user-identity] identity-type))
+  :hierarchy #'p/type-hierarchy)
+
+(defn to-db
   "For the given user identity `user-identity` tries to express the identity in a
   database suitable format.
 
@@ -688,17 +708,12 @@
   the function to treat the given identity as of this type. If the identity is an
   `amelinium.Identity` record but its type is different, `nil` will be returned.
 
-  This is internal multimethod which does not perform conversions or checks. Use
-  `->db` instead.
-
-  Caution: The identity type must be a keyword (it will not be coerced)."
-  {:arglists '([^Identifiable user-identity]
-               [^Keyword identity-type ^Identifiable user-identity])
-   :see-also ["->db"]}
-  (fn
-    (^Keyword [^Identifiable user-identity] (p/type user-identity))
-    (^Keyword [identity-type ^Identifiable user-identity] identity-type))
-  :hierarchy #'p/type-hierarchy)
+  If possible, use `->db` to get some compile-time optimizations."
+  {:see-also ["->db" "to-db*"]}
+  ([^Identifiable user-identity]
+   (to-db* (p/make user-identity)))
+  ([identity-type ^Identifiable user-identity]
+   (to-db* (p/make user-identity (some-keyword identity-type)))))
 
 (defmacro ->db
   "For the given user identity `user-identity` and optional identity type
@@ -733,35 +748,35 @@
              `(to-db ~identity-type ~user-identity)
              `(to-db (some-keyword ~identity-type) ~user-identity)))))))
 
-(defmethod to-db :email
-  (^String [^Identifiable user-identity]
+(defmethod to-db* :email
+  (^String [^Identity user-identity]
    (p/value user-identity))
-  (^String [^Keyword identity-type ^Identifiable user-identity]
+  (^String [^Keyword identity-type ^Identity user-identity]
    (p/value user-identity identity-type)))
 
-(defmethod to-db :phone
-  (^Phonenumber$PhoneNumber [^Identifiable user-identity]
+(defmethod to-db* :phone
+  (^Phonenumber$PhoneNumber [^Identity user-identity]
    (phone/format (p/value user-identity) nil
                  :phone-number.format/e164))
-  (^Phonenumber$PhoneNumber [^Keyword identity-type ^Identifiable user-identity]
+  (^Phonenumber$PhoneNumber [^Keyword identity-type ^Identity user-identity]
    (phone/format (p/value user-identity identity-type) nil
                  :phone-number.format/e164)))
 
-(defmethod to-db :uid
-  (^UUID [^Identifiable user-identity]
+(defmethod to-db* :uid
+  (^UUID [^Identity user-identity]
    (p/value user-identity))
-  (^UUID [^Keyword identity-type ^Identifiable user-identity]
+  (^UUID [^Keyword identity-type ^Identity user-identity]
    (p/value user-identity identity-type)))
 
-(defmethod to-db :id
-  (^Long [^Identifiable user-identity]
+(defmethod to-db* :id
+  (^Long [^Identity user-identity]
    (p/value user-identity))
-  (^Long [^Keyword identity-type ^Identifiable user-identity]
+  (^Long [^Keyword identity-type ^Identity user-identity]
    (p/value user-identity identity-type)))
 
-(defmethod to-db :default
-  ([^Identifiable user-identity]                        nil)
-  ([^Keyword identity-type ^Identifiable user-identity] nil))
+(defmethod to-db* :default
+  ([^Identity user-identity]                        nil)
+  ([^Keyword identity-type ^Identity user-identity] nil))
 
 ;; String conversions
 

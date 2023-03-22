@@ -1053,7 +1053,7 @@
   ([user-identity]   (session/any-id (pid/value user-identity)))
   ([t user-identity] (session/any-id (pid/value user-identity t))))
 
-(defmethod identity/to-db :session
+(defmethod identity/to-db* :session
   ([user-identity]   (session/db-sid (pid/value user-identity)))
   ([t user-identity] (session/db-sid (pid/value user-identity t))))
 
