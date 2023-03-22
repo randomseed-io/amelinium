@@ -708,15 +708,19 @@
   "For the given user identity `user-identity` tries to express the identity in a
   database suitable format.
 
+  Uses `to-db*` multimethod to perform `user-identity` transformation on a basis of
+  its identity type.
+
   If the given identity is not a kind of `amelinium.Identity` record it will be
   converted to it first. If the given value cannot be used as valid identity, `nil`
   is returned.
 
   If the `identity-type` is given, it should be a valid identity type. It instructs
-  the function to treat the given identity as of this type. If the identity is an
-  `amelinium.Identity` record but its type is different, `nil` will be returned.
+  the function to treat the given identity as of this type during pre-conversion. If
+  the identity is already an `amelinium.Identity` record but its type is different,
+  `nil` will be returned.
 
-  If possible, use `->db` to get some compile-time optimizations."
+  If possible, use `->db` macro instead to get some compile-time optimizations."
   {:see-also ["->db" "to-db*"]}
   ([^Identifiable user-identity]
    (to-db* (p/make user-identity)))
@@ -728,36 +732,56 @@
   `identity-type` tries to express the given identity's value in a database suitable
   format.
 
+  Uses `to-db*` multimethod to perform `user-identity` transformation on a basis of
+  its identity type.
+
   If the given identity is not a kind of `amelinium.Identity` record it will be
   converted to it first. If the given value cannot be used as valid identity, `nil`
   is returned.
 
   If the `identity-type` is given, it should be a valid identity type. It instructs
-  the function to treat the given identity as of this type. If the identity is an
-  `amelinium.Identity` record but its type is different, `nil` will be returned."
+  the function to treat the given identity as of this type during pre-conversion. If
+  the identity is already an `amelinium.Identity` record but its type is different,
+  `nil` will be returned.
+
+  If the `identity-type` is given as literal keyword, string or `nil` then a specific
+  conversion function will be obtained at compile-time.
+
+  If `identity-type` is an acceptable literal (or not given at all) and
+  `user-identity` expression is a value for which the function
+  `amelinium.proto.identity/literal?` returns `true` then the conversion is done
+  immediately, and its result replaces the macro call at compile-time.
+
+  However, if the immediate conversion result is `nil`, or it is not a value for
+  which the function `amelinium.proto.identity/literal?` returns `true`, an
+  expression with call to `to-db` or `to-db*` will be generated as fallback to
+  perform the conversion at run-time."
   {:see-also ["->str" "of"]}
   ([user-identity]
    (if (nil? user-identity)
      nil
-     (or (if (p/literal? user-identity)
-           (if-some [s (to-db `~user-identity)] (if (p/literal? s) s)))
-         `(to-db ~user-identity))))
+     (if-some [r (if (p/literal? user-identity)
+                   (let [r (to-db `~user-identity)]
+                     (if (p/literal? r) r)))]
+       r
+       `(to-db ~user-identity))))
   ([identity-type user-identity]
    (if (nil? user-identity)
      nil
      (let [identity-type (if (or (keyword? identity-type) (string? identity-type))
                            (some-keyword identity-type)
                            identity-type)]
-       (or (if (or (nil? identity-type) (keyword? identity-type))
-             (if (p/literal? user-identity)
-               (if-some [s (to-db `~identity-type `~user-identity)]
-                 (if (p/literal? s) s))
-               (if-some [f (get (methods to-db*) `~identity-type)]
-                 `(~f (p/make ~user-identity ~identity-type)))))
-           (if (or (nil? identity-type) (keyword? identity-type))
-             (if-some [f (get (methods to-db*) `~identity-type)]
-               `(~f (p/make ~user-identity ~identity-type))))
-           `(to-db ~identity-type ~user-identity))))))
+       (if-some [r (if (and (or (nil? identity-type) (keyword? identity-type))
+                            (p/literal? user-identity))
+                     (let [r (to-db `~identity-type `~user-identity)]
+                       (if (p/literal? r) r)))]
+         r
+         (or (if (nil? identity-type) (keyword? identity-type)
+                 (if (identical? :amelinium.identity/any identity-type)
+                   (#'->db &form &env user-identity)
+                   (if-some [f (get (methods to-db*) `~identity-type)]
+                     `(~f (p/make ~user-identity ~identity-type)))))
+             `(to-db ~identity-type ~user-identity)))))))
 
 (defmethod to-db* :email
   (^String [^Identity user-identity]
