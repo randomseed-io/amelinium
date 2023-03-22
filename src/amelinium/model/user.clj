@@ -782,6 +782,14 @@
 (defn update-identity
   "Updates user's identity identified by `user-identity` and `code`, or by
   `token`. Code or token must exist in a database."
+  {:arglists '([identity-type db token code user-identity]
+               [identity-type db code user-identity]
+               [identity-type db token nil]
+               [identity-type db token])}
+  ([identity-type db token code user-identity]
+   (if token
+     (update-identity-with-token identity-type db token)
+     (update-identity-with-code  identity-type db code user-identity)))
   ([identity-type db token]
    (update-identity-with-token identity-type db token))
   ([identity-type db code user-identity]
