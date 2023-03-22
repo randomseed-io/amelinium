@@ -2298,13 +2298,11 @@
      (and (nil? src)
           (nil? id)) nil
      (map? src)      (identity/acceptable-type
-                      (or (if id id)
-                          (get src :identity)
-                          (get src :user/identity)
-                          (get src :id))
+                      (or id (identity/value (or identity-type ::identity/any) src))
                       (or (if identity-type (some-keyword identity-type))
                           (get src :id-type)
-                          (get src :identity/type))
+                          (get src :identity/type)
+                          (get src :identity-type))
                       (or (if acceptable-tag (some-keyword acceptable-tag))
                           ::identity/standard))
      :else           (identity/acceptable-type
