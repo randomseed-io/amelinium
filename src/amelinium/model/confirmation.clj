@@ -63,6 +63,7 @@
 
 (db/defcoercions :confirmations
   :id                identity-to-db             identity/of
+  :identity          identity-to-db             identity/of
   :user-id           id-to-db                   long-or-nil
   :user-uid          uid-to-db                  as-uuid
   :requester-id      id-to-db                   long-or-nil
