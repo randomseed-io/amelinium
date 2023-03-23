@@ -175,8 +175,8 @@
 (defmethod out-coercer :default [_] nil)
 
 (defn get-in-coercer*
-  "Same as `get-in-coercer` but trusts that `table-column` is a fully-qualified,
-  lisp-cased keyword (already a result of `colspec-kw`)."
+  "Same as `get-in-coercer` but trusts that `table-column` is a fully-qualified
+  keyword (already a result of `colspec-kw`)."
   {:see-also ["get-in-coercer"]}
   [table-column]
   (if-some [f (in-coercer table-column)] f
