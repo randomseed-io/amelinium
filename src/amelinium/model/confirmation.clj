@@ -387,21 +387,27 @@
   `:confirmed` (already confirmed), `:attempts` (attempts exceeded),
   `:reason` (reason for the given token or code is different from the reason for
   which the confirmation had been created for), `:expires` (confirmation expired),
-  `:present` (an e-mail or a phone number is already assigned to an existing user). "
+  `:present` (an e-mail or a phone number is already assigned to an existing user)."
   [where]
-  (str-squeeze-spc
-   "SELECT (confirmed = TRUE) AS confirmed,"
-   "(attempts <= 0)           AS no_attempts,"
-   "(reason <> ?)             AS bad_reason,"
-   "(expires < NOW())         AS expired,"
-   "(SELECT 1 FROM users WHERE users.email = confirmations.id"
-   "                        OR users.phone = confirmations.id) AS present"
-   "FROM confirmations" (if-some [w (some-str where)] (str "WHERE " w))))
+  (sql/build-query
+   "SELECT * FROM"
+   "(SELECT"
+   " (confirmed  = TRUE)  AS confirmed,"
+   " (attempts  <= 0)     AS no_attempts,"
+   " (reason    <> ?)     AS bad_reason,"
+   " (expires   <  NOW()) AS expired,"
+   " ((SELECT DISTINCT 1 FROM users"
+   "   WHERE users.email = confirmations.id"
+   "      OR users.phone = confirmations.id) <=> 1) AS present"
+   " FROM confirmations"
+   " %{where}) AS confirmations"
+   {:where where}))
 
-(def ^:const report-errors-simple-id-query (gen-report-errors-query "id = ?"))
-(def ^:const report-errors-id-query        (gen-report-errors-query "id = ? AND reason = ?"))
-(def ^:const report-errors-code-query      (gen-report-errors-query "id = ? AND code = ?"))
-(def ^:const report-errors-token-query     (gen-report-errors-query "token = ?"))
+(def ^:const report-errors-simple-id-query (gen-report-errors-query "WHERE id = ?"))
+(def ^:const report-errors-id-query        (gen-report-errors-query "WHERE id = ? AND reason = ?"))
+(def ^:const report-errors-code-query      (gen-report-errors-query "WHERE id = ? AND code = ?"))
+(def ^:const report-errors-token-query     (gen-report-errors-query "WHERE token = ?"))
+
 (def verify-bad-id-set                     #{:verify/not-found :verify/bad-id})
 (def verify-bad-code-set                   #{:verify/not-found :verify/bad-code})
 (def verify-bad-token-set                  #{:verify/not-found :verify/bad-token})
@@ -424,8 +430,9 @@
   `reason`, explicitly set code to `false`)."
   ([db token reason should-be-confirmed?]
    (let [reason (or (some-str reason) "creation")
-         qargs  (db/<<- report-errors-token-query [:confirmations reason token])]
-     (or (process-errors (db/execute-one! db qargs) should-be-confirmed?)
+         qargs  (db/<<- report-errors-token-query [:confirmations reason token])
+         result (db/execute-one! db qargs)]
+     (or (process-errors result should-be-confirmed?)
          verify-bad-token-set)))
   ([db id code reason should-be-confirmed?]
    (let [id     (identity/->db id)
