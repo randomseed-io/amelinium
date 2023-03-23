@@ -82,9 +82,9 @@
 
 (defn idname-simple
   "If the given value `v` is an ident, it returns its name. Otherwise it returns the
-  string representation of the given object."
+  string representation of the given object or `nil` if the string is empty."
   ^String [v]
-  (if (ident? v) (name v) (str v)))
+  (if (ident? v) (name v) (some-str v)))
 
 (defn dbname
   "If the given value `v` is an ident, it returns its (optional) namespace and name
