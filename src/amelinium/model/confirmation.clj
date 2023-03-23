@@ -123,13 +123,11 @@
   ([db id]
    (delete db id "creation"))
   ([db id reason]
-   (println db id reason)
    (if-some [id (db/<- :confirmations/id id)]
-     (do (println id)
-         (sql/delete!
-          db :confirmations
-          {:id     id
-           :reason (db/<- :confirmations/reason (or (some-str reason) "creation"))})))))
+     (sql/delete!
+      db :confirmations
+      {:id     id
+       :reason (db/<- :confirmations/reason (or (some-str reason) "creation"))}))))
 
 ;; Generation of confirmation tokens and codes
 
