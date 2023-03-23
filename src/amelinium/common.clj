@@ -2321,16 +2321,18 @@
                              ::identity/standard))
        id-type))))
 
-
 (defn identity-and-type
-  "Detects the identity type and checks if it is assigned to a tag
+  "Detects an identity type and checks if it is assigned to a tag
   `:amelinium.identity/standard` or to a tag passed as `acceptable-tag` argument.
 
   To accept any valid identity type the `:amelinium.identity/valid` must be
-  explicitly given. If `identity-type` is not given or is `nil` or `false`, it is
-  guessed by analyzing `user-identity`.
+  explicitly given as `acceptable-tag` argument.
 
-  Returns a 2-element vector containing user identity and identity type.
+  If `identity-type` is not given, is set to `nil` or to `:amelinium.identity/any`,
+  it is guessed by analyzing `user-identity`.
+
+  Returns a 2-element vector containing original value of `user-identity` argument
+  and detected identity type.
 
   If `user-identity` is `nil` or `false` then only the given `identity-type` is
   checked whether it is acceptable. If it is not, `nil` is returned instead of
@@ -2339,11 +2341,12 @@
   If `user-identity` is given but it is not matching the given identity type or its
   identity type is not acceptable, `nil` is returned instead of vector.
 
-  If `user-identity` is given but `identity-type` is `nil`, the type of user identity
-  is extracted and checked whether it is acceptable.
+  If `user-identity` is given but `identity-type` is `nil` or
+  `:amelinium.identity/any`, the type of user identity is extracted and checked
+  whether it is acceptable.
 
   User identity is only tested, never transformed, even if it is not an `Identity`
-  object."
+  object. Identity type is extracted from identity object (given or ad-hoc created)."
   ([user-identity]
    (if-some [id-type (identity/acceptable-type user-identity nil ::identity/standard)]
      [user-identity id-type]))
