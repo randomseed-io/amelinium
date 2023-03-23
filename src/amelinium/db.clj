@@ -820,7 +820,7 @@
     (if-some [coercer-fn (get-out-coercer* (sql/make-kw-simple tab-name col-label))]
       coercer-fn
       (let [col-name (.getColumnName rsm i)]
-        (if (identical? col-label col-name)
+        (if (not= col-label col-name)
           (get-out-coercer* (sql/make-kw-simple tab-name col-name)))))))
 
 (defn- delayed-column-by-index-fn
