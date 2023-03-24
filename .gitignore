@@ -1,6 +1,7 @@
 /target
 /classes
 /checkouts
+/docs
 *.jar
 *.class
 /.lein-*
