@@ -13,7 +13,7 @@ docs:
 			tail -n +2 README.md >> doc/10_introduction.md
 			cp -r docs/img docs/docs
 			bin/docs "$(VERSION)"
-			cp -r docs ../amelinium-docs
+			cp -r docs/* ../amelinium-docs
 
 push-docs:
 			cd ../amelinium-docs
