@@ -13,9 +13,12 @@ docs:
 			tail -n +2 README.md >> doc/10_introduction.md
 			cp -r docs/img docs/docs
 			bin/docs "$(VERSION)"
+			cp -r docs ../amelinium-docs
 
 push-docs:
-			git subtree push --prefix=docs docs main
+			cd ../amelinium-docs
+			git push
+			cd -
 
 test-clj:
 			bin/test
