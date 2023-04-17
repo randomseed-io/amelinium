@@ -315,6 +315,23 @@
          (apply (force tr-sub-fn) (some-str k) v a b more))
        (not-empty (str v))))))
 
+(defn html-add-attrs
+  "Generates HTML attribute list in a form of `name= \"value\"` from the given `args`
+  map. Returns a string with each pair separated by a single space and the whole
+  string prefixed with a single space (if it is not empty)."
+  ([args]
+   (html-add-attrs args nil))
+  ([args to-remove]
+   (if (pos? (count args))
+     (let [args (if (seq to-remove) (apply dissoc args to-remove) args)]
+       (if (pos? (count args))
+         (->> args
+              (map (fn [[k v]] (strb (some-str k) "=\"" (html-esc (common/string-from-param v)) "\"")))
+              (str/join " ")
+              (strb " "))
+         ""))
+     "")))
+
 (defn form-field
   "Helper to generate HTML for the `form-field` tag."
   [args tr-sub errors params]
@@ -359,16 +376,19 @@
             html-esumm (if err-summ (strb "      <p class=\"error-summary\">"     (html-esc err-summ) "</p>\n"))
             html-edesc (if err-desc (strb "      <p class=\"error-description\">" (html-esc err-desc) "</p>\n"))
             html-error (if error?   (strb "    <div class=\"form-error\">\n" html-esumm html-edesc "</div>\n"))
-            html-label (if label    (strb "    <label for=\"" id-str "\" class=\"label\">" html-label "</label>\n"))]
+            html-label (if label    (strb "    <label for=\"" id-str "\" class=\"label\">" html-label "</label>\n"))
+            html-attrs (html-add-attrs field [:htmx? :id :name :label :placeholder
+                                              :parameter-type :value :autocomplete
+                                              :input-type :type])]
         (if hidden?
           (strs html-label
                 "  <input type=\"" html-itype "\" name=\"" html-name "\" id=\"" html-id "\""
-                html-phold html-value html-autoc " />\n"
+                html-phold html-value html-autoc html-attrs " />\n"
                 html-error)
           (strs "<div class=\"field param-" html-id html-ptcls "\">\n"
                 html-label
                 "    <input type=\"" html-itype "\" name=\"" html-name "\" id=\"" html-id "\""
-                html-phold html-value html-autoc " />\n"
+                html-phold html-value html-autoc html-attrs " />\n"
                 html-error
                 "  </div>\n"))))))
 
@@ -596,10 +616,13 @@
              html-label   (if label?  (strb "<label for=\"" id-str "\""
                                             html-lang
                                             " class=\"label\">"
-                                            html-label "</label>\n"))]
+                                            html-label "</label>\n"))
+             html-attrs   (html-add-attrs args [:htmx? :id :method :label
+                                                :action :lang :action-lang
+                                                :query-params :path-params])]
          (strs
           html-label
-          "<form" html-id " class=\"familiar medium\"" html-lang html-method html-action ">"
+          "<form" html-id " class=\"familiar medium\"" html-lang html-method html-action html-attrs ">"
           (selmer/render (get (get content :form) :content) (map/qassoc ctx :form-props form-props) {:tag-second \-})
           "</form>")))
      :end-form)
