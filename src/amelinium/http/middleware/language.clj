@@ -326,8 +326,8 @@
   (if-some [p (var/deref-symbol p)]
     (if (map? p)
       (let [parent     (var/deref-symbol (:derive p))
-            p          (if (map? parent) (into parent (dissoc p :parent)) p)
-            config     (into config (dissoc p :compile :handler))
+            p          (if (map? parent) (conj parent (dissoc p :parent)) p)
+            config     (conj (or config {}) (dissoc p :compile :handler))
             compile-fn (var/deref-symbol (:compile p))
             handler-fn (var/deref-symbol (:handler p))
             picker-fn  (if compile-fn (compile-fn config) #(handler-fn config %))]

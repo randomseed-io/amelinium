@@ -985,27 +985,27 @@
 
 (defn lazy-execute-one!
   ([connectable sql-params opts]
-   (let [m (jdbc/execute-one! connectable sql-params (into opts-lazy-simple-map opts))]
+   (let [m (jdbc/execute-one! connectable sql-params (conj opts-lazy-simple-map opts))]
      (if m (map/to-lazy m) m)))
   ([connectable sql-params]
    (lazy-execute-one! connectable sql-params nil)))
 
 (defn lazy-execute!
   ([connectable sql-params opts]
-   (if-some [coll (jdbc/execute! connectable sql-params (into opts-lazy-simple-map opts))]
+   (if-some [coll (jdbc/execute! connectable sql-params (conj opts-lazy-simple-map opts))]
      (mapv #(if % (map/to-lazy %) %) coll)))
   ([connectable sql-params]
    (lazy-execute! connectable sql-params nil)))
 
 (defn execute-one!
   ([connectable sql-params opts]
-   (jdbc/execute-one! connectable sql-params (into opts-simple-map opts)))
+   (jdbc/execute-one! connectable sql-params (conj opts-simple-map opts)))
   ([connectable sql-params]
    (execute-one! connectable sql-params nil)))
 
 (defn execute!
   ([connectable sql-params opts]
-   (jdbc/execute! connectable sql-params (into opts-simple-map opts)))
+   (jdbc/execute! connectable sql-params (conj opts-simple-map opts)))
   ([connectable sql-params]
    (execute! connectable sql-params nil)))
 
@@ -1020,7 +1020,7 @@
   ([connectable table pk opts]
    (lazy-get-by-id connectable table pk :id opts))
   ([connectable table pk pk-name opts]
-   (let [opts (into (into (or (:options connectable) {}) opts-lazy-simple-map) opts)]
+   (let [opts (conj (or (:options connectable) {}) opts-lazy-simple-map opts)]
      (lazy-do (next-sql/get-by-id connectable table pk pk-name opts)))))
 
 ;; Abstract getters and setters

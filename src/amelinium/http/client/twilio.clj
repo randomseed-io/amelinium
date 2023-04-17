@@ -254,7 +254,7 @@
         opts          (if (is-json? accept) (qassoc opts :as :json) opts)
         opts          (if auth-tok          (qassoc opts :oauth-token auth-tok) opts)
         opts          (if content-type      (qassoc opts :content-type content-type) opts)
-        opts          (into opts existing-opts)]
+        opts          (conj opts existing-opts)]
     (qassoc config :request-opts opts)))
 
 (defn prep-twilio
@@ -315,7 +315,7 @@
           (config  ^TwilioConfig [_] config)
           (get-template-id [_ tg lang fb-tpl] (get-template-id-core localized-templates tg lang fb-tpl))
           (request [_ opts params respond raise]
-            (let [opts       (into req-opts opts)
+            (let [opts       (conj (or req-opts {}) opts)
                   json?      (sending-json? opts)
                   params     (if json? params (stringify-params params))
                   fparams    (get opts :form-params)
