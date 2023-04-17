@@ -65,8 +65,8 @@
     (^Session [src _] src))
 
   (inject
-    ([smap dst ^Keyword session-key] (map/qassoc (or session-key (.session-key ^Session smap) :session) smap))
-    ([smap dst] (map/qassoc (or (.session-key ^Session smap) :session) smap)))
+    ([smap dst ^Keyword session-key] (map/qassoc dst (or session-key (.session-key ^Session smap) :session) smap))
+    ([smap dst] (map/qassoc dst (or (.session-key ^Session smap) :session) smap)))
 
   (empty?
     (^Boolean [smap]
