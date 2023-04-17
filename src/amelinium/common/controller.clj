@@ -266,6 +266,7 @@
                                     (qassoc :auth/ok? true :response/status :auth/ok
                                             :user/id user-id :user/account-type ac-type)
                                     (session/inject sess)
+                                    (common/replace-session-id-header sess)
                                     (common/roles-refresh))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

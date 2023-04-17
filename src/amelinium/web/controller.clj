@@ -147,7 +147,9 @@
   ([req session-key]
    (let [req           (qassoc req :app/data-required [] :app/data web/empty-lazy-map)
          route-data    (http/get-route-data req)
-         ^Session sess (session/not-empty-of req (or session-key (get route-data :session-key)))
+         ^Session sess (session/of req (or session-key (get route-data :session-key)))
+         req           (common/reflect-session-id-header req sess)
+         ^Session sess (session/not-empty-of sess)
          auth-state    (delay (common/login-auth-state req :login-page? :auth-page?))
          login-data?   (delay (login-data? req))
          auth-db       (delay (auth/db req))]
