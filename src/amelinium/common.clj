@@ -1578,6 +1578,23 @@
     (add-json-event-header req "HX-Trigger" "setSession" (session/id-field sess) sid false)
     req))
 
+(defn replace-session-hx-header
+  "Adds `HX-Trigger` server response header to `:response/headers` map of the given
+  `req` map by putting a JSON in the following form:
+
+  `{\"setSession\":{\"session-id\": \"SID\"}}`
+
+  where the `session-id` string is obtained from session's ID field (using
+  `amelinium.http.middleware.session/id-field`) and `SID` is replaced with session
+  ID (obtained with `amelinium.http.middleware.session/any-id`).
+
+  If the `HX-Trigger` header already exists, it will be modified and any value
+  associated with `setSession` key will be modified."
+  [req ^Session sess]
+  (if-some [sid (if sess (session/any-id sess))]
+    (add-json-event-header req "HX-Trigger" "setSession" (session/id-field sess) sid true)
+    req))
+
 ;; Context and roles
 
 (defn roles-refresh
