@@ -1522,6 +1522,62 @@
   [v]
   (session/get-variable-failed? v))
 
+(defmacro kv-json-str
+  [k v]
+  `(if-let [k# ~k]
+     (if-some [k# (some-str k#)]
+       (strb "{\"" k# "\":\"" ~v "\"}")) "\"\""))
+
+(defn- inject-json-event-header
+  ([headers cur ename hname k v]
+   (inject-json-event-header headers cur ename hname k v false))
+  ([headers cur ename hname k v replace?]
+   (if-some [js (and (string? cur)
+                     (not-empty cur)
+                     (j/read-value cur j/default-object-mapper))]
+     (if (map? js)
+       (if (or replace? (not (contains? js ename)))
+         (map/qassoc headers hname (j/write-value-as-string (map/qassoc js ename (if k {k v} ""))))
+         headers)
+       (map/qassoc headers hname (strb "{" cur ":\"\", \"" ename "\":" (kv-json-str k v) "}")))
+     (map/qassoc headers hname (strb "{\"" ename "\":" (kv-json-str k v) "}")))))
+
+(defn add-json-event-header
+  ([req header-name event-name]
+   (add-json-event-header req header-name event-name nil nil false))
+  ([req header-name event-name param-key param-value]
+   (add-json-event-header req header-name event-name param-key param-value false))
+  ([req header-name event-name param-key param-value replace?]
+   (let [header-name (some-str header-name)
+         event-name  (some-str event-name)
+         headers     (get req :response/headers)]
+     (map/qassoc
+      req :response/headers
+      (if (pos? (count headers))
+        (if-some [current (get headers header-name)]
+          (inject-json-event-header headers current event-name header-name
+                                    param-key param-value replace?)
+          (map/qassoc headers header-name (strb "{\"" event-name "\":" (kv-json-str param-key param-value) "}")))
+        {header-name (strb "{\"" event-name "\":" (kv-json-str param-key param-value) "}")})))))
+
+(defn add-session-hx-header
+  "Adds `HX-Trigger` server response header to `:response/headers` map of the given
+  `req` map by putting a JSON in the following form:
+
+  `{\"setSession\":{\"session-id\": \"SID\"}}`
+
+  where the `session-id` string is obtained from session's ID field (using
+  `amelinium.http.middleware.session/id-field`) and `SID` is replaced with session
+  ID (obtained with `amelinium.http.middleware.session/any-id`).
+
+  If the `HX-Trigger` header already exists but it does not contain `setSession`
+  trigger name, it will be modified. If it already contains it, it will be left as
+  is."
+  [req ^Session sess]
+  (if-some [sid (if sess (session/any-id sess))]
+    (add-json-event-header req "HX-Trigger" "setSession" (session/id-field sess) sid false)
+    req))
+
 ;; Context and roles
 
 (defn roles-refresh
