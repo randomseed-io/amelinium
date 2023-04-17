@@ -20,6 +20,7 @@
             [ring.util.http-response               :as            resp]
             [ring.util.request                     :as             req]
             [clj-uuid                              :as            uuid]
+            [jsonista.core                         :as               j]
             [amelinium                             :refer         :all]
             [amelinium.types.session               :refer         :all]
             [amelinium.types.auth                  :refer         :all]
@@ -1619,6 +1620,43 @@
         req)
       req)
     req))
+
+(defn add-session-id-header
+  ([req sess]
+   (add-session-id-header req sess false))
+  ([req sess replace?]
+   (if sess
+     (if-some [id-field (session/id-field sess)]
+       (if-some [sid (session/any-id sess)]
+         (let [headers (get req :response/headers)]
+           (if (pos? (count headers))
+             (if (or replace? (not (contains? headers id-field)))
+               (qassoc req :response/headers (qassoc headers id-field sid))
+               req)
+             (qassoc req :response/headers {id-field sid})))
+         req)
+       req)
+     req)))
+
+(defn replace-session-id-header
+  [req sess]
+  (add-session-id-header req sess true))
+
+(defn reflect-session-id-header
+  [req sess]
+  (if sess
+    (if-some [id-field (session/id-field sess)]
+      (if-some [sid (or (session/any-id sess) (get-session-id-header req id-field))]
+        (let [headers (get req :response/headers)]
+          (if (pos? (count headers))
+            (if (contains? headers id-field)
+              req
+              (qassoc req :response/headers (qassoc headers id-field sid)))
+            (qassoc req :response/headers {id-field sid})))
+        req)
+      req)
+    req))
+
 ;; Context and roles
 
 (defn roles-refresh
