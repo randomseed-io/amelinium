@@ -1100,8 +1100,8 @@
     (^Session [src _] (pid/value src :session)))
 
   (inject
-    ([user-identity dst ^Keyword session-key] (sid/inject (sid/session user-identity) dst session-key))
-    ([user-identity dst]                      (sid/inject (sid/session user-identity) dst)))
+    ([user-identity dst ^Keyword session-key] (sid/inject dst (sid/session user-identity) session-key))
+    ([user-identity dst]                      (sid/inject dst (sid/session user-identity))))
 
   (empty?
     (^Boolean [user-identity]                 (sid/empty? (sid/session user-identity)))
