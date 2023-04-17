@@ -1595,6 +1595,30 @@
     (add-json-event-header req "HX-Trigger" "setSession" (session/id-field sess) sid true)
     req))
 
+(defn- get-session-id-header
+  [req id-field]
+  (let [sid (get (get req :headers) id-field)]
+    (if (session/sid-valid? sid) sid)))
+
+(defn reflect-session-hx-header
+  "Tries to obtain session ID from the given `sess` object and if that fails from the
+  request header with name same as session ID field (obtained by calling
+  `amelinium.http.middleware.session/id-field`) on `sess`) from the `req` map. Then
+  it uses `add-json-event-handler` to set `HX-Trigger` response header in a similar
+  way the `add-session-hx-header` does."
+  [req sess]
+  (if sess
+    (if-some [id-field (session/id-field sess)]
+      (if-some [sid (or (session/any-id sess) (get-session-id-header req id-field))]
+        (add-json-event-header req
+                               "HX-Trigger"
+                               "setSession"
+                               id-field
+                               sid
+                               false)
+        req)
+      req)
+    req))
 ;; Context and roles
 
 (defn roles-refresh
