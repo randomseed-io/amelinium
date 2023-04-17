@@ -411,6 +411,16 @@
           "    <button type=\"submit\"" sdata ">" label "</button>\n"
           "  </div>\n")))
 
+(defn hx-form-submit
+  "Helper to generate HTMX for the `form-submit` tag."
+  [label tr-sub validators]
+  (let [label (param-try-tr tr-sub :forms (or label :submit))
+        label (if label (html-esc label) "OK!")]
+    (strs (anti-spam-code validators)
+          "  <div class=\"control\">\n"
+          "    <button type=\"submit\">" label "</button>\n"
+          "  </div>\n")))
+
 (defn get-form-action
   "Prepares default form action attribute by removing `form-errors` from a query string
   for current page if the `:action` in `args` is set to `nil`. If the `:action` is
@@ -512,7 +522,7 @@
              sfld (session/id-field smap)]
          (if (and sid sfld)
            (strs (anti-spam-code validators)
-                 "<input type=\"hidden\" name=\"" sfld "\" value=\"" sid "\" />")))))
+                 "<input type=\"hidden\" name=\"" sfld "\" value=\"" sid "\" hx-history=\"false\" />")))))
 
     (selmer/add-tag!
      :explain-form-error
@@ -573,19 +583,23 @@
      (fn [args ctx]
        (let [args   (parse-args args)
              props  (get ctx :form-props)
-             smap   (if-not props (session/of ctx))
-             sid    (or (get props :session-id) (session/id smap))
-             sfld   (or (get props :session-id-field) (session/id-field smap))
              tr-sub (or (get props :tr-sub) (i18n/no-default (translator-sub ctx translations-fn)))]
-         (form-submit (first args) tr-sub sfld sid validators))))
+         (if (or (get args :htmx?) (get props :htmx?) (get ctx :htmx?))
+           (hx-form-submit (first args) tr-sub validators)
+           (let [smap   (if-not props (session/of ctx))
+                 sid    (or (get props :session-id) (session/id smap))
+                 sfld   (or (get props :session-id-field) (session/id-field smap))
+                 tr-sub (or (get props :tr-sub) (i18n/no-default (translator-sub ctx translations-fn)))]
+             (form-submit (first args) tr-sub sfld sid validators))))))
 
     (selmer/add-tag!
      :form
      (fn [args ctx content]
        (let [args         (args->map (parse-args args))
-             smap         (session/of ctx)
-             sfld         (session/id-field smap)
-             sid          (session/id smap)
+             hx?          (boolean (or (get args :htmx?) (get ctx :htmx?)))
+             smap         (if hx? (session/of ctx))
+             sfld         (if hx? (session/id-field smap))
+             sid          (if hx? (session/id smap))
              lang         (get args :lang)
              method       (get args :method)
              label        (get args :label)
@@ -605,12 +619,17 @@
              action       (if action?
                             (lang-url router ctx action action-lang false
                                       path-params query-params lang-param))
-             form-props   (if id-str?
-                            {:tr-sub tr-sub-fn :session-id sid :session-id-field sfld :id id-str}
-                            {:tr-sub tr-sub-fn :session-id sid :session-id-field sfld})
-             html-method  (strb " method=\"" (if method (html-esc method) "post") "\"")
+             form-props   (if hx?
+                            (if id-str?
+                              {:htmx? hx? :tr-sub tr-sub-fn :id id-str}
+                              {:htmx? hx? :tr-sub tr-sub-fn})
+                            (if id-str?
+                              {:htmx? hx? :tr-sub tr-sub-fn :session-id sid :session-id-field sfld :id id-str}
+                              {:htmx? hx? :tr-sub tr-sub-fn :session-id sid :session-id-field sfld}))
+             method       (if method (html-esc method) "post")
+             html-method  (if hx? ""  (strb " method=\"" method "\""))
              html-lang    (if lang    (strb " lang=\"" (html-esc lang) "\""))
-             html-action  (if action  (strb " action=\"" action "\""))
+             html-action  (if action  (if hx? (strb " hx-" method "=" action) (strb " action=\"" action "\"")))
              html-id      (if id-str? (strb " id=\"" id-str "\""))
              html-label   (if label?  (html-esc label))
              html-label   (if label?  (strb "<label for=\"" id-str "\""
