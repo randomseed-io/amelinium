@@ -363,6 +363,8 @@ Amelinium is copyrighted software owned by Paweł Wilk (pw@gnu.org). You may
 redistribute and/or modify this software as long as you comply with the terms of
 the [GNU Lesser General Public License][LICENSE] (version 3).
 
+Amelinium is delivered with the HTMX JavaScript library licensed under [BSD-2-Clause license][HTMXLICENSE].
+
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
@@ -413,4 +415,5 @@ bin/repl
 
 Starts REPL and nREPL server (port number is stored in `.nrepl-port`).
 
-[LICENSE]:    https://github.com/randomseed-io/amelinium/blob/master/LICENSE
+[LICENSE]:     https://github.com/randomseed-io/amelinium/blob/master/LICENSE
+[HTMXLICENSE]: https://github.com/randomseed-io/amelinium/blob/master/HTMX-LICENSE
