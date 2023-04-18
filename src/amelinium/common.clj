@@ -1596,17 +1596,21 @@
     (add-json-event-header req "HX-Trigger" "setSession" (session/id-field sess) sid true)
     req))
 
-(defn- get-session-id-header
+(defn get-session-id-header
+  "For the given request map `req` it tries to get a request header identified by a
+  name `id-field`, and then checks if it is valid session identifier. Returns a
+  session identifier or `nil` if the obtained value is not valid session ID or the
+  header is not found."
   [req id-field]
   (let [sid (get (get req :headers) id-field)]
     (if (session/sid-valid? sid) sid)))
 
 (defn reflect-session-hx-header
-  "Tries to obtain session ID from the given `sess` object and if that fails from the
+  "Tries to obtain session ID from the given `sess` object, and if that fails from the
   request header with name same as session ID field (obtained by calling
-  `amelinium.http.middleware.session/id-field`) on `sess`) from the `req` map. Then
-  it uses `add-json-event-handler` to set `HX-Trigger` response header in a similar
-  way the `add-session-hx-header` does."
+  `amelinium.http.middleware.session/id-field` on `sess`) from the `req` map. Then it
+  uses `add-json-event-handler` to set `HX-Trigger` response header in a similar way
+  the `add-session-hx-header` does."
   [req sess]
   (if sess
     (if-some [id-field (session/id-field sess)]
@@ -1622,6 +1626,11 @@
     req))
 
 (defn add-session-id-header
+  "Adds session ID header to the `:response/headers` map of the given `req` map. Name
+  of the header is obtained from session ID field (by calling
+  `amelinium.http.middleware.session/id-field`) and its value is set to session
+  ID (obtained by calling `amelinium.http.middleware.session/any-id`). If the header
+  already exists it is not added."
   ([req sess]
    (add-session-id-header req sess false))
   ([req sess replace?]
@@ -1639,10 +1648,21 @@
      req)))
 
 (defn replace-session-id-header
+  "Adds session ID header to the `:response/headers` map of the given `req` map. Name
+  of the header is obtained from session ID field (by calling
+  `amelinium.http.middleware.session/id-field`) and its value is set to session
+  ID (obtained by calling `amelinium.http.middleware.session/any-id`). If the header
+  already exists it is replaced."
   [req sess]
   (add-session-id-header req sess true))
 
 (defn reflect-session-id-header
+  "Adds session ID header to the `:response/headers` map of the given `req` map. Name
+  of the header is obtained from session ID field (by calling
+  `amelinium.http.middleware.session/id-field`) and its value is set to session
+  ID (obtained by calling `amelinium.http.middleware.session/any-id`, and if that
+  fails by getting the value of client request header with the same name using
+  `get-session-id-header`). If the header already exists it is not added."
   [req sess]
   (if sess
     (if-some [id-field (session/id-field sess)]
