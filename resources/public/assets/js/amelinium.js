@@ -1,7 +1,5 @@
 var amelinium = {
-  config: {
-    session_id_key: 'session-id'
-  },
+  config: ameliniumConfig,
 
   init: function() {
     var session_id_key = amelinium.config.session_id_key;

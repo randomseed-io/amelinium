@@ -444,14 +444,16 @@
 
 (defn add-taggers
   "Registers taggers in a global repository. To be changed to a pure fn some day."
-  [router language translations-fn validators]
+  [router language translations-fn validators js-config]
 
-  (let [lang-settings (or (get language :config) language)
-        lang-param    (language/param nil lang-settings)
-        validators    (or (get validators :config) validators)]
+  (let [lang-settings    (or (get language :config) language)
+        lang-param       (language/param nil lang-settings)
+        validators       (or (get validators :config) validators)
+        js-config-script (get js-config :script)]
 
-    (selmer/add-tag! :tr     #(tr     %1 %2 translations-fn))
-    (selmer/add-tag! :tr-sub #(tr-sub %1 %2 translations-fn))
+    (selmer/add-tag! :js-config (constantly js-config-script))
+    (selmer/add-tag! :tr        #(tr     %1 %2 translations-fn))
+    (selmer/add-tag! :tr-sub    #(tr-sub %1 %2 translations-fn))
 
     (selmer/add-tag!
      :anti-spam-field
@@ -652,11 +654,11 @@
 
 (defn init
   "Initializes Selmer taggers."
-  [{:keys [enabled? router language translations validators]
+  [{:keys [enabled? router language translations validators js-config]
     :or   {enabled? true}}]
   (when enabled?
     (log/msg "Initializing Selmer taggers")
-    (add-taggers router language translations validators)))
+    (add-taggers router language translations validators js-config)))
 
 (system/add-init  ::default [_ config] (init config))
 (system/add-halt! ::default [_ config] nil)
