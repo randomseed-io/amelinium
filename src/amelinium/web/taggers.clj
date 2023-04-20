@@ -381,16 +381,15 @@
                                               :parameter-type :value :autocomplete
                                               :input-type :type])]
         (if hidden?
-          (strs html-label
-                "  <input type=\"" html-itype "\" name=\"" html-name "\" id=\"" html-id "\""
+          (strs "  <input type=\"" html-itype "\" name=\"" html-name "\" id=\"" html-id "\""
                 html-phold html-value html-autoc html-attrs " />\n"
-                html-error)
-          (strs "<div class=\"field param-" html-id html-ptcls "\">\n"
                 html-label
-                "    <input type=\"" html-itype "\" name=\"" html-name "\" id=\"" html-id "\""
+                html-error)
+          (strs "    <input type=\"" html-itype "\" name=\"" html-name "\" id=\"" html-id "\""
                 html-phold html-value html-autoc html-attrs " />\n"
+                html-label
                 html-error
-                "  </div>\n"))))))
+                "\n"))))))
 
 (defn form-fields
   "Helper to generate HTML for the `form-fields` tag."
@@ -407,19 +406,17 @@
         label (if label (html-esc label) "OK!")
         sdata (if (and session-field session-id) (strb " name=\"" session-field "\" value=\"" session-id "\""))]
     (strs (anti-spam-code validators)
-          "  <div class=\"control\">\n"
-          "    <button type=\"submit\"" sdata ">" label "</button>\n"
-          "  </div>\n")))
+          "  <button type=\"submit\"" sdata ">" label "</button>\n")))
 
 (defn hx-form-submit
   "Helper to generate HTMX for the `form-submit` tag."
-  [label tr-sub validators]
-  (let [label (param-try-tr tr-sub :forms (or label :submit))
-        label (if label (html-esc label) "OK!")]
+  [label args tr-sub validators]
+  (let [args  (args->map args)
+        label (param-try-tr tr-sub :forms (or label :submit))
+        label (if label (html-esc label) "OK!")
+        attrs (html-add-attrs args [:htmx?])]
     (strs (anti-spam-code validators)
-          "  <div class=\"control\">\n"
-          "    <button type=\"submit\">" label "</button>\n"
-          "  </div>\n")))
+          "  <button type=\"submit\"" attrs ">" label "</button>\n")))
 
 (defn get-form-action
   "Prepares default form action attribute by removing `form-errors` from a query string
@@ -587,7 +584,7 @@
              props  (get ctx :form-props)
              tr-sub (or (get props :tr-sub) (i18n/no-default (translator-sub ctx translations-fn)))]
          (if (or (get args :htmx?) (get props :htmx?) (get ctx :htmx?))
-           (hx-form-submit (first args) tr-sub validators)
+           (hx-form-submit (first args) (rest args) tr-sub validators)
            (let [smap   (if-not props (session/of ctx))
                  sid    (or (get props :session-id) (session/id smap))
                  sfld   (or (get props :session-id-field) (session/id-field smap))
@@ -642,10 +639,9 @@
                                                 :action :lang :action-lang
                                                 :query-params :path-params])]
          (strs
-          html-label
           "<form" html-id " class=\"familiar medium\"" html-lang html-method html-action html-attrs ">"
           (selmer/render (get (get content :form) :content) (map/qassoc ctx :form-props form-props) {:tag-second \-})
-          "</form>")))
+          "</form>\n" html-label)))
      :end-form)
 
     nil))
