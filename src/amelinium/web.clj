@@ -336,6 +336,24 @@
 (def ^:const sl-default-html "/default.html")
 
 (defn resolve-generic
+  "Generic view resolver. Takes `uri`, prefix (`pre`), base directory (`dir`),
+  language (`lang`) and core name (`core`), and tries different combinations of path
+  segments based on these parameters until it finds an existing view file within
+  java resource directories. Returns a pathname as a string.
+
+  Paths tried:
+
+  - `pre`/`lang`/`dir`/`core`.html
+  - `pre`/`lang`/`dir`/`core`/default.html
+  - `pre`/`dir`/`core`.html
+  - `pre`/`lang`/`dir`/default.html
+  - `pre`/`lang`/`dir`.html
+  - `pre`/`dir`/default.html
+  - `pre`/`dir`.html
+  - `pre`/`lang`/default.html
+  - `pre`/default.html
+
+  Results are cached."
   [uri pre dir lang core]
   (let [pre     (or (some-str pre) "views")
         prep-sl (if pre  (str pre  "/"))
@@ -360,22 +378,47 @@
   (db/memoize+ resolve-generic 2048 256))
 
 (defn resolve-layout
+  "Returns a layout file for the given language `lang` and `layout` (a 2-element
+  sequence of base directory and a layout name, or just a name as a single
+  value). Uses `resolve-generic`.
+
+  If no layout name is given it uses `get-layout` to obtain it from a route
+  data (`:app/layout` key) or to fall back to default.
+
+  If layout is set to `false`, explicitly disables using layout by returning
+  `false` (may be helpful with partials rendered using AJAX calls)."
   [req lang layout]
   (let [[ldir layout] (if (coll? layout) layout [nil layout])]
-    (resolve-cached (get req :uri)
-                    layouts-str
-                    (get-layout-dir req ldir)
-                    lang
-                    (or layout (get-layout req)))))
+    (if (false? layout)
+      false
+      (let [layout (or layout (get-layout req))]
+        (if (false? layout)
+          false
+          (resolve-cached (get req :uri)
+                          layouts-str
+                          (get-layout-dir req ldir)
+                          lang layout))))))
 
 (defn resolve-view
+  "Returns a view file for the given language `lang` and `view` (a 2-element sequence
+  of base directory and a view name, or just a name as a single value). Uses
+  `resolve-generic`.
+
+  If no view name is given it uses `get-view` to obtain it from a route
+  data (`:app/view` key) or to fall back to default.
+
+  If view is set to `false`, explicitly disables using it by returning `false`."
   [req lang view]
   (let [[vdir view] (if (coll? view) view [nil view])]
-    (resolve-cached (get req :uri)
-                    views-str
-                    (get-view-dir req vdir)
-                    lang
-                    (or view (get-view req)))))
+    (if (false? view)
+      false
+      (let [view (or view (get-view req))]
+        (if (false? view)
+          false
+          (resolve-cached (get req :uri)
+                          views-str
+                          (get-view-dir req vdir)
+                          lang view))))))
 
 ;; Response rendering
 
@@ -483,7 +526,8 @@
          [layt view] (error-lv req status layout view)
          layt        (resolve-layout req lang layt)
          view        (resolve-view   req lang view)]
-     (if (and layt view)
+     (if (and (nil? layt) (nil? view))
+       (do (log/err "No layout nor view found for" (:uri req)) nil)
        (let [dlng (or lang (get req :language/str))
              data (prep-app-data req data)
              data (map/assoc-missing data
@@ -493,9 +537,9 @@
                                      :path               (delay (common/page req))
                                      :lang               dlng)
              data (update-status data req status dlng)
-             html (selmer/render-file view data)
+             html (if view (selmer/render-file view data) "")
              rndr (qassoc data :body [:safe html])
-             resp (selmer/render-file layt rndr)]
+             resp (if layt (selmer/render-file layt rndr) html)]
          resp)))))
 
 (defn response?
