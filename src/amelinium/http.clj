@@ -19,7 +19,7 @@
 
 (p/import-vars [io.randomseed.utils.reitit.http
                 router? router match match?
-                route-data-param route-name
+                route-data route-data-param route-name
                 route-middleware route-handler route-conflicting?
                 path req-or-route-param])
 
