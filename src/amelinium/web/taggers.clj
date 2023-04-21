@@ -69,6 +69,24 @@
         v)
       "")))
 
+(defn last-char
+  [^String s]
+  (if s
+    (let [l (unchecked-int (.length s))]
+      (if (pos? l)
+        (.charAt s (unchecked-dec-int l))))))
+
+(defn- pboolean
+  [v]
+  (or (true? v)
+      (if-some [v (some-str v)]
+        (not
+         (contains? #{"" " " "\n" "\r" "nil" "false" "no"
+                      "none" "NO" "NONE" "0" "-" ":"
+                      "off" "OFF" "disable"}
+                    (str/trim v)))
+        false)))
+
 (defn parse-assigments
   [fk fv coll]
   (map #(%1 %2) (cycle [fk fv]) coll))
