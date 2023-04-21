@@ -1009,6 +1009,22 @@
          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
      (apply errors/render err-config app-status (or default render-ok) req data view layout lang more))))
 
+;; Partial rendering with HTMX
+
+(defn inject
+  "Injects HTML fragment by issuing HTMX response with `HX-Retarget` header set to
+  `target` (if truthy), `:app/layout` key of the `req` set to `false` and `:app/view`
+  key of the `req` set to `view`. Returns updated request map `req`."
+  ([req view]
+   (inject req view nil))
+  ([req view target]
+   (let [req (qassoc req :app/layout false :app/view view)]
+     (if target
+       (if-some [t (some-str target)]
+         (add-header req :HX-Retarget t)
+         req)
+       req))))
+
 ;; Form errors
 
 (defn handle-bad-request-form-params
