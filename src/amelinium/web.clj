@@ -298,17 +298,22 @@
   "Gets a view partial path for the current route using `:app/view` route data or
   `:name`. If it cannot be extracted, returns default."
   [req]
-  (some-str
-   (or (http/req-or-route-param req :app/view)
-       (http/req-or-route-param req :name)
-       "default")))
+  (let [view (http/req-or-route-param req :app/view)]
+    (if (false? view)
+      false
+      (or (some-str view)
+          (some-str (http/req-or-route-param req :name))
+          "default"))))
 
 (defn get-layout
   "Gets layout partial path for the current route using :app/layout route data. If it
   cannot be extracted, returns default."
   [req]
-  (or (some-str (http/req-or-route-param req :app/layout))
-      "default"))
+  (let [layout (http/req-or-route-param req :app/layout)]
+    (if (false? layout)
+      false
+      (or (some-str layout)
+          "default"))))
 
 (defn get-view-dir
   "Gets view optional subdirectory for the current route using :app/layout-dir route
