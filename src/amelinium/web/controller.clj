@@ -359,13 +359,12 @@
 
        :reitit.coercion/request-coercion
        (let [translate-sub (i18n/no-default (common/translator-sub req))]
-         (web/handle-bad-request-form-params
+         (web/hx-handle-bad-request-form-params
           req
           (coercion/map-errors-simple data)
           (delay (->> (keys (get data :transformed)) (select-keys (get data :value)) (map/map-keys some-str)))
           (delay (coercion/explain-errors-simple data translate-sub))
-          (delay (translate-sub :parameters/error))
-          session-key))
+          (delay (translate-sub :parameters/error))))
 
        :reitit.coercion/response-coercion
        (let [error-list (coercion/list-errors-simple data)]
