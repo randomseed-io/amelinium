@@ -1126,52 +1126,64 @@
                                       :params (force values)}))
             render-bad-params)))))
 
+(defn hx-handle-bad-request-form-params
+  "Called by other functions to render form with feedback about submitted parameter
+  errors (induced manually or caused by coercion exception). On fronted, uses HTMX
+  and JavaScript Fetch API calls to load HTML.
+
+  Takes a request map `req`, a map of erroneous parameter identifiers to parameter
+  types `errors`, a map of current parameter values `values`, a map of error
+  explanations (`explanations`), and a page title (`title`).
+
+  The following arguments can be Delay objects and `clojure.core/force` will be
+  applied to them before use: `errors`, `values`, `explanations`, `title`.
+
+  Parameter type in `errors` map can be `nil`, meaning it is of unknown type.
+
+  The layout and view are obtained from the `:form-errors/page` configuration option
+  associated with HTTP route data, unless `:form-errors/layout` and/or
+  `:form-errors/view` options are set. Layout can be set to `false` to allow
+  injection of HTML fragments.
+
+  If form errors page is not specified one is obtained from the `Referer` request
+  header.
+
+  Sets `HX-Retarget` response header to a value set in route data option
+  `:form-errors/target`."
+  ([req errors]
+   (hx-handle-bad-request-form-params req errors nil nil nil))
+  ([req errors values]
+   (hx-handle-bad-request-form-params req errors values nil nil))
+  ([req errors values explanations]
+   (hx-handle-bad-request-form-params req errors values explanations nil))
+  ([req errors values explanations title]
    (if-not (valuable? errors)
-     req
-     (let [route-data             (http/get-route-data req)
-           forced-orig-page       (get route-data :form-errors/page)
-           orig-page              (or forced-orig-page (:page (get req :goto)))
-           referer                (if (nil? orig-page) (some-str (get (get req :headers) "referer")))
-           [orig-uri orig-params] (if referer (common/url->uri+params req referer))
-           handling-previous?     (contains? (get req :query-params) "form-errors")]
-
-       (if (and (or (valuable? orig-page) (valuable? orig-uri) referer)
-                (not handling-previous?))
-
-         ;; redirect to a form-submission page allowing user to correct errors
-         ;; transfer form errors using query params or form params (if a session is present)
-
-         (let [orig-uri     (if orig-uri (some-str orig-uri))
-               orig-params  (if orig-uri orig-params)
-               dest         (or orig-page orig-uri)
-               dest-uri     (if (keyword? dest) (common/page req dest) dest)
-               dest-uri     (some-str dest-uri)
-               skey         (or session-key (get route-data :session-key))
-               smap         (session/not-empty-of req skey)
-               stored?      (if (and smap (session/valid? smap))
-                              (session/put-var!
-                               smap :form-errors
-                               {:dest   dest-uri
-                                :errors (force errors)
-                                :params (force values)}))
-               joint-params (qassoc orig-params "form-errors" (if stored? "" (coercion/join-errors (force errors))))]
-           (if dest-uri
-             (common/temporary-redirect req dest-uri nil joint-params)
-             (resp/temporary-redirect (str referer
-                                           (if (str/includes? referer "?") "&" "?")
-                                           (common/query-string-encode req joint-params)))))
-
-         ;; render a separate page describing invalid parameters
-         ;; instead of current page
-
-         (-> (assoc-app-data
-              req
-              :title           title
-              :coercion/errors explanations
-              :form/errors     (delay {:dest   (:uri req)
-                                       :errors (force errors)
-                                       :params (force values)}))
-             render-bad-params))))))
+     req ;; generic error page?
+     (let [route-data         (http/get-route-data req)
+           hx-target          (some-str (get route-data :form-errors/target))
+           orig-page          (get route-data :form-errors/page)
+           orig-page          (or orig-page (:page (get req :goto)))
+           title              (or title (get route-data :form-errors/title))
+           referer            (if (nil? orig-page) (some-str (get (get req :headers) "referer")))
+           orig-uri           (if referer (some-str (:uri (parse-url referer))))
+           src-page           (or orig-page (http/route-name req orig-uri))
+           src-route-data     (if src-page (http/route-data req src-page))
+           new-view           (get route-data :form-errors/view)
+           new-view           (if (nil? new-view) (get src-route-data :app/view) new-view)
+           new-view           (if (nil? new-view) (get src-route-data :name) new-view)
+           new-layout         (get route-data :form-errors/layout)
+           new-layout         (if (nil? new-layout) (get src-route-data :app/layout) new-layout)
+           handling-previous? (contains? (get req :query-params) "form-errors")
+           req                (if hx-target  (add-header req :HX-Retarget hx-target) req)
+           req                (if title      (assoc-app-data req :title title)       req)
+           req                (if (nil? new-view)   req (qassoc req :app/view new-view))
+           req                (if (nil? new-layout) req (qassoc req :app/layout new-layout))]
+       (render-ok
+        (assoc-app-data req
+                        :coercion/errors explanations
+                        :form/errors     (delay {:dest   (:uri req)
+                                                 :errors (force errors)
+                                                 :params (force values)})))))))
 
 (defn- param-errors-to-current-vals
   [req errors]
