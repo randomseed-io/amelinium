@@ -503,7 +503,7 @@
          (lang-url router ctx path-or-name lang true path-params query-params lang-param))))
 
     (selmer/add-tag!
-     :link
+     :slink
      (fn [args ctx content]
        (let [smap           (session/of ctx)
              sid            (session/id smap)
@@ -525,10 +525,10 @@
                  (anti-spam-code validators)
                  "<button type=\"submit\" class=\"link\"" sdata ">" lcontent "</button></form>")
            (strs "<a href=\"" out-path "\" class=\"link\">" lcontent "</a>"))))
-     :end-link)
+     :end-slink)
 
     (selmer/add-tag!
-     :slink
+     :slink-simple
      (fn [args ctx content]
        (let [url      (first args)
              ;;url      (selmer/render (first args) ctx {:tag-open \[ :tag-close \]})
@@ -542,7 +542,35 @@
                  (anti-spam-code validators)
                  "<button type=\"submit\" class=\"link\"" sdata ">" lcontent "</button></form>")
            (strs "<a href=\"" url  "\" class=\"link\">" lcontent "</a>"))))
-     :end-slink)
+     :end-slink-simple)
+
+    (selmer/add-tag!
+     :link
+     (fn [args ctx content]
+       (let [lcontent     (get (get content :link) :content)
+             args         (parse-args args)
+             path-or-name (first args)
+             args         (args->map (rest args))
+             {:keys
+              [lang
+               path-params
+               query-params
+               session?]} args
+             smap         (if session? (session/of ctx))
+             sid          (if session? (session/id smap))
+             sfld         (if session? (session/id-field smap))
+             sdata        (if (and sid sfld) (strb " name=\"" sfld "\" value=\"" sid "\""))
+             lang         (or (common/string-from-param lang) (get-lang ctx))
+             path-params  (if path-params  (assignments->kw-map path-params  ctx))
+             query-params (if query-params (assignments->map    query-params ctx))
+             attrs        (html-add-attrs args [:lang :session? :query-params :path-params])
+             out-path     (lang-url router ctx path-or-name lang false path-params query-params lang-param)]
+         (if sdata
+           (strs "<form name=\"sessionLink\" class=\"formlink\" action=\"" out-path "\" method=\"post\">"
+                 (anti-spam-code validators)
+                 "<button type=\"submit\" class=\"link\"" sdata attrs ">" lcontent "</button></form>")
+           (strs "<a href=\"" out-path "\"" attrs ">" lcontent "</a>"))))
+     :end-link)
 
     (selmer/add-tag!
      :session-data
