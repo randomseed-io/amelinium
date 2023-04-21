@@ -428,22 +428,24 @@
    (for [field (->> args (partition-by #{"|"}) (take-nth 2))]
      (form-field field tr-sub errors params))))
 
+(defn form-submit-session
+  "Helper to generate HTML for the `form-submit` tag."
+  [label args tr-sub session-field session-id validators]
+  (let [args  (args->map args)
+        label (param-try-tr tr-sub :forms (or label :submit))
+        label (if label (html-esc label) "OK!")
+        sdata (if (and session-field session-id) (strb " name=\"" session-field "\" value=\"" session-id "\""))
+        attrs (html-add-attrs args [:session?])]
+    (strs (anti-spam-code validators)
+          "  <button type=\"submit\"" sdata attrs ">" label "</button>\n")))
+
 (defn form-submit
   "Helper to generate HTML for the `form-submit` tag."
-  [label tr-sub session-field session-id validators]
-  (let [label (param-try-tr tr-sub :forms (or label :submit))
-        label (if label (html-esc label) "OK!")
-        sdata (if (and session-field session-id) (strb " name=\"" session-field "\" value=\"" session-id "\""))]
-    (strs (anti-spam-code validators)
-          "  <button type=\"submit\"" sdata ">" label "</button>\n")))
-
-(defn hx-form-submit
-  "Helper to generate HTMX for the `form-submit` tag."
   [label args tr-sub validators]
   (let [args  (args->map args)
         label (param-try-tr tr-sub :forms (or label :submit))
         label (if label (html-esc label) "OK!")
-        attrs (html-add-attrs args [:htmx?])]
+        attrs (html-add-attrs args [:session?])]
     (strs (anti-spam-code validators)
           "  <button type=\"submit\"" attrs ">" label "</button>\n")))
 
