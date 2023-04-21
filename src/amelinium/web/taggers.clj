@@ -362,6 +362,7 @@
     (if-some [id-str (common/string-from-param id)]
       (let [{:keys
              [name
+              class
               label
               parameter-type
               value
@@ -377,6 +378,7 @@
             ptype      (common/string-from-param parameter-type)
             itype      (common/string-from-param input-type)
             itype      (or itype (common/string-from-param type))
+            class      (if class (common/string-from-param class))
             label      (param-try-tr tr-sub :forms label id)
             phold      (param-try-tr tr-sub :forms placeholder id)
             value      (valuable (if value? (get params id-str) value))
@@ -386,8 +388,10 @@
             err-summ   (if err-msgs (some-str (get err-msgs :error/summary)))
             err-desc   (if err-msgs (some-str (get err-msgs :error/description)))
             error?     (boolean (or err-summ err-desc))
+            err-id     (if error? (strb id-str "-validation-fb"))
             hidden?    (and itype (= "hidden" itype))
             html-id    (html-esc id-str)
+            html-class (if class    (strb (html-esc class) " form-control") "form-control")
             html-label (if label    (html-esc label))
             html-name  (if name     (html-esc name)  html-id)
             html-itype (if itype    (html-esc itype) "text")
@@ -397,21 +401,24 @@
             html-autoc (if autoc    (strb " autocomplete=\"" (html-esc autoc) "\""))
             html-esumm (if err-summ (strb "      <p class=\"error-summary\">"     (html-esc err-summ) "</p>\n"))
             html-edesc (if err-desc (strb "      <p class=\"error-description\">" (html-esc err-desc) "</p>\n"))
-            html-error (if error?   (strb "    <div class=\"form-error\">\n" html-esumm html-edesc "</div>\n"))
-            html-label (if label    (strb "    <label for=\"" id-str "\" class=\"label\">" html-label "</label>\n"))
-            html-attrs (html-add-attrs field [:htmx? :id :name :label :placeholder
+            html-error (if error?   (strb "    <div id=\"" err-id "\" class=\"form-error invalid-feedback\">\n" html-esumm html-edesc "</div>\n"))
+            html-class (if error?   (strb html-class " is-invalid") html-class)
+            html-ariad (if error?   (strb " aria-describedby=\"" err-id "\""))
+            html-label (if label    (strb "        <label for=\"" id-str "\" class=\"form-label\">" html-label "</label>\n"))
+            html-attrs (html-add-attrs field [:htmx? :session? :id :name :label :placeholder
                                               :parameter-type :value :autocomplete
-                                              :input-type :type])]
+                                              :input-type :type :class])]
         (if hidden?
-          (strs "  <input type=\"" html-itype "\" name=\"" html-name "\" id=\"" html-id "\""
-                html-phold html-value html-autoc html-attrs " />\n"
+          (strs "  <input type=\"" html-itype "\" class=\"" html-class
+                "\" name=\"" html-name "\" id=\"" html-id "\""
+                html-phold html-value html-autoc html-attrs html-ariad " />\n"
                 html-label
                 html-error)
-          (strs "    <input type=\"" html-itype "\" name=\"" html-name "\" id=\"" html-id "\""
-                html-phold html-value html-autoc html-attrs " />\n"
+          (strs "<input type=\"" html-itype "\" class=\"" html-class
+                "\" name=\"" html-name "\" id=\"" html-id "\""
+                html-phold html-value html-autoc html-attrs html-ariad " />\n"
                 html-label
-                html-error
-                "\n"))))))
+                html-error))))))
 
 (defn form-fields
   "Helper to generate HTML for the `form-fields` tag."
@@ -617,13 +624,18 @@
      :form
      (fn [args ctx content]
        (let [args         (args->map (parse-args args))
-             hx?          (boolean (or (get args :htmx?) (get ctx :htmx?)))
-             smap         (if hx? (session/of ctx))
-             sfld         (if hx? (session/id-field smap))
-             sid          (if hx? (session/id smap))
+             hx?          (boolean (get args :htmx? (get ctx :htmx?)))
+             sess?        (boolean (get args :session? (get ctx :session?)))
+             smap         (if sess? (session/of ctx))
+             sfld         (if sess? (session/id-field smap))
+             sid          (if sess? (session/id smap))
              lang         (get args :lang)
              method       (get args :method)
              label        (get args :label)
+             class        (get args :class)
+             class        (if class (common/string-from-param class))
+             errors?      (some? (not-empty (get ctx :form/errors)))
+             class        (if errors? (if class (strb class " has-errors") "has-errors") class)
              action       (get-form-action args ctx)
              id-str       (common/string-from-param (get args :id))
              tr-sub-fn    (delay (i18n/no-default (translator-sub ctx translations-fn)))
@@ -634,21 +646,21 @@
              action?      (some? action)
              action-lang  (if action? (or (common/string-from-param (get args :action-lang)) lang))
              path-params  (if action? (assignments->kw-map (get args :path-params) ctx))
-             query-params (if action? (assignments->map (get args :query-params) ctx))
+             query-params (if action? (assignments->map    (get args :query-params) ctx))
              id-str       (or id-str (if label? (ad-hoc-id action method label path-params query-params)))
              id-str?      (some? id-str)
              action       (if action?
                             (lang-url router ctx action action-lang false
                                       path-params query-params lang-param))
-             form-props   (if hx?
+             form-props   (if sess?
                             (if id-str?
-                              {:htmx? hx? :tr-sub tr-sub-fn :id id-str}
-                              {:htmx? hx? :tr-sub tr-sub-fn})
+                              {:session? sess? :tr-sub tr-sub-fn :session-id sid :session-id-field sfld :id id-str}
+                              {:session? sess? :tr-sub tr-sub-fn :session-id sid :session-id-field sfld})
                             (if id-str?
-                              {:htmx? hx? :tr-sub tr-sub-fn :session-id sid :session-id-field sfld :id id-str}
-                              {:htmx? hx? :tr-sub tr-sub-fn :session-id sid :session-id-field sfld}))
+                              {:session? sess? :tr-sub tr-sub-fn :id id-str}
+                              {:session? sess? :tr-sub tr-sub-fn}))
              method       (if method (html-esc method) "post")
-             html-method  (if hx? ""  (strb " method=\"" method "\""))
+             html-method  (if hx?  "" (strb " method=\"" method "\""))
              html-lang    (if lang    (strb " lang=\"" (html-esc lang) "\""))
              html-action  (if action  (if hx? (strb " hx-" method "=" action) (strb " action=\"" action "\"")))
              html-id      (if id-str? (strb " id=\"" id-str "\""))
@@ -657,11 +669,12 @@
                                             html-lang
                                             " class=\"label\">"
                                             html-label "</label>\n"))
-             html-attrs   (html-add-attrs args [:htmx? :id :method :label
-                                                :action :lang :action-lang
+             html-class   (if class   (strb " class=\"" (html-esc class) "\""))
+             html-attrs   (html-add-attrs args [:htmx? :id :method :label :session?
+                                                :action :lang :action-lang :class
                                                 :query-params :path-params])]
          (strs
-          "<form" html-id " class=\"familiar medium\"" html-lang html-method html-action html-attrs ">"
+          "<form" html-id html-class html-lang html-method html-action html-attrs ">"
           (selmer/render (get (get content :form) :content) (map/qassoc ctx :form-props form-props) {:tag-second \-})
           "</form>\n" html-label)))
      :end-form)
