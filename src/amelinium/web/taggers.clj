@@ -133,7 +133,11 @@
   value."
   [args]
   (if (seq args)
-    (apply array-map (map #(%1 %2) (cycle [common/keyword-from-param identity]) args))))
+    (->> (partition 2 2 [nil] args)
+         (map (fn [[k v]]
+                [(common/keyword-from-param k)
+                 (if (= \? (last-char (some-str k))) (pboolean v) v)]))
+         (into {}))))
 
 (defn anti-spam-code
   "Generates anti-spam HTML string containing randomly selected fields and values using
