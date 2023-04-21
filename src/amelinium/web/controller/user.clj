@@ -160,6 +160,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
 
+(defn- auth-error
+  [req route-data status default-view]
+  (web/inject req
+              (get route-data status default-view)
+              (or (get route-data :auth-error/target)
+                  (get-in route-data [:auth-error/targets status]))))
+
 (defn auth-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
   conditions and may emit a redirect or render a response."
