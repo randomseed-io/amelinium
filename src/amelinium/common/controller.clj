@@ -116,7 +116,10 @@
   a database."
   ^Boolean [req ^Session sess route-data]
   (or (and (session/hard-expired? sess)
-           (not (common/on-page? req (get route-data :auth/session-expired :login/session-expired))))
+           (not (common/on-page?
+                 req
+                 (or (get route-data :auth-error/session-expired)
+                     (get route-data :auth/session-expired :login/session-expired)))))
       false))
 
 (defn get-goto-uri
