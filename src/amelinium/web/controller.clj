@@ -178,7 +178,7 @@
                        :op      :access-denied
                        :level   :warning
                        :msg     (str "Permanent lock " for-mail))
-         (web/go-to req (or (get route-data :auth/account-locked) :login/account-locked)))
+         (web/go-to req (or (get route-data :auth-error/account-locked) :login/account-locked)))
 
        ;; Session expired and the time for prolongation has passed.
 
@@ -194,7 +194,7 @@
                        :op      :session
                        :ok?     false
                        :msg     (str "Hard-expired " for-mail))
-         (web/go-to req (or (get route-data :auth/session-expired) :login/session-expired)))
+         (web/go-to req (or (get route-data :auth-error/session-expired) :login/session-expired)))
 
        ;; Session expired and we are not reaching an authentication page nor a login page.
        ;; User can re-validate session using a login page.
@@ -258,7 +258,7 @@
            (if (false? goto-uri)
              ;; Take care of broken go-to.
              (do (session/del-var! sess :goto)
-                 (web/move-to req (or (get route-data :auth/session-error) :login/session-error)))
+                 (web/move-to req (or (get route-data :auth-error/session-error) :login/session-error)))
              ;; Remove utilized go-to.
              (if valid-session?
                (do (session/del-var! sess :goto)

@@ -187,11 +187,11 @@
        req
        (case (get req :response/status)
          :auth/ok            (if auth-only? req (language/force req (or lang (web/pick-language-str req))))
-         :auth/locked        (common/move-to req (get route-data :auth/locked        :login/account-locked))
-         :auth/soft-locked   (common/move-to req (get route-data :auth/soft-locked   :login/account-soft-locked))
-         :auth/bad-password  (common/move-to req (get route-data :auth/bad-password  :login/bad-password))
-         :auth/session-error (common/go-to   req (get route-data :auth/session-error :login/session-error))
-         (common/go-to req (get route-data :auth/error :login/error)))))))
+         :auth/locked        (auth-error req route-data :auth-error/locked        :login/account-locked)
+         :auth/soft-locked   (auth-error req route-data :auth-error/soft-locked   :login/account-soft-locked)
+         :auth/bad-password  (auth-error req route-data :auth-error/bad-password  :login/bad-password)
+         :auth/session-error (auth-error req route-data :auth-error/session-error :login/session-error)
+         (auth-error req route-data :auth/error :login/error))))))
 
 (defn authenticate!
   "Logs user in when user e-mail and password are given, or checks if the session is
@@ -261,10 +261,10 @@
              (web/assoc-app-data :lock-remains rem-mins)))
 
        (and sess (session/hard-expired? sess))
-       (web/move-to req (or (get route-data :auth/session-expired) :login/session-expired))
+       (web/move-to req (or (get route-data :auth-error/session-expired) :login/session-expired))
 
        :bad-prolongation
-       (web/move-to req (or (get route-data :auth/session-error) :login/session-error))))))
+       (web/move-to req (or (get route-data :auth-error/session-error) :login/session-error))))))
 
 (defn create!
   "Verifies confirmation token against a database and if it matches creates the
@@ -363,8 +363,8 @@
    (case (get req :response/status)
      :pwd/created      req
      :pwd/updated      req
-     :pwd/bad-password (common/move-to req (get route-data :auth/bad-password :login/bad-password))
-     :pwd/bad-user     (common/move-to req (get route-data :auth/bad-password :login/bad-password))
+     :pwd/bad-password (common/move-to req (get route-data :auth-error/bad-password :login/bad-password))
+     :pwd/bad-user     (common/move-to req (get route-data :auth-error/bad-password :login/bad-password))
      (common/go-to req (get route-data :auth/error :login/error)))))
 
 (defn password-change!
