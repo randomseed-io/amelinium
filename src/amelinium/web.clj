@@ -1028,9 +1028,9 @@
 ;; Form errors
 
 (defn handle-bad-request-form-params
-  "Called by other functions to generate a redirect or display a page with a form to be
-  corrected because of a parameter error (induced manually or caused by coercion
-  exception).
+  "Called by other functions to generate a redirect or to display a page with
+  a form to be corrected because of a parameter error (induced manually or
+  caused by coercion exception).
 
   Takes a request map `req`, a map of erroneous parameter identifiers to parameter
   types `errors`, a map of current parameter values `values`, a map of error
@@ -1087,6 +1087,7 @@
           referer                (if (nil? orig-page) (some-str (get (get req :headers) "referer")))
           [orig-uri orig-params] (if referer (common/url->uri+params req referer))
           handling-previous?     (contains? (get req :query-params) "form-errors")]
+
       (if (and (or (valuable? orig-page) (valuable? orig-uri) referer)
                (not handling-previous?))
 
@@ -1124,6 +1125,53 @@
                                       :errors (force errors)
                                       :params (force values)}))
             render-bad-params)))))
+
+   (if-not (valuable? errors)
+     req
+     (let [route-data             (http/get-route-data req)
+           forced-orig-page       (get route-data :form-errors/page)
+           orig-page              (or forced-orig-page (:page (get req :goto)))
+           referer                (if (nil? orig-page) (some-str (get (get req :headers) "referer")))
+           [orig-uri orig-params] (if referer (common/url->uri+params req referer))
+           handling-previous?     (contains? (get req :query-params) "form-errors")]
+
+       (if (and (or (valuable? orig-page) (valuable? orig-uri) referer)
+                (not handling-previous?))
+
+         ;; redirect to a form-submission page allowing user to correct errors
+         ;; transfer form errors using query params or form params (if a session is present)
+
+         (let [orig-uri     (if orig-uri (some-str orig-uri))
+               orig-params  (if orig-uri orig-params)
+               dest         (or orig-page orig-uri)
+               dest-uri     (if (keyword? dest) (common/page req dest) dest)
+               dest-uri     (some-str dest-uri)
+               skey         (or session-key (get route-data :session-key))
+               smap         (session/not-empty-of req skey)
+               stored?      (if (and smap (session/valid? smap))
+                              (session/put-var!
+                               smap :form-errors
+                               {:dest   dest-uri
+                                :errors (force errors)
+                                :params (force values)}))
+               joint-params (qassoc orig-params "form-errors" (if stored? "" (coercion/join-errors (force errors))))]
+           (if dest-uri
+             (common/temporary-redirect req dest-uri nil joint-params)
+             (resp/temporary-redirect (str referer
+                                           (if (str/includes? referer "?") "&" "?")
+                                           (common/query-string-encode req joint-params)))))
+
+         ;; render a separate page describing invalid parameters
+         ;; instead of current page
+
+         (-> (assoc-app-data
+              req
+              :title           title
+              :coercion/errors explanations
+              :form/errors     (delay {:dest   (:uri req)
+                                       :errors (force errors)
+                                       :params (force values)}))
+             render-bad-params))))))
 
 (defn- param-errors-to-current-vals
   [req errors]
