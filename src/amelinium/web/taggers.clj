@@ -642,13 +642,13 @@
        (let [args   (parse-args args)
              props  (get ctx :form-props)
              tr-sub (or (get props :tr-sub) (i18n/no-default (translator-sub ctx translations-fn)))]
-         (if (or (get args :htmx?) (get props :htmx?) (get ctx :htmx?))
-           (hx-form-submit (first args) (rest args) tr-sub validators)
+         (if (or (get args :session?) (get props :session?) (get ctx :session?))
            (let [smap   (if-not props (session/of ctx))
                  sid    (or (get props :session-id) (session/id smap))
                  sfld   (or (get props :session-id-field) (session/id-field smap))
                  tr-sub (or (get props :tr-sub) (i18n/no-default (translator-sub ctx translations-fn)))]
-             (form-submit (first args) tr-sub sfld sid validators))))))
+             (form-submit-session (first args) (rest args) tr-sub sfld sid validators))
+           (form-submit (first args) (rest args) tr-sub validators)))))
 
     (selmer/add-tag!
      :form
