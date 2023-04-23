@@ -118,8 +118,7 @@
   (or (and (session/hard-expired? sess)
            (not (common/on-page?
                  req
-                 (or (get route-data :auth-error/session-expired)
-                     (get route-data :auth/session-expired :login/session-expired)))))
+                 (or (get-in route-data [:auth-error/destinations :auth/session-expired] :login/session-expired)))))
       false))
 
 (defn get-goto-uri

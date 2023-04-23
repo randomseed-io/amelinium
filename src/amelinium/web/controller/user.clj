@@ -160,13 +160,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
 
-(defn- auth-error
-  [req route-data status default-view]
-  (web/inject req
-              (get route-data status default-view)
-              (or (get route-data :auth-error/target)
-                  (get-in route-data [:auth-error/targets status]))))
-
 (defn auth-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
   conditions and may emit a redirect or render a response."
@@ -182,16 +175,17 @@
    (auth-with-password! req user-email password sess route-data lang auth-only? nil))
   ([req user-email password sess route-data lang auth-only? session-key]
    (let [route-data (or route-data (http/get-route-data req))
-         req        (super/auth-user-with-password! req user-email password sess route-data auth-only? session-key)]
+         req        (super/auth-user-with-password! req user-email password sess route-data auth-only? session-key)
+         status     (get req :response/status)]
      (if (web/response? req)
        req
-       (case (get req :response/status)
+       (case status
          :auth/ok            (if auth-only? req (language/force req (or lang (web/pick-language-str req))))
-         :auth/locked        (auth-error req route-data :auth-error/locked        :login/account-locked)
-         :auth/soft-locked   (auth-error req route-data :auth-error/soft-locked   :login/account-soft-locked)
-         :auth/bad-password  (auth-error req route-data :auth-error/bad-password  :login/bad-password)
-         :auth/session-error (auth-error req route-data :auth-error/session-error :login/session-error)
-         (auth-error req route-data :auth/error :login/error))))))
+         :auth/locked        (web/inject-auth-error req route-data status :login/account-locked)
+         :auth/soft-locked   (web/inject-auth-error req route-data status :login/account-soft-locked)
+         :auth/bad-password  (web/inject-auth-error req route-data status :login/bad-password)
+         :auth/session-error (web/inject-auth-error req route-data status :login/session-error)
+         (web/inject-auth-error req route-data (or status :auth/error) :login/error))))))
 
 (defn authenticate!
   "Logs user in when user e-mail and password are given, or checks if the session is
@@ -261,10 +255,10 @@
              (web/assoc-app-data :lock-remains rem-mins)))
 
        (and sess (session/hard-expired? sess))
-       (web/move-to req (or (get route-data :auth-error/session-expired) :login/session-expired))
+       (web/move-to req (get-in route-data [:auth-error/destinations :auth/session-expired] :login/session-expired))
 
        :bad-prolongation
-       (web/move-to req (or (get route-data :auth-error/session-error) :login/session-error))))))
+       (web/move-to req (get-in route-data [:auth-error/destinations :auth/session-error] :login/session-error))))))
 
 (defn create!
   "Verifies confirmation token against a database and if it matches creates the
@@ -363,9 +357,9 @@
    (case (get req :response/status)
      :pwd/created      req
      :pwd/updated      req
-     :pwd/bad-password (common/move-to req (get route-data :auth-error/bad-password :login/bad-password))
-     :pwd/bad-user     (common/move-to req (get route-data :auth-error/bad-password :login/bad-password))
-     (common/go-to req (get route-data :auth/error :login/error)))))
+     :pwd/bad-password (common/move-to req (get-in route-data [:auth-error/destinations :auth/bad-password] :login/bad-password))
+     :pwd/bad-user     (common/move-to req (get-in route-data [:auth-error/destinations :auth/bad-password] :login/bad-password))
+     (common/go-to req (get-in route-data [:auth-error/destinations :auth/error] :login/error)))))
 
 (defn password-change!
   "Changes password for the user authenticated with an old password and e-mail or sets

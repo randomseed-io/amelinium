@@ -178,7 +178,7 @@
                        :op      :access-denied
                        :level   :warning
                        :msg     (str "Permanent lock " for-mail))
-         (web/go-to req (or (get route-data :auth-error/account-locked) :login/account-locked)))
+         (web/go-to req (get-in route-data [:auth-error/destinations :auth/account-locked] :login/account-locked)))
 
        ;; Session expired and the time for prolongation has passed.
 
@@ -194,7 +194,7 @@
                        :op      :session
                        :ok?     false
                        :msg     (str "Hard-expired " for-mail))
-         (web/go-to req (or (get route-data :auth-error/session-expired) :login/session-expired)))
+         (web/go-to req (get-in route-data [:auth-error/destinations :auth/session-expired] :login/session-expired)))
 
        ;; Session expired and we are not reaching an authentication page nor a login page.
        ;; User can re-validate session using a login page.
@@ -202,19 +202,23 @@
 
        (super/prolongation? sess @auth-state @login-data?)
        (let [req           (cleanup-req req @auth-state)
+             use-goto?     (boolean (get route-data :prolongate/use-goto? false))
              ^Session sess (session/allow-soft-expired sess)
              session-field (or (session/id-field sess) "session-id")
-             req-to-save   (common/remove-form-params req session-field)]
-         (session/put-var! sess
-                           :goto {:ts           (t/now)
-                                  :uri          (get req :uri)
-                                  :ref-uri      (some-str (get (get req :headers) "referer"))
-                                  :page         (get route-data :name)
-                                  :session-id   (session/db-id sess)
-                                  :form-params  (get req-to-save :form-params)
-                                  :query-params (get req-to-save :query-params)
-                                  :params       (get req-to-save :params)})
-         (web/move-to req (or (get route-data :auth/prolongate) :login/prolongate)))
+             destination   (get-in route-data [:auth-error/destinations :auth/prolongate] :login/prolongate)]
+         (if use-goto?
+           (let [req-to-save (common/remove-form-params req session-field)]
+             (session/put-var! sess
+                               :goto {:ts           (t/now)
+                                      :uri          (get req :uri)
+                                      :ref-uri      (some-str (get (get req :headers) "referer"))
+                                      :page         (get route-data :name)
+                                      :session-id   (session/db-id sess)
+                                      :form-params  (get req-to-save :form-params)
+                                      :query-params (get req-to-save :query-params)
+                                      :params       (get req-to-save :params)})
+             (web/go-to req destination))
+           (web/inject req destination)))
 
        :----pass
 
@@ -258,7 +262,7 @@
            (if (false? goto-uri)
              ;; Take care of broken go-to.
              (do (session/del-var! sess :goto)
-                 (web/move-to req (or (get route-data :auth-error/session-error) :login/session-error)))
+                 (web/move-to req (get-in route-data [:auth-error/destinations :auth/session-error] :login/session-error)))
              ;; Remove utilized go-to.
              (if valid-session?
                (do (session/del-var! sess :goto)

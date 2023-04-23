@@ -1025,6 +1025,21 @@
          req)
        req))))
 
+(defn inject-auth-error
+  ([req]
+   (inject-auth-error req nil :auth/error nil))
+  ([req status]
+   (inject-auth-error req nil status nil))
+  ([req status default-view]
+   (inject-auth-error req nil status default-view))
+  ([req route-data status default-view]
+   (let [route-data (or route-data (http/get-route-data req))]
+     (inject req
+             (or (get-in route-data [:auth-error/destinations status] default-view)
+                 (get route-data :auth-error/destination))
+             (or (get-in route-data [:auth-error/targets status])
+                 (get route-data :auth-error/target))))))
+
 ;; Form errors
 
 (defn handle-bad-request-form-params
