@@ -1065,9 +1065,21 @@
              (or (get-in route-data [:auth-error/targets status])
                  (get route-data :auth-error/target))))))
 
+(defn goto-auth-error
+  ([req]
+   (goto-auth-error req nil :auth/error nil))
+  ([req status]
+   (goto-auth-error req nil status nil))
+  ([req status default-view]
+   (goto-auth-error req nil status default-view))
+  ([req route-data status default-view]
+   (let [route-data (or route-data (http/get-route-data req))]
+     (go-to req
+            (or (get-in route-data [:auth-error/destinations status] default-view)
+                (get route-data :auth-error/destination))))))
 ;; Form errors
 
-(defn handle-bad-request-form-params
+(defn http-handle-bad-request-form-params
   "Called by other functions to generate a redirect or to display a page with
   a form to be corrected because of a parameter error (induced manually or
   caused by coercion exception).
@@ -1159,11 +1171,12 @@
 
         (-> (assoc-app-data
              req
-             :title           title
-             :coercion/errors explanations
-             :form/errors     (delay {:dest   (:uri req)
-                                      :errors (force errors)
-                                      :params (force values)}))
+             :title                 title
+             :coercion/errors       explanations
+             :form/previous-errors? handling-previous?
+             :form/errors           (delay {:dest   (:uri req)
+                                            :errors (force errors)
+                                            :params (force values)}))
             render-bad-params)))))
 
 (defn hx-handle-bad-request-form-params
@@ -1220,10 +1233,27 @@
            req                (if (nil? new-layout) req (qassoc req :app/layout new-layout))]
        (render-ok
         (assoc-app-data req
-                        :coercion/errors explanations
-                        :form/errors     (delay {:dest   (:uri req)
-                                                 :errors (force errors)
-                                                 :params (force values)})))))))
+                        :coercion/errors       explanations
+                        :form/previous-errors? handling-previous?
+                        :form/errors           (delay {:dest   (:uri req)
+                                                       :errors (force errors)
+                                                       :params (force values)})))))))
+
+(defn handle-bad-request-form-params
+  ([req]
+   (handle-bad-request-form-params req nil nil nil nil nil))
+  ([req errors]
+   (handle-bad-request-form-params req errors nil nil nil nil))
+  ([req errors values]
+   (handle-bad-request-form-params req errors values nil nil nil))
+  ([req errors values explanations]
+   (handle-bad-request-form-params req errors values explanations nil nil))
+  ([req errors values explanations title]
+   (handle-bad-request-form-params req errors values explanations title nil))
+  ([req errors values explanations title session-key]
+   (if (some-> (get req :headers) (get "hx-request") (not= "false"))
+     (hx-handle-bad-request-form-params req errors values explanations title)
+     (http-handle-bad-request-form-params req errors values explanations title session-key))))
 
 (defn- param-errors-to-current-vals
   [req errors]
