@@ -1213,7 +1213,6 @@
    (if-not (valuable? errors)
      req ;; generic error page?
      (let [route-data         (http/get-route-data req)
-           hx-target          (some-str (get route-data :form-errors/target))
            orig-page          (get route-data :form-errors/page)
            orig-page          (or orig-page (:page (get req :goto)))
            title              (or title (get route-data :form-errors/title))
@@ -1227,6 +1226,10 @@
            new-layout         (get route-data :form-errors/layout)
            new-layout         (if (nil? new-layout) (get src-route-data :app/layout) new-layout)
            handling-previous? (contains? (get req :query-params) "form-errors")
+           hx-targets         (get route-data :form-errors/retargets)
+           hx-src-target      (if hx-targets (get (get req :headers) "hx-target"))
+           hx-target          (if hx-src-target (get hx-targets hx-src-target))
+           hx-target          (some-str (or hx-target (get route-data :form-errors/target)))
            req                (if hx-target  (add-header req :HX-Retarget hx-target) req)
            req                (if title      (assoc-app-data req :title title)       req)
            req                (if (nil? new-view)   req (qassoc req :app/view new-view))
