@@ -192,8 +192,11 @@
 
 (defn auth-user-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
-  conditions and may emit a redirect (if go-to was detected) or set the
-  `:response/status` in the returned request map (but not the response map!).
+  conditions and may emit a redirect (if a go-to was detected) or set the
+  `:response/status` in the returned request map (but not in the response map!).
+
+  In case of session prolongation initiated by HTMX it will set the
+  `:response/status` to `:auth/prolonged`.
 
   The last, `auth-only-mode` argument, when set to `true` (default is `false` when
   not given) causes session creation and prolongation to be skipped if the
@@ -262,9 +265,10 @@
                           (let [^Session sess (or sess
                                                   (session/of req (or session-key
                                                                       (get route-data :session-key))))
-                                goto-uri      (get-goto-uri req sess)
+                                hx-prolong?   (hx-prolong? req route-data sess)
+                                goto-uri      (if-not hx-prolong? (get-goto-uri req sess))
                                 goto?         (boolean goto-uri)
-                                ^Session sess (if goto?
+                                ^Session sess (if (or hx-prolong? goto?)
                                                 (session/prolong sess ipaddr)
                                                 (session/create  sess user-id user-email ipaddr))]
                             (if-not (session/valid? sess)
@@ -279,14 +283,19 @@
                                         :user/id user-id :user/account-type ac-type
                                         :auth/ok? false :response/status :auth/session-error))
 
-                              (if goto?
-                                (resp/temporary-redirect goto-uri)
-                                (-> req
-                                    (qassoc :auth/ok? true :response/status :auth/ok
-                                            :user/id user-id :user/account-type ac-type)
-                                    (session/inject sess)
-                                    (common/replace-session-id-header sess)
-                                    (common/roles-refresh))))))))))
+                              (cond
+                                goto?       (resp/temporary-redirect goto-uri)
+                                hx-prolong? (-> req
+                                                (qassoc :auth/ok? true :response/status :auth/prolonged
+                                                        :user/id user-id :user/account-type ac-type)
+                                                (session/inject sess)
+                                                (common/roles-refresh))
+                                :else       (-> req
+                                                (qassoc :auth/ok? true :response/status :auth/ok
+                                                        :user/id user-id :user/account-type ac-type)
+                                                (session/inject sess)
+                                                (common/replace-session-id-header sess)
+                                                (common/roles-refresh))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)

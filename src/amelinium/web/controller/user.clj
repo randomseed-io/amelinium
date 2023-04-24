@@ -181,6 +181,7 @@
        req
        (case status
          :auth/ok            (if auth-only? req (language/force req (or lang (web/pick-language-str req))))
+         :auth/prolonged     (web/inject-auth-error req route-data status :login/prolonged)
          :auth/locked        (web/inject-auth-error req route-data status :login/account-locked)
          :auth/soft-locked   (web/inject-auth-error req route-data status :login/account-soft-locked)
          :auth/bad-password  (web/inject-auth-error req route-data status :login/bad-password)
