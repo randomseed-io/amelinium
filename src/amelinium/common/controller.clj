@@ -145,6 +145,23 @@
   (if (and smap (session/valid? smap))
     (get-goto smap)))
 
+(defn hx-prolong?
+  "Returns `true` if authentication is about prolonging session with HTMX
+  request.
+
+  Requires session `sess` to be soft-expired and `HX-Target` request header taken
+  from `req` (under `:headers` key) to indicate the same target as configured
+  `:auth/prolongate` target value for `:auth-error/targets` map of a route
+  data (given as `route-data`)."
+  [req route-data sess]
+  (if (and sess (session/soft-expired? sess))
+    (if-some [hx-target (get (get req :headers) "hx-target")]
+      (if-some [t (get (get route-data :auth-error/targets) :auth/prolongate)]
+        (or (= t (strb "#" hx-target)) (= t hx-target))
+        false)
+      false)
+    false))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions
 
