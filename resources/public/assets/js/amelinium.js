@@ -1,6 +1,16 @@
 var amelinium = {
   config: ameliniumConfig,
 
+  closeMainModal: function() {
+    var el = document.getElementById('main-modal');
+    if (el) {
+      var mm = bootstrap.Modal.getOrCreateInstance(el);
+      if (mm) {
+        mm.hide();
+      }
+    }
+  },
+
   init: function() {
     var session_id_key = amelinium.config.session_id_key;
     var session_id = "";
