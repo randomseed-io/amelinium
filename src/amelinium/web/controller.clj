@@ -178,7 +178,7 @@
                        :op      :access-denied
                        :level   :warning
                        :msg     (str "Permanent lock " for-mail))
-         (web/go-to req (get-in route-data [:auth-error/destinations :auth/account-locked] :login/account-locked)))
+         (web/goto-auth-error req :auth/account-locked :login/account-locked))
 
        ;; Session expired and the time for prolongation has passed.
 
@@ -194,18 +194,18 @@
                        :op      :session
                        :ok?     false
                        :msg     (str "Hard-expired " for-mail))
-         (web/go-to req (get-in route-data [:auth-error/destinations :auth/session-expired] :login/session-expired)))
+         (web/goto-auth-error req :auth/session-expired :login/session-expired))
 
        ;; Session expired and we are not reaching an authentication page nor a login page.
        ;; User can re-validate session using a login page.
-       ;; We have to preserve form data and original, destination URI in a session variable.
+       ;; We have to preserve form data and original, destination URI in a session variable
+       ;; or use headers and HTMX.
 
        (super/prolongation? sess @auth-state @login-data?)
        (let [req           (cleanup-req req @auth-state)
              use-goto?     (boolean (get route-data :prolongate/use-goto? false))
              ^Session sess (session/allow-soft-expired sess)
-             session-field (or (session/id-field sess) "session-id")
-             destination   (get-in route-data [:auth-error/destinations :auth/prolongate] :login/prolongate)]
+             session-field (or (session/id-field sess) "session-id")]
          (if use-goto?
            (let [req-to-save (common/remove-form-params req session-field)]
              (session/put-var! sess
@@ -217,8 +217,8 @@
                                       :form-params  (get req-to-save :form-params)
                                       :query-params (get req-to-save :query-params)
                                       :params       (get req-to-save :params)})
-             (web/go-to req destination))
-           (web/inject req destination)))
+             (web/goto-auth-error req route-data :auth/prolongate :login/prolongate))
+           (web/inject-auth-error req route-data :auth/prolongate :login/prolongate)))
 
        :----pass
 
@@ -363,12 +363,13 @@
 
        :reitit.coercion/request-coercion
        (let [translate-sub (i18n/no-default (common/translator-sub req))]
-         (web/hx-handle-bad-request-form-params
+         (web/handle-bad-request-form-params
           req
           (coercion/map-errors-simple data)
           (delay (->> (keys (get data :transformed)) (select-keys (get data :value)) (map/map-keys some-str)))
           (delay (coercion/explain-errors-simple data translate-sub))
-          (delay (translate-sub :parameters/error))))
+          (delay (translate-sub :parameters/error))
+          session-key))
 
        :reitit.coercion/response-coercion
        (let [error-list (coercion/list-errors-simple data)]
