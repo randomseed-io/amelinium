@@ -10,6 +10,7 @@
 
   (:require [clojure.string                       :as             str]
             [clojure.core.memoize                 :as             mem]
+            [clojure.java.io                      :as              io]
             [potemkin.namespaces                  :as               p]
             [tick.core                            :as               t]
             [reitit.core                          :as               r]
@@ -34,8 +35,10 @@
             [hiccup.table                         :as           table]
             [lazy-map.core                        :as        lazy-map])
 
-  (:import [reitit.core Match]
-           [lazy_map.core LazyMapEntry LazyMap]))
+  (:import (reitit.core  Match)
+           (java.io       File)
+           (lazy_map.core LazyMapEntry
+                          LazyMap)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Request map keys exposed in views
@@ -339,35 +342,57 @@
   "Generic view resolver. Takes `uri`, prefix (`pre`), base directory (`dir`),
   language (`lang`) and core name (`core`), and tries different combinations of path
   segments based on these parameters until it finds an existing view file within
-  java resource directories. Returns a pathname as a string.
+  java resource directories.
+
+  If `dir` is `nil` or `false` it will create `auto-dir` by taking a directory part
+  of `core` (if it has a directory part). Otherwise `auto-dir` will be same as `dir`.
+
+  Returns a pathname as a string.
 
   Paths tried:
 
   - `pre`/`lang`/`dir`/`core`.html
   - `pre`/`lang`/`dir`/`core`/default.html
   - `pre`/`dir`/`core`.html
-  - `pre`/`lang`/`dir`/default.html
-  - `pre`/`lang`/`dir`.html
-  - `pre`/`dir`/default.html
-  - `pre`/`dir`.html
+  - `pre`/`lang`/`auto-dir`/default.html
+  - `pre`/`lang`/`auto-dir`.html           (if `auto-dir` is not `nil`)
+  - `pre`/`auto-dir`/default.html          (if `auto-dir` is not `nil`)
+  - `pre`/`auto-dir`.html                  (if `auto-dir` is not `nil`)
   - `pre`/`lang`/default.html
   - `pre`/default.html
 
+  Example paths tried for `pre`=`\"views\"`, `lang`=`\"pl\"`,
+                          `dir`=`nil` and `core`=`:login/prolongate`:
+
+  - `views/pl/login/prolongate.html`
+  - `views/pl/login/prolongate/default.html`
+  - `views/login/prolongate.html`
+  - `views/pl/prolongate/default.html`
+  - `views/pl/prolongate.html`
+  - `views/prolongate/default.html`
+  - `views/prolongate.html`
+  - `views/pl/default.html`
+  - `views/default.html`
+
   Results are cached."
+
   [uri pre dir lang core]
-  (let [pre     (or (some-str pre) "views")
-        prep-sl (if pre  (str pre  "/"))
-        dir-sl  (if dir  (str dir  "/"))
-        lang-sl (if lang (str lang "/"))
-        pths    (lazy-cat [[prep-sl lang-sl dir-sl core dot-html]]
-                          [[prep-sl lang-sl dir-sl core sl-default-html]]
-                          [[prep-sl dir-sl core dot-html]]
-                          [[prep-sl lang-sl dir-sl default-html]]
-                          (if dir [[prep-sl lang-sl dir dot-html]])
-                          [[prep-sl dir-sl default-html]]
-                          (if dir [[prep-sl dir dot-html]])
-                          [[prep-sl lang-sl default-html]]
-                          [[prep-sl default-html]])]
+  (let [core        (some-str core)
+        pre         (or (some-str pre) "views")
+        auto-dir    (or dir (.getName ^File (io/as-file core)))
+        auto-dir-sl (if auto-dir (str auto-dir "/"))
+        prep-sl     (if pre      (str pre  "/"))
+        dir-sl      (if dir      (str dir  "/"))
+        lang-sl     (if lang     (str lang "/"))
+        pths        (lazy-cat [[prep-sl lang-sl dir-sl core dot-html]]
+                              [[prep-sl lang-sl dir-sl core sl-default-html]]
+                              [[prep-sl dir-sl core dot-html]]
+                              [[prep-sl lang-sl auto-dir-sl default-html]]
+                              (if auto-dir [[prep-sl lang-sl auto-dir dot-html]])
+                              (if auto-dir [[prep-sl auto-dir-sl default-html]])
+                              (if auto-dir [[prep-sl auto-dir dot-html]])
+                              [[prep-sl lang-sl default-html]]
+                              [[prep-sl default-html]])]
     (or (first (keep #(apply common/some-resource %) pths))
         (do (if (nil? uri) (log/wrn "Empty URI while resolving" pre))
             (log/wrn "Cannot find" pre (if uri (str "for " uri)))
