@@ -146,7 +146,6 @@
   ([req] (info! req nil))
   ([req session-key]
    (let [auth-db       (auth/db req)
-         session-key   (or session-key (http/get-route-data req :session-key))
          ^Session sess (session/of req session-key)
          prolonged?    (some? (and (session/expired? sess) (get req :goto-uri)))
          remaining     (super/lock-remaining-mins req auth-db (if prolonged? sess) t/now)
@@ -298,7 +297,7 @@
   ([req session-key]
    (api/response
     req
-    (let [smap        (session/of req (or session-key (http/get-route-data req :session-key)))
+    (let [smap        (session/of req session-key)
           auth-db     (auth/db req)
           user-id     (session/user-id    smap)
           user-email  (session/user-email smap)
@@ -325,7 +324,7 @@
   ([req session-key]
    (api/response
     req
-    (let [smap    (session/not-empty-of req (or session-key (http/get-route-data req :session-key)))
+    (let [smap    (session/not-empty-of req session-key)
           auth-db (auth/db req)
           props   (user/props-of :session auth-db smap)]
       (if (:uid props)

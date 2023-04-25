@@ -62,7 +62,7 @@
   ([req]
    (prep-request! req nil))
   ([req session-key]
-   (let [^Session sess (session/of req (or session-key (http/get-route-data req :session-key)))
+   (let [^Session sess (session/of req session-key)
          auth-state    (delay (common/login-auth-state req :login-page? :auth-page?))
          auth?         (delay (nth @auth-state 1 false))
          login-data?   (delay (login-data? req))

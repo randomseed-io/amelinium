@@ -181,12 +181,12 @@
        req
        (case status
          :auth/ok            (if auth-only? req (language/force req (or lang (web/pick-language-str req))))
-         :auth/prolonged     (web/inject-auth-error req route-data status :login/prolonged)
-         :auth/locked        (web/inject-auth-error req route-data status :login/account-locked)
-         :auth/soft-locked   (web/inject-auth-error req route-data status :login/account-soft-locked)
-         :auth/bad-password  (web/inject-auth-error req route-data status :login/bad-password)
-         :auth/session-error (web/inject-auth-error req route-data status :login/session-error)
-         (web/inject-auth-error req route-data (or status :auth/error) :login/error))))))
+         :auth/prolonged     (web/handle-auth-error req route-data status :login/prolonged)
+         :auth/locked        (web/handle-auth-error req route-data status :login/account-locked)
+         :auth/soft-locked   (web/handle-auth-error req route-data status :login/account-soft-locked)
+         :auth/bad-password  (web/handle-auth-error req route-data status :login/bad-password)
+         :auth/session-error (web/handle-auth-error req route-data status :login/session-error)
+         (web/handle-auth-error req route-data (or status :auth/error) :login/error))))))
 
 (defn authenticate!
   "Logs user in when user e-mail and password are given, or checks if the session is
@@ -219,22 +219,21 @@
          ^String user-email (some-str (get form-params "login"))
          ^String password   (if user-email (some-str (get form-params "password")))
          ^Session sess      (session/of req (or session-key (get @route-data :session-key)))
-         lang               (delay (web/pick-language-str req :user))
-         valid-session?     (delay (session/valid? sess))]
+         lang               (delay (web/pick-language-str req :user))]
      (cond
-       password          (auth-with-password! req user-email password sess @route-data @lang false session-key)
-       @valid-session?   (if (some? (language/from-path req))
-                           ;; Render the contents in a language specified by the current path.
-                           req
-                           ;; Redirect to a proper language version of this very page.
-                           (web/move-to req (or (get @route-data :name) (get req :uri)) @lang))
-       :invalid-session! (web/move-to req (or (get @route-data :auth/login) :auth/login) @lang)))))
+       password              (auth-with-password! req user-email password sess @route-data @lang false session-key)
+       (session/valid? sess) (if (some? (language/from-path req))
+                                ;; Render the contents in a language specified by the current path.
+                                req
+                                ;; Redirect to a proper language version of this very page.
+                                (web/move-to req (or (get @route-data :name) (get req :uri)) @lang))
+       :invalid-session!     (web/move-to req (or (get @route-data :auth/login) :auth/login) @lang)))))
 
 (defn login!
   "Prepares response data to be displayed on a login page."
   ([req] (login! req nil))
   ([req session-key]
-   (let [^Session sess (session/of req (or session-key (http/get-route-data req :session-key)))
+   (let [^Session sess (session/of req session-key)
          rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))]
      (web/assoc-app-data req :lock-remains rem-mins))))
 

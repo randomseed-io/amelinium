@@ -46,8 +46,7 @@
    (if (and gmap (= (get req :uri) (get gmap :uri)))
      (if-some [gmap (valuable (select-keys gmap [:form-params :query-params
                                                  :session-id :ref-uri :page]))]
-       (let [^Session smap     (or (session/of smap)
-                                   (session/of req (or session-key (http/get-route-data req :session-key))))
+       (let [^Session smap     (or (session/of smap) (session/of req session-key))
              ^String sid-field (or (session/id-field smap) "session-id")]
          (if (and (= (session/db-id smap) (get gmap :session-id false)))
            (-> gmap
@@ -203,10 +202,11 @@
 
        (super/prolongation? sess @auth-state @login-data?)
        (let [req           (cleanup-req req @auth-state)
-             use-goto?     (boolean (get route-data :prolongate/use-goto? false))
+             use-htmx?     (web/use-hx? req route-data :prolongate/use-htmx?)
              ^Session sess (session/allow-soft-expired sess)
              session-field (or (session/id-field sess) "session-id")]
-         (if use-goto?
+         (if use-htmx?
+           (web/inject-auth-error req route-data :auth/prolongate :login/prolongate)
            (let [req-to-save (common/remove-form-params req session-field)]
              (session/put-var! sess
                                :goto {:ts           (t/now)
@@ -217,8 +217,7 @@
                                       :form-params  (get req-to-save :form-params)
                                       :query-params (get req-to-save :query-params)
                                       :params       (get req-to-save :params)})
-             (web/goto-auth-error req route-data :auth/prolongate :login/prolongate))
-           (web/inject-auth-error req route-data :auth/prolongate :login/prolongate)))
+             (web/goto-auth-error req route-data :auth/prolongate :login/prolongate))))
 
        :----pass
 
