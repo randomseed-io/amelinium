@@ -1617,7 +1617,10 @@
              ^String sid ^String db-sid ^IPAddress remote-ip]
    (if-some [^SessionControl ctrl (p/control src session-key)]
      (let [^SessionConfig opts (p/config ^SessionControl ctrl)]
-       (handler ctrl (.session-key opts) (.id-field opts) sid db-sid remote-ip))))
+       (handler ctrl
+                (.session-key opts)
+                (.id-field    opts)
+                sid db-sid remote-ip))))
   (^Session [^SessionControl ctrl ^Keyword session-key
              id-field ^String sid ^String db-sid ^IPAddress remote-ip]
    (let [pass               (if (not= sid db-sid) (second (split-secure-sid sid)))
