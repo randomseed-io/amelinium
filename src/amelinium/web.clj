@@ -1197,10 +1197,10 @@
     - `:params` mapped to `values`,
     - `:dest` mapped to destination URI;
   - `:coercion/errors` set to `explanations` map."
-  [req errors values explanations title session-key]
+  [req route-data errors values explanations title session-key]
   (if-not (valuable? errors)
     req
-    (let [route-data             (http/get-route-data req)
+    (let [route-data             (or route-data (http/get-route-data req))
           forced-orig-page       (get route-data :form-errors/page)
           orig-page              (or forced-orig-page (:page (get req :goto)))
           referer                (if (nil? orig-page) (some-str (get (get req :headers) "referer")))
