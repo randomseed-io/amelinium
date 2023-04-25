@@ -1116,6 +1116,10 @@
                  (get route-data :auth-error/target))))))
 
 (defn goto-auth-error
+  "Uses `go-to` to make a redirect on a basis of the given authentication status
+  `status` by looking it up in `:auth-error/destinations` of a route data map with
+  fallback to `default-page` (if set) or to a value associated with the
+  `:auth-error/destination` key."
   ([req]
    (goto-auth-error req nil :auth/error nil))
   ([req status]
@@ -1257,9 +1261,9 @@
   Parameter type in `errors` map can be `nil`, meaning it is of unknown type.
 
   The layout and view are obtained from the `:form-errors/page` configuration option
-  associated with HTTP route data, unless `:form-errors/layout` and/or
-  `:form-errors/view` options are set. Layout can be set to `false` to allow
-  injection of HTML fragments.
+  associated with HTTP route data or the destination page established by checking
+  `Referer` header, unless `:form-errors/layout` and/or `:form-errors/view` options
+  are set. Layout can be set to `false` to allow injection of HTML fragments.
 
   If form errors page is not specified one is obtained from the `Referer` request
   header.
