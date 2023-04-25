@@ -1124,12 +1124,12 @@
    (goto-auth-error req nil :auth/error nil))
   ([req status]
    (goto-auth-error req nil status nil))
-  ([req status default-view]
-   (goto-auth-error req nil status default-view))
-  ([req route-data status default-view]
+  ([req status default-page]
+   (goto-auth-error req nil status default-page))
+  ([req route-data status default-page]
    (let [route-data (or route-data (http/get-route-data req))]
      (go-to req
-            (or (get-in route-data [:auth-error/destinations status] default-view)
+            (or (get-in route-data [:auth-error/destinations status] default-page)
                 (get route-data :auth-error/destination))))))
 
 (defn handle-auth-error
