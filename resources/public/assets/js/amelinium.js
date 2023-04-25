@@ -23,12 +23,16 @@ var amelinium = {
 
   init: function() {
     var session_id_key = amelinium.config.session_id_key;
-    var session_id = "";
+    var session_id = null;
 
     if (session_id_key) {
        document.body.addEventListener('htmx:afterOnLoad', function(evt) {
         var sid = evt.detail.xhr.getResponseHeader(session_id_key);
-        if (sid) { session_id = sid; }
+        if (sid) {
+          session_id = sid;
+        } else {
+          session_id = null;
+        }
       });
 
       document.body.addEventListener('htmx:configRequest', function(evt) {
