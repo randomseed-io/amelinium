@@ -237,6 +237,17 @@
          rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))]
      (web/assoc-app-data req :lock-remains rem-mins))))
 
+(defn logout!
+  "Logs user out."
+  ([req]
+   (logout! req))
+  ([req session-key]
+   (let [route-data (http/get-route-data req)]
+     (session/delete! req (or session-key (get route-data :session-key)))
+     (if-some [dst (get route-data :destination)]
+       (web/go-to req dst)
+       req))))
+
 (defn prolong!
   "Prepares response data to be displayed on a prolongation page."
   ([req]
