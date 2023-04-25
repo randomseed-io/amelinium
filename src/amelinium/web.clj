@@ -1266,16 +1266,18 @@
 
   Sets `HX-Retarget` response header to a value set in route data option
   `:form-errors/target`."
-  ([req errors]
-   (hx-handle-bad-request-form-params req errors nil nil nil))
-  ([req errors values]
-   (hx-handle-bad-request-form-params req errors values nil nil))
-  ([req errors values explanations]
-   (hx-handle-bad-request-form-params req errors values explanations nil))
-  ([req errors values explanations title]
+  ([req route-data errors]
+   (hx-handle-bad-request-form-params req route-data errors nil nil nil))
+  ([req route-data errors values]
+   (hx-handle-bad-request-form-params req route-data errors values nil nil))
+  ([req route-data errors values explanations]
+   (hx-handle-bad-request-form-params req route-data errors values explanations nil))
+  ([req route-data errors values explanations title _]
+   (hx-handle-bad-request-form-params req route-data errors values explanations title))
+  ([req route-data errors values explanations title]
    (if-not (valuable? errors)
      req ;; generic error page?
-     (let [route-data         (http/get-route-data req)
+     (let [route-data         (or route-data (http/get-route-data req))
            orig-page          (get route-data :form-errors/page)
            orig-page          (or orig-page (:page (get req :goto)))
            title              (or title (get route-data :form-errors/title))
@@ -1290,11 +1292,11 @@
            new-layout         (if (nil? new-layout) (get src-route-data :app/layout) new-layout)
            handling-previous? (contains? (get req :query-params) "form-errors")
            hx-targets         (get route-data :form-errors/retargets)
-           hx-src-target      (if hx-targets (get (get req :headers) "hx-target"))
+           hx-src-target      (if hx-targets (hx-target req))
            hx-target          (if hx-src-target (get hx-targets hx-src-target))
            hx-target          (some-str (or hx-target (get route-data :form-errors/target)))
-           req                (if hx-target  (add-header req :HX-Retarget hx-target) req)
-           req                (if title      (assoc-app-data req :title title)       req)
+           req                (if hx-target (add-header req :HX-Retarget hx-target) req)
+           req                (if title (assoc-app-data req :title title) req)
            req                (if (nil? new-view)   req (qassoc req :app/view new-view))
            req                (if (nil? new-layout) req (qassoc req :app/layout new-layout))]
        (render-ok
@@ -1317,9 +1319,10 @@
   ([req errors values explanations title]
    (handle-bad-request-form-params req errors values explanations title nil))
   ([req errors values explanations title session-key]
-   (if (some-> (get req :headers) (get "hx-request") (not= "false"))
-     (hx-handle-bad-request-form-params req errors values explanations title)
-     (http-handle-bad-request-form-params req errors values explanations title session-key))))
+   (let [route-data (http/get-route-data req)]
+     (if (use-hx? req route-data :form-errors/use-htmx?)
+       (hx-handle-bad-request-form-params   req route-data errors values explanations title)
+       (http-handle-bad-request-form-params req route-data errors values explanations title session-key)))))
 
 (defn- param-errors-to-current-vals
   [req errors]
