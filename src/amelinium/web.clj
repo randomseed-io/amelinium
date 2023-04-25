@@ -1036,6 +1036,48 @@
 
 ;; HTMX
 
+(defn hx-request?
+  "Returns `true` if the client request has `HX-Request` header set to any value but
+  `false` or an empty string."
+  ^Boolean [req]
+  (if-some [hdr (get (get req :headers) "hx-request")]
+    (if-some [hdr (some-str hdr)]
+      (not= "false" hdr)
+      false)
+    false))
+
+(defn use-hx?
+  "Returns `true` if response should be HTMX-compatible, `false` if it should not. Uses
+  optional `route-data` or gets it from the `req` to look for (optional) `extra-key`
+  first, and if it is not given or has falsy value then gets a value associated with
+  the `:use-htmx?` key.
+
+  * If the obtained value is `false`, it will return `false`.
+  * If the obtained value is `true` or any non-`nil` value, it will return `true`.
+  * If the obtained value is `nil`, or there is no route data nor any of the mentioned
+    keys can be found in route data, it will try to auto-detect HTMX using `hx-request?`
+    function which analyzes the `HX-Request` request header."
+  (^Boolean [req]
+   (hx-request? req))
+  (^Boolean [req route-data]
+   (use-hx? req route-data false))
+  (^Boolean [req route-data extra-key]
+   (if-some [route-data (or route-data (http/get-route-data req))]
+     (if-some [force-hx (or (if extra-key (find route-data extra-key))
+                            (find route-data :use-htmx?))]
+       (if-some [force-hx? (val force-hx)]
+         (boolean force-hx?)
+         (hx-request? req))
+       (hx-request? req))
+     (hx-request? req))))
+
+(defn hx-target
+  "Returns a string from `HX-Target` header set by a client. If the header does not
+  exist, it returns `nil`. If the header exists but contains an empty string, it
+  returns `nil`."
+  [req]
+  (some-str (get (get req :headers) "hx-target")))
+
 (defn inject
   "Injects HTML fragment by issuing HTMX response with `HX-Retarget` header set to
   `target` (if truthy), `:app/layout` key of the `req` set to `false` and `:app/view`
@@ -1051,6 +1093,14 @@
        req))))
 
 (defn inject-auth-error
+  "Uses `inject` to set a view on a basis of the given authentication status `status`
+  by looking it up in `:auth-error/destinations` of a route data map with fallback to
+  `default-view` (if set) or to a value associated with the `:auth-error/destination`
+  key.
+
+  It also sets an HTMX target element to the given status by looking it up in
+  `:auth-error/targets` of a route data map with fallback to a value associated with
+  the `:auth-error/target` key."
   ([req]
    (inject-auth-error req nil :auth/error nil))
   ([req status]
@@ -1077,6 +1127,19 @@
      (go-to req
             (or (get-in route-data [:auth-error/destinations status] default-view)
                 (get route-data :auth-error/destination))))))
+
+(defn handle-auth-error
+  ([req]
+   (handle-auth-error req nil :auth/error nil))
+  ([req status]
+   (handle-auth-error req nil status nil))
+  ([req status default-view]
+   (handle-auth-error req nil status default-view))
+  ([req route-data status default-view]
+   (let [route-data (or route-data (http/get-route-data req))]
+     (if (use-hx? req route-data :auth-error/use-htmx?)
+       (inject-auth-error req route-data status default-view)
+       (goto-auth-error   req route-data status default-view)))))
 ;; Form errors
 
 (defn http-handle-bad-request-form-params
