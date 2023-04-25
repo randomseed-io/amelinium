@@ -30,7 +30,7 @@ var amelinium = {
         var sid = evt.detail.xhr.getResponseHeader(session_id_key);
         if (sid) {
           session_id = sid;
-        } else {
+        } else if (sid === "") {
           session_id = null;
         }
       });
