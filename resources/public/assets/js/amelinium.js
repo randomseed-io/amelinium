@@ -1,6 +1,16 @@
 var amelinium = {
   config: ameliniumConfig,
 
+  openMainModal: function() {
+    var el = document.getElementById('main-modal');
+    if (el) {
+      var mm = bootstrap.Modal.getOrCreateInstance(el);
+      if (mm) {
+        mm.show();
+      }
+    }
+  },
+
   closeMainModal: function() {
     var el = document.getElementById('main-modal');
     if (el) {
