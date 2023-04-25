@@ -20,6 +20,7 @@
             [amelinium.db                 :as         db]
             [amelinium.logging            :as        log]
             [amelinium.system             :as     system]
+            [amelinium.http               :as       http]
             [amelinium.auth.algo.scrypt   :as     scrypt]
             [amelinium.proto.session      :as          p]
             [amelinium.types.session      :refer    :all]
@@ -107,8 +108,19 @@
     (^Session [src _] src))
 
   (inject
-    ([smap dst ^Keyword session-key] (map/qassoc dst (or session-key (.session-key ^Session smap) :session) smap))
-    ([smap dst] (map/qassoc dst (or (.session-key ^Session smap) :session) smap)))
+    ([smap dst ^Keyword session-key]
+     (map/qassoc dst
+                 (or session-key
+                     (.session-key ^Session smap)
+                     (http/get-route-data dst :session-key)
+                     :session)
+                 smap))
+    ([smap dst]
+     (map/qassoc dst
+                 (or (.session-key ^Session smap)
+                     (http/get-route-data dst :session-key)
+                     :session)
+                 smap)))
 
   (empty?
     (^Boolean [smap]
@@ -132,8 +144,8 @@
   clojure.lang.Associative
 
   (session
-    (^Session [req] (if-some [s (get req :session)] s))
-    (^Session [req ^Keyword session-key] (if-some [s (get req (or session-key :session))] s)))
+    (^Session [req] (get-session-by-key req))
+    (^Session [req ^Keyword session-key] (get-session-by-key req session-key)))
 
   (empty?
     (^Boolean [req]
@@ -152,30 +164,34 @@
   (inject
     (^Session [dst src]
      (if-some [^Session smap (p/session src)]
-       (map/qassoc dst (or  (.session-key smap)
-                            (if-some [^SessionControl ctrl (.control smap)]
-                              (if-some [^SessionConfig cfg (p/config ctrl)]
-                                (.session-key cfg)))
-                            :session)
+       (map/qassoc dst
+                   (or  (.session-key smap)
+                        (if-some [^SessionControl ctrl (.control smap)]
+                          (if-some [^SessionConfig cfg (p/config ctrl)]
+                            (.session-key cfg)))
+                        (http/get-route-data dst :session-key)
+                        :session)
                    smap)
        dst))
     (^Session [dst src ^Keyword session-key]
      (if-some [^Session smap (p/session src)]
-       (map/qassoc dst (or session-key
-                           (.session-key smap)
-                           (if-some [^SessionControl ctrl (.control smap)]
-                             (if-some [^SessionConfig cfg (p/config ctrl)]
-                               (.session-key cfg)))
-                           :session)
+       (map/qassoc dst
+                   (or session-key
+                       (.session-key smap)
+                       (if-some [^SessionControl ctrl (.control smap)]
+                         (if-some [^SessionConfig cfg (p/config ctrl)]
+                           (.session-key cfg)))
+                       (http/get-route-data dst :session-key)
+                       :session)
                    smap)
        dst)))
 
   (control
     (^SessionControl [req]
-     (if-some [^Session s (get req :session)]
+     (if-some [^Session s (get-session-by-key req)]
        (.control s)))
     (^SessionControl [req ^Keyword session-key]
-     (if-some [^Session s (get req session-key)]
+     (if-some [^Session s (get-session-by-key req session-key)]
        (.control s))))
 
   nil
