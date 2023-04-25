@@ -56,6 +56,48 @@
   ^Boolean [v]
   (instance? Session v))
 
+(defn get-session-key
+  "Returns a session key as keyword by reading the given `session-key`, and if it is
+  `nil` or `false` by getting a value associated with the `:session-key` route data
+  key of the `req`, and if that fails by returning the `:session` keyword."
+  (^Keyword [req]
+   (or (http/get-route-data req :session-key)
+       :session))
+  (^Keyword [req ^Keyword session-key]
+   (or session-key
+       (http/get-route-data req :session-key)
+       :session)))
+
+(defn get-session-by-key
+  "Obtains a session object from associative structure (usually a request map `req`) by
+  looking for a value associated with a session key returned by calling
+  `get-session-key`."
+  ([req]
+   (get req (get-session-key req)))
+  ([req ^Keyword session-key]
+   (get req (get-session-key req session-key))))
+
+(defn sid-valid?
+  "Returns `true` if the given session ID is valid."
+  ^Boolean [sid]
+  (boolean
+   (and sid (string? sid) (not-empty-string? sid)
+        (<= 30 (count sid) 256)
+        (re-matches sid-match sid))))
+
+(defn sid-valid
+  "Returns the given `sid` if it is valid after converting it to a string. Otherwise it
+  returns `nil`."
+  [sid]
+  (let [sid (some-str sid)] (if (sid-valid? sid) sid)))
+
+(defmacro when-sid-valid
+  "Conditionally evaluates expressions from `body` in an implicit `do` when the session
+  ID given as `sid` is valid. Otherwise it returns `nil` without evaluating
+  anything."
+  [sid & body]
+  `(if (sid-valid? ~sid) (do ~@body)))
+
 (extend-protocol p/Sessionable
 
   Session
@@ -276,11 +318,12 @@
   (identify
     (^String [req]
      (or (p/identify (p/session req))
-         (some-str (or (get-in req [:params :session-id])
-                       (get-in req [:params "session-id"])))))
+         (sid-valid (or (some-str (get-in req [:params  :session-id]))
+                        (some-str (get-in req [:params  "session-id"]))
+                        (some-str (get-in req [:headers "session-id"]))))))
     (^String [req session-key-or-req-path]
      (if (coll? session-key-or-req-path)
-       (some-str (get-in req session-key-or-req-path))
+       (sid-valid (get-in req session-key-or-req-path))
        (p/identify (p/session req session-key-or-req-path)))))
 
   nil
@@ -985,14 +1028,6 @@
      (and (.expired? s)
           (not (.hard-expired? s)))
      false)))
-
-(defn sid-valid?
-  "Returns `true` if the given session ID is valid."
-  ^Boolean [sid]
-  (boolean
-   (and sid (string? sid) (not-empty-string? sid)
-        (<= 30 (count sid) 256)
-        (re-matches sid-match sid))))
 
 (defn created-valid?
   "Returns `true` if the given session has valid creation time. The session can be
