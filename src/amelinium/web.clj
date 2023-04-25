@@ -50,8 +50,7 @@
 (def ^:const remote-ip-keys  [:remote-ip :remote-ip/str :remote-ip/by-proxy? :remote-ip/proxy])
 (def ^:const language-keys   [:language/id :language/str :language/default :accept])
 (def ^:const i18n-keys       [:i18n/translator :i18n/translator-sub :i18n/translator-nd :i18n/translator-sub-nd])
-(def ^:const roles-keys      [:roles :roles/in-context :roles/context
-                              :user/authorized? :user/authenticated?])
+(def ^:const roles-keys      [:roles :roles/in-context :roles/context :user/authorized? :user/authenticated?])
 
 (def ^:const common-auth-keys (vec (concat session-keys remote-ip-keys roles-keys)))
 
@@ -124,6 +123,7 @@
 ;; HTML generators and transformers
 
 (defn roles-table
+  "Generates roles table as HTML string."
   ([req]
    (let [{:keys [data labels]} (roles-tabler req nil)]
      (if (and data labels)
@@ -173,8 +173,8 @@
   (qassoc req :app/data false))
 
 (defn no-app-data?
-  [req]
   "Returns `true` when the value associated with `:app/data` in `req` is `false`."
+  [req]
   (false? (get req :app/data)))
 
 (defn app-data
@@ -1034,7 +1034,7 @@
          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
      (apply errors/render err-config app-status (or default render-ok) req data view layout lang more))))
 
-;; Partial rendering with HTMX
+;; HTMX
 
 (defn inject
   "Injects HTML fragment by issuing HTMX response with `HX-Retarget` header set to
