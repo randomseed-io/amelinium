@@ -6,6 +6,7 @@ var amelinium = {
     if (el) {
       var mm = bootstrap.Modal.getOrCreateInstance(el);
       if (mm) {
+        mm.handleUpdate();
         mm.show();
       }
     }
@@ -17,6 +18,7 @@ var amelinium = {
       var mm = bootstrap.Modal.getOrCreateInstance(el);
       if (mm) {
         mm.hide();
+        mm.handleUpdate();
       }
     }
   },
@@ -26,15 +28,16 @@ var amelinium = {
     var session_id = null;
 
     if (session_id_key) {
-       document.body.addEventListener('htmx:afterOnLoad', function(evt) {
+      document.body.addEventListener('htmx:afterRequest', function(evt) {
         var sid = evt.detail.xhr.getResponseHeader(session_id_key);
         if (sid) {
-          session_id = sid;
-        } else if (sid === "") {
-          session_id = null;
+          if (sid === "-") {
+            session_id = null;
+          } else {
+            session_id = sid;
+          }
         }
       });
-
       document.body.addEventListener('htmx:configRequest', function(evt) {
         if (session_id) {
           evt.detail.headers[session_id_key] = session_id;
