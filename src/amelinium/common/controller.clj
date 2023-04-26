@@ -288,6 +288,7 @@
                                 ^Session sess (if prolonged?
                                                 (session/prolong sess ipaddr)
                                                 (session/create  sess user-id user-email ipaddr))]
+
                             (if-not (session/valid? sess)
 
                               (let [e (session/error sess)
@@ -315,8 +316,6 @@
                                   (session/inject sess)
                                   (common/replace-session-id-header sess)
                                   (common/roles-refresh)))))))))
-
-;; (resp/temporary-redirect goto-uri)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
