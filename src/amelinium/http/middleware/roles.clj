@@ -66,6 +66,14 @@
        (some? (.id       session))
        (some? (.user-id  session))))
 
+(defn user-known?
+  "Returns `true` if user ID can be obtained from the given session `session`, even if
+  the session expired or has errors; `false` otherwise."
+  ^Boolean [^Session session]
+  (and (or session false)
+       (session/session? session)
+       (some? (.user-id  session))))
+
 (defn user-authorized?
   "Checks if user is authorized in the specified context. Takes a request map and a set
   of roles which are tested to be true in the detected context. Uses :data entry of
