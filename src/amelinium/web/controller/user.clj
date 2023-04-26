@@ -10,6 +10,7 @@
 
   (:require [tick.core                          :as               t]
             [clojure.string                     :as             str]
+            [ring.util.http-response            :as            resp]
             [amelinium.types.session            :refer         :all]
             [amelinium.logging                  :as             log]
             [amelinium.db                       :as              db]
@@ -156,6 +157,18 @@
                            :verify/mins-left          mins-left
                            :verify/attempts-left      attempts-left
                            :verify/attempts-left-word attempts-left-w))))))
+
+(defn- auth-ok
+  [req route-data lang]
+  (if-some [goto-uri (get req :auth/goto)]
+    (resp/temporary-redirect goto-uri)
+    (language/force req (or lang (web/pick-language-str req)))))
+
+(defn- auth-prolonged-ok
+  [req route-data lang]
+  (if (get req :auth/htmx?)
+    (web/inject-auth-error req route-data :auth/prolonged-ok :login/prolonged)
+    (auth-ok req route-data lang)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
