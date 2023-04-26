@@ -90,6 +90,11 @@
                 pick-language pick-language-without-fallback
                 pick-language-str pick-language-str-without-fallback])
 
+;; HTMX
+
+(p/import-vars [amelinium.common
+                hx-request? use-hx? hx-target])
+
 ;; Special redirects
 
 (p/import-vars [amelinium.common

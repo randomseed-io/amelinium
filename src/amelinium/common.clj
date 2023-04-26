@@ -1123,6 +1123,50 @@
        (let [r (apply resp-fn a b c more)] (qassoc r :headers (conj (get r :headers) headers)))
        (apply resp-fn a b c more)))))
 
+;; HTMX
+
+(defn hx-request?
+  "Returns `true` if the client request has `HX-Request` header set to any value but
+  `false` or an empty string."
+  ^Boolean [req]
+  (if-some [hdr (get (get req :headers) "hx-request")]
+    (if-some [hdr (some-str hdr)]
+      (not= "false" hdr)
+      false)
+    false))
+
+(defn use-hx?
+  "Returns `true` if response should be HTMX-compatible, `false` if it should not. Uses
+  optional `route-data` or gets it from the `req` to look for (optional) `extra-key`
+  first, and if it is not given or has falsy value then gets a value associated with
+  the `:use-htmx?` key.
+
+  * If the obtained value is `false`, it will return `false`.
+  * If the obtained value is `true` or any non-`nil` value, it will return `true`.
+  * If the obtained value is `nil`, or there is no route data nor any of the mentioned
+    keys can be found in route data, it will try to auto-detect HTMX using `hx-request?`
+    function which analyzes the `HX-Request` request header."
+  (^Boolean [req]
+   (hx-request? req))
+  (^Boolean [req route-data]
+   (use-hx? req route-data false))
+  (^Boolean [req route-data extra-key]
+   (if-some [route-data (or route-data (http/get-route-data req))]
+     (if-some [force-hx (or (if extra-key (find route-data extra-key))
+                            (find route-data :use-htmx?))]
+       (if-some [force-hx? (val force-hx)]
+         (boolean force-hx?)
+         (hx-request? req))
+       (hx-request? req))
+     (hx-request? req))))
+
+(defn hx-target
+  "Returns a string from `HX-Target` header set by a client. If the header does not
+  exist, it returns `nil`. If the header exists but contains an empty string, it
+  returns `nil`."
+  [req]
+  (some-str (get (get req :headers) "hx-target")))
+
 ;; Redirects
 
 (defn redirect
