@@ -300,6 +300,38 @@
                       (qassoc apd# ~@pairs)
                       (lazy-map/->LazyMap {~@pairs ~@[]})))))))))
 
+;; Targets
+
+(defn get-target
+  "Gets a target element ID set for the current route using `:app/target` route
+  data. If it cannot be extracted, returns `nil`."
+  [req]
+  (if-let [target (http/req-or-route-param req :app/target)]
+    (some-str target)))
+
+(defn set-target-header
+  "Sets the `HX-Retarget` header to a string value of the given `target` in response
+  headers (under the `:response/headers` key) of the given `req` map. If the target
+  is not given, its value is obtained from `:app/target` of the `req` or the route
+  data within a request map. Returns updated `req`.
+
+  By default it will not replace existing `HX-Retarget` header, unless the `replace?`
+  argument is set to `true`."
+  ([req]
+   (if-some [target (get-target req)]
+     (set-target-header req target false)
+     req))
+  ([req target]
+   (set-target-header req target false))
+  ([req target replace?]
+   (if-some [target (some-str target)]
+     (if-some [headers (get req :response/headers)]
+       (if (or replace? (not (contains? headers "HX-Retarget")))
+         (qassoc req :headers (qassoc headers "HX-Retarget" target))
+         req)
+       (qassoc req :headers {"HX-Retarget" target}))
+     req)))
+
 ;; Layouts and views
 
 (defn get-view
