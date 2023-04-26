@@ -1219,6 +1219,35 @@
   ([f req name-or-path lang params query-params & more]
    (hx-transform-redirect (apply common/redirect f req name-or-path lang params query-params more))))
 
+(defn hx-go-to
+  "Same as `go-to` but uses `hx-localized-redirect` internally to generate HTMX
+  redirect."
+  {:arglists '([]
+               [req]
+               [url]
+               [req url]
+               [req name-or-path]
+               [req name-or-path path-params]
+               [req name-or-path path-params query-params]
+               [req name-or-path lang]
+               [req name-or-path lang path-params]
+               [req name-or-path lang path-params query-params]
+               [req name-or-path lang path-params query-params & more])}
+  ([]
+   (hx-transform-redirect (common/localized-redirect common/see-other)))
+  ([req-or-url]
+   (hx-transform-redirect (common/localized-redirect common/see-other req-or-url)))
+  ([req name-or-path]
+   (hx-transform-redirect (common/localized-redirect common/see-other req name-or-path)))
+  ([req name-or-path lang]
+   (hx-transform-redirect (common/localized-redirect common/see-other req name-or-path lang)))
+  ([req name-or-path lang params]
+   (hx-transform-redirect (common/localized-redirect common/see-other req name-or-path lang params)))
+  ([req name-or-path lang params query-params]
+   (hx-transform-redirect (common/localized-redirect common/see-other req name-or-path lang params query-params)))
+  ([req name-or-path lang params query-params & more]
+   (hx-transform-redirect (apply common/localized-redirect common/see-other req name-or-path lang params query-params more))))
+
 ;; Form errors
 
 (defn http-handle-bad-request-form-params
