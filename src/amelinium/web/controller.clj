@@ -197,6 +197,7 @@
 
        ;; Session expired and we are not reaching an authentication page nor a login page.
        ;; User can re-validate session using a login page.
+       ;;
        ;; We have to preserve form data and original, destination URI in a session variable
        ;; or use headers and HTMX.
 
