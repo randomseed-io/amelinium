@@ -1140,6 +1140,85 @@
      (if (use-hx? req route-data :auth-error/use-htmx?)
        (inject-auth-error req route-data status default-view)
        (goto-auth-error   req route-data status default-view)))))
+
+(defn hx-transform-redirect
+  [resp]
+  (if resp
+    (let [headers (get resp :headers)]
+      (qassoc resp
+              :status  200
+              :headers (-> (qassoc headers "HX-Redirect" (get headers "Location"))
+                           (dissoc "Location"))))))
+
+(defn hx-localized-redirect
+  "HTMX redirect wrapper. Uses `HX-Redirect` header to trigger redirect and resets the
+  status code to 200. The `f` should be a function which takes a request map and
+  returns a response; should take at least one single argument which should be a
+  URL. The URL will be parameterized with a language. Works almost the same way as
+  the `redirect` but it will generate a localized path using a language obtained from
+  a request (under `:language/str` key) and if there will be no language-parameterized
+  variant of the path, it will fail. Use this function to make sure that localized
+  path will be produced, or `nil`."
+  {:arglists '([f]
+               [f req]
+               [f url]
+               [f req url]
+               [f req name-or-path]
+               [f req name-or-path path-params]
+               [f req name-or-path path-params query-params]
+               [f req name-or-path lang]
+               [f req name-or-path lang path-params]
+               [f req name-or-path lang path-params query-params]
+               [f req name-or-path lang path-params query-params & more])}
+  ([f]
+   (hx-transform-redirect (common/localized-redirect f)) )
+  ([f req-or-url]
+   (hx-transform-redirect (common/localized-redirect f req-or-url)))
+  ([f req name-or-path]
+   (hx-transform-redirect (common/localized-redirect f req name-or-path)))
+  ([f req name-or-path lang]
+   (hx-transform-redirect (common/localized-redirect f req name-or-path lang)))
+  ([f req name-or-path lang params]
+   (hx-transform-redirect (common/localized-redirect f req name-or-path lang params)))
+  ([f req name-or-path lang params query-params]
+   (hx-transform-redirect (common/localized-redirect f req name-or-path lang params query-params)))
+  ([f req name-or-path lang params query-params & more]
+   (hx-transform-redirect (apply common/localized-redirect f req name-or-path lang params query-params more))))
+
+(defn hx-redirect
+  "Generic HTMX redirect wrapper. Uses `HX-Redirect` header to trigger redirect and
+  resets the status code to 200. The `f` should be a function which takes a request
+  map and returns a response; should take at least one single argument which should
+  be a URL. The URL will be parameterized with a language if required. If the
+  language is given it uses the `localized-page` function. If there is no language
+  given but the page identified by its name requires a language parameter to be set,
+  it will be obtained from the given request map (under the key `:language/str`)."
+  {:arglists '([f]
+               [f req]
+               [f url]
+               [f req url]
+               [f req name-or-path]
+               [f req name-or-path path-params]
+               [f req name-or-path path-params query-params]
+               [f req name-or-path lang]
+               [f req name-or-path lang path-params]
+               [f req name-or-path lang path-params query-params]
+               [f req name-or-path lang path-params query-params & more])}
+  ([f]
+   (hx-transform-redirect (common/redirect f)) )
+  ([f req-or-url]
+   (hx-transform-redirect (common/redirect f req-or-url)))
+  ([f req name-or-path]
+   (hx-transform-redirect (common/redirect f req name-or-path)))
+  ([f req name-or-path lang]
+   (hx-transform-redirect (common/redirect f req name-or-path lang)))
+  ([f req name-or-path lang params]
+   (hx-transform-redirect (common/redirect f req name-or-path lang params)))
+  ([f req name-or-path lang params query-params]
+   (hx-transform-redirect (common/redirect f req name-or-path lang params query-params)))
+  ([f req name-or-path lang params query-params & more]
+   (hx-transform-redirect (apply common/redirect f req name-or-path lang params query-params more))))
+
 ;; Form errors
 
 (defn http-handle-bad-request-form-params
