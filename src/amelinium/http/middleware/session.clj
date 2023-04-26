@@ -733,7 +733,7 @@
   "Splits secure ID into a vector of 2 strings: session ID and password (a.k.a secure
   token)."
   ^String [^String session-id]
-  (str/split session-id token-splitter 2))
+  (if session-id (str/split session-id token-splitter 2)))
 
 (defn db-id
   "Returns a database session ID from a session object or any other value which can be
