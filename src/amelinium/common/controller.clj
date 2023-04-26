@@ -162,6 +162,18 @@
       false)
     false))
 
+(defn hx-prolong?
+  "Returns `true` if authentication is about prolonging session with HTMX
+  request.
+
+  Requires session `sess` to be soft-expired and `HX-Target` request header taken
+  from `req` (under `:headers` key) to indicate the same target as configured
+  `:auth/prolongate` target value for `:auth-error/targets` map of a route
+  data (given as `route-data`)."
+  [req route-data sess]
+  (and sess (session/soft-expired? sess)
+       (common/use-hx? req route-data :auth-error/use-htmx?)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions
 
