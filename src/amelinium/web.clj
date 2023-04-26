@@ -661,7 +661,8 @@
   ([resp-fn status req data view layout lang]
    (if (resp/response? req)
      req
-     (let [r (-> (render req status data view layout lang) (resp-fn))]
+     (let [req (set-target-header req)
+           r   (-> (render req status data view layout lang) (resp-fn))]
        (if-some [headers (get req :response/headers)]
          (qassoc r :headers (conj (get r :headers) headers))
          r)))))
@@ -715,7 +716,8 @@
   ([resp-fn status req data view layout]
    (render-response-force resp-fn status req data view layout nil))
   ([resp-fn status req data view layout lang]
-   (let [r (-> (render req status data view layout lang) (resp-fn))]
+   (let [req (set-target-header req)
+         r   (-> (render req status data view layout lang) (resp-fn))]
      (if-some [headers (get req :response/headers)]
        (qassoc r :headers (conj (get r :headers) headers))
        r))))
