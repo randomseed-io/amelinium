@@ -597,6 +597,7 @@
                                      :url                (delay (req/request-url req))
                                      :character-encoding (delay (req/character-encoding req))
                                      :path               (delay (common/page req))
+                                     :htmx-request?      (delay (common/hx-request? req))
                                      :lang               dlng)
              data (update-status data req status dlng)
              html (if view (selmer/render-file view data) "")
