@@ -50,7 +50,7 @@
 (def ^:const remote-ip-keys  [:remote-ip :remote-ip/str :remote-ip/by-proxy? :remote-ip/proxy])
 (def ^:const language-keys   [:language/id :language/str :language/default :accept])
 (def ^:const i18n-keys       [:i18n/translator :i18n/translator-sub :i18n/translator-nd :i18n/translator-sub-nd])
-(def ^:const roles-keys      [:roles :roles/in-context :roles/context :user/authorized? :user/authenticated?])
+(def ^:const roles-keys      [:roles :roles/in-context :roles/context :user/authorized? :user/authenticated? :user/known?])
 
 (def ^:const common-auth-keys (vec (concat session-keys remote-ip-keys roles-keys)))
 
