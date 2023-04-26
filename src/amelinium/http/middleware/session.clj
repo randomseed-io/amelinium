@@ -752,7 +752,7 @@
   parts separated with a dash character)."
   ^String [^Session smap]
   (or (.db-id smap)
-      (nth (split-secure-sid (or (.id smap) (.err-id smap)) 0 nil))))
+      (nth (split-secure-sid (or (.id smap) (.err-id smap))) 0 nil)))
 
 (defn db-sid-str
   "Extracts a database session ID from a secure session ID."
