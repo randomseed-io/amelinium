@@ -76,17 +76,28 @@
 
 (defn user-authorized?
   "Checks if user is authorized in the specified context. Takes a request map and a set
-  of roles which are tested to be true in the detected context. Uses :data entry of
-  the current route to get local configuration in which it looks for
-  keys: :roles/forbidden, :roles/any and :roles/all (in that order).
-  The :roles/forbidden should contain a set of roles which make access unauthorized
-  if at least one of the current roles is matching. The :roles/any authorizes
-  operation if at least one of the current roles is matching. The :roles/all, if
-  present, matches if all the specified roles are effectively present. The default
-  strategy (when there are no rules specified or just the :roles/forbidden) is to
-  allow but it can be changed in the middleware configuration, under the
-  key :authorize-default?. Returns nil if the access is forbidden, true if granted,
-  false if there were rules but none matched."
+  of roles which are tested to be true in the detected context. Uses `:data` entry of
+  the current route to get local configuration in which it looks for keys (in order):
+
+  - `:roles/forbidden`,
+  - `:roles/any`,
+  - `:roles/all`.
+
+  The `:roles/forbidden` should contain a set of roles which make access unauthorized
+  if at least one of the current roles is matching.
+
+  The `:roles/any` authorizes operation if at least one of the current roles is
+  matching.
+
+  The `:roles/all`, if present, matches if all the specified roles are effectively
+  present.
+
+  The default strategy (when there are no rules specified or just the
+  `:roles/forbidden`) is to allow but it can be changed in the middleware
+  configuration, under the key `:authorize-default?`.
+
+  Returns `nil` if the access is forbidden, `true` if granted, `false` if there were
+  rules but none matched."
   ([req]
    (user-authorized? req
                      (get req :roles/in-context)
@@ -179,7 +190,7 @@
     ((get config :invalidator) config user-id)))
 
 (defn handler
-  "Processes RBAC information by taking a user-id and configuration options."
+  "Processes RBAC information by taking `user-id` and configuration options."
   ([user-id config]
    (handler user-id config
             (get config :query-roles-fn)
@@ -202,11 +213,14 @@
 (defn get-roles-for-user-id
   "Retrieves all roles for the given user ID and returns them as a map where keys are
   contexts (expressed as keywords) and values are sets of roles assigned to those
-  contexts. If the user ID is `nil` or `false`, it returns a map with a global
-  context and just one, anonymous role assigned to it within a set. If there is no
-  anonymous role passed as an argument, returns `nil` in such case. Self-role is not
-  included, even if it configured, since it is highly conditioned and may depend on
-  data from the request or an external data source."
+  contexts.
+
+  If the user ID is `nil` or `false`, it returns a map with a global context and just
+  one, anonymous role assigned to it within a set. If there is no anonymous role
+  passed as an argument, returns `nil`.
+
+  Self-role is not included, even if it is configured, since it's highly conditioned
+  and may depend on data from the request or an external data source."
   ([config user-id]
    (get-roles-for-user-id config user-id (get config :processor)
                           (get config :global-context)
@@ -221,8 +235,15 @@
      (if anonymous-role {global-context #{anonymous-role}}))))
 
 (defn get-roles-from-session
-  "Uses session map (`session`) to obtain current user's ID and then calls `handler-fn`
-  with user ID to obtain user's roles."
+  "Uses the given session map `session` to obtain current user's ID and then calls
+  `handler-fn` with that user ID to obtain user's roles.
+
+  If the ID cannot be obtained from a session, anonymous role is added (if it is
+  configured).
+
+  If the ID can be obtained from a session but the session is marked as invalid, a
+  special known-user role is added (if it is configured) so it is possible to
+  identify users with expired or broken sessions visiting the service."
   ([config ^Session session]
    (get-roles-from-session config session (get config :processor)
                            (get config :global-context)
