@@ -255,10 +255,15 @@
   ([req]
    (logout! req))
   ([req session-key]
-   (let [route-data (http/get-route-data req)]
-     (session/delete! req (or session-key (get route-data :session-key)))
+   (let [route-data  (http/get-route-data req)
+         session-key (or session-key (get route-data :session-key))
+         sess        (session/of req session-key)
+         req         (common/empty-session-id-header req sess)]
+     (session/delete! sess)
      (if-some [dst (get route-data :destination)]
-       (web/go-to req dst)
+       (if (web/use-hx? req route-data)
+         (web/hx-go-to req dst)
+         (web/go-to req dst))
        req))))
 
 (defn prolong!
