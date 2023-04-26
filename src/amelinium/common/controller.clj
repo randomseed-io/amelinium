@@ -207,8 +207,11 @@
   conditions and may emit a redirect (if a go-to was detected) or set the
   `:response/status` in the returned request map (but not in the response map!).
 
-  In case of session prolongation initiated by HTMX it will set the
-  `:response/status` to `:auth/prolonged`.
+  In case of successful authentication it will set `:auth/ok` to `true` and
+  `:response-status` to `:auth/ok`.
+
+  In case of session prolongation and successful authentication it will set
+  `:auth/ok?` to `true` and `:response/status` to `:auth/prolonged-ok`.
 
   The last, `auth-only-mode` argument, when set to `true` (default is `false` when
   not given) causes session creation and prolongation to be skipped if the
@@ -277,10 +280,12 @@
                           (let [^Session sess (or sess
                                                   (session/of req (or session-key
                                                                       (get route-data :session-key))))
-                                hx-prolong?   (hx-prolong? req route-data sess)
-                                goto-uri      (if-not hx-prolong? (get-goto-uri req sess))
+                                hx?           (and (common/use-hx? req route-data :auth-error/use-htmx?))
+                                hx-pl?        (and hx? sess (session/soft-expired? sess))
+                                goto-uri      (if-not hx-pl? (get-goto-uri req sess))
                                 goto?         (boolean goto-uri)
-                                ^Session sess (if (or hx-prolong? goto?)
+                                prolonged?    (or hx-pl? goto?)
+                                ^Session sess (if prolonged?
                                                 (session/prolong sess ipaddr)
                                                 (session/create  sess user-id user-email ipaddr))]
                             (if-not (session/valid? sess)
@@ -291,23 +296,27 @@
                                 (when c
                                   (log/log (or s :warn) c)
                                   (oplog-fn :level s :user-id user-id :op :session :ok? false :msg c))
-                                (qassoc req :user/authenticated? false :user/authorized? false
-                                        :user/id user-id :user/account-type ac-type
-                                        :auth/ok? false :response/status :auth/session-error))
+                                (qassoc req
+                                        :auth/ok?            false
+                                        :response/status     :auth/session-error
+                                        :user/authenticated? false
+                                        :user/authorized?    false
+                                        :user/id             user-id
+                                        :user/account-type   ac-type))
 
-                              (cond
-                                goto?       (resp/temporary-redirect goto-uri)
-                                hx-prolong? (-> req
-                                                (qassoc :auth/ok? true :response/status :auth/prolonged
-                                                        :user/id user-id :user/account-type ac-type)
-                                                (session/inject sess)
-                                                (common/roles-refresh))
-                                :else       (-> req
-                                                (qassoc :auth/ok? true :response/status :auth/ok
-                                                        :user/id user-id :user/account-type ac-type)
-                                                (session/inject sess)
-                                                (common/replace-session-id-header sess)
-                                                (common/roles-refresh))))))))))
+                              (-> req
+                                  (qassoc
+                                   :auth/ok?          true
+                                   :response/status   (if prolonged? :auth/prolonged-ok :auth/ok)
+                                   :auth/goto         goto-uri
+                                   :auth/htmx?        hx?
+                                   :user/id           user-id
+                                   :user/account-type ac-type)
+                                  (session/inject sess)
+                                  (common/replace-session-id-header sess)
+                                  (common/roles-refresh)))))))))
+
+;; (resp/temporary-redirect goto-uri)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
