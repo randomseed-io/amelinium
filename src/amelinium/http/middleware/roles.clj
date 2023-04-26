@@ -258,7 +258,7 @@
     global-context anonymous-role known-user-role]
    (let [user-id (valuable (session/user-id session))
          roles   (get-roles-for-user-id config user-id handler-fn global-context anonymous-role)]
-     (if (or (not user-id) (session/valid? ^Session session) )
+     (if (or (not user-id) (session/valid? session))
        roles
        (if known-user-role {global-context #{known-user-role}})))))
 
@@ -355,6 +355,7 @@
     global-context authorize-default? session-key
     roles-forbidden roles-any roles-all]
    (let [^Session session (session/of req session-key)
+         known?           (delay (user-known? session))
          authenticated?   (delay (user-authenticated? session))
          roles            (delay (let [sr (if (and self-role @authenticated?) (srfn req))]
                                    (cond-> (get-roles-from-session config session
@@ -373,6 +374,7 @@
                               (assoc :roles               roles
                                      :roles/context       context
                                      :roles/in-context    in-context
+                                     :user/known?         known?
                                      :user/authorized?    authorized?
                                      :user/authenticated? authenticated?))]
      (if (and unauth-redir (not @authorized?))
