@@ -58,14 +58,13 @@
        (set/union context-roles global-roles)))))
 
 (defn user-authenticated?
-  "Returns true if user is authenticated, false otherwise."
-  [session]
-  (boolean
-   (if (session/session? session)
-     (let [^Session session session]
-       (and (.valid?         ^Session session)
-            (some? (.id      ^Session session))
-            (some? (.user-id ^Session session)))))))
+  "Returns `true` if user is authenticated, false otherwise."
+  ^Boolean [^Session session]
+  (and (or session false)
+       (session/session? session)
+       (.valid?          session)
+       (some? (.id       session))
+       (some? (.user-id  session))))
 
 (defn user-authorized?
   "Checks if user is authorized in the specified context. Takes a request map and a set
