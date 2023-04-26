@@ -1618,7 +1618,7 @@
   If the `HX-Trigger` header already exists but it does not contain `setSession`
   trigger name, it will be modified. If it already contains it, it will be left as
   is."
-  [req ^Session sess]
+  [req sess]
   (if-some [sid (if sess (session/any-id sess))]
     (add-json-event-header req "HX-Trigger" "setSession" (session/id-field sess) sid false)
     req))
@@ -1635,7 +1635,7 @@
 
   If the `HX-Trigger` header already exists, it will be modified and any value
   associated with `setSession` key will be modified."
-  [req ^Session sess]
+  [req sess]
   (if-some [sid (if sess (session/any-id sess))]
     (add-json-event-header req "HX-Trigger" "setSession" (session/id-field sess) sid true)
     req))
@@ -1720,6 +1720,21 @@
         req)
       req)
     req))
+
+(defn empty-session-id-header
+  "Adds session ID header with an empty string to the `:response/headers` map of the
+  given `req` map. Name of the header is obtained from session ID field (by calling
+  `amelinium.http.middleware.session/id-field`). If the header already exists it is
+  replaced."
+  ([req sess]
+   (empty-session-id-header req sess :response/headers))
+  ([req sess headers-key]
+   (if-some [id-field (session/id-field sess)]
+     (let [headers (get req headers-key)]
+       (if (pos? (count headers))
+         (qassoc req headers-key (qassoc headers id-field "-"))
+         (qassoc req headers-key {id-field "-"})))
+     req)))
 
 ;; Context and roles
 
