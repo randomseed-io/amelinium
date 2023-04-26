@@ -236,10 +236,10 @@
      (cond
        password              (auth-with-password! req user-email password sess @route-data @lang false session-key)
        (session/valid? sess) (if (some? (language/from-path req))
-                                ;; Render the contents in a language specified by the current path.
-                                req
-                                ;; Redirect to a proper language version of this very page.
-                                (web/move-to req (or (get @route-data :name) (get req :uri)) @lang))
+                               ;; Render the contents in a language specified by the current path.
+                               req
+                               ;; Redirect to a proper language version of this very page.
+                               (web/move-to req (or (get @route-data :name) (get req :uri)) @lang))
        :invalid-session!     (web/move-to req (or (get @route-data :auth/login) :auth/login) @lang)))))
 
 (defn login!
