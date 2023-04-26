@@ -193,8 +193,8 @@
      (if (web/response? req)
        req
        (case status
-         :auth/ok            (if auth-only? req (language/force req (or lang (web/pick-language-str req))))
-         :auth/prolonged     (web/handle-auth-error req route-data status :login/prolonged)
+         :auth/ok            (if auth-only? req (auth-ok req route-data lang))
+         :auth/prolonged-ok  (if auth-only? req (auth-prolonged-ok req route-data lang))
          :auth/locked        (web/handle-auth-error req route-data status :login/account-locked)
          :auth/soft-locked   (web/handle-auth-error req route-data status :login/account-soft-locked)
          :auth/bad-password  (web/handle-auth-error req route-data status :login/bad-password)
