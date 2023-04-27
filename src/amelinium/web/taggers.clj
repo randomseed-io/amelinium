@@ -356,69 +356,74 @@
 
 (defn form-field
   "Helper to generate HTML for the `form-field` tag."
-  [args tr-sub errors params]
-  (let [field (args->map args)
-        id    (get field :id)]
-    (if-some [id-str (common/string-from-param id)]
-      (let [{:keys
-             [name
-              class
-              label
-              parameter-type
-              value
-              placeholder
-              autocomplete
-              input-type
-              type]}   field
-            value?     (contains? params id-str)
-            error?     (contains? errors id-str)
-            id-str     (common/string-from-param id)
-            name       (common/string-from-param name)
-            autoc      (common/string-from-param autocomplete)
-            ptype      (common/string-from-param parameter-type)
-            itype      (common/string-from-param input-type)
-            itype      (or itype (common/string-from-param type))
-            class      (if class (common/string-from-param class))
-            label      (param-try-tr tr-sub :forms label id)
-            phold      (param-try-tr tr-sub :forms placeholder id)
-            value      (valuable (if value? (get params id-str) value))
-            value      (if value (param-try-tr tr-sub :forms value id))
-            ptype      (or ptype (if error? (get errors id-str)))
-            err-msgs   (if error?   (coercion/translate-error @tr-sub id-str ptype))
-            err-summ   (if err-msgs (some-str (get err-msgs :error/summary)))
-            err-desc   (if err-msgs (some-str (get err-msgs :error/description)))
-            error?     (boolean (or err-summ err-desc))
-            err-id     (if error? (strb id-str "-validation-fb"))
-            hidden?    (and itype (= "hidden" itype))
-            html-id    (html-esc id-str)
-            html-class (if class    (strb (html-esc class) " form-control") "form-control")
-            html-label (if label    (html-esc label))
-            html-name  (if name     (html-esc name)  html-id)
-            html-itype (if itype    (html-esc itype) "text")
-            html-ptcls (if ptype    (strb " param-type-"     (html-esc ptype)))
-            html-value (if value    (strb " value=\""        (html-esc value) "\""))
-            html-phold (if phold    (strb " placeholder=\""  (html-esc phold) "\""))
-            html-autoc (if autoc    (strb " autocomplete=\"" (html-esc autoc) "\""))
-            html-esumm (if err-summ (strb "      <p class=\"error-summary\">"     (html-esc err-summ) "</p>\n"))
-            html-edesc (if err-desc (strb "      <p class=\"error-description\">" (html-esc err-desc) "</p>\n"))
-            html-error (if error?   (strb "    <div id=\"" err-id "\" class=\"form-error invalid-feedback\">\n" html-esumm html-edesc "</div>\n"))
-            html-class (if error?   (strb html-class " is-invalid") html-class)
-            html-ariad (if error?   (strb " aria-describedby=\"" err-id "\""))
-            html-label (if label    (strb "        <label for=\"" id-str "\" class=\"form-label\">" html-label "</label>\n"))
-            html-attrs (html-add-attrs field [:htmx? :session? :id :name :label :placeholder
-                                              :parameter-type :value :autocomplete
-                                              :input-type :type :class])]
-        (if hidden?
-          (strs "  <input type=\"" html-itype "\" class=\"" html-class
-                "\" name=\"" html-name "\" id=\"" html-id "\""
-                html-phold html-value html-autoc html-attrs html-ariad " />\n"
-                html-label
-                html-error)
-          (strs "<input type=\"" html-itype "\" class=\"" html-class
-                "\" name=\"" html-name "\" id=\"" html-id "\""
-                html-phold html-value html-autoc html-attrs html-ariad " />\n"
-                html-label
-                html-error))))))
+  ([args tr-sub errors params]
+   (form-field args tr-sub errors params nil))
+  ([args tr-sub errors params props]
+   (let [field (args->map args)
+         id    (get field :id)]
+     (if-some [id-str (common/string-from-param id)]
+       (let [{:keys
+              [name
+               class
+               label
+               parameter-type
+               value
+               placeholder
+               autocomplete
+               wrapper-class
+               input-type
+               type]}   field
+             value?     (contains? params id-str)
+             error?     (contains? errors id-str)
+             id-str     (common/string-from-param id)
+             name       (common/string-from-param name)
+             autoc      (common/string-from-param autocomplete)
+             ptype      (common/string-from-param parameter-type)
+             itype      (common/string-from-param input-type)
+             wrapp      (common/string-from-param wrapper-class)
+             itype      (or itype (common/string-from-param type))
+             class      (if class (common/string-from-param class))
+             label      (param-try-tr tr-sub :forms label id)
+             phold      (param-try-tr tr-sub :forms placeholder id)
+             value      (valuable (if value? (get params id-str) value))
+             value      (if value (param-try-tr tr-sub :forms value id))
+             ptype      (or ptype (if error? (get errors id-str)))
+             err-msgs   (if error?   (coercion/translate-error @tr-sub id-str ptype))
+             err-summ   (if err-msgs (some-str (get err-msgs :error/summary)))
+             err-desc   (if err-msgs (some-str (get err-msgs :error/description)))
+             error?     (boolean (or err-summ err-desc))
+             err-id     (if error? (strb id-str "-validation-fb"))
+             hidden?    (and itype (= "hidden" itype))
+             html-id    (html-esc id-str)
+             html-wrap  (if wrapp (html-esc wrapp) (get props :wrapper-class))
+             html-wr-st (if html-wrap (strb "  <div class=\"" html-wrap "\">"))
+             html-wr-en (if html-wrap "</div>")
+             html-class (if class    (strb (html-esc class) " form-control") "form-control")
+             html-label (if label    (html-esc label))
+             html-name  (if name     (html-esc name)  html-id)
+             html-itype (if itype    (html-esc itype) "text")
+             html-ptcls (if ptype    (strb " param-type-"     (html-esc ptype)))
+             html-value (if value    (strb " value=\""        (html-esc value) "\""))
+             html-phold (if phold    (strb " placeholder=\""  (html-esc phold) "\""))
+             html-autoc (if autoc    (strb " autocomplete=\"" (html-esc autoc) "\""))
+             html-esumm (if err-summ (strb "      <p class=\"error-summary\">"     (html-esc err-summ) "</p>\n"))
+             html-edesc (if err-desc (strb "      <p class=\"error-description\">" (html-esc err-desc) "</p>\n"))
+             html-error (if error?   (strb "    <div id=\"" err-id "\" class=\"form-error invalid-feedback\">\n" html-esumm html-edesc "</div>\n"))
+             html-class (if error?   (strb html-class " is-invalid") html-class)
+             html-ariad (if error?   (strb " aria-describedby=\"" err-id "\""))
+             html-label (if label    (strb "        <label for=\"" id-str "\" class=\"form-label\">" html-label "</label>\n"))
+             html-attrs (html-add-attrs field [:htmx? :session? :id :name :label :placeholder
+                                               :parameter-type :value :autocomplete
+                                               :input-type :type :class :wrapper-class])]
+         (if hidden?
+           (strs html-wr-st "<input type=\"" html-itype "\" class=\"" html-class
+                 "\" name=\"" html-name "\" id=\"" html-id "\""
+                 html-phold html-value html-autoc html-attrs html-ariad " />\n"
+                 html-label html-error html-wr-en)
+           (strs html-wr-st "<input type=\"" html-itype "\" class=\"" html-class
+                 "\" name=\"" html-name "\" id=\"" html-id "\""
+                 html-phold html-value html-autoc html-attrs html-ariad " />\n"
+                 html-label html-error html-wr-en)))))))
 
 (defn form-fields
   "Helper to generate HTML for the `form-fields` tag."
@@ -634,7 +639,7 @@
                errors      (if form-errors (get form-errors :errors))
                params      (if form-errors (get form-errors :params))
                args        (parse-args args)]
-           (form-field args tr-sub errors params)))))
+           (form-field args tr-sub errors params props)))))
 
     (selmer/add-tag!
      :form-submit
@@ -662,6 +667,7 @@
              lang         (get args :lang)
              method       (get args :method)
              label        (get args :label)
+             wrcls        (get args :wrapper-class)
              class        (get args :class)
              class        (if class (common/string-from-param class))
              errors?      (some? (not-empty (get ctx :form/errors)))
@@ -673,6 +679,7 @@
              label?       (some? label)
              method       (if method (common/string-from-param method))
              lang         (if lang   (common/string-from-param lang))
+             wrcls        (if wrcls  (common/string-from-param wrcls))
              action?      (some? action)
              action-lang  (if action? (or (common/string-from-param (get args :action-lang)) lang))
              path-params  (if action? (assignments->kw-map (get args :path-params) ctx))
@@ -689,7 +696,8 @@
                             (if id-str?
                               {:session? sess? :tr-sub tr-sub-fn :id id-str}
                               {:session? sess? :tr-sub tr-sub-fn}))
-             method       (if method (html-esc method) "post")
+             form-props   (if wrcls   (map/qassoc form-props :wrapper-class (html-esc wrcls)) form-props)
+             method       (if method  (html-esc method) "post")
              html-method  (if hx?  "" (strb " method=\"" method "\""))
              html-lang    (if lang    (strb " lang=\"" (html-esc lang) "\""))
              html-action  (if action  (if hx? (strb " hx-" method "=" action) (strb " action=\"" action "\"")))
@@ -702,7 +710,7 @@
              html-class   (if class   (strb " class=\"" (html-esc class) "\""))
              html-attrs   (html-add-attrs args [:htmx? :id :method :label :session?
                                                 :action :lang :action-lang :class
-                                                :query-params :path-params])]
+                                                :query-params :path-params :wrapper-class])]
          (strs
           "<form" html-id html-class html-lang html-method html-action html-attrs ">"
           (selmer/render (get (get content :form) :content) (map/qassoc ctx :form-props form-props) {:tag-second \-})
