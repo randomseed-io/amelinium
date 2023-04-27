@@ -289,8 +289,15 @@
        :bad-prolongation
        (web/move-to req (get-in route-data [:auth-error/destinations :auth/session-error] :login/session-error))))))
 
+(defn register!
+  "Initiates user registration process."
+  ([req] (register! req nil))
+  ([req session-key]
+   (let [^Session sess (session/of req session-key)]
+     req)))
+
 (defn create!
-  "Verifies confirmation token against a database and if it matches creates the
+  "Verifies confirmation token against a database and if it matches creates an
   account."
   [req]
   (let [auth-config  (auth/config req)
