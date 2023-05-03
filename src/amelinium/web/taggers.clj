@@ -389,7 +389,8 @@
                autocomplete
                wrapper-class
                input-type
-               type]}   field
+               type
+               _field]} field
              value?     (contains? params id-str)
              error?     (contains? errors id-str)
              id-str     (common/string-from-param id)
@@ -398,8 +399,10 @@
              ptype      (common/string-from-param parameter-type)
              itype      (common/string-from-param input-type)
              wrapp      (common/string-from-param wrapper-class)
+             hyper      (common/string-from-param _field)
              itype      (or itype (common/string-from-param type))
              class      (if class (common/string-from-param class))
+             label      (if (nil? label) id (if-not (false? (pboolean label)) label))
              label      (param-try-tr tr-sub :forms label id)
              phold      (param-try-tr tr-sub :forms placeholder id)
              value      (valuable (if value? (get params id-str) value))
@@ -412,12 +415,14 @@
              err-id     (if error? (strb id-str "-validation-fb"))
              hidden?    (and itype (= "hidden" itype))
              html-id    (html-esc id-str)
+             html-hyper (if hyper (html-esc hyper) (get props :_field))
+             html-hyper (if html-hyper (strb " _=\"" html-hyper "\""))
              html-wrap  (if wrapp (html-esc wrapp) (get props :wrapper-class))
              html-wr-st (if html-wrap (strb "  <div class=\"" html-wrap "\">"))
              html-wr-en (if html-wrap "</div>")
              html-class (if class    (strb (html-esc class) " form-control") "form-control")
              html-label (if label    (html-esc label))
-             html-name  (if name     (html-esc name)  html-id)
+             html-name  (if name     (html-esc name) html-id)
              html-itype (if itype    (html-esc itype) "text")
              html-ptcls (if ptype    (strb " param-type-"     (html-esc ptype)))
              html-value (if value    (strb " value=\""        (html-esc value) "\""))
@@ -431,15 +436,16 @@
              html-label (if label    (strb "        <label for=\"" id-str "\" class=\"form-label\">" html-label "</label>\n"))
              html-attrs (html-add-attrs field [:htmx? :session? :id :name :label :placeholder
                                                :parameter-type :value :autocomplete
-                                               :input-type :type :class :wrapper-class])]
+                                               :input-type :type :class :wrapper-class
+                                               :_field])]
          (if hidden?
            (strs html-wr-st "<input type=\"" html-itype "\" class=\"" html-class
                  "\" name=\"" html-name "\" id=\"" html-id "\""
-                 html-phold html-value html-autoc html-attrs html-ariad " />\n"
+                 html-phold html-value html-autoc html-attrs html-ariad html-hyper " />\n"
                  html-label html-error html-wr-en)
            (strs html-wr-st "<input type=\"" html-itype "\" class=\"" html-class
                  "\" name=\"" html-name "\" id=\"" html-id "\""
-                 html-phold html-value html-autoc html-attrs html-ariad " />\n"
+                 html-phold html-value html-autoc html-attrs html-ariad html-hyper " />\n"
                  html-label html-error html-wr-en)))))))
 
 (defn form-fields
