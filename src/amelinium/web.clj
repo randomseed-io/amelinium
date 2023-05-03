@@ -1131,6 +1131,12 @@
                 (get route-data :auth-error/destination))))))
 
 (defn handle-auth-error
+  "Sets proper HTMX response (when `use-hx?` returns `true` because the request
+  indicated it is HTMX or `:auth-error/use-htmx?` route data key is set or generic
+  `:use-htmx?` route data key is set), or a redirect response, as a result of
+  authentication error encountered. Additionally, sets an HTTP response header
+  `Authentication-Error` with error status detected (mainly to be used by reverse
+  proxies)."
   ([req]
    (handle-auth-error req nil :auth/error nil))
   ([req status]
@@ -1138,7 +1144,9 @@
   ([req status default-view]
    (handle-auth-error req nil status default-view))
   ([req route-data status default-view]
-   (let [route-data (or route-data (http/get-route-data req))]
+   (let [route-data (or route-data (http/get-route-data req))
+         str-status (some-str status)
+         req        (if str-status (add-header req :Authentication-Error str-status) req)]
      (if (use-hx? req route-data :auth-error/use-htmx?)
        (inject-auth-error req route-data status default-view)
        (goto-auth-error   req route-data status default-view)))))
