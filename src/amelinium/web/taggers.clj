@@ -693,6 +693,22 @@
            (form-submit (first args) (rest args) tr-sub validators)))))
 
     (selmer/add-tag!
+     :submit-button
+     (fn [args ctx content]
+       (let [args    (parse-args args)
+             props   (get ctx :form-props)
+             tr-sub  (or (get props :tr-sub) (i18n/no-default (translator-sub ctx translations-fn)))
+             content (get (get content :submit-button) :content)]
+         (if (or (get args :session?) (get props :session?) (get ctx :session?))
+           (let [smap   (if-not props (session/of ctx))
+                 sid    (or (get props :session-id) (session/id smap))
+                 sfld   (or (get props :session-id-field) (session/id-field smap))
+                 tr-sub (or (get props :tr-sub) (i18n/no-default (translator-sub ctx translations-fn)))]
+             (form-submit-session (first args) (rest args) tr-sub sfld sid validators content))
+           (form-submit (first args) (rest args) tr-sub validators content))))
+     :end-submit-button)
+
+    (selmer/add-tag!
      :form
      (fn [args ctx content]
        (let [args         (args->map (parse-args args))
