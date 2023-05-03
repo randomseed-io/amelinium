@@ -284,7 +284,11 @@
    (tr args ctx nil))
   ([args ctx translations-fn]
    (if-some [translator (translator ctx translations-fn)]
-     (apply translator (common/keyword-from-param (first args)) (next args)))))
+     (let [arg-1 (common/keyword-from-param (first args))
+           nxta  (next args)]
+       (if nxta
+         (apply translator arg-1 nxta)
+         (translator arg-1))))))
 
 (defn tr-sub
   "Translation function. Creates a translator by calling `translator-sub` and prepares
@@ -294,10 +298,14 @@
    (tr-sub args ctx nil))
   ([args ctx translations-fn]
    (if-some [translator-sub (translator-sub ctx translations-fn)]
-     (apply translator-sub
-            (common/keyword-from-param (first  args))
-            (common/keyword-from-param (second args))
-            (nnext args)))))
+     (let [arg-1 (common/keyword-from-param (first  args))
+           arg-2 (common/keyword-from-param (second args))
+           nxta  (nnext args)]
+       (if nxta
+         (apply translator-sub arg-1 arg-2 nxta)
+         (if arg-2
+           (translator-sub arg-1 arg-2)
+           (translator-sub arg-1)))))))
 
 (defn kw-param?
   "Returns `true` if the given value is a keyword or a string expressing a
