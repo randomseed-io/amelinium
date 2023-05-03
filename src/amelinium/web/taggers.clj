@@ -458,24 +458,38 @@
 
 (defn form-submit-session
   "Helper to generate HTML for the `form-submit` tag."
-  [label args tr-sub session-field session-id validators]
-  (let [args  (args->map args)
-        label (param-try-tr tr-sub :forms (or label :submit))
-        label (if label (html-esc label) "OK!")
-        sdata (if (and session-field session-id) (strb " name=\"" session-field "\" value=\"" session-id "\""))
-        attrs (html-add-attrs args [:session?])]
-    (strs (anti-spam-code validators)
-          "  <button type=\"submit\"" sdata attrs ">" label "</button>\n")))
+  ([label args tr-sub session-field session-id validators]
+   (form-submit-session label args tr-sub session-field session-id validators nil))
+  ([label args tr-sub session-field session-id validators html]
+   (let [args    (args->map args)
+         noname? (nil? (get args :name))
+         args    (if noname? (map/qassoc args :name (common/string-from-param (get args :id))) args)
+         html    (some-str html)
+         nohtml? (nil? html)
+         label   (if nohtml? (if (nil? label) (get args :id) (if-not (false? (pboolean label)) label)))
+         label   (if nohtml? (param-try-tr tr-sub :forms (or label :submit)))
+         label   (if nohtml? (if label (html-esc label) "OK!"))
+         sdata   (if (and session-field session-id) (strb " name=\"" session-field "\" value=\"" session-id "\""))
+         attrs   (html-add-attrs args [:session?])]
+     (strs (anti-spam-code validators)
+           "  <button type=\"submit\"" sdata attrs ">" (or html label) "</button>\n"))))
 
 (defn form-submit
   "Helper to generate HTML for the `form-submit` tag."
-  [label args tr-sub validators]
-  (let [args  (args->map args)
-        label (param-try-tr tr-sub :forms (or label :submit))
-        label (if label (html-esc label) "OK!")
-        attrs (html-add-attrs args [:session?])]
-    (strs (anti-spam-code validators)
-          "  <button type=\"submit\"" attrs ">" label "</button>\n")))
+  ([label args tr-sub validators]
+   (form-submit label args tr-sub validators nil))
+  ([label args tr-sub validators html]
+   (let [args    (args->map args)
+         noname? (nil? (get args :name))
+         args    (if noname? (map/qassoc args :name (common/string-from-param (get args :id))) args)
+         html    (some-str html)
+         nohtml? (nil? html)
+         label   (if nohtml? (if (nil? label) (get args :id) (if-not (false? (pboolean label)) label)))
+         label   (if nohtml? (param-try-tr tr-sub :forms (or label :submit)))
+         label   (if nohtml? (if label (html-esc label) "OK!"))
+         attrs   (html-add-attrs args [:session?])]
+     (strs (anti-spam-code validators)
+           "  <button type=\"submit\"" attrs ">" (or html label) "</button>\n"))))
 
 (defn get-form-action
   "Prepares default form action attribute by removing `form-errors` from a query string
