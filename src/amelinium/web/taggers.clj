@@ -712,27 +712,33 @@
      :form
      (fn [args ctx content]
        (let [args         (args->map (parse-args args))
-             hx?          (boolean (get args :htmx? (get ctx :htmx?)))
-             sess?        (boolean (get args :session? (get ctx :session?)))
+             id           (get args :id)
+             hx?          (pboolean (get args :htmx?    (get ctx :htmx?)))
+             sess?        (pboolean (get args :session? (get ctx :session?)))
              smap         (if sess? (session/of ctx))
              sfld         (if sess? (session/id-field smap))
              sid          (if sess? (session/id smap))
              lang         (get args :lang)
              method       (get args :method)
              label        (get args :label)
+             name         (get args :name)
              wrcls        (get args :wrapper-class)
+             hyper        (get args :_field)
              class        (get args :class)
              class        (if class (common/string-from-param class))
              errors?      (some? (not-empty (get ctx :form/errors)))
              class        (if errors? (if class (strb class " has-errors") "has-errors") class)
              action       (get-form-action args ctx)
-             id-str       (common/string-from-param (get args :id))
+             id-str       (common/string-from-param id)
              tr-sub-fn    (delay (i18n/no-default (translator-sub ctx translations-fn)))
+             name         (if (nil? name) id-str (if-not (false? (pboolean name)) name))
              label        (if label (param-try-tr tr-sub-fn :forms label id-str))
              label?       (some? label)
              method       (if method (common/string-from-param method))
              lang         (if lang   (common/string-from-param lang))
+             name         (if name   (common/string-from-param name))
              wrcls        (if wrcls  (common/string-from-param wrcls))
+             hyper        (if hyper  (common/string-from-param hyper))
              action?      (some? action)
              action-lang  (if action? (or (common/string-from-param (get args :action-lang)) lang))
              path-params  (if action? (assignments->kw-map (get args :path-params) ctx))
@@ -749,23 +755,28 @@
                             (if id-str?
                               {:session? sess? :tr-sub tr-sub-fn :id id-str}
                               {:session? sess? :tr-sub tr-sub-fn}))
-             form-props   (if wrcls   (map/qassoc form-props :wrapper-class (html-esc wrcls)) form-props)
-             method       (if method  (html-esc method) "post")
-             html-method  (if hx?  "" (strb " method=\"" method "\""))
-             html-lang    (if lang    (strb " lang=\"" (html-esc lang) "\""))
-             html-action  (if action  (if hx? (strb " hx-" method "=" action) (strb " action=\"" action "\"")))
-             html-id      (if id-str? (strb " id=\"" id-str "\""))
-             html-label   (if label?  (html-esc label))
-             html-label   (if label?  (strb "<label for=\"" id-str "\""
-                                            html-lang
-                                            " class=\"label\">"
-                                            html-label "</label>\n"))
-             html-class   (if class   (strb " class=\"" (html-esc class) "\""))
+             form-props   (if wrcls     (map/qassoc form-props :wrapper-class (html-esc wrcls)) form-props)
+             form-props   (if hyper     (map/qassoc form-props :_field (html-esc hyper)) form-props)
+             method       (if method    (html-esc method) "post")
+             html-method  (if hx?  ""   (strb " method=\"" method "\""))
+             html-lang    (if lang      (strb " lang=\"" (html-esc lang) "\""))
+             html-action  (if action    (if hx? (strb " hx-" method "=" action) (strb " action=\"" action "\"")))
+             html-id-str  (if id-str?   (html-esc id-str))
+             html-id      (if id-str?   (strb " id=\"" html-id-str "\""))
+             html-name    (if name      (html-esc name) html-id-str)
+             html-name    (if html-name (strb " name=\""  html-name "\""))
+             html-label   (if label?    (html-esc label))
+             html-label   (if label?    (strb "<label for=\"" id-str "\""
+                                              html-lang
+                                              " class=\"label\">"
+                                              html-label "</label>\n"))
+             html-class   (if class     (strb " class=\"" (html-esc class) "\""))
              html-attrs   (html-add-attrs args [:htmx? :id :method :label :session?
                                                 :action :lang :action-lang :class
-                                                :query-params :path-params :wrapper-class])]
+                                                :query-params :path-params :wrapper-class
+                                                :name :_field])]
          (strs
-          "<form" html-id html-class html-lang html-method html-action html-attrs ">"
+          "<form" html-id html-class html-name html-lang html-name html-method html-action html-attrs ">"
           (selmer/render (get (get content :form) :content) (map/qassoc ctx :form-props form-props) {:tag-second \-})
           "</form>\n" html-label)))
      :end-form)
