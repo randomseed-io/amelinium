@@ -78,14 +78,23 @@
 
 (defn- pboolean
   [v]
-  (or (true? v)
-      (if-some [v (some-str v)]
-        (not
-         (contains? #{"" " " "\n" "\r" "nil" "false" "no"
-                      "none" "NO" "NONE" "0" "-" ":"
-                      "off" "OFF" "disable"}
-                    (str/trim v)))
-        false)))
+  (if (or (nil? v) (false? v))
+    false
+    (or (true? v)
+        (if-some [v (some-str v)]
+          (not
+           (contains? #{"" " " "\n" "\r" ":"
+                        "nil" "null" "false" "no" "not" "none" "off"
+                        "NIL" "NULL" "FALSE" "NO" "NOT" "NONE" "OFF"
+                        "0" "-" "–" "—" "--" "---" "----"
+                        "[]" "{}" "()" "<>"
+                        "[ ]" "{ }" "( )" "< >"
+                        "[[]]" "{{}}" "(())" "<<>>"
+                        "[[ ]]" "{{ }}" "(( ))" "<< >>"
+                        "{%%}" "[%%]" "[--]" "{--}"
+                        "{% %}" "[% %]" "[- -]" "{- -}"}
+                      (str/trim v)))
+          false))))
 
 (defn parse-assigments
   [fk fv coll]
