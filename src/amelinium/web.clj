@@ -1144,6 +1144,9 @@
        (goto-auth-error   req route-data status default-view)))))
 
 (defn hx-transform-redirect
+  "Adds the `HX-Redirect` response header set to a value of existing `Location` header
+  and removes the last one from the response map `resp`. Additionally forces HTTP
+  status of the response to be 200."
   [resp]
   (if resp
     (let [headers (get resp :headers)]
