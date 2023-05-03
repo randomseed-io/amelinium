@@ -160,7 +160,7 @@
                            :email              "E-mail address should have a local part and a valid domain name."
                            :password           "Password should have at least 8 characters, big and small letters, a digit and a special character."
                            :password-relaxed   "Password must be present."
-                           :name               "Name should consist of regular characters with optional hyphen and cannot have blanks (like space)."
+                           :name               "Name should consist of regular characters with optional hyphens."
                            :token              "Token should be a string expressing hexadecimal number."
                            :session-id         "Session ID should be a string consisting of one or two hexadecimal numbers."
                            :secure-session-id  "Secure session ID should be a string consisting two hexadecimal numbers separated by hyphen."
@@ -179,9 +179,9 @@
                            :password.password-relaxed      "Password must be present."
                            :name                           :type-should/name
                            :first-name                     :type-should/name
-                           :last-name                      "Last name should consist of letters with optional hyphen and without blanks (like space)."
-                           :second-name                    "Second name should consist of letters with optional hyphen and without blanks (like space)."
-                           :middle-name                    "Middle name should consist of letters with optional hyphen and without blanks (like space)."
+                           :last-name                      "Last name should consist of letters with optional hyphens."
+                           :second-name                    "Second name should consist of letters with optional hyphens."
+                           :middle-name                    "Middle name should consist of letters with optional hyphens."
                            :user.phone                     :type-should/phone
                            :user.email                     :type-should/email
                            :user.login                     "Login should be a valid e-mail address."
@@ -204,26 +204,39 @@
                            :not-updated "Identity information has not been changed."}
    :user                  {:created "User account created."
                            :deleted "User account deleted."}
-   :forms                 {:logging           "Signing in"
-                           :recovery          "Password recovery"
-                           :recover           "Recover!"
-                           :continue          "Continue"
-                           :send-again        "Re-send!"
-                           :login             "Login!"
-                           :change            "Change!"
-                           :set               "Set!"
-                           :submit            "Submit!"
-                           :email             :parameter/email
-                           :password          :parameter/password
-                           :new-password      :parameter/password
-                           :repeated-password :parameter/repeated-password
-                           :name              :parameter/name
-                           :first-name        :parameter/first-name
-                           :second-name       :parameter/second-name
-                           :last-name         :parameter/last-name
-                           :middle-name       :parameter/middle-name
-                           :phone             :parameter/phone
-                           :regular-phone     :parameter/regular-phone}
+   :forms                 {:logging                "Signing in"
+                           :register               "Create account!"
+                           :recovery               "Password recovery"
+                           :recover                "Recover!"
+                           :continue               "Continue"
+                           :send-again             "Re-send!"
+                           :login                  "Login!"
+                           :change                 "Change!"
+                           :set                    "Set!"
+                           :submit                 "Submit!"
+                           :email                  :parameter/email
+                           :password               :parameter/password
+                           :new-password           :parameter/password
+                           :repeated-password      :parameter/repeated-password
+                           :name                   :parameter/name
+                           :first-name             :parameter/first-name
+                           :second-name            :parameter/second-name
+                           :last-name              :parameter/last-name
+                           :middle-name            :parameter/middle-name
+                           :phone                  :parameter/phone
+                           :regular-phone          :parameter/regular-phone
+                           :user.email             :parameter/email
+                           :user.password          :parameter/password
+                           :user.new-password      :parameter/new-password
+                           :user.repeated-password :parameter/repeated-password
+                           :user.name              :parameter/name
+                           :user.first-name        :parameter/first-name
+                           :user.second-name       :parameter/second-name
+                           :user.last-name         :parameter/last-name
+                           :user.middle-name       :parameter/middle-name
+                           :user.phone             :parameter/phone
+                           :user.regular-phone     :parameter/regular-phone
+                           }
 
    :in-mins       [:pluralize {:zero   "a couple of seconds"
                                :one    "one minute"

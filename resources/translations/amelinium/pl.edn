@@ -164,12 +164,12 @@
                            :email             "Adres e-mailowy powinien zawierać część lokalną i poprawną domenę."
                            :password          "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
                            :password-relaxed  "Należy podać hasło."
-                           :name              "Imię powinno składać się ze zwykłych znaków i opcjonalnego łącznika, bez białych znaków (spacji)."
+                           :name              "Imię powinno składać się ze zwykłych znaków i opcjonalnych łączników."
                            :token             "Token powinien być łańcuchem znakowym reprezentującym liczbę w zapisie szesnastkowym."
                            :session-id        "Identyfikator sesji powinien być jednym lub dwoma łańcuchami znakowymi w zapisie szesnastkowym."
                            :secure-session-id "Bezpieczny identyfikator sesji powinien być jedną lub dwoma liczbami szesnastkowymi oddzielonymi dywizem."
                            :language          "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."
-                           :repeated-password "Powtórzone hasło musi być takie samo jak pierwsze hasło."}
+                           :repeated-password "Powtórzone hasło musi być takie samo jak pierwsze."}
    :parameter-should      {:phone                          :type-should/phone
                            :regular-phone                  :type-should/regular-phone
                            :email                          :type-should/email
@@ -182,9 +182,9 @@
                            :password.password-relaxed      "Należy podać hasło."
                            :name                           :type-should/name
                            :first-name                     :type-should/name
-                           :last-name                      "Nazwisko może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
-                           :second-name                    "Drugie imię może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
-                           :middle-name                    "Drugie imię może zawierać litery i opcjonalny łącznik, ale bez białych znaków (spacji)."
+                           :last-name                      "Nazwisko może zawierać litery i opcjonalne łączniki."
+                           :second-name                    "Drugie imię może zawierać litery i opcjonalne łączniki."
+                           :middle-name                    "Drugie imię może zawierać litery i opcjonalne łączniki."
                            :user.phone                     :type-should/phone
                            :user.email                     :type-should/email
                            :user.login                     :parameter-should/login
@@ -203,26 +203,39 @@
                            :lang                           :type-should/language}
    :user                  {:created "Utworzono konto użytkownika."
                            :deleted "Usunięto konto użytkownika."}
-   :forms                 {:logging           "Logowanie"
-                           :recovery          "Odzyskiwanie hasła"
-                           :login             "Zaloguj!"
-                           :recover           "Odzyskaj!"
-                           :continue          "Kontynuuj"
-                           :change            "Zmień!"
-                           :set               "Ustaw!"
-                           :submit            "Zatwierdź!"
-                           :send-again        "Wyślij ponownie!"
-                           :email             :parameter/email
-                           :password          :parameter/password
-                           :new-password      :parameter/new-password
-                           :repeated-password :parameter/repeated-password
-                           :name              :parameter/name
-                           :first-name        :parameter/first-name
-                           :second-name       :parameter/second-name
-                           :last-name         :parameter/last-name
-                           :middle-name       :parameter/middle-name
-                           :phone             :parameter/phone
-                           :regular-phone     :parameter/regular-phone}
+   :forms                 {:logging                "Logowanie"
+                           :register               "Załóż konto!"
+                           :recovery               "Odzyskiwanie hasła"
+                           :login                  "Zaloguj!"
+                           :recover                "Odzyskaj!"
+                           :continue               "Kontynuuj"
+                           :change                 "Zmień!"
+                           :set                    "Ustaw!"
+                           :submit                 "Zatwierdź!"
+                           :send-again             "Wyślij ponownie!"
+                           :email                  :parameter/email
+                           :password               :parameter/password
+                           :new-password           :parameter/new-password
+                           :repeated-password      :parameter/repeated-password
+                           :name                   :parameter/name
+                           :first-name             :parameter/first-name
+                           :second-name            :parameter/second-name
+                           :last-name              :parameter/last-name
+                           :middle-name            :parameter/middle-name
+                           :phone                  :parameter/phone
+                           :regular-phone          :parameter/regular-phone
+                           :user.email             :parameter/email
+                           :user.password          :parameter/password
+                           :user.new-password      :parameter/new-password
+                           :user.repeated-password :parameter/repeated-password
+                           :user.name              :parameter/name
+                           :user.first-name        :parameter/first-name
+                           :user.second-name       :parameter/second-name
+                           :user.last-name         :parameter/last-name
+                           :user.middle-name       :parameter/middle-name
+                           :user.phone             :parameter/phone
+                           :user.regular-phone     :parameter/regular-phone
+                           }
 
    :in-mins       [:pluralize {:zero       "kilka sekund"
                                :one        "minutę"
