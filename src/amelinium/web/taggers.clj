@@ -550,7 +550,7 @@
        (let [smap           (session/of ctx)
              sid            (session/id smap)
              sfld           (session/id-field smap)
-             lcontent       (get (get content :link) :content)
+             lcontent       (get (get content :slink) :content)
              sdata          (if (and sid sfld) (strb " name=\"" sfld "\" value=\"" sid "\""))
              path-or-name   (first args)
              args           (rest args)
@@ -578,7 +578,7 @@
              sid      (session/id smap)
              sfld     (session/id-field smap)
              sdata    (if (and sid sfld) (strb " name=\"" sfld "\" value=\"" sid "\""))
-             lcontent (get (get content :slink) :content)]
+             lcontent (get (get content :slink-simple) :content)]
          (if sdata
            (strs "<form name=\"sessionLink\" class=\"formlink\" action=\"" url "\" method=\"post\">"
                  (anti-spam-code validators)
