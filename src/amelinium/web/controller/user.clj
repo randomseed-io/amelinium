@@ -227,10 +227,10 @@
   ([req]
    (authenticate! req nil))
   ([req session-key]
-   (let [form-params        (get req :form-params)
+   (let [form-params        (get (get req :parameters) :form)
          route-data         (delay (http/get-route-data req))
-         ^String user-email (some-str (get form-params "login"))
-         ^String password   (if user-email (some-str (get form-params "password")))
+         ^String user-email (some-str (or (get form-params :user/login) (get form-params :login)))
+         ^String password   (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))
          ^Session sess      (session/of req (or session-key (get @route-data :session-key)))
          lang               (delay (web/pick-language-str req :user))]
      (cond
@@ -306,7 +306,7 @@
         token        (get (get all-params :path) :token)
         params       (get all-params :form)
         code         (get params :code)
-        login        (get params :login)
+        login        (or (get params :user/login) (get params :login))
         confirmation (confirmation/establish db login code token one-minute "creation")
         confirmed?   (get confirmation :confirmed?)
         creation     (if confirmed? (user/create db login token code))
@@ -402,10 +402,10 @@
   the password for the given `user-id`."
   [req]
   (let [form-params  (get (get req :parameters) :form)
-        user-email   (some-str (or (get form-params :username) (get form-params :login)))
-        new-password (get form-params :new-password)
-        new-repeated (get form-params :repeated-password)
-        old-password (if user-email (some-str (get form-params :password)))
+        user-email   (some-str (or (get form-params :user/login) (get form-params :login) (get form-params :username)))
+        new-password (or (get form-params :user/new-password)      (get form-params :new-password))
+        new-repeated (or (get form-params :user/repeated-password) (get form-params :repeated-password))
+        old-password (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))
         route-data   (http/get-route-data req)
         req          (auth-with-password! req user-email old-password nil route-data nil true nil)]
     (if (web/response? req)
@@ -482,8 +482,11 @@
         path-params   (get params :path)
         token         (or (get path-params :token) (get form-params :token))
         code          (get form-params :code)
-        email         (get form-params :email)
-        login         (or (get form-params :username) (get form-params :login) email)
+        email         (get form-params :user/email)
+        login         (or (get form-params :user/login)
+                          (get form-params :username)
+                          (get form-params :login)
+                          email)
         phone         (if-not email (get form-params :phone))
         [id id-type]  (common/identity-and-type (or email phone) (if email :email (if phone :phone)))
         password      (some-str (get form-params :new-password))

@@ -49,8 +49,8 @@
 (defn pr-session   [v] (if-not (map? v) v (assoc v :data "--------------" :api  "--------------")))
 
 (def ctx-transformer
-  {mask         [:password :pwd :private-key :private :secret :signature :request-id :anti-phisihng-code]
-   pseudonimize [:user :username :nick :nickname]
+  {mask         [:user/password :user/repeated-password :repeated-password :password :pwd :private-key :private :secret :signature :request-id :anti-phisihng-code]
+   pseudonimize [:user/login :login :user/email :email :user :username :nick :nickname]
    str          [:currency]
    pr-session   [:session]})
 

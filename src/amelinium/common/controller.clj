@@ -69,7 +69,7 @@
   page ID is `:login/account-soft-locked`. Otherwise it returns `nil`. Uses cached
   user properties."
   ([req auth-db smap time-fn]
-   (lock-remaining-mins req auth-db smap time-fn :login))
+   (lock-remaining-mins req auth-db smap time-fn :user/login))
   ([req auth-db smap time-fn id-field]
    (if auth-db
      (let [user (and smap (user/props-of :session auth-db smap))

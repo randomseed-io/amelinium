@@ -997,14 +997,14 @@
   (or (http/route-name req) (page req)))
 
 (defn login-page
-  "Returns a path for the login page. The page must have ID of `:login`."
-  (^String [req]         (page req :login))
-  (^String [req lang-id] (page req :login lang-id)))
+  "Returns a path for the login page. The page must have ID of `:user/login`."
+  (^String [req]         (page req :user/login))
+  (^String [req lang-id] (page req :user/login lang-id)))
 
 (defn auth-page
-  "Returns a path for the authentication page. The page must have ID of `:welcome`."
-  (^String [req]         (page req :welcome))
-  (^String [req lang-id] (page req :welcome lang-id)))
+  "Returns a path for the authentication page. The page must have ID of `:user/welcome`."
+  (^String [req]         (page req :user/welcome))
+  (^String [req lang-id] (page req :user/welcome lang-id)))
 
 ;; Additional responses
 

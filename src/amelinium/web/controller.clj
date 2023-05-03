@@ -56,7 +56,7 @@
 (defn remove-login-data
   "Removes login data from the form params part of a request map."
   [req]
-  (common/remove-form-params req :password))
+  (common/remove-form-params req :user/password :user/new-password :user/repeated-password :password :new-password :repeated-password))
 
 (defn cleanup-req
   "Removes login data from `req` if we are on authentication page."
@@ -112,8 +112,8 @@
   "Returns true if `:form-params` map of a request map `req` contains login data."
   [req]
   (if-some [fparams (get req :form-params)]
-    (and (contains? fparams "password")
-         (contains? fparams "login"))))
+    (and (or (contains? fparams "user/password") (contains? fparams "password"))
+         (or (contains? fparams "user/login")    (contains? fparams "login")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions

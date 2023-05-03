@@ -107,8 +107,8 @@
    (api/response
     req
     (let [form-params    (get (get req :parameters) :form)
-          user-email     (some-str (get form-params :login))
-          password       (if user-email (some-str (get form-params :password)))
+          user-email     (some-str (or (get form-params :user/login) (get form-params :login)))
+          password       (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))
           route-data     (delay (http/get-route-data req))
           session-key    (or session-key (get @route-data :session-key))
           sess           (session/of req session-key)
@@ -137,8 +137,8 @@
   (api/response
    req
    (let [form-params (get (get req :parameters) :form)
-         user-email  (some-str (get form-params :login))
-         password    (if user-email (some-str (get form-params :password)))]
+         user-email  (some-str (or (get form-params :user/login) (get form-params :login)))
+         password    (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))]
      (super/auth-user-with-password! req user-email password nil nil true nil))))
 
 (defn info!
@@ -347,8 +347,8 @@
         (let [route-data    (http/get-route-data req)
               smap          (session/of req (or session-key (get route-data :session-key)))
               user-email    (session/user-email smap)
-              password      (if user-email (some-str (get form-params :password)))
-              form-params   (dissoc form-params :password)
+              password      (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))
+              form-params   (dissoc form-params :password :user/password)
               auth-result   (super/auth-user-with-password! req user-email password smap route-data true nil)
               auth-bad?     (not= :auth/ok (:response/status auth-result))
               auth-settings (if-not auth-bad? (auth/settings req))
@@ -438,7 +438,7 @@
          params     (get all-params :form)
          code       (get params :code)
          token      (get params :token)
-         login      (or (get params :user/email) (get params :login) (get params :email))]
+         login      (or (get params :user/login) (get params :user/email) (get params :login) (get params :email))]
      (if-not (or token (and code login))
        (api/render-error req :parameters/error)
        (let [confirmation (confirmation/establish db login code token one-minute "creation")
@@ -472,8 +472,8 @@
    (api/response
     req
     (let [form-params  (get (get req :parameters) :form)
-          old-password (some-str (get form-params :password))
-          new-password (get form-params :user/password)
+          old-password (some-str (or (get form-params :user/password)     (get form-params :password)))
+          new-password (some-str (or (get form-params :user/new-password) (get form-params :new-password)))
           route-data   (http/get-route-data req)
           session-key  (or session-key (get route-data :session-key))
           session      (session/valid-of req session-key)
@@ -499,7 +499,7 @@
     req
     (let [form-params  (get (get req :parameters) :form)
           to-change    (select-keys form-params [:user/email :user/phone])
-          new-password (get form-params :user/password)
+          new-password (get form-params :user/new-password)
           token        (get form-params :token)
           code         (get form-params :code)
           [id-type id] (first to-change)
@@ -533,7 +533,7 @@
   (api/response
    req
    (let [form-params (get (get req :parameters) :form)
-         password    (some-str (get form-params :password))
+         password    (some-str (get form-params :user/password))
          channel     (select-keys form-params [:user/email :user/phone])
          phone       (get channel :user/phone)
          email       (get channel :user/email)

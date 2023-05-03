@@ -43,6 +43,7 @@
 
 (def ^:const default-validators
   {"login"      vc/valid-email?
+   "user/login" vc/valid-email?
    "phone"      vc/valid-phone?
    "url"        vc/valid-url?
    "password"   #"|.{5,256}"

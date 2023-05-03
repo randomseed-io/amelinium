@@ -140,9 +140,12 @@
   and parameters map. If `:password` parameter is present it will make JSON password
   suite."
   [^AuthSettings auth-settings params]
-  (let [^String           email       (some-str (or (get params :user/email) (get params :email) (get params :login)))
+  (let [^String           email       (some-str (or (get params :user/login)
+                                                    (get params :user/email)
+                                                    (get params :login)
+                                                    (get params :email)))
         ^Phoneable        phone       (or (get params :user/phone) (get params :phone))
-        ^String           password    (some-str     (or (get params :user/password) (get params :password)))
+        ^String           password    (some-str     (or (get params :user/new-password) (get params :new-password) (get params :user/password) (get params :password)))
         account-type                  (some-keyword (or (get params :user/account-type) (get params :account-type)))
         account-type                  (or account-type (.default-type auth-settings))
         ^AuthConfig       auth-config (or (get (.types auth-settings) account-type) (.default auth-settings))
@@ -161,7 +164,10 @@
   "Creates simple user data record (only db, phone and email) by getting values from
   the given authentication settings and parameters map."
   [auth-settings params]
-  (let [email (some-str (or (get params :user/email) (get params :email) (get params :login)))
+  (let [email (some-str (or (get params :user/login)
+                            (get params :user/email)
+                            (get params :email)
+                            (get params :login)))
         phone (or (get params :user/phone) (get params :phone))
         db    (.db ^AuthSettings auth-settings)]
     (->UserData email phone nil nil db nil nil nil nil nil nil nil nil)))

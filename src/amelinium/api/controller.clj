@@ -35,8 +35,8 @@
   "Removes login data from the form params and body part of a request map."
   [req]
   (-> req
-      (common/remove-form-params :password)
-      (common/remove-params :body-params :body false :password)))
+      (common/remove-form-params :password :repeated-password :user/password :user/repeated-password :user/new-password :new-password)
+      (common/remove-params :body-params :body false :password :user/password :repeated-password :user/repeated-password :user/new-password :new-password)))
 
 (defn cleanup-req
   "Takes a request map `req` and an authentication state, 2-element vector
@@ -47,11 +47,11 @@
   (if (nth auth-state 1 false) req (remove-login-data req)))
 
 (defn login-data?
-  "Returns true if :body map of a request contains login data."
+  "Returns `true` if `:body` map of a request contains login data."
   [req]
   (if-some [bparams (get req :body-params)]
-    (and (contains? bparams :password)
-         (contains? bparams :login))))
+    (and (or (contains? bparams :user/password) (contains? bparams :password))
+         (or (contains? bparams :user/login)    (contains? bparams :login)))))
 
 ;; Request preparation handler
 
