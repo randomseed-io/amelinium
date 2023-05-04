@@ -1429,6 +1429,11 @@
                                                        :params (force values)})))))))
 
 (defn handle-bad-request-form-params
+  "Dispatch function which calls `hx-handle-bad-request-form-params` when HTMX is in
+  use or `http-handle-bad-request-form-params` in other cases. HTMX mode will be in
+  place when a client request contains `HX-Request` header set to a non-falsy and not
+  empty value, or it was enforced by using route data key `:form-errors/use-htmx?`
+  set to a truthy value."
   ([req]
    (handle-bad-request-form-params req nil nil nil nil nil))
   ([req errors]
@@ -1462,9 +1467,27 @@
 
   Parameter type in `errors` map can be `nil`, meaning it is of unknown type.
 
+  This function can work in two modes: HTMX and simple HTTP mode.
+
+  HTMX mode is in place when a client request contains the `HX-Request` header set to
+  a non-falsy and not empty value, or it was enforced by using route data key
+  `:form-errors/use-htmx?` set to a truthy value.
+
+  In HTMX mode the HTML result is rendered with layout and view obtained from the
+  `:form-errors/page` configuration option associated with HTTP route data or the
+  destination page established by checking the `Referer` header, unless
+  `:form-errors/layout` and/or `:form-errors/view` options are set. Layout can be set
+  to `false` to allow injection of HTML fragments. If form errors page is not
+  specified one is obtained from the `Referer` request header. See
+  `hx-handle-bad-request-form-params` for more info.
+
+  If simple HTTP mode is in place the `http-handle-bad-request-form-params` is used,
+  and the following will happen:
+
   If there is a session then the `errors` map is stored in a session variable
   `:form-errors` under the `:errors` key (additionally, there is a `:dest` key
-  identifying a path of the current page).
+  identifying a path of the current page), unless an HTMX response is to be generated
+  by `handle-bad-request-form-params` which is called internally).
 
   If there is no valid session or a session variable cannot be stored, the result is
   serialized as a query string parameter `form-errors` with erroneous fields

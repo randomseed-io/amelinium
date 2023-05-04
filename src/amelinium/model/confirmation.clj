@@ -256,7 +256,8 @@
                (map/assoc-if user-id      :existing-user/id   user-id)
                (map/assoc-if user-uid     :existing-user/uid user-uid)
                (map/assoc-if requester-id :user/id       requester-id)
-               (qassoc :exists? (some? user-id) :confirmed? confirmed)
+               (qassoc :confirmed? confirmed
+                       :exists?    (some? user-id))
                (dissoc :confirmed :user-id :user-uid :requester-id))))))))
 
 (defn- gen-confirmation-core
