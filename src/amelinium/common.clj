@@ -2595,12 +2595,12 @@
 
 (defn retry-in-mins
   "Calculates minutes of duration on a basis of `Duration` object. Returns an integer
-  number (or `nil` when there was no duration given) which is never less than 1 and
-  always incremented by one. Used to calculate retry times to report them to a user."
+  number of minutes left or `nil` when there was no duration given or the duration is
+  negative. Used to calculate retry timeouts to report them to a user."
   [duration]
   (when duration
-    (let [mins (inc (t/minutes duration))]
-      (if (pos-int? mins) mins 1))))
+    (if-some [mins (t/minutes duration)]
+      (if (neg? mins) nil mins))))
 
 ;; Response status
 
