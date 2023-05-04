@@ -292,6 +292,58 @@
        :bad-prolongation
        (web/move-to req (get-in route-data [:auth-error/destinations :auth/session-error] :login/session-error))))))
 
+(defn confirmation-status!
+  ([req]             (confirmation-status! req nil nil))
+  ([req session-key] (confirmation-status! req session-key nil))
+  ([req session-key reason]
+   (if-some [params (not-empty (get (get req :parameters) :form))]
+     (let [id     (or (get params :user/login) (get params :login)
+                      (get params :user/email) (get params :email)
+                      (get params :user/phone) (get params :phone))
+           qtoken (some-str (or (get params :verify/qtoken)
+                                (get params :confirmation/qtoken)
+                                (get params :qtoken)))
+           reason (or (some-str reason)
+                      (some-str (http/get-route-data req :confirmation/reason))
+                      "creation")]
+       (if (and id qtoken)
+         (if-some [r (confirmation/status (auth/db req) id reason)]
+           (if (= qtoken (confirmation/make-qtoken id (get r :token)))
+             (let [lang            (or (common/pick-language req :registration) (common/lang-id req))
+                   tr              (i18n/no-default (common/translator req lang))
+                   attempts        (get r :attempts)
+                   attempts?       (int? attempts)
+                   attempts-left   (if attempts? (if (neg? attempts) 0 attempts))
+                   max-attempts?   (if attempts? (zero? attempts-left))
+                   retry-dur       (delay (common/duration-nanos (get r :expires)))
+                   retry-in        (delay (common/retry-in-mins @retry-dur))
+                   in-mins         (delay (tr :in-mins          @retry-in))
+                   retry-in-mins   (delay (tr :try-in-mins      @retry-in))
+                   mins-left       (delay (tr :mins-left        @retry-in))
+                   attempts-left-w (delay (tr :attempts-left attempts-left))
+                   id-type         (delay (common/guess-identity-type r id nil nil))
+                   id-str          (delay (identity/->str @id-type id))
+                   confirmed?      (delay (get r :confirmed?))]
+               (web/assoc-app-data
+                req
+                :user/id-type              id-type
+                :user/identity             id-str
+                :verify/confirmed?         confirmed?
+                :verify/retry-in           retry-in
+                :verify/in-mins            in-mins
+                :verify/retry-in-mins      retry-in-mins
+                :verify/retry-unit         :minutes
+                :verify/retry-dur          retry-dur
+                :verify/mins-left          mins-left
+                :verify/max-attempts?      max-attempts?
+                :verify/attempts-left      attempts-left
+                :verify/attempts-left-word attempts-left-w
+                :verify/qtoken             qtoken))
+             req)
+           req)
+         req))
+     req)))
+
 (defn register!
   "Initiates user registration process."
   ([req] (register! req nil))
