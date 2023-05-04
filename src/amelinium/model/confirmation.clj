@@ -644,3 +644,14 @@
    (if-some [token (some-str token)]
      (update-request-id db token request-id)
      (update-request-id db id code request-id))))
+
+;; Reading properties
+
+(defn status
+  [db id reason]
+  (if-some [{:keys [expires token confirmed] :as r}
+            (db/<exec-one! db "SELECT id,id_type,attempts,expires,token,confirmed FROM confirmations WHERE id=? AND reason=?"
+                           [:confirmations id reason])]
+    (if (and expires token)
+      (-> (qassoc r :confirmed? confirmed)
+          (dissoc r :confirmed)))))
