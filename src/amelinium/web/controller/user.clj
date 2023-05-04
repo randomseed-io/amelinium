@@ -92,6 +92,7 @@
                                             :verify/retry-unit         :minutes
                                             :verify/retry-dur          retry-dur
                                             :verify/mins-left          mins-left
+                                            :verify/max-attempts?      max-attempts?
                                             :verify/attempts-left      attempts-left
                                             :verify/attempts-left-word attempts-left-w
                                             :sub-status/description    retry-in-mins)
@@ -99,29 +100,29 @@
                         (web/add-status :verify/max-attempts))
       :send!        (let [{:keys [token code
                                   exists?]} result
-
-                          lang-str         (some-str lang)
-                          remote-ip        (get req :remote-ip/str)
-                          rdata            (or route-data (http/get-route-data req))
-                          existing-uid     (if exists? (some-str (get result :existing-user/uid)))
-                          existing-user-id (if exists? (get result :existing-user/id))
-                          lang-qs          (common/query-string-encode req {"lang" lang-str})
-                          url-type         (common/id-type->url-type id-type reason)
-                          verify-link      (str (get rdata url-type) token "/?" lang-qs)
-                          recovery-link    (if existing-uid (str (get rdata :url/recover) existing-uid "/?" lang-qs))
-                          req-updater      (get opts :async/responder super/verify-request-id-update)
-                          exc-handler      (get opts :async/raiser super/verify-process-error)
-                          req-updater      #(req-updater db id-type id code token %)
-                          exc-handler      #(exc-handler db id-type id code token %)
-                          email?           (identical? :email id-type)
-                          phone?           (and (not email?) (identical? :phone id-type))
-                          user-login       (if email? id-str (if existing-user-id (delay (user/email db :id existing-user-id))))
-                          template-params  (delay {:serviceName      (tr :verify/app-name)
-                                                   :expiresInMinutes @in-mins
-                                                   :remoteAddress    remote-ip
-                                                   :verifyCode       (str code)
-                                                   :verifyLink       verify-link
-                                                   :recoveryLink     recovery-link})]
+                          lang-str          (some-str lang)
+                          remote-ip         (get req :remote-ip/str)
+                          rdata             (or route-data (http/get-route-data req))
+                          existing-uid      (if exists? (some-str (get result :existing-user/uid)))
+                          existing-user-id  (if exists? (get result :existing-user/id))
+                          lang-qs           (common/query-string-encode req {"lang" lang-str})
+                          url-type          (common/id-type->url-type id-type reason)
+                          verify-link       (str (get rdata url-type) token "/?" lang-qs)
+                          recovery-link     (if existing-uid (str (get rdata :url/recover) existing-uid "/?" lang-qs))
+                          req-updater       (get opts :async/responder super/verify-request-id-update)
+                          exc-handler       (get opts :async/raiser super/verify-process-error)
+                          req-updater       #(req-updater db id-type id code token %)
+                          exc-handler       #(exc-handler db id-type id code token %)
+                          email?            (identical? :email id-type)
+                          phone?            (and (not email?) (identical? :phone id-type))
+                          user-login        (if email? id-str (if existing-user-id (delay (user/email db :id existing-user-id))))
+                          qtoken            (if (and id-str token) (delay (confirmation/make-qtoken id-str token)))
+                          template-params   (delay {:serviceName      (tr :verify/app-name)
+                                                    :expiresInMinutes @in-mins
+                                                    :remoteAddress    remote-ip
+                                                    :verifyCode       (str code)
+                                                    :verifyLink       verify-link
+                                                    :recoveryLink     recovery-link})]
                       (case id-type
                         :email (if-some [template (get opts (if exists?
                                                               :tpl/email-exists
@@ -155,8 +156,10 @@
                            :verify/retry-unit         :minutes
                            :verify/retry-dur          retry-dur
                            :verify/mins-left          mins-left
+                           :verify/max-attempts?      max-attempts?
                            :verify/attempts-left      attempts-left
-                           :verify/attempts-left-word attempts-left-w))))))
+                           :verify/attempts-left-word attempts-left-w
+                           :verify/qtoken             qtoken))))))
 
 (defn- auth-ok
   [req route-data lang]
