@@ -345,10 +345,36 @@
      req)))
 
 (defn register!
-  "Initiates user registration process."
+  "Initiates user registration process by receiving e-mail, password and name."
   ([req] (register! req nil))
   ([req session-key]
-   (let [^Session sess (session/of req session-key)]
+   (if-some [params (not-empty (get (get req :parameters) :form))]
+     (if (not= (:user/new-password params) (:user/repeated-password params))
+       (web/form-params-error! req {:user/repeated-password :repeated-password})
+       (let [route-data                  (http/get-route-data req)
+             [fname sname]               (str/split (or (get params :user/first-name) "") #"\\s+")
+             params                      (if sname (qassoc params
+                                                           :user/first-name  fname
+                                                           :user/second-name sname) params)
+             ^AuthSettings auth-settings (auth/settings req)
+             ^UserData     udata         (user/make-user-data auth-settings params)
+             db                          (if udata (.db udata))
+             result                      (confirmation/create-for-registration db udata)
+             req                         (verify! req {:db               db
+                                                       :id               (if udata (.email udata))
+                                                       :id-type          :email
+                                                       :result           result
+                                                       :route-data       route-data
+                                                       :tpl/email-exists :registration/exists
+                                                       :tpl/email-verify :registration/verify
+                                                       :tpl/phone-exists :verify/sms-exists
+                                                       :tpl/phone-verify :verify/sms})]
+         (web/response
+          ;; verify! returned error
+          req
+          ;; verify! performed registration initiation
+          (qassoc req :app/view (get route-data :register-sent/view :user/register-sent))
+          )))
      req)))
 
 (defn create!
