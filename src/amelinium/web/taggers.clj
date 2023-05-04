@@ -413,7 +413,6 @@
              err-desc   (if err-msgs (some-str (get err-msgs :error/description)))
              error?     (boolean (or err-summ err-desc))
              err-id     (if error? (strb id-str "-validation-fb"))
-             hidden?    (and itype (= "hidden" itype))
              html-id    (html-esc id-str)
              html-hyper (if hyper (html-esc hyper) (get props :_field))
              html-hyper (if html-hyper (strb " _=\"" html-hyper "\""))
@@ -438,15 +437,10 @@
                                                :parameter-type :value :autocomplete
                                                :input-type :type :class :wrapper-class
                                                :_field])]
-         (if hidden?
-           (strs html-wr-st "<input type=\"" html-itype "\" class=\"" html-class
-                 "\" name=\"" html-name "\" id=\"" html-id "\""
-                 html-phold html-value html-autoc html-attrs html-ariad html-hyper " />\n"
-                 html-label html-error html-wr-en)
-           (strs html-wr-st "<input type=\"" html-itype "\" class=\"" html-class
-                 "\" name=\"" html-name "\" id=\"" html-id "\""
-                 html-phold html-value html-autoc html-attrs html-ariad html-hyper " />\n"
-                 html-label html-error html-wr-en)))))))
+         (strs html-wr-st "<input type=\"" html-itype "\" class=\"" html-class
+               "\" name=\"" html-name "\" id=\"" html-id "\""
+               html-phold html-value html-autoc html-attrs html-ariad html-hyper " />\n"
+               html-label html-error html-wr-en))))))
 
 (defn form-fields
   "Helper to generate HTML for the `form-fields` tag."
@@ -623,6 +617,14 @@
          (if (and sid sfld)
            (strs (anti-spam-code validators)
                  "<input type=\"hidden\" name=\"" sfld "\" value=\"" sid "\" hx-history=\"false\" />")))))
+
+    (selmer/add-tag!
+     :hidden-param
+     (fn [args ctx]
+       (let [p      (first args)
+             pname  (common/string-from-param p)
+             pvalue (html-esc (get ctx (some-keyword pname)))]
+         (strs "<input type=\"hidden\" name=\"" pname "\" value=\"" pvalue "\" hx-history=\"false\" />"))))
 
     (selmer/add-tag!
      :explain-form-error
