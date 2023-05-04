@@ -1450,10 +1450,20 @@
        (hx-handle-bad-request-form-params   req route-data errors values explanations title)
        (http-handle-bad-request-form-params req route-data errors values explanations title session-key)))))
 
-(defn- param-errors-to-current-vals
-  [req errors]
-  (let [form-params (get req :form-params)]
-    (map/map-vals-by-k #(get form-params (if (string? %) % (some-str %))) errors)))
+(defn- param-current-vals
+  [req]
+  (if-let [form-params (get req :form-params)]
+    (let [good-params (->> (get (get req :parameters) :form)
+                           (map/remove-empty-values)
+                           (map/map-keys some-str))]
+      (->> form-params
+           (map/map-vals-by-k #(if (contains? good-params %) (some-str (get form-params %))))
+           (map/remove-empty-values)))))
+
+(defn- param-errors-stringify
+  [errors]
+  (if errors
+    (reduce-kv #(qassoc %1 (some-str %2) (some-str %3)) errors errors)))
 
 (defn- param-errors-stringify-vals
   [errors]
