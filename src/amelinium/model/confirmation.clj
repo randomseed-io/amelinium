@@ -548,10 +548,10 @@
                 :user/id    user-id
                 :code       code
                 :errors     errs}
-               (let [i (identity/of id)]
+               (let [i (or (identity/of id) id)]
                  {:confirmed? false
                   :id-type    (identity/type i)
-                  :identity   (or i id)
+                  :identity   i
                   :user/id    nil
                   :code       code
                   :errors     errs}))))))))
@@ -567,10 +567,11 @@
          (if confirmed?
            (-> (dissoc r :confirmed :requester-id)
                (qassoc :confirmed? true :user/id user-id))
-           (let [errs (report-errors db token reason false)]
+           (let [errs (report-errors db token reason false)
+                 i    (or (identity/of id) id)]
              (if r
                {:confirmed? false
-                :identity   (or (identity/of id) id)
+                :identity   i
                 :id-type    id-type
                 :user/id    user-id
                 :token      token
