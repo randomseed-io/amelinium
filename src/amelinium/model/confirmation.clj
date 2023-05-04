@@ -116,6 +116,18 @@
   ^String []
   (-> (random-uuid) uuid/to-byte-array hash/md5 codecs/bytes->hex))
 
+(defn make-qtoken
+  "Generates a quick token on a basis of a string representation of the given
+  argument(s). Returns a string."
+  (^String [x]
+   (-> (or (some-str x) "") codecs/str->bytes hash/md5 codecs/bytes->hex))
+  (^String [x y]
+   (make-qtoken (strb (some-str x) (some-str y))))
+  (^String [x y z]
+   (make-qtoken (strb (some-str x) (some-str y) (some-str z))))
+  (^String [x y z & more]
+   (make-qtoken (apply strb (some-str x) (some-str y) (some-str z) (map some-str more)))))
+
 ;; Confirmation deletion
 
 (defn delete
