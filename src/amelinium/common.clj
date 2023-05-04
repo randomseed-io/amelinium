@@ -2516,7 +2516,8 @@
                       (or (if identity-type (some-keyword identity-type))
                           (get src :id-type)
                           (get src :identity/type)
-                          (get src :identity-type))
+                          (get src :identity-type)
+                          (get src :id_type))
                       (or (if acceptable-tag (some-keyword acceptable-tag))
                           ::identity/standard))
      :else           (identity/acceptable-type
