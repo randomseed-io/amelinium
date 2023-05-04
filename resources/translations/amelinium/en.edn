@@ -239,14 +239,17 @@
                            :user.regular-phone     :parameter/regular-phone
                            }
 
-   :in-mins       [:pluralize {:zero   "a couple of seconds"
+   :in-mins       [:pluralize {:none   "zero seconds"
+                               :zero   "a couple of seconds"
                                :one    "one minute"
                                :plural "{1} minutes"}]
-   :try-in-mins   [:pluralize "Try again in a couple of seconds." "Try again in a minute." "Try again in {1} minutes."]
-   :mins-left     [:pluralize {:zero   "Less than a minute left"
+   :try-in-mins   [:pluralize "Try again." "Try again in a couple of seconds." "Try again in a minute." "Try again in {1} minutes."]
+   :mins-left     [:pluralize {:none   "No time left"
+                               :zero   "Less than a minute left"
                                :one    "One minute left"
                                :plural "{1} minutes left"}]
-   :attempts-left [:pluralize {:zero   "zero attempts"
+   :attempts-left [:pluralize {:none   "no attempts"
+                               :zero   "zero attempts"
                                :one    "one attempt"
                                :plural "{1} attempts"}]
 

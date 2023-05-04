@@ -238,19 +238,23 @@
                            :user.regular-phone     :parameter/regular-phone
                            }
 
-   :in-mins       [:pluralize {:zero       "kilka sekund"
+   :in-mins       [:pluralize {:none       "zero sekund"
+                               :zero       "kilka sekund"
                                :one        "minutę"
                                :genitive   "{1} minut"
                                :nominative "{1} minuty"}]
-   :mins-left     [:pluralize {:zero       "Pozostała niecała minuta"
+   :mins-left     [:pluralize {:none       "Przekroczono czas"
+                               :zero       "Pozostała niecała minuta"
                                :one        "Pozostała minuta"
                                :genitive   "Pozostało {1} minut"
                                :nominative "Pozostały {1} minuty"}]
-   :try-in-mins   [:pluralize {:zero       "Spróbuj za kilka sekund."
+   :try-in-mins   [:pluralize {:none       "Spróbuj jeszcze raz."
+                               :zero       "Spróbuj za kilka sekund."
                                :one        "Spróbuj za minutę."
                                :genitive   "Spróbuj za {1} minut."
                                :nominative "Spróbuj za {1} minuty."}]
-   :attempts-left [:pluralize {:zero       "zero prób"
+   :attempts-left [:pluralize {:none       "zero prób"
+                               :zero       "zero prób"
                                :one        "jedna próba"
                                :genitive   "{1} prób"
                                :nominative "{1} próby"}]
