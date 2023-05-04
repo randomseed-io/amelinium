@@ -176,7 +176,7 @@
         attempts-left     (if attempts? (if (neg? attempts) 0 attempts))
         max-attempts?     (if attempts? (zero? attempts-left))
         bad-result?       (not (or errors? attempts?))
-        retry-dur         (delay (common/duration-nanos expires))
+        retry-dur         (delay (common/simple-duration expires))
         retry-in          (delay (common/retry-in-mins @retry-dur))]
     (cond
       bad-result?   (api/render-error  req (or no-data :verify/bad-result))

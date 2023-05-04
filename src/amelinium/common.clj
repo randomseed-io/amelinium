@@ -2587,9 +2587,9 @@
     (some-str
      (t/format DateTimeFormatter/RFC_1123_DATE_TIME (t/zoned-date-time t)))))
 
-(defn duration-nanos
-  "Calculates the duration in nanoseconds between the time of calling the function (or
-  the given time `begin`) till the given time `end`."
+(defn simple-duration
+  "Calculates the duration between the time of calling the function (or the given
+  time `begin`) till the given time `end`, with nanoseconds set to 0."
   ([end]       (when end (.withNanos ^Duration (t/between (t/now) end) 0)))
   ([begin end] (when end (.withNanos ^Duration (t/between (or begin (t/now)) end) 0))))
 
