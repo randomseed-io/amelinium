@@ -1541,8 +1541,8 @@
                        :form/errors nil
                        :coercion/errors nil)
        (handle-bad-request-form-params req
-                                       (delay (param-errors-stringify-vals errors))
-                                       (delay (param-errors-to-current-vals req errors))
+                                       (delay (param-errors-stringify errors))
+                                       (delay (param-current-vals req))
                                        nil
                                        (delay (translate-sub :parameters/error))
                                        session-key)))))
