@@ -548,8 +548,8 @@
 
 (defn bindable-sym?
   "Returns `true` if a bindable, auto-generated symbol for the table/column (from `qs`,
-  which should be a `QSlot` record) and a value `v` exists in `bindings`
-  map. Otherwise it returns `false`."
+  which should be a `QSlot` record) and a value `v` exist in `bindings` map. Otherwise
+  it returns `false`."
   [bindings ^QSlot qs v]
   (contains? bindings (gen-qs-keyword qs v)))
 
@@ -678,7 +678,7 @@
    (#<Fn@3bf6fdc6 amelinium.model.confirmation/to_expiry> expires)]
   ```
 
-  We can see that coerces for `id` and `expires` symbols were resolved and function
+  We can see that coercers for `id` and `expires` symbols were resolved and function
   call forms were created at compile-time. That's because `:users/id` and
   `:confirmations/expires` were recognized as existing dispatch values when calling
   `in-coercer` internally. A coercer for the `email` symbol (using
