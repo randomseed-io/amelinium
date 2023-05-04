@@ -214,6 +214,7 @@
                            :change                 "Change!"
                            :set                    "Set!"
                            :submit                 "Submit!"
+                           :confirm                "Confirm!"
                            :email                  :parameter/email
                            :password               :parameter/password
                            :new-password           :parameter/password
