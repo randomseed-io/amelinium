@@ -348,45 +348,47 @@
   "Initiates user registration process by receiving e-mail, password and name."
   ([req] (register! req nil))
   ([req session-key]
-   (if-some [params (not-empty (get (get req :parameters) :form))]
-     (if (not= (:user/new-password params) (:user/repeated-password params))
-       (web/form-params-error! req {:user/repeated-password :repeated-password})
-       (let [route-data                  (http/get-route-data req)
-             [fname sname]               (str/split (or (get params :user/first-name) "") #"\\s+")
-             params                      (if sname (qassoc params
-                                                           :user/first-name  fname
-                                                           :user/second-name sname) params)
-             ^AuthSettings auth-settings (auth/settings req)
-             ^UserData     udata         (user/make-user-data auth-settings params)
-             db                          (if udata (.db udata))
-             result                      (confirmation/create-for-registration db udata)
-             req                         (verify! req {:db               db
-                                                       :id               (if udata (.email udata))
-                                                       :id-type          :email
-                                                       :result           result
-                                                       :route-data       route-data
-                                                       :tpl/email-exists :registration/exists
-                                                       :tpl/email-verify :registration/verify
-                                                       :tpl/phone-exists :verify/sms-exists
-                                                       :tpl/phone-verify :verify/sms})]
-         (web/response
-          ;; verify! returned error
-          req
-          ;; verify! performed registration initiation
-          (qassoc req :app/view (get route-data :register-sent/view :user/register-sent))
-          )))
-     req)))
+   (let [params       (not-empty (get (get req :parameters) :form))
+         new-password (if params (get params :user/new-password))]
+     (if new-password
+       (if (not= (:user/new-password params) (:user/repeated-password params))
+         (web/form-params-error! req {:user/repeated-password :repeated-password})
+         (let [route-data          (http/get-route-data req)
+               [fname sname]       (str/split (or (get params :user/first-name) "") #"\\s+")
+               params              (if sname (qassoc params
+                                                     :user/first-name  fname
+                                                     :user/second-name sname) params)
+               auth-settings       (auth/settings req)
+               ^UserData     udata (user/make-user-data auth-settings params)
+               db                  (if udata (.db udata))
+               result              (confirmation/create-for-registration db udata)
+               req                 (verify! req {:db               db
+                                                 :id               (if udata (.email udata))
+                                                 :id-type          :email
+                                                 :result           result
+                                                 :route-data       route-data
+                                                 :tpl/email-exists :registration/exists
+                                                 :tpl/email-verify :registration/verify
+                                                 :tpl/phone-exists :verify/sms-exists
+                                                 :tpl/phone-verify :verify/sms})]
+           (web/response
+            ;; verify! returned error
+            req
+            ;; verify! performed registration initiation
+            (qassoc req :app/view (get route-data :register-sent/view :user/register-sent)))))
+       req))))
 
 (defn create!
-  "Verifies confirmation token against a database and if it matches creates an
+  "Verifies confirmation token or code against a database and if it matches creates an
   account."
   [req]
   (let [auth-config  (auth/config req)
         db           (auth/db auth-config)
         all-params   (get req :parameters)
-        token        (get (get all-params :path) :token)
+        path-params  (get all-params :path)
         params       (get all-params :form)
-        code         (get params :code)
+        token        (get path-params :token)
+        code         (or (get params :confirmation/code) (get params :code))
         login        (or (get params :user/login) (get params :login))
         confirmation (confirmation/establish db login code token one-minute "creation")
         confirmed?   (get confirmation :confirmed?)
@@ -424,9 +426,9 @@
          all-params   (get req :parameters)
          path-params  (get all-params  :path)
          form-params  (get all-params  :form)
-         code         (get form-params :code)
-         token        (get path-params :token)
-         id-type      (or (some-keyword (get path-params :id-type)))
+         code         (or (get form-params :confirmation/code)  (get form-params :code))
+         token        (some-str     (get path-params :token))
+         id-type      (some-keyword (get path-params :id-type))
          id           (get form-params id-type)
          [id id-type] (common/identity-and-type id id-type)
          confirmation (confirmation/establish db id code token one-minute "change")
@@ -561,17 +563,23 @@
         form-params   (get params :form)
         query-params  (get params :query)
         path-params   (get params :path)
-        token         (or (get path-params :token) (get form-params :token))
-        code          (get form-params :code)
-        email         (get form-params :user/email)
+        token         (or (get path-params :token)
+                          (get form-params :confirmation/token)
+                          (get form-params :token))
+        code          (or (get form-params :confirmation/code)
+                          (get form-params :code))
+        email         (or (get form-params :user/email)
+                          (get form-params :email))
         login         (or (get form-params :user/login)
                           (get form-params :username)
                           (get form-params :login)
                           email)
         phone         (if-not email (get form-params :phone))
         [id id-type]  (common/identity-and-type (or email phone) (if email :email (if phone :phone)))
-        password      (some-str (get form-params :new-password))
-        password-2    (some-str (get form-params :repeated-password))
+        password      (some-str (or (get form-params :user/new-password)
+                                    (get form-params :new-password)))
+        password-2    (some-str (or (get form-params :user/repeated-password)
+                                    (get form-params :repeated-password)))
         set-password? (some? (or password password-2))]
     (cond
 

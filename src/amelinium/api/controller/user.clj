@@ -385,7 +385,6 @@
                                 :tpl/email-exists :update/exists
                                 :tpl/email-verify :update/verify})))))))))))
 
-
 (defn identity-create!
   "Verifies confirmation code or token against a database and if it matches, creates
   new identity."
@@ -396,8 +395,8 @@
     req
     (let [form-params       (get (get req :parameters) :form)
           to-change         (select-keys form-params [:user/email :user/phone])
-          token             (get form-params :token)
-          code              (get form-params :code)
+          token             (or (get form-params :confirmation/token) (get form-params :token))
+          code              (or (get form-params :confirmation/code)  (get form-params :code))
           [id-type-long id] (first to-change)]
       (if-not (or token (and code id))
         (api/render-error req :parameters/error)
@@ -436,8 +435,8 @@
    (let [db         (auth/db req)
          all-params (get req :parameters)
          params     (get all-params :form)
-         code       (get params :code)
-         token      (get params :token)
+         token      (or (get params :confirmation/token) (get params :token))
+         code       (or (get params :confirmation/code)  (get params :code))
          login      (or (get params :user/login) (get params :user/email) (get params :login) (get params :email))]
      (if-not (or token (and code login))
        (api/render-error req :parameters/error)
@@ -500,8 +499,8 @@
     (let [form-params  (get (get req :parameters) :form)
           to-change    (select-keys form-params [:user/email :user/phone])
           new-password (get form-params :user/new-password)
-          token        (get form-params :token)
-          code         (get form-params :code)
+          token        (or (get form-params :confirmation/token) (get form-params :token))
+          code         (or (get form-params :confirmation/code)  (get form-params :code))
           [id-type id] (first to-change)
           id-type      (if (identical? id-type :user/email) :email (if (identical? id-type :user/phone) :phone id-type))]
       (if (and token code)
@@ -571,7 +570,9 @@
    (password-create! req session-key super/invalidate-user-sessions!))
   ([req session-key session-invalidator]
    (let [form-params (get (get req :parameters) :form)]
-     (if (or (some? (get form-params :token))
+     (if (or (some? (get form-params :confirmation/token))
+             (some? (get form-params :confirmation/code))
+             (some? (get form-params :token))
              (some? (get form-params :code)))
        (password-recover! req session-invalidator)
        (password-change!  req session-key session-invalidator)))))
