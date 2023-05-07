@@ -117,34 +117,36 @@
                            :banned    "Konto zablokowane"}
    :output                {:error "Błędne dane wyjściowe"}
    :parameters            {:error "Błędne parametry"}
-   :parameter             {:phone                 "Numer telefoniczny"
-                           :regular-phone         :parameter/phone
-                           :email                 "Adres e-mailowy"
-                           :login                 "Login"
-                           :password              "Hasło"
-                           :new-password          "Nowe hasło"
-                           :password-relaxed      "Hasło"
-                           :repeated-password     "Powtórzone hasło"
-                           :name                  "Imię"
-                           :first-name            "Imię"
-                           :last-name             "Nazwisko"
-                           :second-name           "Drugie imię"
-                           :middle-name           "Drugie imię"
-                           :user.regular-phone    :parameter/phone
-                           :user.phone            :parameter/phone
-                           :user.email            :parameter/email
-                           :user.login            :parameter/login
-                           :user.password         :parameter/password
-                           :user.password-relaxed :parameter/password-relaxed
-                           :user.name             :parameter/name
-                           :user.first-name       :parameter/first-name
-                           :user.last-name        :parameter/last-name
-                           :user.second-name      :parameter/second-name
-                           :user.middle-name      :parameter/middle-name
-                           :token                 "Token"
-                           :session-id            "Identyfikator sesji"
-                           :language              "Identyfikator języka"
-                           :lang                  "Identyfikator języka"}
+   :parameter             {:phone                  "Numer telefoniczny"
+                           :regular-phone          :parameter/phone
+                           :email                  "Adres e-mailowy"
+                           :login                  "Login"
+                           :password               "Hasło"
+                           :new-password           "Nowe hasło"
+                           :password-relaxed       "Hasło"
+                           :repeated-password      "Powtórzone hasło"
+                           :name                   "Imię"
+                           :first-name             "Imię"
+                           :last-name              "Nazwisko"
+                           :second-name            "Drugie imię"
+                           :middle-name            "Drugie imię"
+                           :user.regular-phone     :parameter/phone
+                           :user.phone             :parameter/phone
+                           :user.email             :parameter/email
+                           :user.login             :parameter/login
+                           :user.password          :parameter/password
+                           :user.password-relaxed  :parameter/password-relaxed
+                           :user.new-password      :parameter/new-password
+                           :user.repeated-password :parameter/repeated-password
+                           :user.name              :parameter/name
+                           :user.first-name        :parameter/first-name
+                           :user.last-name         :parameter/last-name
+                           :user.second-name       :parameter/second-name
+                           :user.middle-name       :parameter/middle-name
+                           :token                  "Token"
+                           :session-id             "Identyfikator sesji"
+                           :language               "Identyfikator języka"
+                           :lang                   "Identyfikator języka"}
    :parameter-type        {:string            "Napis tekstowy"
                            :integer           "Liczba"
                            :boolean           "Pole decyzji"
@@ -153,23 +155,23 @@
                            :email             "Adres e-mailowy"
                            :password          "Hasło"
                            :password-relaxed  "Hasło"
+                           :repeated-password "Powtórzone hasło"
                            :name              "Imię"
                            :token             "Token"
                            :session-id        "Identyfikator sesji"
                            :secure-session-id "Bezpieczny identyfikator sesji"
-                           :language          "Identyfikator języka"
-                           :repeated-password "Powtórzone hasło"}
+                           :language          "Identyfikator języka"}
    :type-should           {:phone             "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa."
                            :regular-phone     "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa i nie być numerem specjalnym."
                            :email             "Adres e-mailowy powinien zawierać część lokalną i poprawną domenę."
                            :password          "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
                            :password-relaxed  "Należy podać hasło."
+                           :repeated-password "Powtórzone hasło powinno być takie samo jak pierwsze."
                            :name              "Imię powinno składać się ze zwykłych znaków i opcjonalnych łączników."
                            :token             "Token powinien być łańcuchem znakowym reprezentującym liczbę w zapisie szesnastkowym."
                            :session-id        "Identyfikator sesji powinien być jednym lub dwoma łańcuchami znakowymi w zapisie szesnastkowym."
                            :secure-session-id "Bezpieczny identyfikator sesji powinien być jedną lub dwoma liczbami szesnastkowymi oddzielonymi dywizem."
-                           :language          "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."
-                           :repeated-password "Powtórzone hasło musi być takie samo jak pierwsze."}
+                           :language          "Identyfikator języka powinien wyrażać poprawny kod obsługiwanego języka."}
    :parameter-should      {:phone                          :type-should/phone
                            :regular-phone                  :type-should/regular-phone
                            :email                          :type-should/email
@@ -190,6 +192,8 @@
                            :user.login                     :parameter-should/login
                            :user.password                  :type-should/password
                            :user.password-relaxed          :type-should/password-relaxed
+                           :user.new-password              :type-should/password
+                           :user.repeated-password         :type-should/repeated-password
                            :user.password.password         :parameter-should/password.password
                            :user.password.password-relaxed :parameter-should/password.password-relaxed
                            :user.name                      :type-should/name
@@ -258,5 +262,6 @@
                                :one        "jedna próba"
                                :genitive   "{1} prób"
                                :nominative "{1} próby"}]
+
 
    :tongue/pluralizer amelinium.i18n.pluralizers/pl}}}

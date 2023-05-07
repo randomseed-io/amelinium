@@ -112,34 +112,36 @@
                            :banned    "Account Blocked"}
    :output                {:error "Invalid output data"}
    :parameters            {:error "Invalid parameters"}
-   :parameter             {:phone                 "Phone number"
-                           :regular-phone         "Phone number"
-                           :email                 "E-mail address"
-                           :login                 "Login"
-                           :password              "Password"
-                           :password-relaxed      "Password"
-                           :new-password          "New password"
-                           :repeated-password     "Repeated password"
-                           :name                  "Name"
-                           :first-name            "First name"
-                           :last-name             "Last name"
-                           :second-name           "Second name"
-                           :middle-name           "Middle name"
-                           :user.phone            :parameter/phone
-                           :user.regular-phone    :parameter/phone
-                           :user.email            :parameter/email
-                           :user.login            :parameter/login
-                           :user.password         :parameter/password
-                           :user.password-relaxed :parameter/password-relaxed
-                           :user.name             :parameter/name
-                           :user.first-name       :parameter/first-name
-                           :user.last-name        :parameter/last-name
-                           :user.second-name      :parameter/second-name
-                           :user.middle-name      :parameter/middle-name
-                           :token                 "Token"
-                           :session-id            "Session identifier"
-                           :language              "Language identifier"
-                           :lang                  "Language identifier"}
+   :parameter             {:phone                  "Phone number"
+                           :regular-phone          "Phone number"
+                           :email                  "E-mail address"
+                           :login                  "Login"
+                           :password               "Password"
+                           :password-relaxed       "Password"
+                           :new-password           "New password"
+                           :repeated-password      "Repeated password"
+                           :name                   "Name"
+                           :first-name             "First name"
+                           :last-name              "Last name"
+                           :second-name            "Second name"
+                           :middle-name            "Middle name"
+                           :user.phone             :parameter/phone
+                           :user.regular-phone     :parameter/phone
+                           :user.email             :parameter/email
+                           :user.login             :parameter/login
+                           :user.password          :parameter/password
+                           :user.password-relaxed  :parameter/password-relaxed
+                           :user.new-password      :parameter/new-password
+                           :user.repeated-password :parameter/repeated-password
+                           :user.name              :parameter/name
+                           :user.first-name        :parameter/first-name
+                           :user.last-name         :parameter/last-name
+                           :user.second-name       :parameter/second-name
+                           :user.middle-name       :parameter/middle-name
+                           :token                  "Token"
+                           :session-id             "Session identifier"
+                           :language               "Language identifier"
+                           :lang                   "Language identifier"}
    :parameter-type        {:string             "String"
                            :integer            "Integer number"
                            :boolean            "Decision field"
@@ -149,6 +151,7 @@
                            :login              "Login"
                            :password           "Password"
                            :password-relaxed   "Password"
+                           :repeated-password  "Repeated password"
                            :name               "Name"
                            :token              "Token"
                            :session-id         "Session identifier"
@@ -160,6 +163,7 @@
                            :email              "E-mail address should have a local part and a valid domain name."
                            :password           "Password should have at least 8 characters, big and small letters, a digit and a special character."
                            :password-relaxed   "Password must be present."
+                           :repeated-password  "Repeated password should be the same as entered."
                            :name               "Name should consist of regular characters with optional hyphens."
                            :token              "Token should be a string expressing hexadecimal number."
                            :session-id         "Session ID should be a string consisting of one or two hexadecimal numbers."
@@ -173,7 +177,7 @@
                            :login                          "Login should be a valid e-mail address."
                            :password                       :type-should/password
                            :new-password                   :type-should/password
-                           :repeated-password              :type-should/password
+                           :repeated-password              :type-should/repeated-password
                            :password-relaxed               :type-should/password-relaxed
                            :password.password              "Password should have min. 8 letters (big and small), a digit, and a special character."
                            :password.password-relaxed      "Password must be present."
@@ -187,6 +191,8 @@
                            :user.login                     "Login should be a valid e-mail address."
                            :user.password                  :type-should/password
                            :user.password-relaxed          :type-should/password-relaxed
+                           :user.new-password              :type-should/password
+                           :user.repeated-password         :type-should/repeated-password
                            :user.password.password         :parameter-should/password.password
                            :user.password.password-relaxed :parameter-should/password.password-relaxed
                            :user.name                      :type-should/name
