@@ -724,7 +724,9 @@
         email (some-str email)]
     (if (and code email)
       (if-some [r (db/execute-one! db [create-with-code-query code email])]
-        (qassoc r :created? true :identity (identity/of-type (get r :email)))
+        (qassoc r
+                :created? true
+                :identity (identity/of-type :email (get r :email)))
         (let [errs (confirmation/report-errors db email code "creation" true)]
           {:created? false
            :errors   errs})))))
