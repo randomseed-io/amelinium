@@ -40,6 +40,54 @@
                 msg-with-val err-with-val msg err wrn dbg
                 log-exceptions])
 
+(defmacro web-msg
+  [req msg & more]
+  (if more
+    (#'log/info &form &env (list* #'some-str-spc
+                                  (list #'clojure.core/str
+                                        "[" (list #'clojure.core/or (list :uri req) "-") "]: "
+                                        (list #'some-str msg))
+                                  more))
+    (#'log/info &form &env (list  #'clojure.core/str
+                                  "[" (list #'clojure.core/or (list :uri req) "-") "]: "
+                                  (list #'some-str msg)))))
+
+(defmacro web-wrn
+  [req msg & more]
+  (if more
+    (#'log/warn &form &env (list* #'some-str-spc
+                                  (list #'clojure.core/str
+                                        "[" (list #'clojure.core/or (list :uri req) "-") "]: "
+                                        (list #'some-str msg))
+                                  more))
+    (#'log/warn &form &env (list  #'clojure.core/str
+                                  "[" (list #'clojure.core/or (list :uri req) "-") "]: "
+                                  (list #'some-str msg)))))
+
+(defmacro web-err
+  [req msg & more]
+  (if more
+    (#'log/error &form &env (list* #'some-str-spc
+                                   (list #'clojure.core/str
+                                         "[" (list #'clojure.core/or (list :uri req) "-") "]: "
+                                         (list #'some-str msg))
+                                   more))
+    (#'log/error &form &env (list  #'clojure.core/str
+                                   "[" (list #'clojure.core/or (list :uri req) "-") "]: "
+                                   (list #'some-str msg)))))
+
+(defmacro web-dbg
+  [req msg & more]
+  (if more
+    (#'log/debug &form &env (list* #'some-str-spc
+                                   (list #'clojure.core/str
+                                         "[" (list #'clojure.core/or (list :uri req) "-") "]: "
+                                         (list #'some-str msg))
+                                   more))
+    (#'log/debug &form &env (list  #'clojure.core/str
+                                   "[" (list #'clojure.core/or (list :uri req) "-") "]: "
+                                   (list #'some-str msg)))))
+
 ;;
 ;; Context processing
 ;;

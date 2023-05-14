@@ -170,7 +170,7 @@
 (defn- auth-prolonged-ok
   [req route-data lang]
   (if (get req :auth/htmx?)
-    (web/inject-auth-error req route-data :auth/prolonged-ok :login/prolonged)
+    (web/inject-error req route-data :auth/prolonged-ok :login/prolonged)
     (auth-ok req route-data lang)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -476,9 +476,9 @@
    (case (get req :response/status)
      :pwd/created      req
      :pwd/updated      req
-     :pwd/bad-password (common/move-to req (get-in route-data [:auth-error/destinations :auth/bad-password] :login/bad-password))
-     :pwd/bad-user     (common/move-to req (get-in route-data [:auth-error/destinations :auth/bad-password] :login/bad-password))
-     (common/go-to req (get-in route-data [:auth-error/destinations :auth/error] :login/error)))))
+     :pwd/bad-password (common/move-to req (get-in route-data [:error/destinations :auth/bad-password] :login/bad-password))
+     :pwd/bad-user     (common/move-to req (get-in route-data [:error/destinations :auth/bad-password] :login/bad-password))
+     (common/go-to req (get-in route-data [:error/destinations :auth/error] :login/error)))))
 
 (defn password-change!
   "Changes password for the user authenticated with an old password and e-mail or sets

@@ -337,37 +337,45 @@
 (defn get-view
   "Gets a view partial path for the current route using `:app/view` route data or
   `:name`. If it cannot be extracted, returns default."
-  [req]
-  (let [view (http/req-or-route-param req :app/view)]
-    (if (false? view)
-      false
-      (or (some-str view)
-          (some-str (http/req-or-route-param req :name))
-          "default"))))
+  ([req]
+   (get-view req (http/get-route-data req)))
+  ([req route-data]
+   (let [view (get req :app/view)
+         view (if (nil? view) (get route-data :app/view) view)]
+     (if (false? view)
+       false
+       (or (some-str view)
+           (some-str (http/req-or-route-param req :name))
+           "default")))))
 
 (defn get-layout
   "Gets layout partial path for the current route using :app/layout route data. If it
   cannot be extracted, returns default."
-  [req]
-  (let [layout (http/req-or-route-param req :app/layout)]
-    (if (false? layout)
-      false
-      (or (some-str layout)
-          "default"))))
+  ([req]
+   (get-layout req (http/get-route-data req)))
+  ([req route-data]
+   (let [layout (get req :app/layout)
+         layout (if (nil? layout) (get route-data :app/layout) layout)]
+     (if (false? layout)
+       false
+       (or (some-str layout)
+           "default")))))
 
 (defn get-view-dir
-  "Gets view optional subdirectory for the current route using :app/layout-dir route
+  "Gets view optional subdirectory for the current route using `:app/layout-dir` route
   data. If it cannot be extracted, returns `nil`."
-  [req view-dir]
-  (some-str
-   (or view-dir (http/req-or-route-param req :app/view-dir))))
+  ([req view-dir]
+   (some-str (or view-dir (http/req-or-route-param req :app/view-dir))))
+  ([req view-dir route-data]
+   (some-str (or view-dir (get req :app/view-dir) (get route-data :app/view-dir)))))
 
 (defn get-layout-dir
   "Gets layout optional subdirectory for the current route using :app/layout-dir route
   data. If it cannot be extracted, returns `nil`."
-  [req layout-dir]
-  (some-str
-   (or layout-dir (http/req-or-route-param req :app/layout-dir))))
+  ([req layout-dir]
+   (some-str (or layout-dir (http/req-or-route-param req :app/layout-dir))))
+  ([req layout-dir route-data]
+   (some-str (or layout-dir (get req :app/layout-dir) (get route-data :app/layout-dir)))))
 
 (def ^:const views-str               "views")
 (def ^:const layouts-str           "layouts")
@@ -449,17 +457,19 @@
 
   If layout is set to `false`, explicitly disables using layout by returning
   `false` (may be helpful with partials rendered using AJAX calls)."
-  [req lang layout]
-  (let [[ldir layout] (if (coll? layout) layout [nil layout])]
-    (if (false? layout)
-      false
-      (let [layout (or layout (get-layout req))]
-        (if (false? layout)
-          false
-          (resolve-cached (get req :uri)
-                          layouts-str
-                          (get-layout-dir req ldir)
-                          lang layout))))))
+  ([req lang layout]
+   (resolve-layout req lang layout (http/get-route-data req)))
+  ([req lang layout route-data]
+   (let [[ldir layout] (if (coll? layout) layout [nil layout])]
+     (if (false? layout)
+       false
+       (let [layout (or layout (get-layout req route-data))]
+         (if (false? layout)
+           false
+           (resolve-cached (get req :uri)
+                           layouts-str
+                           (get-layout-dir req ldir route-data)
+                           lang layout)))))))
 
 (defn resolve-view
   "Returns a view file for the given language `lang` and `view` (a 2-element sequence
@@ -470,17 +480,19 @@
   data (`:app/view` key) or to fall back to default.
 
   If view is set to `false`, explicitly disables using it by returning `false`."
-  [req lang view]
-  (let [[vdir view] (if (coll? view) view [nil view])]
-    (if (false? view)
-      false
-      (let [view (or view (get-view req))]
-        (if (false? view)
-          false
-          (resolve-cached (get req :uri)
-                          views-str
-                          (get-view-dir req vdir)
-                          lang view))))))
+  ([req lang view]
+   (resolve-view req lang view (http/get-route-data req)))
+  ([req lang view route-data]
+   (let [[vdir view] (if (coll? view) view [nil view])]
+     (if (false? view)
+       false
+       (let [view (or view (get-view req route-data))]
+         (if (false? view)
+           false
+           (resolve-cached (get req :uri)
+                           views-str
+                           (get-view-dir req vdir route-data)
+                           lang view)))))))
 
 ;; Response rendering
 
@@ -492,7 +504,15 @@
   [req k]
   (identical? (some-keyword k) (get req :response/status)))
 
-(defn update-status
+(defn- update-status
+  "Updates `:app/data` map of the `req` by setting its status key `status-key` to
+  `status`, `title-key` to translated `status` and `description-key` to translated
+  message obtained for a translation key made with namespace of `status` and name of
+  `status` with `.full` attached. If `status` is untranslatable (is not an ident nor
+  a string), it will just associate `status-key` with the given `status`.
+
+  Any existing entries of `:app/data` having the same keys as given (`status-key`,
+  `title-key` and `description-key`) will remain unmodified."
   ([req status lang status-key title-key description-key]
    (if status
      (->> (update-status (get req :app/data empty-lazy-map) req status lang status-key title-key description-key)
@@ -516,22 +536,42 @@
   ([req status lang]
    (update-status req status lang :status :status/title :status/description)))
 
-(defn- error-lv
-  "Sets a different sub-path for layout and view when a namespace of status is not
+(defmacro or-some
+  "Same as `or` but returns first value which is not `nil`."
+  ([] nil)
+  ([x] x)
+  ([x & next]
+   `(let [or# ~x]
+      (if (nil? or#) (or-some ~@next) or#))))
+
+(defn- status-lv
+  "Sets a different sub-path for layout and view when a namespace of HTTP status is not
   \"ok\" nor \"info\"."
-  [req status layout view]
-  (if (or (nil? status)
-          (and layout view)
-          (contains? #{"ok" "info"} (namespace status)))
+  [req status layout view route-data]
+  (if (nil? status)
     [layout view]
-    [(or layout
-         (get (http/req-or-route-param req :error/layouts) status)
-         (http/req-or-route-param req :app/error-layout)
-         "error")
-     (or view
-         (get (http/req-or-route-param req :error/views) status)
-         (http/req-or-route-param req :app/error-view)
-         "error")]))
+    (let [no-layout (nil? layout)
+          no-view   (nil? view)]
+      (if (not (or no-layout no-view))
+        [layout view]
+        (if (contains? #{"ok" "info"} (namespace status))
+          [layout view]
+          (let [app-status (get req :response/status)]
+            [(if no-layout
+               (or-some (if (some? app-status)
+                          (get (or (get req :status/layouts) (get route-data :status/layouts)) app-status))
+                        (get (or (get req :status/layouts) (get route-data :status/layouts)) status)
+                        (get req :app/error-layout)
+                        (get route-data :app/error-layout)
+                        "error")
+               layout)
+             (if no-view
+               (or-some (if (some? app-status) (get (or (get req :status/views) (get route-data :status/views)) app-status))
+                        (get (or (get req :status/views) (get route-data :status/views)) status)
+                        (get req :app/error-view)
+                        (get route-data :app/error-view)
+                        "error")
+               view)]))))))
 
 (defn render
   "HTML web page renderer. Takes a request, a data map to be used in templates, a name
@@ -560,14 +600,14 @@
   In case of an error response page (when the namespace of a `status` keyword is not
   \"ok\" nor \"info\") the following sources are checked to find a layout path:
   - the given `layout`,
-  - value of `status` looked up in a map under `:error/layouts` (in a route data or a request map),
+  - value of `status` looked up in a map under `:status/layouts` (in a route data or a request map),
   - value of `:app/error-layout` (in a route data or a request map),
   - \"error\".
 
   In case of an error response page (when the namespace of a status keyword is not
   \"ok\" nor \"info\") the following sources are checked to find a view path:
   - the given `view`,
-  - value of `status` looked up in a map under `:error/views` (in a  route data or a request map),
+  - value of `status` looked up in a map under `:status/views` (in a  route data or a request map),
   - value of `:app/error-view` (in a route data or a request map),
   - \"error\"."
   ([]
@@ -582,24 +622,27 @@
    (render req status data view nil nil))
   ([req status data view layout]
    (render req status data view layout nil))
-  ([req status data view layout lang]
-   (let [lang        (if lang (some-str lang))
-         lang        (if (false? lang) nil (pick-language-str req))
-         [layt view] (error-lv req status layout view)
-         layt        (resolve-layout req lang layt)
-         view        (resolve-view   req lang view)]
+  ([req http-status data view layout lang]
+   (let [uri         (get req :uri)
+         lang        (if lang (some-str lang))
+         lang        (if (false? lang) nil (common/pick-language-str req))
+         route-data  (http/get-route-data req)
+         [layt view] (status-lv req http-status layout view route-data)
+         layt        (resolve-layout req lang layt route-data)
+         view        (resolve-view   req lang view route-data)]
+     (log/web-dbg req "Rendering (layout:" layt "view:" (str view ")"))
      (if (and (nil? layt) (nil? view))
-       (do (log/err "No layout nor view found for" (:uri req)) nil)
+       (do (log/web-err req "No layout nor view found") nil)
        (let [dlng (or lang (get req :language/str))
              data (prep-app-data req data)
              data (map/assoc-missing data
-                                     :uri                (get req :uri)
+                                     :uri                uri
                                      :url                (delay (req/request-url req))
                                      :character-encoding (delay (req/character-encoding req))
                                      :path               (delay (common/page req))
                                      :htmx-request?      (delay (common/hx-request? req))
                                      :lang               dlng)
-             data (update-status data req status dlng)
+             data (update-status data req http-status dlng)
              html (if view (selmer/render-file view data) "")
              rndr (qassoc data :body [:safe html])
              resp (if layt (selmer/render-file layt rndr) html)]
@@ -634,14 +677,14 @@
   In case of an error response page (when the namespace of a `status` keyword is not
   \"ok\" nor \"info\") the following sources are checked to find a layout path:
   - the given `layout`,
-  - value of `status` looked up in a map under `:error/layouts` (in a route data or a request map),
+  - value of `status` looked up in a map under `:status/layouts` (in a route data or a request map),
   - value of `:app/error-layout` (in a route data or a request map),
   - \"error\".
 
   In case of an error response page (when the namespace of a status keyword is not
   \"ok\" nor \"info\") the following sources are checked to find a view path:
   - the given `view`,
-  - value of `status` looked up in a map under `:error/views` (in a  route data or a request map),
+  - value of `status` looked up in a map under `:status/views` (in a  route data or a request map),
   - value of `:app/error-view` (in a route data or a request map),
   - \"error\"."
   ([]
@@ -691,14 +734,14 @@
   In case of an error response page (when the namespace of a `status` keyword is not
   \"ok\" nor \"info\") the following sources are checked to find a layout path:
   - the given `layout`,
-  - value of `status` looked up in a map under `:error/layouts` (in a route data or a request map),
+  - value of `status` looked up in a map under `:status/layouts` (in a route data or a request map),
   - value of `:app/error-layout` (in a route data or a request map),
   - \"error\".
 
   In case of an error response page (when the namespace of a status keyword is not
   \"ok\" nor \"info\") the following sources are checked to find a view path:
   - the given `view`,
-  - value of `status` looked up in a map under `:error/views` (in a  route data or a request map),
+  - value of `status` looked up in a map under `:status/views` (in a  route data or a request map),
   - value of `:app/error-view` (in a route data or a request map),
   - \"error\"."
   ([]
@@ -1042,36 +1085,43 @@
    (let [err-config (errors/config req)
          app-status (errors/most-significant err-config app-status)
          req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+     (log/web-dbg req "Rendering response with application status" app-status)
      (errors/render err-config app-status render-ok req)))
   ([req app-status default]
    (let [err-config (errors/config req)
          app-status (errors/most-significant err-config app-status)
          req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+     (log/web-dbg req "Rendering response with application status" app-status)
      (errors/render err-config app-status (or default render-ok) req)))
   ([req app-status default data]
    (let [err-config (errors/config req)
          app-status (errors/most-significant err-config app-status)
          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+     (log/web-dbg req "Rendering response with application status" app-status)
      (errors/render err-config app-status (or default render-ok) req data)))
   ([req app-status default data view]
    (let [err-config (errors/config req)
          app-status (errors/most-significant err-config app-status)
          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+     (log/web-dbg req "Rendering response with application status" app-status)
      (errors/render err-config app-status (or default render-ok) req data view)))
   ([req app-status default data view layout]
    (let [err-config (errors/config req)
          app-status (errors/most-significant err-config app-status)
          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+     (log/web-dbg req "Rendering response with application status" app-status)
      (errors/render err-config app-status (or default render-ok) req data view layout)))
   ([req app-status default data view layout lang]
    (let [err-config (errors/config req)
          app-status (errors/most-significant err-config app-status)
          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+     (log/web-dbg req "Rendering response with application status" app-status)
      (errors/render err-config app-status (or default render-ok) req data view layout lang)))
   ([req app-status default data view layout lang & more]
    (let [err-config (errors/config req)
          app-status (errors/most-significant err-config app-status)
          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+     (log/web-dbg req "Rendering response with application status" app-status)
      (apply errors/render err-config app-status (or default render-ok) req data view layout lang more))))
 
 ;; HTMX
@@ -1080,59 +1130,66 @@
   "Injects HTML fragment by issuing HTMX response with `HX-Retarget` header set to
   `target` (if truthy), `:app/layout` key of the `req` set to `false` and `:app/view`
   key of the `req` set to `view`. Returns updated request map `req`."
-  ([req view]
-   (inject req view nil))
-  ([req view target]
-   (let [req (qassoc req :app/layout false :app/view view)]
+  ([req]
+   (log/web-dbg req "Setting :app/layout to false")
+   (qassoc req :app/layout false))
+  ([req target]
+   (let [req (qassoc req :app/layout false)]
+     (log/web-dbg req "Setting :app/layout to false")
      (if target
        (if-some [t (some-str target)]
-         (add-header req :HX-Retarget t)
+         (do (log/web-dbg req "Setting HX-Retarget header to" target)
+             (add-header req :HX-Retarget t))
+         req)
+       req)))
+  ([req target view]
+   (let [req (qassoc req :app/layout false :app/view view)]
+     (log/web-dbg req "Setting :app/layout to false and :app/view to" view)
+     (if target
+       (if-some [t (some-str target)]
+         (do (log/web-dbg req "Setting HX-Retarget header to" target)
+             (add-header req :HX-Retarget t))
          req)
        req))))
 
-(defn inject-auth-error
-  "Uses `inject` to set a view on a basis of the given authentication status `status`
-  by looking it up in `:auth-error/destinations` of a route data map with fallback to
-  `default-view` (if set) or to a value associated with the `:auth-error/destination`
-  key.
-
-  It also sets an HTMX target element to the given status by looking it up in
-  `:auth-error/targets` of a route data map with fallback to a value associated with
-  the `:auth-error/target` key."
+(defn inject-error
+  "Uses `inject` to set a target (`HX-Retarget` header) on a basis of the given status
+  `status` by looking it up in `:status/targets` of a route data map with fallback to
+  `:error/target`. Also sets a default view to the given `default-view` (if set)."
   ([req]
-   (inject-auth-error req nil :auth/error nil))
+   (inject-error req nil :error/internal nil))
   ([req status]
-   (inject-auth-error req nil status nil))
+   (inject-error req nil status nil))
   ([req status default-view]
-   (inject-auth-error req nil status default-view))
+   (inject-error req nil status default-view))
   ([req route-data status default-view]
-   (let [route-data (or route-data (http/get-route-data req))]
-     (inject req
-             (or (get-in route-data [:auth-error/destinations status] default-view)
-                 (get route-data :auth-error/destination))
-             (or (get-in route-data [:auth-error/targets status])
-                 (get route-data :auth-error/target))))))
+   (let [route-data (or route-data (http/get-route-data req))
+         target     (or (get-in route-data [:status/targets status])
+                        (get route-data :error/target))]
+     (if default-view
+       (inject req target default-view)
+       (inject req target)))))
 
-(defn goto-auth-error
-  "Uses `go-to` to make a redirect on a basis of the given authentication status
-  `status` by looking it up in `:auth-error/destinations` of a route data map with
-  fallback to `default-page` (if set) or to a value associated with the
-  `:auth-error/destination` key."
+(defn goto-error
+  "Uses `go-to` to make a redirect on a basis of the given status `status` by looking
+  it up in `:error/destinations` of a route data map with fallback to
+  `default-page` (if set) or to a value associated with the `:error/destination`
+  key."
   ([req]
-   (goto-auth-error req nil :auth/error nil))
+   (goto-error req nil :auth/error nil))
   ([req status]
-   (goto-auth-error req nil status nil))
+   (goto-error req nil status nil))
   ([req status default-page]
-   (goto-auth-error req nil status default-page))
+   (goto-error req nil status default-page))
   ([req route-data status default-page]
    (let [route-data (or route-data (http/get-route-data req))]
      (go-to req
-            (or (get-in route-data [:auth-error/destinations status] default-page)
-                (get route-data :auth-error/destination))))))
+            (or (get-in route-data [:error/destinations status] default-page)
+                (get route-data :error/destination))))))
 
 (defn handle-auth-error
   "Sets proper HTMX response (when `use-hx?` returns `true` because the request
-  indicated it is HTMX or `:auth-error/use-htmx?` route data key is set or generic
+  indicated it is HTMX or `:error/use-htmx?` route data key is set or generic
   `:use-htmx?` route data key is set), or a redirect response, as a result of
   authentication error encountered. Additionally, sets an HTTP response header
   `Authentication-Error` with error status detected (mainly to be used by reverse
@@ -1144,12 +1201,13 @@
   ([req status default-view]
    (handle-auth-error req nil status default-view))
   ([req route-data status default-view]
+   (log/web-dbg req "Handling auth error:" status)
    (let [route-data (or route-data (http/get-route-data req))
          str-status (some-str status)
          req        (if str-status (add-header req :Authentication-Error str-status) req)]
-     (if (use-hx? req route-data :auth-error/use-htmx?)
-       (inject-auth-error req route-data status default-view)
-       (goto-auth-error   req route-data status default-view)))))
+     (if (use-hx? req route-data :error/use-htmx?)
+       (inject-error req route-data status default-view)
+       (goto-error   req route-data status default-view)))))
 
 (defn hx-transform-redirect
   "Adds the `HX-Redirect` response header set to a value of existing `Location` header
