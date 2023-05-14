@@ -439,9 +439,9 @@
                               [[prep-sl lang-sl default-html]]
                               [[prep-sl default-html]])]
     (or (first (keep #(apply common/some-resource %) pths))
-        (do (if (nil? uri) (log/wrn "Empty URI while resolving" pre))
-            (log/wrn "Cannot find" pre (if uri (str "for " uri)))
-            (doseq [path pths] (log/wrn (apply str "Tried: [resources]/" path)))))))
+        (do (if (nil? uri) (log/wrn "[-]: Empty URI while resolving" pre))
+            (log/wrn (str "[" uri "]: Cannot find") pre)
+            (doseq [path pths] (log/wrn (apply str "[" uri "]: Tried [resources]/" path)))))))
 
 (def ^{:arglists '([uri pre dir lang core])}
   resolve-cached
