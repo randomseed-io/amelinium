@@ -679,23 +679,24 @@
          [layt view] (status-lv req http-status layout view route-data)
          layt        (resolve-layout req lang layt route-data)
          view        (resolve-view   req lang view route-data)]
-     (log/web-dbg req "Rendering (layout:" layt "view:" (str view ")"))
-     (if (and (nil? layt) (nil? view))
-       (do (log/web-err req "No layout nor view found") nil)
-       (let [dlng (or lang (get req :language/str))
-             data (prep-app-data req data)
-             data (map/assoc-missing data
-                                     :uri                uri
-                                     :url                (delay (req/request-url req))
-                                     :character-encoding (delay (req/character-encoding req))
-                                     :path               (delay (common/page req))
-                                     :htmx-request?      (delay (common/hx-request? req))
-                                     :lang               dlng)
-             data (update-status data req http-status dlng)
-             html (if view (selmer/render-file view data) "")
-             rndr (qassoc data :body [:safe html])
-             resp (if layt (selmer/render-file layt rndr) html)]
-         resp)))))
+     (if (or layt view)
+       (do (log/web-dbg req "Rendering (layout:" layt "view:" (str view ")"))
+           (let [dlng (or lang (get req :language/str))
+                 data (prep-app-data req data)
+                 data (map/assoc-missing data
+                                         :uri                uri
+                                         :url                (delay (req/request-url req))
+                                         :character-encoding (delay (req/character-encoding req))
+                                         :path               (delay (common/page req))
+                                         :htmx-request?      (delay (common/hx-request? req))
+                                         :lang               dlng)
+                 data (update-status data req http-status dlng)
+                 html (if view (selmer/render-file view data) "")
+                 rndr (qassoc data :body [:safe html])
+                 resp (if layt (selmer/render-file layt rndr) html)]
+             resp))
+       (do (log/web-err req "Rendering empty document since no layout nor view was set")
+           "")))))
 
 (defn response?
   "Returns `true` if the given context map `req` is a response."
