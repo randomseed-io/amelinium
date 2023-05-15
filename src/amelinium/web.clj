@@ -1536,15 +1536,15 @@
            hx-target          (some-str (or hx-target (get route-data :form-errors/target)))
            req                (if hx-target (add-header req :HX-Retarget hx-target) req)
            req                (if title (assoc-app-data req :title title) req)
-           req                (if (nil? new-view)   req (qassoc req :app/view new-view))
+           req                (if (nil? new-view)   req (qassoc req :app/view   new-view))
            req                (if (nil? new-layout) req (qassoc req :app/layout new-layout))]
-       (render-ok
-        (assoc-app-data req
-                        :coercion/errors       explanations
-                        :form/previous-errors? handling-previous?
-                        :form/errors           (delay {:dest   (:uri req)
-                                                       :errors (force errors)
-                                                       :params (force values)})))))))
+       (-> req
+           (assoc-app-data :coercion/errors       explanations
+                           :form/previous-errors? handling-previous?
+                           :form/errors           (delay {:dest   (:uri req)
+                                                          :errors (force errors)
+                                                          :params (force values)}))
+           (render-bad-params nil new-view new-layout))))))
 
 (defn handle-bad-request-form-params
   "Dispatch function which calls `hx-handle-bad-request-form-params` when HTMX is in
