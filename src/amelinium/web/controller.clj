@@ -207,7 +207,7 @@
              ^Session sess (session/allow-soft-expired sess)
              session-field (or (session/id-field sess) "session-id")]
          (if use-htmx?
-           (web/inject-error req route-data :auth/prolongate :login/prolongate)
+           (web/inject-status req route-data :auth/prolongate :login/prolongate)
            (let [req-to-save (common/remove-form-params req session-field)]
              (session/put-var! sess
                                :goto {:ts           (t/now)

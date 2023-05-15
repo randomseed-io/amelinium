@@ -1179,7 +1179,8 @@
 (defn inject
   "Injects HTML fragment by issuing HTMX response with `HX-Retarget` header set to
   `target` (if truthy), `:app/layout` key of the `req` set to `false` and `:app/view`
-  key of the `req` set to `view`. Returns updated request map `req`."
+  key of the `req` set to `view` (if given and set). Returns updated request map
+  `req`."
   ([req]
    (log/web-dbg req "Setting :app/layout to false")
    (qassoc req :app/layout false))
@@ -1202,18 +1203,27 @@
          req)
        req))))
 
-(defn inject-error
-  "Uses `inject` to set a target (`HX-Retarget` header) on a basis of the given status
-  `status` by looking it up in `:status/targets` of a route data map with fallback to
-  `:error/target`. Also sets a default view to the given `default-view` (if set)."
+(defn inject-status
+  "Uses `inject` to set a target (`HX-Retarget` header) on a basis of the given
+  application status `status` by looking it up in `:status/targets` of a route data
+  map with a fallback to `:error/target`.
+
+  Additionally it sets a fallback view to the given `default-view` (if set) and a
+  flag `:response/set-status!` in `req` to ensure that application status is
+  processed even if an HTTP response status will be `:ok/found` during rendering.
+
+  Returns `req` with added `:response/status` set to the value of `status`, updated
+  `:response/headers` and `:response/set-status!` flag."
   ([req]
-   (inject-error req nil :error/internal nil))
+   (inject-status req nil :error/internal nil))
   ([req status]
-   (inject-error req nil status nil))
+   (inject-status req nil status nil))
   ([req status default-view]
-   (inject-error req nil status default-view))
+   (inject-status req nil status default-view))
   ([req route-data status default-view]
-   (let [route-data (or route-data (http/get-route-data req))
+   (log/web-dbg req "Injecting status" status)
+   (let [req        (qassoc req :response/status status :response/set-status! true)
+         route-data (or route-data (http/get-route-data req))
          target     (or (get-in route-data [:status/targets status])
                         (get route-data :error/target))]
      (if default-view
@@ -1256,8 +1266,8 @@
          str-status (some-str status)
          req        (if str-status (add-header req :Authentication-Error str-status) req)]
      (if (use-hx? req route-data :error/use-htmx?)
-       (inject-error req route-data status default-view)
-       (goto-error   req route-data status default-view)))))
+       (inject-status req route-data status default-view)
+       (goto-error    req route-data status default-view)))))
 
 (defn hx-transform-redirect
   "Adds the `HX-Redirect` response header set to a value of existing `Location` header

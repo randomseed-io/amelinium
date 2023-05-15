@@ -170,7 +170,7 @@
 (defn- auth-prolonged-ok
   [req route-data lang]
   (if (get req :auth/htmx?)
-    (web/inject-error req route-data :auth/prolonged-ok :login/prolonged)
+    (web/inject-status req route-data :auth/prolonged-ok :login/prolonged)
     (auth-ok req route-data lang)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
