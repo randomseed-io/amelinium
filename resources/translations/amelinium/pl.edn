@@ -247,7 +247,7 @@
                                :one        "minutę"
                                :genitive   "{1} minut"
                                :nominative "{1} minuty"}]
-   :mins-left     [:pluralize {:none       "Przekroczono czas"
+   :mins-left     [:pluralize {:none       "Przekroczono czas oczekiwania"
                                :zero       "Pozostała niecała minuta"
                                :one        "Pozostała minuta"
                                :genitive   "Pozostało {1} minut"
