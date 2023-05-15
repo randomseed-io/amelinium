@@ -39,6 +39,9 @@ associates.
   handling](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L82)**
   with configurable accessors, secure tokens and prolongation support.
 
+* [HTMX](https://htmx.org/)-driven **Hypermedia as the Engine of Application State**
+  ([HATEOAS](https://htmx.org/essays/hypermedia-apis-vs-data-apis/)) support.
+
 * **Cookie-less** session handling.
 
 * **[Role-based access
