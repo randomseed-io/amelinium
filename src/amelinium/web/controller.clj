@@ -177,7 +177,7 @@
                        :op      :access-denied
                        :level   :warning
                        :msg     (str "Permanent lock " for-mail))
-         (web/goto-error req :auth/account-locked :login/account-locked))
+         (web/goto-with-status req :auth/account-locked :login/account-locked))
 
        ;; Session expired and the time for prolongation has passed.
 
@@ -193,7 +193,7 @@
                        :op      :session
                        :ok?     false
                        :msg     (str "Hard-expired " for-mail))
-         (web/goto-error req :auth/session-expired :login/session-expired))
+         (web/goto-with-status req :auth/session-expired :login/session-expired))
 
        ;; Session expired and we are not reaching an authentication page nor a login page.
        ;; User can re-validate session using a login page.
@@ -207,7 +207,7 @@
              ^Session sess (session/allow-soft-expired sess)
              session-field (or (session/id-field sess) "session-id")]
          (if use-htmx?
-           (web/inject-status req route-data :auth/prolongate :login/prolongate)
+           (web/inject-with-status req route-data :auth/prolongate :login/prolongate)
            (let [req-to-save (common/remove-form-params req session-field)]
              (session/put-var! sess
                                :goto {:ts           (t/now)
@@ -218,7 +218,7 @@
                                       :form-params  (get req-to-save :form-params)
                                       :query-params (get req-to-save :query-params)
                                       :params       (get req-to-save :params)})
-             (web/goto-error req route-data :auth/prolongate :login/prolongate))))
+             (web/goto-with-status req route-data :auth/prolongate :login/prolongate))))
 
        :----pass
 

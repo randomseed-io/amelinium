@@ -1178,9 +1178,9 @@
 
 (defn inject
   "Injects HTML fragment by issuing HTMX response with `HX-Retarget` header set to
-  `target` (if truthy), `:app/layout` key of the `req` set to `false` and `:app/view`
-  key of the `req` set to `view` (if given and set). Returns updated request map
-  `req`."
+  `target` (if given and its value is not `false` and not `nil`), `:app/layout` key
+  of the `req` set to `false` and `:app/view` key of the `req` set to `view` (if
+  given and not `nil`). Returns updated request map `req`."
   ([req]
    (log/web-dbg req "Setting :app/layout to false")
    (qassoc req :app/layout false))
@@ -1203,48 +1203,49 @@
          req)
        req))))
 
-(defn inject-status
+(defn inject-with-status
   "Uses `inject` to set a target (`HX-Retarget` header) on a basis of the given
-  application status `status` by looking it up in `:status/targets` of a route data
-  map with a fallback to `:error/target`.
+  application status `app-status` by looking it up in `:status/targets` of a route
+  data map with a fallback to `:error/target`.
 
   Additionally it sets a fallback view to the given `default-view` (if set) and a
   flag `:response/set-status!` in `req` to ensure that application status is
   processed even if an HTTP response status will be `:ok/found` during rendering.
 
-  Returns `req` with added `:response/status` set to the value of `status`, updated
-  `:response/headers` and `:response/set-status!` flag."
+  Returns `req` with added `:response/status` set to the value of `app-status`,
+  updated `:response/headers` and `:response/set-status!` flag."
   ([req]
-   (inject-status req nil :error/internal nil))
-  ([req status]
-   (inject-status req nil status nil))
-  ([req status default-view]
-   (inject-status req nil status default-view))
-  ([req route-data status default-view]
-   (log/web-dbg req "Injecting status" status)
-   (let [req        (qassoc req :response/status status :response/set-status! true)
+   (inject-with-status req nil :error/internal nil))
+  ([req app-status]
+   (inject-with-status req nil app-status nil))
+  ([req app-status default-view]
+   (inject-with-status req nil app-status default-view))
+  ([req route-data app-status default-view]
+   (let [req        (qassoc req :response/status app-status :response/set-status! true)
          route-data (or route-data (http/get-route-data req))
-         target     (or (get-in route-data [:status/targets status])
+         target     (or (get-in route-data [:status/targets app-status])
                         (get route-data :error/target))]
+     (log/web-dbg req "Injecting HTML fragment with application status" app-status
+                  (str "(target:" (some-str target) ")"))
      (if default-view
        (inject req target default-view)
        (inject req target)))))
 
-(defn goto-error
-  "Uses `go-to` to make a redirect on a basis of the given status `status` by looking
-  it up in `:error/destinations` of a route data map with fallback to
-  `default-page` (if set) or to a value associated with the `:error/destination`
-  key."
+(defn goto-with-status
+  "Uses `go-to` to make a redirect on a basis of the given application status
+  `app-status` by looking it up in `:error/destinations` of a route data map with
+  fallback to a value associated with the `:error/destination` key or to a value of
+  the `default-page` argument (if set)."
   ([req]
-   (goto-error req nil :auth/error nil))
-  ([req status]
-   (goto-error req nil status nil))
-  ([req status default-page]
-   (goto-error req nil status default-page))
-  ([req route-data status default-page]
+   (goto-with-status req nil :auth/error nil))
+  ([req app-status]
+   (goto-with-status req nil app-status nil))
+  ([req app-status default-page]
+   (goto-with-status req nil app-status default-page))
+  ([req route-data app-status default-page]
    (let [route-data (or route-data (http/get-route-data req))]
      (go-to req
-            (or (get-in route-data [:error/destinations status] default-page)
+            (or (get-in route-data [:error/destinations app-status] default-page)
                 (get route-data :error/destination))))))
 
 (defn handle-error
