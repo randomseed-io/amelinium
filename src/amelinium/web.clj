@@ -1247,27 +1247,35 @@
             (or (get-in route-data [:error/destinations status] default-page)
                 (get route-data :error/destination))))))
 
-(defn handle-auth-error
+(defn handle-error
   "Sets proper HTMX response (when `use-hx?` returns `true` because the request
   indicated it is HTMX or `:error/use-htmx?` route data key is set or generic
-  `:use-htmx?` route data key is set), or a redirect response, as a result of
-  authentication error encountered. Additionally, sets an HTTP response header
-  `Authentication-Error` with error status detected (mainly to be used by reverse
-  proxies)."
+  `:use-htmx?` route data key is set), or a redirect response, as a result of error
+  encountered. Additionally, sets an HTTP response header named `header-name` (if
+  set) with error status detected (mainly to be used by reverse proxies). If header
+  name is `false`, no header is set. If header name is not set or is `nil`, the name
+  `Error` is used. Returns updated `req`."
   ([req]
-   (handle-auth-error req nil :auth/error nil))
-  ([req status]
-   (handle-auth-error req nil status nil))
-  ([req status default-view]
-   (handle-auth-error req nil status default-view))
-  ([req route-data status default-view]
-   (log/web-dbg req "Handling auth error:" status)
-   (let [route-data (or route-data (http/get-route-data req))
-         str-status (some-str status)
-         req        (if str-status (add-header req :Authentication-Error str-status) req)]
+   (handle-error req nil :auth/error nil nil))
+  ([req app-status]
+   (handle-error req nil app-status nil nil))
+  ([req app-status default-view]
+   (handle-error req nil app-status default-view nil))
+  ([req route-data app-status default-view]
+   (handle-error req route-data app-status default-view nil))
+  ([req route-data app-status default-view header-name]
+   (log/web-dbg req "Handling error:" app-status)
+   (let [route-data     (or route-data (http/get-route-data req))
+         header-name    (cond (nil? header-name)   "Error"
+                              (false? header-name) nil
+                              :else                (or (some-str header-name) "Error"))
+         str-app-status (some-str app-status)
+         req            (if (and str-app-status header-name)
+                          (add-header req header-name str-app-status)
+                          req)]
      (if (use-hx? req route-data :error/use-htmx?)
-       (inject-status req route-data status default-view)
-       (goto-error    req route-data status default-view)))))
+       (inject-with-status req route-data app-status default-view)
+       (goto-with-status   req route-data app-status default-view)))))
 
 (defn hx-transform-redirect
   "Adds the `HX-Redirect` response header set to a value of existing `Location` header

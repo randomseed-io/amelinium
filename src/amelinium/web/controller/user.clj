@@ -198,11 +198,11 @@
        (case status
          :auth/ok            (if auth-only? req (auth-ok req route-data lang))
          :auth/prolonged-ok  (if auth-only? req (auth-prolonged-ok req route-data lang))
-         :auth/locked        (web/handle-auth-error req route-data status :login/account-locked)
-         :auth/soft-locked   (web/handle-auth-error req route-data status :login/account-soft-locked)
-         :auth/bad-password  (web/handle-auth-error req route-data status :login/bad-password)
-         :auth/session-error (web/handle-auth-error req route-data status :login/session-error)
-         (web/handle-auth-error req route-data (or status :auth/error) :login/error))))))
+         :auth/locked        (web/handle-error req route-data status :login/account-locked      :Authentication-Error)
+         :auth/soft-locked   (web/handle-error req route-data status :login/account-soft-locked :Authentication-Error)
+         :auth/bad-password  (web/handle-error req route-data status :login/bad-password        :Authentication-Error)
+         :auth/session-error (web/handle-error req route-data status :login/session-error       :Authentication-Error)
+         (web/handle-error req route-data (or status :auth/error) :login/error :Authentication-Error))))))
 
 (defn authenticate!
   "Logs user in when user e-mail and password are given, or checks if the session is
