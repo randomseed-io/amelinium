@@ -544,34 +544,83 @@
    `(let [or# ~x]
       (if (nil? or#) (or-some ~@next) or#))))
 
-(defn- status-lv
-  "Sets a different sub-path for layout and view when a namespace of HTTP status is not
-  \"ok\" nor \"info\"."
-  [req status layout view route-data]
-  (if (nil? status)
-    [layout view]
-    (let [no-layout (nil? layout)
-          no-view   (nil? view)]
-      (if (not (or no-layout no-view))
-        [layout view]
-        (if (contains? #{"ok" "info"} (namespace status))
-          [layout view]
-          (let [app-status (get req :response/status)]
-            [(if no-layout
-               (or-some (if (some? app-status)
-                          (get (or (get req :status/layouts) (get route-data :status/layouts)) app-status))
-                        (get (or (get req :status/layouts) (get route-data :status/layouts)) status)
-                        (get req :app/error-layout)
-                        (get route-data :app/error-layout)
-                        "error")
-               layout)
-             (if no-view
-               (or-some (if (some? app-status) (get (or (get req :status/views) (get route-data :status/views)) app-status))
-                        (get (or (get req :status/views) (get route-data :status/views)) status)
-                        (get req :app/error-view)
-                        (get route-data :app/error-view)
-                        "error")
-               view)]))))))
+(defn get-for-status
+  "If the given `status` is not `nil` and not `false`, it looks for `k` in `req`,
+  and if that returns `nil` tries to look for `k` in `route-data`, and then, if its
+  not `nil` gets a value associated with the given `status` in this map. If
+  `other-status` is given, it will be used as fallback in the same way as the first,
+  when it will return `nil`."
+  ([req route-data k status]
+   (if status
+     (if-some [db (or (get req k) (get route-data k))]
+       (get db status))))
+  ([req route-data k status other-status]
+   (if status
+     (if-some [db (or (get req k) (get route-data k))]
+       (or-some (get db status)
+                (if other-status (get db other-status))))
+     (if other-status
+       (if-some [db (or (get req k) (get route-data k))]
+         (get db other-status))))))
+
+(defn status-lv
+  "Sets a different layout and/or view when the given HTTP status (`status`) is not
+  `:ok/found` nor `:ok` nor `nil` and the `:response/set-status!` entry of the `req`
+  does not have a truthy value.
+
+  If `layout` is given and it is not `nil`, it will not be changed but returned as
+  is. If `view` is given and it is not `nil`, it will not be changed but returned as
+  is.
+
+  To establish a layout it will check for `:status/layouts` key in `req` and then in
+  `route-data` to obtain a mapping of statuses to layouts. It will then look for an
+  application status (taken from `:response/status` of the given `req`) and if that
+  will return `nil` it will look for an HTTP status `status` in the same map. If that
+  will fail, it will try `:error/layout` key of the `req` and the `:error/layout` key
+  of the `route-data`. Finally, it will return a string `\"error\"`.
+
+  To establish a view it will check for `:status/views` key in `req` and then in
+  `route-data` to obtain a mapping of statuses to views. It will then look for an
+  application status (taken from `:response/status` of the given `req`) and if that
+  will return `nil` it will look for an HTTP status `status` in the same map. If that
+  will fail, it will try `:error/layout` key of the `req` and then `:error/layout`
+  key of the `route-data`. Finally, it will return a string `\"error\"`.
+
+  Returns a 2-element vector in a form of `[layout view]`."
+  ([req]
+   req)
+  ([req status]
+   (status-lv req status nil nil (http/get-route-data req)))
+  ([req status layout]
+   (status-lv req status layout nil (http/get-route-data req)))
+  ([req status layout view]
+   (status-lv req status layout view (http/get-route-data req)))
+  ([req status layout view route-data]
+   (if (and (or (identical? :ok/found status)
+                (nil? status)
+                (identical? :ok status))
+            (not (get req :response/set-status!)))
+     [layout view]
+     (let [no-layout (nil? layout)
+           no-view   (nil? view)]
+       (if (not (or no-layout no-view))
+         [layout view]
+         (let [app-status (get req :response/status)]
+           (log/web-dbg req "Getting layout/view for"
+                        (if app-status (str "application status " app-status " and"))
+                        "HTTP response status" status)
+           [(if no-layout
+              (or-some (get-for-status req route-data :status/layouts app-status status)
+                       (get req :error/layout)
+                       (get route-data :error/layout)
+                       "error")
+              layout)
+            (if no-view
+              (or-some (get-for-status req route-data :status/views app-status status)
+                       (get req :error/view)
+                       (get route-data :error/view)
+                       "error")
+              view)]))))))
 
 (defn render
   "HTML web page renderer. Takes a request, a data map to be used in templates, a name
