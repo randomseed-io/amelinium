@@ -34,7 +34,8 @@
   (:import [amelinium Session AuthSettings AuthConfig AuthConfirmation]
            [amelinium UserData Suites SuitesJSON]))
 
-(def one-minute (t/new-duration 1 :minutes))
+(def one-minute   (t/new-duration 1 :minutes))
+(def zero-seconds (t/new-duration 0 :seconds))
 
 (defn retry-after
   "Returns an expiration date and time formatted according to the RFC 1123."
@@ -76,10 +77,11 @@
         max-attempts?     (if attempts? (zero? attempts-left))
         bad-result?       (not (or errors? attempts?))
         retry-dur         (delay (common/simple-duration expires))
+        expired?          (delay (t/< @retry-dur zero-seconds))
         retry-in          (delay (common/retry-in-mins @retry-dur))
-        in-mins           (delay (tr :in-mins @retry-in))
+        in-mins           (delay (tr :in-mins     @retry-in))
         retry-in-mins     (delay (tr :try-in-mins @retry-in))
-        mins-left         (delay (tr :mins-left @retry-in))
+        mins-left         (delay (tr :mins-left   @retry-in))
         attempts-left-w   (delay (tr :attempts-left attempts-left))
         confirmed?        (and confirmed? (boolean confirm-once?))]
     (cond
@@ -93,6 +95,7 @@
                                             :verify/retry-dur          retry-dur
                                             :verify/mins-left          mins-left
                                             :verify/max-attempts?      max-attempts?
+                                            :verify/expired?           expired?
                                             :verify/attempts-left      attempts-left
                                             :verify/attempts-left-word attempts-left-w
                                             :sub-status/description    retry-in-mins)
@@ -150,6 +153,7 @@
                            :identity/phone?           phone?
                            :identity/email?           email?
                            :identity/type             id-type
+                           :verify/expired?           expired?
                            :verify/retry-in           retry-in
                            :verify/in-mins            in-mins
                            :verify/retry-in-mins      retry-in-mins
@@ -315,30 +319,34 @@
                    attempts?       (int? attempts)
                    attempts-left   (if attempts? (if (neg? attempts) 0 attempts))
                    max-attempts?   (if attempts? (zero? attempts-left))
-                   retry-dur       (delay (common/simple-duration (get r :expires)))
-                   retry-in        (delay (common/retry-in-mins @retry-dur))
+                   retry-dur       (common/simple-duration (get r :expires))
+                   expired?        (t/< retry-dur zero-seconds)
+                   retry-in        (delay (common/retry-in-mins retry-dur))
                    in-mins         (delay (tr :in-mins          @retry-in))
                    retry-in-mins   (delay (tr :try-in-mins      @retry-in))
                    mins-left       (delay (tr :mins-left        @retry-in))
                    attempts-left-w (delay (tr :attempts-left attempts-left))
                    id-type         (delay (common/guess-identity-type r id nil nil))
                    id-str          (delay (identity/->str @id-type id))
-                   confirmed?      (delay (get r :confirmed?))]
-               (web/assoc-app-data
-                req
-                :user/id-type              id-type
-                :user/identity             id-str
-                :verify/confirmed?         confirmed?
-                :verify/retry-in           retry-in
-                :verify/in-mins            in-mins
-                :verify/retry-in-mins      retry-in-mins
-                :verify/retry-unit         :minutes
-                :verify/retry-dur          retry-dur
-                :verify/mins-left          mins-left
-                :verify/max-attempts?      max-attempts?
-                :verify/attempts-left      attempts-left
-                :verify/attempts-left-word attempts-left-w
-                :verify/qtoken             qtoken))
+                   confirmed?      (delay (get r :confirmed?))
+                   req             (web/assoc-app-data
+                                    req
+                                    :user/id-type              id-type
+                                    :user/identity             id-str
+                                    :verify/confirmed?         confirmed?
+                                    :verify/expired?           expired?
+                                    :verify/retry-in           retry-in
+                                    :verify/in-mins            in-mins
+                                    :verify/retry-in-mins      retry-in-mins
+                                    :verify/retry-unit         :minutes
+                                    :verify/retry-dur          retry-dur
+                                    :verify/mins-left          mins-left
+                                    :verify/max-attempts?      max-attempts?
+                                    :verify/attempts-left      attempts-left
+                                    :verify/attempts-left-word attempts-left-w
+                                    :verify/qtoken             qtoken)]
+               (cond expired? (web/handle-error req :verify/expired)
+                     :else    req))
              req)
            req)
          req))
