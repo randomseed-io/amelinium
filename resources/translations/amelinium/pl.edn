@@ -121,6 +121,8 @@
                            :regular-phone          :parameter/phone
                            :email                  "Adres e-mailowy"
                            :login                  "Login"
+                           :identity               "Adres e-mailowy lub nr telefoniczny"
+                           :public-identity        "Adres e-mailowy lub zwykły nr telefoniczny"
                            :password               "Hasło"
                            :new-password           "Nowe hasło"
                            :password-relaxed       "Hasło"
@@ -134,6 +136,8 @@
                            :user.phone             :parameter/phone
                            :user.email             :parameter/email
                            :user.login             :parameter/login
+                           :user.identity          :parameter/identity
+                           :user.public-identity   :parameter/public-identity
                            :user.password          :parameter/password
                            :user.password-relaxed  :parameter/password-relaxed
                            :user.new-password      :parameter/new-password
@@ -152,6 +156,8 @@
                            :boolean           "Pole decyzji"
                            :phone             "Numer telefoniczny"
                            :regular-phone     "Zwyczajny numer telefoniczny"
+                           :identity          "Adres e-mailowy lub nr telefoniczny"
+                           :public-identity   "Adres e-mailowy lub zwykły nr telefoniczny"
                            :email             "Adres e-mailowy"
                            :password          "Hasło"
                            :password-relaxed  "Hasło"
@@ -164,6 +170,8 @@
    :type-should           {:phone             "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa."
                            :regular-phone     "Numer telefoniczny powinien zawierać kod kraju ze znakiem plusa i nie być numerem specjalnym."
                            :email             "Adres e-mailowy powinien zawierać część lokalną i poprawną domenę."
+                           :identity          "Adres e-mailowy powinien być poprawny, a nr telefoniczny powinien zawierać kod kraju."
+                           :public-identity   "Adres e-mailowy powinien być poprawny, a nr telefoniczny powinien zawierać kod kraju i nie może być numerem specjalnym."
                            :password          "Hasło powinno mieć przynajmniej 8 znaków, zawierać duże i małe litery, cyfrę i znak specjalny."
                            :password-relaxed  "Należy podać hasło."
                            :repeated-password "Powtórzone hasło powinno być takie samo jak pierwsze."
@@ -175,6 +183,8 @@
    :parameter-should      {:phone                          :type-should/phone
                            :regular-phone                  :type-should/regular-phone
                            :email                          :type-should/email
+                           :identity                       :type-shoud/identity
+                           :public-identity                :type-shoud/public-identity
                            :login                          "Login powinien być poprawnym adresem e-mailowym."
                            :password                       :type-should/password
                            :new-password                   :type-should/password
@@ -189,6 +199,8 @@
                            :middle-name                    "Drugie imię może zawierać litery i opcjonalne łączniki."
                            :user.phone                     :type-should/phone
                            :user.email                     :type-should/email
+                           :user.identity                  :type-should/identity
+                           :user.public-identity           :type-should/public-identity
                            :user.login                     :parameter-should/login
                            :user.password                  :type-should/password
                            :user.password-relaxed          :type-should/password-relaxed
@@ -219,6 +231,7 @@
                            :confirm                "Potwierdź!"
                            :send-again             "Wyślij ponownie!"
                            :email                  :parameter/email
+                           :identity               :parameter/identity
                            :password               :parameter/password
                            :new-password           :parameter/new-password
                            :repeated-password      :parameter/repeated-password
@@ -240,6 +253,8 @@
                            :user.middle-name       :parameter/middle-name
                            :user.phone             :parameter/phone
                            :user.regular-phone     :parameter/regular-phone
+                           :user.identity          :parameter/identity
+                           :user.public-identity   :parameter/public-identity
                            }
 
    :in-mins       [:pluralize {:none       "zero sekund"

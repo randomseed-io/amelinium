@@ -114,6 +114,8 @@
    :parameters            {:error "Invalid parameters"}
    :parameter             {:phone                  "Phone number"
                            :regular-phone          "Phone number"
+                           :identity               "E-mail address or phone number"
+                           :public-identity        "E-mail address or regular phone number"
                            :email                  "E-mail address"
                            :login                  "Login"
                            :password               "Password"
@@ -129,6 +131,8 @@
                            :user.regular-phone     :parameter/phone
                            :user.email             :parameter/email
                            :user.login             :parameter/login
+                           :user.identity          :parameter/identity
+                           :user.public-identity   :parameter/public-identity
                            :user.password          :parameter/password
                            :user.password-relaxed  :parameter/password-relaxed
                            :user.new-password      :parameter/new-password
@@ -147,6 +151,8 @@
                            :boolean            "Decision field"
                            :phone              "Phone number"
                            :regular-phone      "Regular phone number"
+                           :identity           "E-mail address or phone number"
+                           :public-identity    "E-mail address or regular phone number"
                            :email              "E-mail address"
                            :login              "Login"
                            :password           "Password"
@@ -161,6 +167,8 @@
    :type-should           {:phone              "Phone number should contain a country code with a plus sign."
                            :regular-phone      "Phone number should contain a country code with a plus sign and be a regular (non-special) number."
                            :email              "E-mail address should have a local part and a valid domain name."
+                           :identity           "E-mail address should be valid, and a phone number should begin with a country code with a plus sign."
+                           :public-identity    "E-mail address should be valid, and a phone number should be a regular phone number beginning with a plus sign and country code."
                            :password           "Password should have at least 8 characters, big and small letters, a digit and a special character."
                            :password-relaxed   "Password must be present."
                            :repeated-password  "Repeated password should be the same as entered."
@@ -174,6 +182,8 @@
    :parameter-should      {:phone                          :type-should/phone
                            :regular-phone                  :type-should/regular-phone
                            :email                          :type-should/email
+                           :identity                       :type-should/identity
+                           :public-identity                :type-should/public-identity
                            :login                          "Login should be a valid e-mail address."
                            :password                       :type-should/password
                            :new-password                   :type-should/password
@@ -232,6 +242,8 @@
                            :middle-name            :parameter/middle-name
                            :phone                  :parameter/phone
                            :regular-phone          :parameter/regular-phone
+                           :identity               :parameter/identity
+                           :public-identity        :parameter/public-identity
                            :user.email             :parameter/email
                            :user.password          :parameter/password
                            :user.new-password      :parameter/new-password
@@ -243,6 +255,8 @@
                            :user.middle-name       :parameter/middle-name
                            :user.phone             :parameter/phone
                            :user.regular-phone     :parameter/regular-phone
+                           :user.identity          :parameter/identity
+                           :user.public-identity   :parameter/public-identity
                            }
 
    :in-mins       [:pluralize {:none   "zero seconds"
