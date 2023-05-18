@@ -12,6 +12,7 @@
             [clojure.string                     :as             str]
             [amelinium.logging                  :as             log]
             [amelinium.identity                 :as        identity]
+            [amelinium.utils                    :refer         :all]
             [amelinium.common                   :as          common]
             [amelinium.common.controller        :as           super]
             [amelinium.i18n                     :as            i18n]
@@ -46,7 +47,7 @@
 (defn retry-after
   "Returns an expiration date and time formatted according to the RFC 1123."
   [expires]
-  (common/rfc1123-date-time expires))
+  (rfc1123-date-time expires))
 
 (defn auth-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
@@ -176,8 +177,8 @@
         attempts-left     (if attempts? (if (neg? attempts) 0 attempts))
         max-attempts?     (if attempts? (zero? attempts-left))
         bad-result?       (not (or errors? attempts?))
-        retry-dur         (delay (common/simple-duration expires))
-        retry-in          (delay (common/retry-in-mins @retry-dur))]
+        retry-dur         (delay (simple-duration expires))
+        retry-in          (delay (retry-in-mins @retry-dur))]
     (cond
       bad-result?   (api/render-error  req (or no-data :verify/bad-result))
       errors?       (api/render-error  req errors)

@@ -20,6 +20,7 @@
             [selmer.parser                        :as          selmer]
             [amelinium.db                         :as              db]
             [amelinium.i18n                       :as            i18n]
+            [amelinium.utils                      :refer         :all]
             [amelinium.common                     :as          common]
             [amelinium.errors                     :as          errors]
             [amelinium.http                       :as            http]
@@ -114,16 +115,6 @@
                 role-required! with-role-only!
                 roles-for-context roles-for-contexts default-contexts-labeler
                 roles-matrix roles-tabler])
-
-;; Data structures
-
-(p/import-vars [amelinium.common
-                empty-lazy-map])
-
-;; Filesystem operations
-
-(p/import-vars [amelinium.common
-                some-resource])
 
 ;; HTML generators and transformers
 
@@ -438,7 +429,7 @@
                               (if auto-dir [[prep-sl auto-dir dot-html]])
                               [[prep-sl lang-sl default-html]]
                               [[prep-sl default-html]])]
-    (or (first (keep #(apply common/some-resource %) pths))
+    (or (first (keep #(apply some-resource %) pths))
         (do (if (nil? uri) (log/wrn "[-]: Empty URI while resolving" pre))
             (log/wrn (str "[" uri "]: Cannot find") pre)
             (doseq [path pths] (log/wrn (apply str "[" uri "]: Tried [resources]/" path)))))))
@@ -521,28 +512,20 @@
   ([data req status lang status-key title-key description-key]
    (if status
      (if (common/untranslatable? status)
-       (map/assoc-missing (or data common/empty-lazy-map) status-key status)
+       (map/assoc-missing (or data empty-lazy-map) status-key status)
        (let [translate-sub (delay (i18n/no-default (common/translator-sub req lang)))]
          (map/assoc-missing
-          (or data common/empty-lazy-map)
+          (or data empty-lazy-map)
           status-key      status
           title-key       (delay (@translate-sub status))
           description-key (delay (@translate-sub
-                                  (common/try-namespace status)
-                                  (str (common/try-name status) ".full"))))))
+                                  (try-namespace status)
+                                  (str (try-name status) ".full"))))))
      data))
   ([data req status lang]
    (update-status data req status lang :status :status/title :status/description))
   ([req status lang]
    (update-status req status lang :status :status/title :status/description)))
-
-(defmacro or-some
-  "Same as `or` but returns first value which is not `nil`."
-  ([] nil)
-  ([x] x)
-  ([x & next]
-   `(let [or# ~x]
-      (if (nil? or#) (or-some ~@next) or#))))
 
 (defn get-for-status
   "If the given `status` is not `nil` and not `false`, it looks for `k` in `req`,
@@ -1678,11 +1661,6 @@
 
 (p/import-vars [amelinium.common
                 path localized-path])
-
-;; Anti-spam
-
-(p/import-vars [amelinium.common
-                random-uuid-or-empty])
 
 ;; Language helpers
 

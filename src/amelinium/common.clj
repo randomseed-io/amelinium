@@ -11,7 +11,6 @@
   (:require [clojure.set                           :as             set]
             [clojure.string                        :as             str]
             [clojure.core.memoize                  :as             mem]
-            [clojure.java.io                       :as              io]
             [tick.core                             :as               t]
             [reitit.core                           :as               r]
             [reitit.coercion                       :as        coercion]
@@ -22,6 +21,7 @@
             [clj-uuid                              :as            uuid]
             [jsonista.core                         :as               j]
             [amelinium                             :refer         :all]
+            [amelinium.utils                       :refer         :all]
             [amelinium.types.session               :refer         :all]
             [amelinium.types.auth                  :refer         :all]
             [amelinium.proto.identity              :as             pid]
@@ -42,9 +42,7 @@
             [io.randomseed.utils.db                :as              db]
             [io.randomseed.utils                   :refer         :all])
 
-  (:import [java.time        Duration]
-           [java.time.format DateTimeFormatter]
-           [amelinium        Session AuthSettings AuthConfig]
+  (:import [amelinium        Session AuthSettings AuthConfig]
            [lazy_map.core    LazyMapEntry LazyMap]
            [reitit.core      Match]))
 
@@ -154,8 +152,8 @@
        :lang)))
 
 (defn login-page?
-  "Returns true if the current (or given as a match) page is a login page (has :login-page?
-  route data set to a truthy value)."
+  "Returns true if the current (or given as a match) page is a login page (has
+  `:login-page?` route data set to a truthy value)."
   ([req]            (boolean (http/get-route-data req :login-page?)))
   ([req ring-match] (boolean (http/get-route-data ring-match req :login-page?))))
 
@@ -1879,21 +1877,6 @@
                                 data)]
      {:data (seq data) :labels labels})))
 
-;; Data structures
-
-(def empty-lazy-map
-  (map/lazy))
-
-;; Filesystem operations
-
-(defn some-resource
-  "Returns the given path if there is a resource it points to. Otherwise it returns
-  nil. Multiple arguments are joined using str."
-  ([path]
-   (if-some [path (str path)] (and (io/resource path) path)))
-  ([path & more]
-   (if-some [path (apply str path more)] (and (io/resource path) path))))
-
 ;; Linking helpers
 
 (defn path
@@ -2008,43 +1991,6 @@
                    params query-params
                    false true
                    router language-settings-or-param)))
-
-;; Anti-spam
-
-(defn random-uuid-or-empty
-  ([]
-   (random-uuid-or-empty nil))
-  ([rng]
-   (if (zero? (get-rand-int 2 rng))
-     (random-uuid)
-     "")))
-
-;; Parameters
-
-(defn string-from-param
-  ^String [s]
-  (if-some [^String s (some-str s)]
-    (if (= \: (.charAt s 0))
-      (let [^String s (subs s 1)] (if (not-empty-string? s) s))
-      s)))
-
-(defn keyword-from-param
-  ^clojure.lang.Keyword [s]
-  (if (keyword? s)
-    s
-    (if-some [^String s (some-str s)]
-      (if (= \: (.charAt s 0))
-        (let [^String s (subs s 1)] (if (not-empty-string? s) (keyword s)))
-        (keyword s)))))
-
-(defn try-kw-from-param
-  [s]
-  (if (keyword? s)
-    s
-    (if-some [^String s (some-str s)]
-      (if (= \: (.charAt s 0))
-        (let [^String s (subs s 1)] (if (not-empty-string? s) (keyword s)))
-        s))))
 
 (defn parse-query-params
   "Parses query params string `qstr` using Ring's `ring.util.codec/form-decode`. The
@@ -2260,7 +2206,7 @@
          lang         (or lang (get req :language/str) (some-str (get req :language/id)) (some-str (get req :lang)))
          lang-param   (or lang-param (get req :language/settings) :lang)
          path-or-name (or (valuable path-or-name) (current-page req))
-         path-or-name (if path-or-name (try-kw-from-param path-or-name))
+         path-or-name (if path-or-name (keyword-from-param path-or-name))
          path-fn      (if localized? localized-path path)
          out-path     (path-fn path-or-name lang path-params query-params router lang-param)]
      (or out-path (if-not (ident? path-or-name) (some-str path-or-name))))))
@@ -2337,14 +2283,6 @@
      (i18n/translator-sub req lang-id)
      (or (get req (if i18n/*handle-missing-keys* :i18n/translator-sub :i18n/translator-sub-nd))
          (i18n/translator-sub req)))))
-
-(defn try-namespace
-  [v]
-  (if (ident? v) (namespace v) v))
-
-(defn try-name
-  [v]
-  (if (ident? v) (name v) v))
 
 (defn add-missing-translation
   "For the given `body` map, a new key `new-k`, a key `k` and a translation function
@@ -2480,7 +2418,7 @@
     :url/update-email))
 
 (defn guess-identity-type
-  "Detects the identity type and checks if it is assigned to a tag
+  "Detects an identity type and checks if it is assigned to a tag
   `:amelinium.identity/standard` or to a tag passed as `acceptable-tag` argument. To
   accept any valid identity type the `:amelinium.identity/valid` must be explicitly
   given.
@@ -2577,30 +2515,6 @@
      (if identity-type
        (if-some [id-type (acceptable-identity-type identity-type acceptable-tag)]
          [nil id-type])))))
-
-;; Date and time
-
-(defn rfc1123-date-time
-  "Returns a date and time formatted according to the RFC 1123."
-  [t]
-  (when t
-    (some-str
-     (t/format DateTimeFormatter/RFC_1123_DATE_TIME (t/zoned-date-time t)))))
-
-(defn simple-duration
-  "Calculates the duration between the time of calling the function (or the given
-  time `begin`) till the given time `end`, with nanoseconds set to 0."
-  ([end]       (when end (.withNanos ^Duration (t/between (t/now) end) 0)))
-  ([begin end] (when end (.withNanos ^Duration (t/between (or begin (t/now)) end) 0))))
-
-(defn retry-in-mins
-  "Calculates minutes of duration on a basis of `Duration` object. Returns an integer
-  number of minutes left or `nil` when there was no duration given or the duration is
-  negative. Used to calculate retry timeouts to report them to a user."
-  [duration]
-  (when duration
-    (if-some [mins (t/minutes duration)]
-      (if (neg? mins) nil mins))))
 
 ;; Response status
 

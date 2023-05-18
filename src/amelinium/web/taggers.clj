@@ -15,6 +15,7 @@
             [selmer.util                          :as      sutil]
             [selmer.filter-parser                 :as         fp]
             [amelinium.i18n                       :as       i18n]
+            [amelinium.utils                      :refer    :all]
             [amelinium.common                     :as     common]
             [amelinium.http.middleware.session    :as    session]
             [amelinium.http.middleware.language   :as   language]
@@ -124,7 +125,7 @@
      (let [v-fn (if ctx #(render-assignment-value ctx %) identity)]
        (->> (str/split s #"\,")
             (mapcat #(map str/trim (str/split (str/trim %) #"\=")))
-            (parse-assigments common/keyword-from-param v-fn)
+            (parse-assigments keyword-from-param v-fn)
             (apply array-map)
             (not-empty)))))
   ([^String s]
@@ -138,13 +139,13 @@
 (defn args->map
   "Transforms the given sequence of arguments `args` to a map by taking each
   consecutive pair and changing its first element into a keyword (using
-  `amelinium.common/keyword-from-param`) to become a key associated with its paired
+  `amelinium.utils/keyword-from-param`) to become a key associated with its paired
   value."
   [args]
   (if (seq args)
     (->> (partition 2 2 [nil] args)
          (map (fn [[k v]]
-                [(common/keyword-from-param k)
+                [(keyword-from-param k)
                  (if (= \? (last-char (some-str k))) (pboolean v) v)]))
          (into {}))))
 
@@ -163,7 +164,7 @@
          r       (concat
                   (if k-some  (map vector k-some  (repeatedly random-uuid)))
                   (if k-blank (map vector k-blank (repeat "")))
-                  (if k-any   (map vector k-any   (repeatedly #(common/random-uuid-or-empty rng)))))]
+                  (if k-any   (map vector k-any   (repeatedly #(random-uuid-or-empty rng)))))]
      (if (seq r)
        (apply strb (map #(strb "<input type=\"text\" name=\""   (str (nth % 0))
                                "\" class=\"subspace\" value=\"" (str (nth % 1))
@@ -284,7 +285,7 @@
    (tr args ctx nil))
   ([args ctx translations-fn]
    (if-some [translator (translator ctx translations-fn)]
-     (let [arg-1 (common/keyword-from-param (first args))
+     (let [arg-1 (keyword-from-param (first args))
            nxta  (next args)]
        (if nxta
          (apply translator arg-1 nxta)
@@ -298,8 +299,8 @@
    (tr-sub args ctx nil))
   ([args ctx translations-fn]
    (if-some [translator-sub (translator-sub ctx translations-fn)]
-     (let [arg-1 (common/keyword-from-param (first  args))
-           arg-2 (common/keyword-from-param (second args))
+     (let [arg-1 (keyword-from-param (first  args))
+           arg-2 (keyword-from-param (second args))
            nxta  (nnext args)]
        (if nxta
          (apply translator-sub arg-1 arg-2 nxta)
@@ -326,31 +327,31 @@
   ([tr-sub-fn v]
    (if v
      (if (kw-param? v)
-       (if-some [v (common/keyword-from-param v)]
+       (if-some [v (keyword-from-param v)]
          ((force tr-sub-fn) v))
        (not-empty (str v)))))
   ([tr-sub-fn k v]
    (if v
      (if (kw-param? v)
-       (if-some [v (common/string-from-param v)]
+       (if-some [v (string-from-param v)]
          ((force tr-sub-fn) (some-str k) v))
        (not-empty (str v)))))
   ([tr-sub-fn k v a]
    (if v
      (if (kw-param? v)
-       (if-some [v (common/string-from-param v)]
+       (if-some [v (string-from-param v)]
          ((force tr-sub-fn) (some-str k) v a))
        (not-empty (str v)))))
   ([tr-sub-fn k v a b]
    (if v
      (if (kw-param? v)
-       (if-some [v (common/string-from-param v)]
+       (if-some [v (string-from-param v)]
          ((force tr-sub-fn) (some-str k) v a b))
        (not-empty (str v)))))
   ([tr-sub-fn k v a b & more]
    (if v
      (if (kw-param? v)
-       (if-some [v (common/string-from-param v)]
+       (if-some [v (string-from-param v)]
          (apply (force tr-sub-fn) (some-str k) v a b more))
        (not-empty (str v))))))
 
@@ -365,7 +366,7 @@
      (let [args (if (seq to-remove) (apply dissoc args to-remove) args)]
        (if (pos? (count args))
          (->> args
-              (map (fn [[k v]] (strb (some-str k) "=\"" (html-esc (common/string-from-param v)) "\"")))
+              (map (fn [[k v]] (strb (some-str k) "=\"" (html-esc (string-from-param v)) "\"")))
               (str/join " ")
               (strb " "))
          ""))
@@ -378,7 +379,7 @@
   ([args tr-sub errors params props]
    (let [field (args->map args)
          id    (get field :id)]
-     (if-some [id-str (common/string-from-param id)]
+     (if-some [id-str (string-from-param id)]
        (let [{:keys
               [name
                class
@@ -393,15 +394,15 @@
                _field]} field
              value?     (contains? params id-str)
              error?     (contains? errors id-str)
-             id-str     (common/string-from-param id)
-             name       (common/string-from-param name)
-             autoc      (common/string-from-param autocomplete)
-             ptype      (common/string-from-param parameter-type)
-             itype      (common/string-from-param input-type)
-             wrapp      (common/string-from-param wrapper-class)
-             hyper      (common/string-from-param _field)
-             itype      (or itype (common/string-from-param type))
-             class      (if class (common/string-from-param class))
+             id-str     (string-from-param id)
+             name       (string-from-param name)
+             autoc      (string-from-param autocomplete)
+             ptype      (string-from-param parameter-type)
+             itype      (string-from-param input-type)
+             wrapp      (string-from-param wrapper-class)
+             hyper      (string-from-param _field)
+             itype      (or itype (string-from-param type))
+             class      (if class (string-from-param class))
              label      (if (nil? label) id (if-not (false? (pboolean label)) label))
              label      (param-try-tr tr-sub :forms label id)
              phold      (param-try-tr tr-sub :forms placeholder id)
@@ -457,7 +458,7 @@
   ([label args tr-sub session-field session-id validators html]
    (let [args    (args->map args)
          noname? (nil? (get args :name))
-         args    (if noname? (map/qassoc args :name (common/string-from-param (get args :id))) args)
+         args    (if noname? (map/qassoc args :name (string-from-param (get args :id))) args)
          html    (some-str html)
          nohtml? (nil? html)
          label   (if nohtml? (if (nil? label) (get args :id) (if-not (false? (pboolean label)) label)))
@@ -475,7 +476,7 @@
   ([label args tr-sub validators html]
    (let [args    (args->map args)
          noname? (nil? (get args :name))
-         args    (if noname? (map/qassoc args :name (common/string-from-param (get args :id))) args)
+         args    (if noname? (map/qassoc args :name (string-from-param (get args :id))) args)
          html    (some-str html)
          nohtml? (nil? html)
          label   (if nohtml? (if (nil? label) (get args :id) (if-not (false? (pboolean label)) label)))
@@ -596,7 +597,7 @@
              sid          (if session? (session/id smap))
              sfld         (if session? (session/id-field smap))
              sdata        (if (and sid sfld) (strb " name=\"" sfld "\" value=\"" sid "\""))
-             lang         (or (common/string-from-param lang) (get-lang ctx))
+             lang         (or (string-from-param lang) (get-lang ctx))
              path-params  (if path-params  (assignments->kw-map path-params  ctx))
              query-params (if query-params (assignments->map    query-params ctx))
              attrs        (html-add-attrs args [:lang :session? :query-params :path-params])
@@ -622,7 +623,7 @@
      :hidden-param
      (fn [args ctx]
        (let [p      (first args)
-             pname  (common/string-from-param p)
+             pname  (string-from-param p)
              pvalue (html-esc (get ctx (some-keyword pname)))]
          (strs "<input type=\"hidden\" name=\"" pname "\" value=\"" pvalue "\" hx-history=\"false\" />"))))
 
@@ -631,8 +632,8 @@
      (fn [args ctx]
        (if-some [fe (get ctx :form/errors)]
          (let [fe         (get fe :errors)
-               param-id   (common/string-from-param (first args))
-               param-type (common/string-from-param (second args))]
+               param-id   (string-from-param (first args))
+               param-type (string-from-param (second args))]
            (if (and param-id (contains? fe param-id))
              (let [translator-sub (i18n/no-default (translator-sub ctx translations-fn))
                    param-type     (or param-type (get fe param-id))
@@ -651,7 +652,7 @@
      (fn [args ctx]
        (if-some [fe (not-empty (get ctx :form/errors))]
          (if-some [pa (not-empty (get fe :params))]
-           (if-let [param-id (common/string-from-param (first args))]
+           (if-let [param-id (string-from-param (first args))]
              (if-some [param (some-str (get pa param-id))]
                (binding [sutil/*escape-variables* true]
                  (html-esc param))))))))
@@ -727,22 +728,22 @@
              wrcls        (get args :wrapper-class)
              hyper        (get args :_field)
              class        (get args :class)
-             class        (if class (common/string-from-param class))
+             class        (if class (string-from-param class))
              errors?      (some? (not-empty (get ctx :form/errors)))
              class        (if errors? (if class (strb class " has-errors") "has-errors") class)
              action       (get-form-action args ctx)
-             id-str       (common/string-from-param id)
+             id-str       (string-from-param id)
              tr-sub-fn    (delay (i18n/no-default (translator-sub ctx translations-fn)))
              name         (if (nil? name) id-str (if-not (false? (pboolean name)) name))
              label        (if label (param-try-tr tr-sub-fn :forms label id-str))
              label?       (some? label)
-             method       (if method (common/string-from-param method))
-             lang         (if lang   (common/string-from-param lang))
-             name         (if name   (common/string-from-param name))
-             wrcls        (if wrcls  (common/string-from-param wrcls))
-             hyper        (if hyper  (common/string-from-param hyper))
+             method       (if method (string-from-param method))
+             lang         (if lang   (string-from-param lang))
+             name         (if name   (string-from-param name))
+             wrcls        (if wrcls  (string-from-param wrcls))
+             hyper        (if hyper  (string-from-param hyper))
              action?      (some? action)
-             action-lang  (if action? (or (common/string-from-param (get args :action-lang)) lang))
+             action-lang  (if action? (or (string-from-param (get args :action-lang)) lang))
              path-params  (if action? (assignments->kw-map (get args :path-params) ctx))
              query-params (if action? (assignments->map    (get args :query-params) ctx))
              id-str       (or id-str (if label? (ad-hoc-id action method label path-params query-params)))

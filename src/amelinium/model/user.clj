@@ -1077,22 +1077,22 @@
 
   Session
 
-  (type ^Keyword [v] :session)
+  (type
+    (^Keyword [v] :session)
+    (^Keyword [v ^Keyword identity-type]
+      (if (identity/type? :session identity-type) :session)))
 
   (value
     (^Session [session]
      session)
     (^Session [session ^Keyword identity-type]
-     (if (or (identical? :session identity-type)
-             (identical? ::identity/any identity-type))
-       session)))
+     (if (identity/type? :session identity-type) session)))
 
   (make
     (^Identity [session]
      (Identity. :session session))
     (^Identity [session ^Keyword identity-type]
-     (if (or (identical? :session identity-type)
-             (identical? ::identity/any identity-type))
+     (if (identity/type? :session identity-type)
        (Identity. :session session))))
 
   (literal? ^Boolean [v] false))

@@ -14,6 +14,7 @@
             [ring.util.response]
             [ring.util.http-response              :as            resp]
             [ring.util.request                    :as             req]
+            [amelinium.utils                      :refer         :all]
             [amelinium.common                     :as          common]
             [amelinium.errors                     :as          errors]
             [amelinium.i18n                       :as            i18n]
@@ -68,16 +69,6 @@
                 role-required! with-role-only!
                 roles-for-context roles-for-contexts default-contexts-labeler
                 roles-matrix roles-tabler])
-
-;; Data structures
-
-(p/import-vars [amelinium.common
-                empty-lazy-map])
-
-;; Filesystem operations
-
-(p/import-vars [amelinium.common
-                some-resource])
 
 ;; Language helpers
 
@@ -818,11 +809,6 @@
 
 (p/import-vars [amelinium.common
                 path localized-path])
-
-;; Anti-spam
-
-(p/import-vars [amelinium.common
-                random-uuid-or-empty])
 
 (defn anti-spam-code
   "Generates anti-spam value pairs string containing randomly selected fields and

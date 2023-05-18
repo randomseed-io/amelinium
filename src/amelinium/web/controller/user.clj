@@ -15,6 +15,7 @@
             [amelinium.logging                  :as             log]
             [amelinium.db                       :as              db]
             [amelinium.i18n                     :as            i18n]
+            [amelinium.utils                    :refer         :all]
             [amelinium.common                   :as          common]
             [amelinium.common.controller        :as           super]
             [amelinium.web                      :as             web]
@@ -40,7 +41,7 @@
 (defn retry-after
   "Returns an expiration date and time formatted according to the RFC 1123."
   [expires]
-  (common/rfc1123-date-time expires))
+  (rfc1123-date-time expires))
 
 (defn verify!
   "Performs the identity verification by sending an e-mail or SMS with a URL to
@@ -76,9 +77,9 @@
         attempts-left     (if attempts? (if (neg? attempts) 0 attempts))
         max-attempts?     (if attempts? (zero? attempts-left))
         bad-result?       (not (or errors? attempts?))
-        retry-dur         (delay (common/simple-duration expires))
+        retry-dur         (delay (simple-duration expires))
         expired?          (delay (t/< @retry-dur zero-seconds))
-        retry-in          (delay (common/retry-in-mins @retry-dur))
+        retry-in          (delay (retry-in-mins @retry-dur))
         in-mins           (delay (tr :in-mins     @retry-in))
         retry-in-mins     (delay (tr :try-in-mins @retry-in))
         mins-left         (delay (tr :mins-left   @retry-in))
@@ -319,9 +320,9 @@
                    attempts?       (int? attempts)
                    attempts-left   (if attempts? (if (neg? attempts) 0 attempts))
                    max-attempts?   (if attempts? (zero? attempts-left))
-                   retry-dur       (common/simple-duration (get r :expires))
+                   retry-dur       (simple-duration (get r :expires))
                    expired?        (t/< retry-dur zero-seconds)
-                   retry-in        (delay (common/retry-in-mins retry-dur))
+                   retry-in        (delay (retry-in-mins retry-dur))
                    in-mins         (delay (tr :in-mins          @retry-in))
                    retry-in-mins   (delay (tr :try-in-mins      @retry-in))
                    mins-left       (delay (tr :mins-left        @retry-in))

@@ -14,6 +14,7 @@
             [amelinium.types.session            :refer         :all]
             [amelinium.logging                  :as             log]
             [amelinium.model.user               :as            user]
+            [amelinium.utils                    :refer         :all]
             [amelinium.common                   :as          common]
             [amelinium.common.controller        :as           super]
             [amelinium.i18n                     :as            i18n]
@@ -144,7 +145,7 @@
   "Prepares a request before any web controller is called."
   ([req] (prep-request! req nil))
   ([req session-key]
-   (let [req           (qassoc req :app/data-required [] :app/data web/empty-lazy-map)
+   (let [req           (qassoc req :app/data-required [] :app/data empty-lazy-map)
          route-data    (http/get-route-data req)
          ^Session sess (session/not-empty-of req (or session-key (get route-data :session-key)))
          auth-state    (delay (common/login-auth-state req :login-page? :auth-page?))
