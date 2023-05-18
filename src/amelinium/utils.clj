@@ -117,12 +117,12 @@
      (t/format DateTimeFormatter/RFC_1123_DATE_TIME (t/zoned-date-time t)))))
 
 (defn timeout?
-  "Returns `true` if the given duration is negative, `false` otherwise. Uses
+  "Returns `true` if the given duration is negative or 0, `false` otherwise. Uses
   milliseconds. Returns `false` when `nil` or `false` is given."
   [duration]
   (if duration
     (if-some [millis (t/millis duration)]
-      (neg? millis)
+      (not (pos? millis))
       false)
     false))
 
