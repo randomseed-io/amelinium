@@ -37,29 +37,47 @@
 
 ;; Standard identity string matchers
 
+(declare type?)
+
 (defn id-phone-string
-  "Returns `true` if the given string looks like a phone number."
-  ^Keyword [^String v]
-  (if (and (= \+ (.charAt v 0))
-           (> (.length v) 4))
-    :phone))
+  "Returns `true` if the given string looks like a phone number. If identity type or
+  acceptable type `t` is given, then it must be a parent or be equal to `:phone`."
+  (^Keyword [^String v]
+   (if (and (= \+ (.charAt v 0))
+            (> (.length v) 4))
+     :phone))
+  (^Keyword [^String v ^Keyword t]
+   (if (type? :phone t)
+     (id-phone-string v))))
 
 (defn id-email-string
-  "Returns `true` if the given string looks like an e-mail address."
-  ^Keyword [^String v]
-  (if (and (> (.length v) 2)
-           (pos-int? (str/index-of v \@ 1)))
-    :email))
+  "Returns `true` if the given string looks like an e-mail address. If identity type or
+  acceptable type `t` is given, then it must be a parent or be equal to `:email`."
+  (^Keyword [^String v]
+   (if (and (> (.length v) 2)
+            (pos-int? (str/index-of v \@ 1)))
+     :email))
+  (^Keyword [^String v ^Keyword t]
+   (if (type? :email t)
+     (id-email-string v))))
 
 (defn id-uid-string
-  "Returns `true` if the given string looks like a UID (UUID)."
-  ^Keyword [^String v]
-  (if (uuid/uuid-string? v) :uid))
+  "Returns `true` if the given string looks like a UID (UUID). If identity type or
+  acceptable type `t` is given, then it must be a parent or be equal to `:uid`."
+  (^Keyword [^String v]
+   (if (uuid/uuid-string? v) :uid))
+  (^Keyword [^String v ^Keyword t]
+   (if (type? :uid t)
+     (id-uid-string v))))
 
 (defn id-id-string
-  "Returns `true` if the given string looks like a user ID."
-  ^Keyword [^String v]
-  (if (pos-int? (safe-parse-long v)) :id))
+  "Returns `true` if the given string looks like a user ID. If identity type or
+  acceptable type `t` is given, then it must be a parent or be equal to `:id`."
+  (^Keyword [^String v]
+   (if (pos-int? (safe-parse-long v)) :id))
+  (^Keyword [^String v ^Keyword t]
+   (if (type? :id t)
+     (id-id-string v))))
 
 (p/add-type-string-matcher! id-phone-string
                             id-email-string
@@ -126,15 +144,18 @@
 ;; Public functions
 
 (defn type?
-  "Returns `true` if the given identity type identifier `t` exists.
+  "Returns `true` if the given identity type identifier `t` exists and is valid.
 
-  If `acceptable-tag` is given this function will check if the given tag is a parent
-  of the given type identifier. To add acceptable type(s) use
-  `amelinium.proto.identity/add-acceptable-type`."
+  If `acceptable-tag` is given this function will in addition check if the given tag
+  is a parent of the given type identifier or is `:amelinium.identity/any`. To add
+  acceptable type(s) use `amelinium.proto.identity/add-acceptable-type`."
   ([t]
    (isa? p/type-hierarchy (some-keyword t) ::valid))
   ([t ^Keyword acceptable-tag]
-   (and acceptable-tag (isa? p/type-hierarchy (some-keyword t) acceptable-tag))))
+   (and acceptable-tag
+        (if (identical? ::any acceptable-tag)
+          (isa? p/type-hierarchy (some-keyword t) ::valid)
+          (isa? p/type-hierarchy (some-keyword t) acceptable-tag)))))
 
 (defn check-type
   "Returns a keyword for the given identity type `identity-type` if it is a valid
@@ -148,7 +169,10 @@
      (if (isa? p/type-hierarchy t ::valid) t)))
   (^Keyword [id-type acceptable-tag]
    (if-let [t (some-keyword id-type)]
-     (if (and acceptable-tag (isa? p/type-hierarchy t acceptable-tag)) t))))
+     (if acceptable-tag
+       (if (identical? ::any acceptable-tag)
+         (if (isa? p/type-hierarchy t ::valid) t)
+         (if (isa? p/type-hierarchy t acceptable-tag) t))))))
 
 (defn type
   "Returns a keyword describing identity type detected by analyzing the given user
@@ -261,21 +285,42 @@
   (fn ^Keyword [identity-type] identity-type)
   :hierarchy #'p/type-hierarchy)
 
-(defn- parse-single
-  ([^Keyword identity-type user-identity]
+(defn parse-group
+  "Parses identity `identity-type` with `acceptable-type` tag which should be a parent
+  tag grouping identity types (like `:amelinium.identity/any` or another). Will use
+  `amelinium.proto.identity/type` passing a tag to it to limit the parsers tried and
+  constrain the identity type to one that belongs to a parent tag in
+  `amelinium.proto.identity/type-hierarchy`. Hint: new parent tags can be registered
+  with `amelinium.proto.identity/add-acceptable-type!`.
+
+  This is internal function. Use `of-type` instead, which will choose the appropriate
+  parser via multimethod and cache the results."
+  ^Identity [^Keyword acceptable-type ^Identifiable user-identity]
+  (if-some [^Keyword t (p/type user-identity acceptable-type)]
+    ((parser t) user-identity)))
+
+(defn parse-single
+  "Parses identity `user-identity` by choosing the parser with `parser` multimethod on
+  a basis of the given `identity-type` or a detected identity type (by getting it
+  with `amelinium.proto.identity/type`). Returns user identity object or `nil`.
+
+  This is internal function. Use `of` or `of-type` instead, which will cache the
+  results."
+  (^Identity [^Keyword identity-type ^Identifiable user-identity]
    (if user-identity ((parser identity-type) user-identity)))
-  ([user-identity]
+  (^Identity [^Identifiable user-identity]
    (if user-identity ((parser (p/type user-identity)) user-identity))))
 
 (def ^{:tag      Identity
-       :arglists '(^Identity [user-identity]
-                   ^Identity [^Keyword identity-type user-identity])
-       :see-also ["of"]}
+       :arglists '(^Identity [^Identifiable user-identity]
+                   ^Identity [^Keyword identity-type ^Identifiable user-identity])
+       :see-also ["of" "of-type"]}
   parse
   "Parses the given identity `user-identity` with optional `identity-type`
   predefined. Returns an identity record of type `amelinium.Identity`. Memoized proxy
-  for parsing strings and other non-native data. Do not use it directly, use `of`
-  instead.
+  for parsing strings and other non-native data.
+
+  Do not use it directly, use `of` or `of-type` instead.
 
   Caution: The identity type must be a keyword (it will not be coerced)."
   (rdb/memoize parse-single 4096))
@@ -335,35 +380,50 @@
          (vec))
    (dissoc (group-by second identity-map-keys) ::any)))
 
+(defn- try-map-keys
+  [m identity-type]
+  (if-some [ks (get identity-map-keys-by-type identity-type)]
+    (if (seq m)
+      (some (fn [k]
+              (if-let [i (get m k)]
+                (if (and (map? i) (not (record? i))) nil (p/make i identity-type))))
+            ks))))
+
 (defn parse-map
   "Tries to extract identity from a map `m` by searching for commonly known identity
   keys.
 
-  Optional identity type `identity-type` will be used to constrain the conversion. If
-  a known key is found but its associated value cannot be converted to `Identity`
+  Optional identity type `identity-type` will be used to constrain the
+  conversion. Its value may also be an acceptable type tag used to group identity
+  types semantically.
+
+  If a known key is found but its associated value cannot be converted to `Identity`
   object, process continues and other keys are tried.
 
-  Uses `identity-map-keys` when no identity type is given, or it is set to
+  It uses `identity-map-keys` when no identity type is given, or it is set to
   `:amelinium.identity/any`.
 
   Uses `identity-map-keys-by-type` when an identity type is given to select a group
-  of keys to be tried out. When the group is not found for the given identity type,
-  `nil` is returned."
+  of keys to be tried out. It will also look for a key that matches the given
+  acceptable identity type tag (if passed as `identity-type` instead of a type). If
+  that fails it performs a series of lookups in the map by taking each direct
+  descendant of the given tag associated within
+  `amelinium.proto.identity/type-hierarchy`.
+
+  When a group is not found for the given identity type or acceptable type tag, `nil`
+  is returned."
   ([m]
    (if (seq m)
      (some (fn [[k t]]
              (if-let [i (get m k)]
                (if (and (map? i) (not (record? i))) nil (p/make i t))))
            identity-map-keys)))
-  ([identity-type m]
-   (if-some [ks (get identity-map-keys-by-type identity-type)]
-     (if (seq m)
-       (some (fn [k]
-               (if-let [i (get m k)]
-                 (if (and (map? i) (not (record? i))) nil (p/make i identity-type))))
-             ks))
+  ([^Keyword identity-type m]
+   (if identity-type
      (if (identical? ::any identity-type)
-       (parse-map m)))))
+       (parse-map m)
+       (or (try-map-keys m identity-type)
+           (some #(try-map-keys m %) (descendants p/type-hierarchy identity-type)))))))
 
 ;; Creating identities
 
@@ -374,28 +434,33 @@
   established and it was not given, `nil` is returned.
 
   Optional identity type `identity-type` (which must be a keyword) may be given as a
-  first argument. It is used to pick the right parser (if parsing is needed) and to
-  reject wrong identity type (if `amelinium.Identity` record is given). If there is a
-  need to give list of keywords as user identities (including the first), and not to
-  give an identity type, then first argument's value needs to be converted to a
-  string, or `of-value` should be used as an alternative.
+  first argument. It is used to pick the right parser (if parsing is needed) or to
+  simply reject wrong identity type (if `amelinium.Identity` record is given).
+
+  A value of `identity-type` may also be an acceptable type tag (registered with
+  `add-acceptable-type!`) which groups identity types. In such case parsing and
+  detection will be constrained to identity types being its descendants.
+
+  If there is a need to give list of keywords as user identities (including the
+  first), and not to give any identity type, then first argument's value needs to be
+  converted to a string, or `of-value` or `of-type` should be used as an alternative.
 
   If multiple identities are given it will return a sequence of these identities
   parsed with parsing functions chosen for detected identity types. If an identity
   type is cannot be detected and/or is not valid, `nil` value will be inserted into
   the corresponding location of generated output sequence."
   {:see-also ["of-value" "of-type" "of-seq"]
-   :arglists '([user-identity]
-               [identity-type user-identity]
-               [identity-type user-identity & user-identities]
-               [user-identity & user-identities])}
-  (^Identity [user-identity]
+   :arglists '(^Identity [^Identifiable user-identity]
+               ^Identity [identity-type ^Identifiable user-identity]
+               ^Identity [identity-type ^Identifiable user-identity & user-identities]
+               ^Identity [^Identifiable user-identity & user-identities])}
+  (^Identity [^Identifiable user-identity]
    (p/make user-identity))
-  ([identity-type user-identity]
+  (^Identity [identity-type ^Identifiable user-identity]
    (if (keyword? identity-type)
      (p/make user-identity identity-type)
      (map p/make (cons identity-type (cons user-identity nil)))))
-  ([identity-type user-identity & ids]
+  ([identity-type ^Identifiable user-identity & ids]
    (if (keyword? identity-type)
      (map #(p/make % identity-type) (cons user-identity ids))
      (map p/make (cons identity-type (cons user-identity ids))))))
@@ -411,7 +476,7 @@
   type is cannot be detected and/or is not valid, `nil` value will be inserted into
   the corresponding location of generated output sequence."
   {:see-also ["of" "of-type" "of-seq"]}
-  (^Identity [user-identity]
+  (^Identity [^Identifiable user-identity]
    (p/make user-identity))
   ([user-identity & ids]
    (map p/make (cons user-identity ids))))
@@ -422,14 +487,18 @@
   identity type and identity value in a form it expresses it best. If the identity
   type is `nil` then `nil` is returned.
 
+  A value of `identity-type` may also be an acceptable type tag (registered with
+  `add-acceptable-type!`) which groups identity types. In such case parsing and
+  detection will be constrained to identity types being its descendants.
+
   If multiple identities are given it will return a sequence of these identities
   parsed with parsing functions chosen for the given identity type. If the identity
   type is not valid or the parsing cannot be applied for an input value, `nil` will
   be inserted into corresponding location of the output sequence."
   {:see-also ["of" "of-value" "of-seq"]}
-  (^Identity [identity-type user-identity]
+  (^Identity [identity-type ^Identifiable user-identity]
    (p/make user-identity (some-keyword identity-type)))
-  ([identity-type user-identity & ids]
+  ([identity-type ^Identifiable user-identity & ids]
    (let [identity-type (some-keyword identity-type)]
      (map #(p/make % identity-type) (cons user-identity ids)))))
 
@@ -439,14 +508,18 @@
   identity type and identity value in a form it expresses it best. If the identity
   type is `nil` or empty then any identity type is accepted.
 
+  A value of `identity-type` may also be an acceptable type tag (registered with
+  `add-acceptable-type!`) which groups identity types. In such case parsing and
+  detection will be constrained to identity types being its descendants.
+
   If multiple identities are given it will return a sequence of these identities
   parsed with parsing functions chosen for the given identity type. If the identity
   type is not valid or the parsing cannot be applied for an input value, `nil` will
   be inserted into corresponding location of the output sequence."
   {:see-also ["of" "of-value" "of-seq"]}
-  (^Identity [identity-type user-identity]
+  (^Identity [identity-type ^Identifiable user-identity]
    (p/make user-identity  (or (some-keyword identity-type) ::any)))
-  ([identity-type user-identity & ids]
+  ([identity-type ^Identifiable user-identity & ids]
    (let [identity-type (some-keyword identity-type)]
      (if identity-type
        (map #(p/make % identity-type) (cons user-identity ids))
@@ -458,6 +531,10 @@
   identity value in a form it expresses it best. If the given identity type was given
   as an optional `identity-type` argument, it will be assumed as the expected type
   for all input values.
+
+  A value of `identity-type` may also be an acceptable type tag (registered with
+  `add-acceptable-type!`) which groups identity types. In such case parsing and
+  detection will be constrained to identity types being its descendants.
 
   If an identity type was not given but it cannot be detected and/or is not valid,
   `nil` value will be inserted into the corresponding location of generated output
@@ -486,29 +563,34 @@
 
   (literal? ^Boolean [v] false)
 
-  (type ^Keyword [v]
-    (.id-type ^Identity v))
+  (type
+    (^Keyword [v] (.id-type ^Identity v))
+    (^Keyword [v ^Keyword t]
+     (let [^Keyword id-type (.id-type ^Identity v)]
+       (if (type? id-type t) id-type))))
 
   (value
     ([v] (.value ^Identity v))
     ([v ^Keyword identity-type]
-     (if (or (identical? ::any identity-type)
-             (identical? identity-type (.id-type ^Identity v)))
+     (if (type? (.id-type ^Identity v) identity-type)
        (.value ^Identity v))))
 
   (make
     (^Identity [v] v)
     (^Identity [v ^Keyword identity-type]
-     (if (or (identical? ::any identity-type)
-             (identical? identity-type (.id-type ^Identity v))) v)))
+     (if (type? (.id-type ^Identity v) identity-type) v)))
 
   String
 
   (literal? ^Boolean [v] true)
 
-  (type ^Keyword [v]
-    (if (not-empty-string? v)
-      (p/type-string-match v)))
+  (type
+    (^Keyword [v]
+     (if (not-empty-string? v)
+       (p/type-string-match v)))
+    (^Keyword [v ^Keyword t]
+     (if (not-empty-string? v)
+       (p/type-string-match v t))))
 
   (value
     ([v] (p/value (p/make v)))
@@ -525,8 +607,11 @@
 
   (literal? ^Boolean [v] false)
 
-  (type ^Keyword [v]
-    (p/type (parse-map v)))
+  (type
+    (^Keyword [v]
+     (p/type (parse-map v)))
+    (^Keyword [v ^Keyword t]
+     (p/type (parse-map t v))))
 
   (value
     ([v] (p/value (parse-map v)))
@@ -543,8 +628,11 @@
 
   (literal? ^Boolean [v] true)
 
-  (type ^Keyword [v]
-    (p/type (some-str v)))
+  (type
+    (^Keyword [v]
+     (p/type (some-str v)))
+    (^Keyword [v ^Keyword t]
+     (p/type (some-str v) t)))
 
   (value
     ([v] (p/value (some-str v)))
@@ -561,8 +649,11 @@
 
   (literal? ^Boolean [v] false)
 
-  (type ^Keyword [v]
-    (p/type (some-str v)))
+  (type
+    (^Keyword [v]
+     (p/type (some-str v)))
+    (^Keyword [v ^Keyword t]
+     (p/type (some-str v) t)))
 
   (value
     ([v] (p/value (some-str v)))
@@ -579,16 +670,17 @@
 
   (literal? ^Boolean [v] true)
 
-  (type ^Keyword [v]
-    (if (pos-int? v) :id))
+  (type
+    (^Keyword [v]
+     (if (pos-int? v) :id))
+    (^Keyword [v ^Keyword t]
+     (if (and (pos-int? v) (type? :id t)) :id)))
 
   (value
     (^Long [v]
      (if (pos-int? v) (long v)))
     (^Long [v ^Keyword identity-type]
-     (if (and (pos-int? v)
-              (or (identical? :id identity-type)
-                  (identical? ::any identity-type)))
+     (if (and (pos-int? v) (type? :id identity-type))
        (long v))))
 
   (make
@@ -596,54 +688,53 @@
      (if (pos-int? v)
        (Identity. :id (long v))))
     (^Identity [v ^Keyword identity-type]
-     (if (and (pos-int? v)
-              (or (identical? :id identity-type)
-                  (identical? ::any identity-type)))
+     (if (and (pos-int? v) (type? :id identity-type))
        (Identity. :id (long v)))))
 
   Phonenumber$PhoneNumber
 
   (literal? ^Boolean [v] true)
 
-  (type ^Keyword [v] :phone)
+  (type
+    (^Keyword [v] :phone)
+    (^Keyword [v ^Keyword t] (if (type? :phone t) :phone)))
 
   (value
     (^Phonenumber$PhoneNumber [v] v)
     (^Phonenumber$PhoneNumber [v ^Keyword identity-type]
-     (if (or (identical? :phone identity-type)
-             (identical? ::any identity-type)) v)))
+     (if (type? :phone identity-type) v)))
 
   (make
     (^Identity [v] (Identity. :phone v))
     (^Identity [v ^Keyword identity-type]
-     (if (or (identical? :phone identity-type)
-             (identical? ::any identity-type))
+     (if (type? :phone identity-type)
        (Identity. :phone v))))
 
   UUID
 
   (literal? ^Boolean [v] true)
 
-  (type ^Keyword [v] :uid)
+  (type
+    (^Keyword [v] :uid)
+    (^Keyword [v ^Keyword t] (if (type? :uid t) :uid)))
 
   (value
     (^UUID [v] v)
     (^UUID [v ^Keyword identity-type]
-     (if (or (identical? :uid identity-type)
-             (identical? ::any identity-type)) v)))
+     (if (type? :uid identity-type) v)))
 
   (make
     (^Identity [v] (Identity. :uid v))
     (^Identity [v ^Keyword identity-type]
-     (if (or (identical? :uid identity-type)
-             (identical? ::any identity-type))
-       (Identity. :uid v))))
+     (if (type? :uid identity-type) (Identity. :uid v))))
 
   Character
 
   (literal? ^Boolean [v] true)
 
-  (type [v] nil)
+  (type
+    ([v] nil)
+    ([v t] nil))
 
   (value
     ([v] nil)
@@ -657,7 +748,9 @@
 
   (literal? ^Boolean [v] true)
 
-  (type [v] nil)
+  (type
+    ([v] nil)
+    ([v t] nil))
 
   (value
     ([v] nil)
@@ -671,7 +764,9 @@
 
   (literal? ^Boolean [v] true)
 
-  (type [v] nil)
+  (type
+    ([v] nil)
+    ([v t] nil))
 
   (value
     ([v] nil)
@@ -697,6 +792,10 @@
   identity type. It instructs the function to treat the given identity as of this
   type.
 
+  A value of `identity-type` may also be an acceptable type tag (registered with
+  `add-acceptable-type!`) which groups identity types. In such case parsing and
+  detection will be constrained to identity types being its descendants.
+
   This is internal multimethod which does not perform conversions or checks. Use
   `to-db` or `->db` instead."
   {:arglists '([^Identifiable user-identity]
@@ -719,9 +818,14 @@
   is returned.
 
   If the `identity-type` is given, it should be a valid identity type. It instructs
-  the function to treat the given identity as of this type during pre-conversion. If
-  the identity is already an `amelinium.Identity` record but its type is different,
-  `nil` will be returned.
+  the function to treat the given identity as of this type during pre-conversion.
+
+  A value of `identity-type` may also be an acceptable type tag (registered with
+  `add-acceptable-type!`) which groups identity types. In such case parsing and
+  detection will be constrained to identity types being its descendants.
+
+  If the identity is already an `amelinium.Identity` record but its type is
+  different, `nil` will be returned.
 
   If possible, use `->db` macro instead to get some compile-time optimizations."
   {:see-also ["->db" "to-db*"]}
@@ -746,6 +850,10 @@
   the function to treat the given identity as of this type during pre-conversion. If
   the identity is already an `amelinium.Identity` record but its type is different,
   `nil` will be returned.
+
+  A value of `identity-type` may also be an acceptable type tag (registered with
+  `add-acceptable-type!`) which groups identity types. In such case parsing and
+  detection will be constrained to identity types being its descendants.
 
   If the `identity-type` is given as literal keyword, string or `nil`, then a
   specific conversion function will be obtained at compile-time.
@@ -829,6 +937,10 @@
   type. If the identity type is different than in the given object, `nil` is
   returned.
 
+  A value of `identity-type` may also be an acceptable type tag (registered with
+  `add-acceptable-type!`) which groups identity types. In such case parsing and
+  detection will be constrained to identity types being its descendants.
+
   This is internal multimethod which does not perform conversions or checks. Use
   `to-str` function or `->str` macro instead."
   {:arglists '(^String [^Identity user-identity]
@@ -848,8 +960,14 @@
   is returned.
 
   If the `identity-type` is given, it should be a valid identity type. It instructs
-  the function to treat the given identity as of this type. If the identity is an
-  `amelinium.Identity` record but its type is different, `nil` will be returned."
+  the function to treat the given identity as of this type.
+
+  A value of `identity-type` may also be an acceptable type tag (registered with
+  `add-acceptable-type!`) which groups identity types. In such case parsing and
+  detection will be constrained to identity types being its descendants.
+
+  If the identity is an `amelinium.Identity` record but its type is different, `nil`
+  will be returned."
   {:see-also ["->str" "->db" "of"]}
   (^String [^Identifiable user-identity]
    (to-str* (p/make user-identity)))
@@ -871,6 +989,10 @@
   the function to treat the given identity as of this type during pre-conversion. If
   the identity is already an `amelinium.Identity` record but its type is different,
   `nil` will be returned.
+
+  A value of `identity-type` may also be an acceptable type tag (registered with
+  `add-acceptable-type!`) which groups identity types. In such case parsing and
+  detection will be constrained to identity types being its descendants.
 
   If the `identity-type` is given as literal keyword, string or `nil`, then a
   specific conversion function will be obtained at compile-time.
@@ -940,3 +1062,47 @@
    (some-str (p/value user-identity)))
   (^String [^Keyword identity-type ^Identifiable user-identity]
    (some-str (p/value user-identity identity-type))))
+
+;; Acceptable types / identity type groups support in detection and parsing
+
+(defmethod parser ::p/group [^Keyword acceptable-tag]
+  (fn ^Identity [^Identifiable user-identity]
+    (parse-group acceptable-tag user-identity)))
+
+(defn add-acceptable-type!
+  "For the given parent tag `acceptable-tag` (which should be a qualified keyword) and
+  an identity type `t`, creates a relation so that the identity type is a descendant
+  of the given parent. It also ensures that the parent itself is a descendant of
+  `:amelinium.identity/valid` tag.
+
+  Additionally, it makes an extra parent for the given acceptable tag in
+  `amelinium.proto.identity/type-hierarchy` which is
+  `:amelinium.proto.identity/group`. This special value is a valid dispatch for the
+  `parser` multimethod which uses `parse-group` to handle identity parsing with
+  acceptable tag given explicitly as its identity type specification. If you don't
+  want that, use `amelinium.proto.identity/add-acceptable-type!` directly.
+
+  Useful when there is a need to accept a limited set of recognized identity
+  types. Then the detection function can check whether an identity belongs to a
+  parent.
+
+  Makes changes in the global identity type hierarchy
+  `amelinium.identity.proto/type-hierarchy`."
+  ([^Keyword acceptable-tag ^Keyword t]
+   (p/add-subtype! ::p/group acceptable-tag)
+   (p/add-acceptable-type! acceptable-tag t))
+  ([^Keyword acceptable-tag ^Keyword t & more]
+   (p/add-subtype! ::p/group acceptable-tag)
+   (apply p/add-acceptable-type! acceptable-tag t more)))
+
+(defn unaccept-type!
+  "Removes identity type `t` from the given parent `acceptable-tag` and removes parent
+  `:amelinium.proto.identity/group` from the acceptable tag in the `amelinium.proto.`
+  hierarchy. Makes changes in the global identity type hierarchy
+  `amelinium.identity.proto/type-hierarchy`."
+  ([^Keyword acceptable-tag ^Keyword t]
+   (p/del-subtype! ::p/group acceptable-tag)
+   (p/unaccept-type! acceptable-tag t))
+  ([^Keyword acceptable-tag ^Keyword t & more]
+   (p/del-subtype! ::p/group acceptable-tag)
+   (apply p/unaccept-type! acceptable-tag t more)))

@@ -2465,6 +2465,9 @@
                           ::identity/standard)))))
 
 (defn acceptable-identity-type
+  "For the given identity type `identity-type` and optional acceptable type tag
+  `acceptable-type` (`amelinium.identity/standard` by default), returns that type as
+  keyword, or `nil` if the type is not acceptable."
   ([identity-type]
    (acceptable-identity-type identity-type nil))
   ([identity-type acceptable-tag]

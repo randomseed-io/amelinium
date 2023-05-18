@@ -9,6 +9,7 @@
   (:refer-clojure :exclude [type value])
 
   (:require [amelinium]
+            [amelinium.utils           :refer      :all]
             [amelinium.types.identity  :refer      :all]
             [io.randomseed.utils.db    :as          rdb]
             [io.randomseed.utils       :as        utils]
@@ -31,7 +32,7 @@
 (defonce ^{:doc      "Internal function for matching strings on a basis of `type-string-matchers`."
            :tag      Keyword
            :redef    true
-           :arglists '(^Keyword [^String v])}
+           :arglists '(^Keyword [^String v] [^String v ^Keyword t])}
   type-string-match
   (constantly nil))
 
@@ -136,22 +137,28 @@
 
   (^{:tag Keyword}
    type
-   [user-identity]
+   [user-identity] [user-identity ^Keyword identity-type]
    "Returns a keyword describing identity type detected by analyzing the given
   value (`:phone` for a phone number, `:email` for e-mail address, `:id` for numeric
-  user ID, `:uid` for UUID). Does not perform full validation, just detection.")
+  user ID, `:uid` for UUID). If `identity-type` or a parent tag for identity types is
+  given, detection functions for the given identity type or (a tag-grouped) identity
+  types will be cherry-picked and result will be constrained to it. Does not perform
+  full validation, just detection.")
 
   (value
     [user-identity] [user-identity ^Keyword identity-type]
     "Returns a value of the given identity which is an object which represents
-  it best.")
+  it best. If `identity-type` is given, parsing for the given identity type will be
+  called explicitly. If a parent tag for identity types is given, it will be used to
+  parse and constrain the type.")
 
   (^{:tag Identity}
    make
    [user-identity] [user-identity ^Keyword identity-type]
    "Creates `amelinium.Identity` record by detecting identity type and parsing the
   identity. If `identity-type` is given, parsing for the given identity type will be
-  called explicitly.
+  called explicitly. If a parent tag for identity types is given, it will be used to
+  parse and constrain the type.
 
   For the `Identity` record it simply returns it unless the `identity-type` is given
   and it differs from a value of its `:id-type` field.")
@@ -163,21 +170,23 @@
 
 (defn add-type-string-matcher!
   "Adds new identity type string matcher to a global chain. Multiple functions may be
-  given."
+  given. Each function should accept an input and optional identity type. If the
+  identity type is given then it will be used as a hint to check whether this matcher
+  should be applied."
   ([f]
    (locking #'type-string-matchers
      (alter-var-root #'type-string-matchers conj f)
      (alter-var-root #'type-string-match
                      (constantly
                       (rdb/memoize
-                       (apply some-fn type-string-matchers) 4096)))))
+                       (apply some-fn* type-string-matchers) 4096)))))
   ([f & more]
    (locking #'type-string-matchers
      (doseq [f (cons f more)] (alter-var-root #'type-string-matchers conj f))
      (alter-var-root #'type-string-match
                      (constantly
                       (rdb/memoize
-                       (apply some-fn type-string-matchers) 4096))))))
+                       (apply some-fn* type-string-matchers) 4096))))))
 
 (defn del-type-string-matcher!
   "Deletes identity type string matcher of the given index `n` from a global
@@ -188,7 +197,7 @@
      (alter-var-root #'type-string-match
                      (constantly
                       (rdb/memoize
-                       (apply some-fn type-string-matchers) 4096)))))
+                       (apply some-fn* type-string-matchers) 4096)))))
   ([n & more]
    (locking #'type-string-matchers
      (doseq [n (cons n more)]
@@ -196,4 +205,4 @@
      (alter-var-root #'type-string-match
                      (constantly
                       (rdb/memoize
-                       (apply some-fn type-string-matchers) 4096))))))
+                       (apply some-fn* type-string-matchers) 4096))))))
