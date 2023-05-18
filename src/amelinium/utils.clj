@@ -121,8 +121,8 @@
   milliseconds. Returns `false` when `nil` or `false` is given."
   [duration]
   (if duration
-    (if-some [msecs (t/millis duration)]
-      (neg? msecs)
+    (if-some [millis (t/millis duration)]
+      (neg? millis)
       false)
     false))
 
@@ -135,10 +135,9 @@
 (defn retry-in-mins
   "Calculates minutes of duration on a basis of `Duration` object. Returns an integer
   number of minutes left or `nil` when there was no duration given or the duration is
-  negative. Used to calculate retry timeouts to report them to a user."
+  negative. May return 0 if there is less than 1 minute left. Used to calculate retry
+  timeouts to report them to a user."
   [duration]
   (when duration
-    (if-some [mins (t/minutes duration)]
-      (if (neg? mins) nil mins))))
-
-;; FIXME! be strict about timeout, but return minutes
+    (if-some [millis (t/millis duration)]
+      (if (neg? millis) nil (t/minutes duration)))))
