@@ -2384,7 +2384,8 @@
 
 ;; Identities
 
-(pid/add-acceptable-type! ::identity/standard :email :phone :uid)
+(identity/add-acceptable-type! ::identity/standard :email :phone :uid)
+(identity/add-acceptable-type! ::identity/public   :email :phone)
 
 (defn id-type->url-type
   "Returns URL type identifier which matches the given identity type and confirmation
