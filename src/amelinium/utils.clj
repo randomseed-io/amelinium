@@ -20,7 +20,21 @@
                              PersistentVector
                              IPersistentMap)))
 
-;; Data structures
+;; Data structures and control flow expressions
+
+(defn- quote-form?
+  [x]
+  (and (list? x) (= (first x) 'quote)))
+
+(defn- const-form?
+  [x]
+  (or (nil?        x)
+      (string?     x)
+      (keyword?    x)
+      (boolean?    x)
+      (number?     x)
+      (char?       x)
+      (quote-form? x)))
 
 (def empty-lazy-map
   "An empty lazy map."
@@ -33,6 +47,21 @@
   ([x & next]
    `(let [or# ~x]
       (if (nil? or#) (or-some ~@next) or#))))
+
+(defmacro qsome
+  "Same as `clojure.core/some` but when `coll` and (some) elements of `coll` are
+  constant forms then a source code with `or` expression is generated instead of
+  `some` with recurrent predicate application."
+  [pred coll]
+  (if (sequential? coll)
+    (let [pred-sym (gensym "pred__qsome__")]
+      `(let [~pred-sym ~pred]
+         (or ~@(->> (partition-by const-form? coll)
+                    (mapcat (fn [elements]
+                              (if (const-form? (first elements))
+                                (map #(list pred-sym %) elements)
+                                (cons (list some pred-sym (vec elements)) nil))))))))
+    `(some ~pred ~coll)))
 
 (defn some-fn*
   "Same as `clojure.core/some-fn` but multiple arguments are passed to each predicate
