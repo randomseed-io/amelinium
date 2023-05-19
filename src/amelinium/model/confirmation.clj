@@ -673,10 +673,33 @@
 ;; Reading properties
 
 (defn status
-  [db id reason]
-  (if-some [{:keys [expires token confirmed] :as r}
-            (db/<exec-one! db "SELECT id,id_type,attempts,expires,token,confirmed FROM confirmations WHERE id=? AND reason=?"
-                           [:confirmations id reason])]
-    (if (and expires token)
-      (-> (qassoc r :confirmed? confirmed)
-          (dissoc r :confirmed)))))
+  "Returns confirmation status as a map containing the following keys: `:id`,
+  `:id_type`, `:attempts`, `:expires`, `:token`, `:confirmed?` and `:qtoken`. The
+  arguments should be `db` (database connection object), `id` (user's identity for
+  which the verification is required), `qtoken` (quick token derived from
+  confirmation token to authorize the operation) and optional `reason` (confirmation
+  reason). If reason is not given then all user's confirmation for the given identity
+  will be analyzed and their quick tokens calculated; the first quick token that
+  matches the one passed as an argument will cause the result to be returned."
+  ([db id qtoken]
+   (status db id qtoken nil))
+  ([db id qtoken reason]
+   (if (and id qtoken)
+     (if-some [{:keys [expires token confirmed] :as r}
+               (if reason
+                 (if-some [{:keys [token] :as r}
+                           (db/<exec-one! db
+                                          ["SELECT id,id_type,attempts,expires,token,confirmed"
+                                           "FROM confirmations "
+                                           "WHERE id=? AND reason=?"]
+                                          [:confirmations id reason])]
+                   (if (qtoken-matches? qtoken id token) (qassoc r :qtoken qtoken)))
+                 (some #(if (qtoken-matches? qtoken id (get % :token)) (qassoc % :qtoken qtoken))
+                       (db/<exec! db
+                                  ["SELECT id,id_type,attempts,expires,token,confirmed"
+                                   "FROM confirmations "
+                                   "WHERE id=?"]
+                                  [:confirmations id])))]
+       (if (and expires token)
+         (-> (qassoc r :confirmed? confirmed)
+             (dissoc r :confirmed)))))))
