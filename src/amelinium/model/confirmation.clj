@@ -128,6 +128,31 @@
   (^String [x y z & more]
    (make-qtoken (apply strb (some-str x) (some-str y) (some-str z) (map some-str more)))))
 
+(defn make-qtoken-some
+  "Generates a quick token on a basis of a string representation of the given
+  argument(s) which combined may not be an empty string. Returns a string or `nil`."
+  (^String [x]
+   (if-some [x (some-str x)] (-> x codecs/str->bytes hash/md5 codecs/bytes->hex)))
+  (^String [x y]
+   (make-qtoken (strb (some-str x) (some-str y))))
+  (^String [x y z]
+   (make-qtoken (strb (some-str x) (some-str y) (some-str z))))
+  (^String [x y z & more]
+   (make-qtoken (apply strb (some-str x) (some-str y) (some-str z) (map some-str more)))))
+
+(defn qtoken-matches?
+  "Checks if a quick token `qtoken` matches the result of applying `make-qtoken` to all
+  other arguments which cannot be an empty string after concatenation. If combined
+  arguments are empty, `nil` or `false`, returns `false`. If `qtoken` is falsy or an
+  empty string, returns `false` too. If `qtoken` matches the calculated quick token,
+  returns `true`."
+  ([qtoken] false)
+  ([qtoken a] (or (and qtoken (= qtoken (make-qtoken-some a))) false))
+  ([qtoken a b] (or (and qtoken (= qtoken (make-qtoken-some a b))) false))
+  ([qtoken a b c] (or (and qtoken (= qtoken (make-qtoken-some a b c))) false))
+  ([qtoken a b c d] (or (and qtoken (= qtoken (make-qtoken-some a b c d))) false))
+  ([qtoken a b c d & more] (or (and qtoken (= qtoken (apply make-qtoken-some a b c d more))) false)))
+
 ;; Confirmation deletion
 
 (defn delete
