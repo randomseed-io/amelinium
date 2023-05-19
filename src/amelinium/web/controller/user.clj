@@ -502,12 +502,11 @@
   "Displays password recovery form and initiates password recovery by sending an e-mail
   or SMS message with a verification code or token."
   [req]
-  (let [params  (get req :parameters)
-        id-type (common/acceptable-identity-type (get-in params [:path :id-type]))
-        email?  (or (identical? :email id-type) (identical? :user/email id-type))
-        phone?  (or (identical? :phone id-type) (identical? :user/phone id-type))
-        req     (web/assoc-app-data req :identity/type id-type :phone? phone? :email? email?)]
-    (if-some [[id id-type] (common/identity-and-type (get-in params [:form id-type]) id-type)]
+  (let [params  (get (get req :parameters) :form)
+        id      (identity/of-type ::identity/public (get params :user/identity))
+        id-type (identity/type id)
+        req     (web/assoc-app-data req :identity/type id-type)]
+    (if id-type
 
       ;; initiate recovery
       ;; by generating a verification code and token
@@ -531,21 +530,13 @@
                                     :tpl/phone-exists :verify/sms-recovery
                                     :tpl/email-exists :recovery/verify})]
         (web/response
-
          ;; verify! returned an error response, short-circuit
-
          req
 
          ;; display a form for entering verification code
-
          (qassoc req :app/view :user/password-recover-sent)))
 
       ;; display initial password recovery form
-      ;; with known identity type (id-type)
-      ;; or
-      ;; display generic password recovery form
-      ;; with unknown identity type (id-type)
-
       req)))
 
 (defn password-update!
