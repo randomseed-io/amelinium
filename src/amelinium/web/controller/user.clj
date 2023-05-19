@@ -302,53 +302,40 @@
   ([req session-key] (confirmation-status! req session-key nil))
   ([req session-key reason]
    (if-some [params (not-empty (get (get req :parameters) :form))]
-     (let [id     (or (get params :user/login) (get params :login)
-                      (get params :user/email) (get params :email)
-                      (get params :user/phone) (get params :phone))
-           qtoken (some-str (or (get params :verify/qtoken)
-                                (get params :confirmation/qtoken)
-                                (get params :qtoken)))
-           reason (or (some-str reason)
-                      (some-str (http/get-route-data req :confirmation/reason))
-                      "creation")]
+     (let [id     (->> [:user/identity :user/login :user/email :user/phone
+                        :identity :login :email :phone]
+                       (some params) (identity/of-type ::identity/public))
+           qtoken (->> [:verify/qtoken :confirmation/qtoken :qtoken] (some params))]
        (if (and id qtoken)
-         (if-some [r (confirmation/status (auth/db req) id reason)]
-           (if (= qtoken (confirmation/make-qtoken id (get r :token)))
-             (let [lang            (or (common/pick-language req :registration) (common/lang-id req))
-                   tr              (i18n/no-default (common/translator req lang))
-                   attempts        (get r :attempts)
-                   attempts?       (int? attempts)
-                   attempts-left   (if attempts? (if (neg? attempts) 0 attempts))
-                   max-attempts?   (if attempts? (zero? attempts-left))
-                   retry-dur       (simple-duration (get r :expires))
-                   expired?        (timeout? retry-dur)
-                   retry-in        (delay (retry-in-mins retry-dur))
-                   in-mins         (delay (tr :in-mins          @retry-in))
-                   retry-in-mins   (delay (tr :try-in-mins      @retry-in))
-                   mins-left       (delay (tr :mins-left        @retry-in))
-                   attempts-left-w (delay (tr :attempts-left attempts-left))
-                   id-type         (delay (common/guess-identity-type r id nil nil))
-                   id-str          (delay (identity/->str @id-type id))
-                   confirmed?      (delay (get r :confirmed?))
-                   req             (web/assoc-app-data
-                                    req
-                                    :user/id-type              id-type
-                                    :user/identity             id-str
-                                    :verify/confirmed?         confirmed?
-                                    :verify/expired?           expired?
-                                    :verify/retry-in           retry-in
-                                    :verify/in-mins            in-mins
-                                    :verify/retry-in-mins      retry-in-mins
-                                    :verify/retry-unit         :minutes
-                                    :verify/retry-dur          retry-dur
-                                    :verify/mins-left          mins-left
-                                    :verify/max-attempts?      max-attempts?
-                                    :verify/attempts-left      attempts-left
-                                    :verify/attempts-left-word attempts-left-w
-                                    :verify/qtoken             qtoken)]
-               (cond expired? (web/handle-error req :verify/expired)
-                     :else    req))
-             req)
+         (if-some [r (confirmation/status (auth/db req) id qtoken reason)]
+           (let [lang          (or (common/pick-language req :registration) (common/lang-id req))
+                 tr            (i18n/no-default (common/translator req lang))
+                 retry-dur     (simple-duration (get r :expires))
+                 attempts      (get r :attempts)
+                 attempts?     (int? attempts)
+                 attempts-left (if attempts? (if (neg? attempts) 0 attempts))
+                 max-attempts? (if attempts? (zero? attempts-left))
+                 expired?      (timeout? retry-dur)
+                 retry-in      (delay (retry-in-mins retry-dur))
+                 id-type       (delay (common/guess-identity-type r id nil nil))
+                 req           (web/assoc-app-data
+                                req
+                                :user/id-type              id-type
+                                :user/identity             (delay (identity/->str @id-type id))
+                                :verify/confirmed?         (delay (get r :confirmed?))
+                                :verify/in-mins            (delay (tr :in-mins     @retry-in))
+                                :verify/retry-in-mins      (delay (tr :try-in-mins @retry-in))
+                                :verify/mins-left          (delay (tr :mins-left   @retry-in))
+                                :verify/attempts-left-word (delay (tr :attempts-left attempts-left))
+                                :verify/attempts-left      attempts-left
+                                :verify/retry-in           retry-in
+                                :verify/retry-dur          retry-dur
+                                :verify/max-attempts?      max-attempts?
+                                :verify/expired?           expired?
+                                :verify/qtoken             qtoken
+                                :verify/retry-unit         :minutes)]
+             (cond expired? (web/handle-error req :verify/expired)
+                   :else    req))
            req)
          req))
      req)))
