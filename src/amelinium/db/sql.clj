@@ -594,7 +594,15 @@
   associated with a tag name. If the name is not fully-qualified (does not contain a
   namespace part) its default namespace will be set to `amelinium.db.sql`.
 
-  There is also additional pattern `%'column-table-specification'` which is a
+  There is a special pattern using `%SOME` tag:
+  - `%SOME? variable:has-value#no-value` or
+  - `%SOME? variable:has-value`
+
+  It performs a substitution with `has-value` string if `variable` exists and is not
+  `nil` and not `false`; otherwise it performs a substitution with `no-value` string
+  or an empty string if the `no-value` was not given.
+
+  There is also an additional pattern `%'column-table-specification'` which is a
   quotation pattern. It uses `colspec-quoted` function on a given text.
 
   Example:
