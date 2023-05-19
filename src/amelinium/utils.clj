@@ -65,20 +65,60 @@
 
 (defn some-fn*
   "Same as `clojure.core/some-fn` but multiple arguments are passed to each predicate
-  function. Takes a set of predicates and returns a function that returns the first
-  truthy value (not `nil` and not `false`) returned by one of its composing
-  predicates against all of its arguments, else it returns a value returned by the
-  last predicate given (which may be `false` or `nil`)."
-  [& preds]
-  (fn
-    ([] (some #(%) preds))
-    ([a] (some #(% a) preds))
-    ([a b] (some #(% a b) preds))
-    ([a b c] (some #(% a b c) preds))
-    ([a b c d] (some #(% a b c d) preds))
-    ([a b c d e] (some #(% a b c d e) preds))
-    ([a b c d e f] (some #(% a b c d e f) preds))
-    ([a b c d e f & args] (some #(apply % a b c d e f args) preds))))
+  function and nullary variant is not returning `nil` but calls each predicate
+  without passing any arguments.
+
+  Takes a set of predicates and returns a function that returns the first truthy
+  value (not `nil` and not `false`) returned by one of its composing predicates
+  against all of its arguments, else it returns a value returned by the last
+  predicate given (which may be `false` or `nil`)."
+  ([p] p)
+  ([p1 p2]
+   (fn
+     ([] (or (p1) (p2)))
+     ([a] (or (p1 a) (p2 a)))
+     ([a b] (or (p1 a b) (p2 a b)))
+     ([a b c] (or (p1 a b c) (p2 a b c)))
+     ([a b c d] (or (p1 a b c d) (p2 a b c d)))
+     ([a b c d e] (or (p1 a b c d e) (p2 a b c d e)))
+     ([a b c d e f] (or (p1 a b c d e f) (p2 a b c d e f)))
+     ([a b c d e f & args] (or (apply p1 a b c d e f args) (apply p2 a b c d e f args)))))
+  ([p1 p2 p3]
+   (fn
+     ([] (or (p1) (p2) (p3)))
+     ([a] (or (p1 a) (p2 a) (p3 a)))
+     ([a b] (or (p1 a b) (p2 a b) (p3 a b)))
+     ([a b c] (or (p1 a b c) (p2 a b c) (p3 a b c)))
+     ([a b c d] (or (p1 a b c d) (p2 a b c d) (p3 a b c d)))
+     ([a b c d e] (or (p1 a b c d e) (p2 a b c d e) (p3 a b c d e)))
+     ([a b c d e f] (or (p1 a b c d e f) (p2 a b c d e f) (p3 a b c e f)))
+     ([a b c d e f & args] (or (apply p1 a b c d e f args)
+                               (apply p2 a b c d e f args)
+                               (apply p3 a b c d e f args)))))
+  ([p1 p2 p3 p4]
+   (fn
+     ([] (or (p1) (p2) (p3) (p4)))
+     ([a] (or (p1 a) (p2 a) (p3 a) (p4 a)))
+     ([a b] (or (p1 a b) (p2 a b) (p3 a b) (p4 a b)))
+     ([a b c] (or (p1 a b c) (p2 a b c) (p3 a b c) (p4 a b c)))
+     ([a b c d] (or (p1 a b c d) (p2 a b c d) (p3 a b c d) (p4 a b c d)))
+     ([a b c d e] (or (p1 a b c d e) (p2 a b c d e) (p3 a b c d e) (p4 a b c d e)))
+     ([a b c d e f] (or (p1 a b c d e f) (p2 a b c d e f) (p3 a b c e f) (p4 a b c d e f)))
+     ([a b c d e f & args] (or (apply p1 a b c d e f args)
+                               (apply p2 a b c d e f args)
+                               (apply p3 a b c d e f args)
+                               (apply p4 a b c d e f args)))))
+  ([p1 p2 p3 p4 & preds]
+   (let [preds (list* p1 p2 p3 p4 preds)]
+     (fn spn
+       ([] (some #(%) preds))
+       ([a] (some #(% a) preds))
+       ([a b] (some #(% a b) preds))
+       ([a b c] (some #(% a b c) preds))
+       ([a b c d] (some #(% a b c d) preds))
+       ([a b c d e] (some #(% a b c d e) preds))
+       ([a b c d e f] (some #(% a b c d e f) preds))
+       ([a b c d e f & args] (some #(apply % a b c d e f args) preds))))))
 
 ;; File system operations
 
