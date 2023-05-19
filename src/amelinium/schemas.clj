@@ -16,6 +16,7 @@
             [tick.core                             :as           t]
             [clojure.string                        :as         str]
             [clojure.test.check.generators         :as         gen]
+            [clj-uuid                              :as        uuid]
             [phone-number.core                     :as       phone]
             [phone-number.util                     :as      phutil]
             [io.randomseed.utils.validators.common :as          vc]
@@ -335,6 +336,58 @@
                         :json-schema/example (phone->str (gen/generate gen-phone))
                         :gen/gen             gen-phone}})))
 
+(def user-identity
+  (let [obj->identity #(identity/of-type ::identity/standard %)
+        identity->str #(identity/->str   ::identity/standard %)]
+    (m/-simple-schema
+     {:type            :identity
+      :pred            #(case (identity/type %)
+                          :uid   (uuid?                   (identity/value %))
+                          :phone (vc/valid-regular-phone? (identity/value %))
+                          :email (vc/valid-email?         (identity/value %)))
+      :type-properties {:error/message       "should be a valid standard identity"
+                        :decode/string       obj->identity
+                        :decode/json         obj->identity
+                        :encode/string       identity->str
+                        :encode/json         identity->str
+                        :json-schema/type    "string"
+                        :json-schema/format  "email"
+                        :json-schema/x-anyOf [{:type    "string"
+                                               :format  "phone"
+                                               :example (identity->str (gen/generate gen-regular-phone))}
+                                              {:type    "string"
+                                               :format  "email"
+                                               :example (identity->str (gen/generate gen-email))}
+                                              {:type    "string"
+                                               :format  "uuid"
+                                               :example (identity->str (gen/generate gen/uuid))}]
+                        :json-schema/example (identity->str (gen/generate gen-email))
+                        :gen/gen             gen-email}})))
+
+(def public-identity
+  (let [obj->identity #(identity/of-type ::identity/public %)
+        identity->str #(identity/->str   ::identity/public %)]
+    (m/-simple-schema
+     {:type            :public-identity
+      :pred            #(case (identity/type %)
+                          :phone (vc/valid-regular-phone? (identity/value %))
+                          :email (vc/valid-email?         (identity/value %)))
+      :type-properties {:error/message       "should be an e-mail or a regular phone number"
+                        :decode/string       obj->identity
+                        :decode/json         obj->identity
+                        :encode/string       identity->str
+                        :encode/json         identity->str
+                        :json-schema/type    "string"
+                        :json-schema/format  "email"
+                        :json-schema/x-anyOf [{:type    "string"
+                                               :format  "phone"
+                                               :example (identity->str (gen/generate gen-regular-phone))}
+                                              {:type    "string"
+                                               :format  "email"
+                                               :example (identity->str (gen/generate gen-email))}]
+                        :json-schema/example (identity->str (gen/generate gen-email))
+                        :gen/gen             gen-email}})))
+
 (def password
   (m/-simple-schema
    {:type            :password
@@ -527,6 +580,8 @@
    :password           password
    :password-relaxed   password-relaxed
    :repeated-password  repeated-password
+   :identity           user-identity
+   :public-identity    public-identity
    :instant            instant
    :duration           duration
    :phone              phone
