@@ -304,8 +304,8 @@
    (if-some [params (not-empty (get (get req :parameters) :form))]
      (let [id     (->> [:user/identity :user/login :user/email :user/phone
                         :identity :login :email :phone]
-                       (some params) (identity/of-type ::identity/public))
-           qtoken (->> [:verify/qtoken :confirmation/qtoken :qtoken] (some params))]
+                       (qsome params) (identity/of-type ::identity/public))
+           qtoken (->> [:verify/qtoken :confirmation/qtoken :qtoken] (qsome params))]
        (if (and id qtoken)
          (if-some [r (confirmation/status (auth/db req) id qtoken reason)]
            (let [lang          (or (common/pick-language req :registration) (common/lang-id req))
