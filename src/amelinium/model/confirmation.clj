@@ -134,11 +134,33 @@
   (^String [x]
    (if-some [x (some-str x)] (-> x codecs/str->bytes hash/md5 codecs/bytes->hex)))
   (^String [x y]
-   (make-qtoken (strb (some-str x) (some-str y))))
+   (make-qtoken-some (strb (some-str x) (some-str y))))
   (^String [x y z]
-   (make-qtoken (strb (some-str x) (some-str y) (some-str z))))
+   (make-qtoken-some (strb (some-str x) (some-str y) (some-str z))))
   (^String [x y z & more]
-   (make-qtoken (apply strb (some-str x) (some-str y) (some-str z) (map some-str more)))))
+   (make-qtoken-some (apply strb (some-str x) (some-str y) (some-str z) (map some-str more)))))
+
+(defn make-qtoken-all
+  "Generates a quick token on a basis of a string representation of the given
+  argument(s) which all must not be an empty string. Returns a string or `nil`."
+  (^String [x]
+   (if-some [x (some-str x)] (-> x codecs/str->bytes hash/md5 codecs/bytes->hex)))
+  (^String [x y]
+   (if-some [x (some-str x)]
+     (if-some [y (some-str y)]
+       (make-qtoken-all (strb x y)))))
+  (^String [x y z]
+   (if-some [x (some-str x)]
+     (if-some [y (some-str y)]
+       (if-some [z (some-str z)]
+         (make-qtoken-all (strb x y z))))))
+  (^String [x y z & more]
+   (if-some [x (some-str x)]
+     (if-some [y (some-str y)]
+       (if-some [z (some-str z)]
+         (let [more (map some-str more)]
+           (if (every? some? more)
+             (make-qtoken-all (apply strb x y z more)))))))))
 
 (defn qtoken-matches?
   "Checks if a quick token `qtoken` matches the result of applying `make-qtoken` to all
