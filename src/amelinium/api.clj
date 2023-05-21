@@ -950,15 +950,15 @@
 
 (defmacro assoc-body
   "Adds keys with associated values to `:response/body` map of the `req` using
-  `qassoc`. If any key argument is a literal identifier (keyword or symbol), a
-  character, or a literal string, it will be converted to a keyword literal and
-  placed as `qassoc` argument. Otherwise it will be left as is and wrapped into a
-  call to `io.randomseed.utils/some-keyword` to ensure the result is a keyword
+  `qassoc`. If any key argument is a literal keyword, a character, or a literal
+  string, it will be converted to a keyword literal and placed as `qassoc`
+  argument. Otherwise it will be left as is and wrapped into a call to
+  `io.randomseed.utils/some-keyword` to ensure the result is a keyword
   run-time. Missing last value, if any, will be padded with `nil`. If there is no
   body or the body is empty, it will initialize it with a map expression, otherwise
   it will use `assoc`. Assumes that `req` is always a map."
   ([req k v]
-   (let [k (if (or (ident? k) (string? k) (char? k))
+   (let [k (if (or (keyword? k) (string? k) (char? k))
              (some-keyword k)
              (cons `some-keyword (cons k nil)))]
      `(let [req# ~req]
@@ -967,9 +967,9 @@
    (let [pairs  (cons k (cons v more))
          names  (take-nth 2 pairs)
          values (concat (take-nth 2 (rest pairs)) '(nil))
-         pairs  (map #(cons (if (or (ident?  %1)
-                                    (string? %1)
-                                    (char?   %1))
+         pairs  (map #(cons (if (or (keyword? %1)
+                                    (string?  %1)
+                                    (char?    %1))
                               (some-keyword %1)
                               (cons `some-keyword (cons %1 nil)))
                             (cons %2 nil))

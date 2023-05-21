@@ -2316,17 +2316,17 @@
 
 (defmacro add-header
   "Adds a header `header` to `:response/headers` map of the `req` using built-in
-  function `qassoc`. If a header name argument is a literal identifier (keyword or
-  symbol), a character, a number, or a literal string, it will be converted to a
-  string literal and placed as `qassoc` argument. Otherwise it will be left as is and
-  wrapped into a call to `io.randomseed.utils/some-str` to ensure the result is a
-  string run-time. All arguments of the body are used to calculate a value of the
-  header. Assumes that `req` is always a map."
+  function `qassoc`. If a header name argument is a literal keyword, a character, a
+  number, or a literal string, it will be converted to a string literal and placed as
+  `qassoc` argument. Otherwise it will be left as is and wrapped into a call to
+  `io.randomseed.utils/some-str` to ensure the result is a string run-time. All
+  arguments of the body are used to calculate a value of the header. Assumes that
+  `req` is always a map."
   [req header-name & body]
-  (let [header-name (if (or (ident?  header-name)
-                            (string? header-name)
-                            (char?   header-name)
-                            (number? header-name))
+  (let [header-name (if (or (keyword? header-name)
+                            (string?  header-name)
+                            (char?    header-name)
+                            (number?  header-name))
                       (some-str header-name)
                       (cons `some-str (cons header-name nil)))]
     `(let [req# ~req
@@ -2338,17 +2338,16 @@
 
 (defmacro add-headers
   "Adds headers with associated values to `:response/headers` map of the `req` using
-  built-in function `qassoc`. If any header name argument is a literal identifier
-  (a keyword or a symbol), a character, a number, or a literal string, it will be
-  converted to a string literal and placed as an argument passed to `qassoc`.
-  Otherwise it will be left as is and wrapped in a call to `io.randomseed.utils/some-str`
-  to ensure at run-time that the result will be a string. Missing header value, if any,
-  will be padded with `nil`."
+  built-in function `qassoc`. If any header name argument is a literal keyword, a
+  character, a number, or a literal string, it will be converted to a string literal
+  and placed as an argument passed to `qassoc`.  Otherwise it will be left as is and
+  wrapped in a call to `io.randomseed.utils/some-str` to ensure at run-time that the
+  result will be a string. Missing header value, if any, will be padded with `nil`."
   ([req header-name header-value]
-   (let [header-name (if (or (ident?  header-name)
-                             (string? header-name)
-                             (char?   header-name)
-                             (number? header-name))
+   (let [header-name (if (or (keyword? header-name)
+                             (string?  header-name)
+                             (char?    header-name)
+                             (number?  header-name))
                        (some-str header-name)
                        (cons `some-str (cons header-name nil)))]
      `(let [req# ~req
@@ -2361,10 +2360,10 @@
    (let [pairs  (cons header-name (cons header-value more))
          names  (take-nth 2 pairs)
          values (concat (take-nth 2 (rest pairs)) '(nil))
-         pairs  (map #(cons (if (or (ident?  %1)
-                                    (string? %1)
-                                    (char?   %1)
-                                    (number? %1))
+         pairs  (map #(cons (if (or (keyword? %1)
+                                    (string?  %1)
+                                    (char?    %1)
+                                    (number?  %1))
                               (some-str %1)
                               (cons `some-str (cons %1 nil)))
                             (cons %2 nil))
