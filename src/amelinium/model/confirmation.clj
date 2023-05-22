@@ -323,16 +323,15 @@
   ([db id user-id exp attempts id-type user-required? reason]
    (if db
      (if-some [id (identity/opt-type id-type id)]
-       (let [need-gen? (or user-required? (some? user-id))
-             code      (if (and need-gen? exp) (gen-code))
-             token     (if (and need-gen? exp) (gen-token))
-             reason    (or reason "change")
-             expires   (or exp ten-minutes)
-             id-type   (identity/type-opt id-type id)
-             query     (gen-confirmation-query id-type user-required?)
-             qargs     (db/<<- query [:confirmations id code token reason id-type
-                                      expires attempts user-id id id])
-             qargs     (if user-required? (conj qargs (nth qargs 7 nil)) qargs)]
+       (let [code    (if exp (gen-code))
+             token   (if exp (gen-token))
+             reason  (or reason "change")
+             expires (or exp ten-minutes)
+             id-type (identity/type-opt id-type id)
+             query   (gen-confirmation-query id-type user-required?)
+             qargs   (db/<<- query [:confirmations id code token reason id-type
+                                    expires attempts user-id id id])
+             qargs   (if user-required? (conj qargs (nth qargs 7 nil)) qargs)]
          (if-some [{:keys [user-id user-uid requester-id confirmed] :as r}
                    (db/execute-one! db qargs)]
            (-> r
