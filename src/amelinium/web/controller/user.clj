@@ -174,8 +174,8 @@
 
 (defn- auth-prolonged-ok
   [req route-data lang]
-  (if (get req :auth/htmx?)
-    (web/inject-with-status req route-data :auth/prolonged-ok :login/prolonged)
+  (if (common/use-hx? req route-data :auth/use-htmx?)
+    (web/hx-go-to-with-status req route-data :auth/prolonged-ok :login/prolonged)
     (auth-ok req route-data lang)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -269,9 +269,7 @@
          req         (common/empty-session-id-header req sess)]
      (session/delete! sess)
      (if-some [dst (get route-data :destination)]
-       (if (web/use-hx? req route-data)
-         (web/hx-go-to req dst)
-         (web/go-to req dst))
+       (web/go-to req dst)
        req))))
 
 (defn prolong!
@@ -474,7 +472,7 @@
      :pwd/updated      req
      :pwd/bad-password (common/move-to req (get-in route-data [:error/destinations :auth/bad-password] :login/bad-password))
      :pwd/bad-user     (common/move-to req (get-in route-data [:error/destinations :auth/bad-password] :login/bad-password))
-     (common/go-to req (get-in route-data [:error/destinations :auth/error] :login/error)))))
+     (web/go-to req (get-in route-data [:error/destinations :auth/error] :login/error)))))
 
 (defn password-change!
   "Changes password for the user authenticated with an old password and e-mail or sets

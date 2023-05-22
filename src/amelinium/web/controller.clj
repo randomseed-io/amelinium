@@ -178,7 +178,7 @@
                        :op      :access-denied
                        :level   :warning
                        :msg     (str "Permanent lock " for-mail))
-         (web/goto-with-status req :auth/account-locked :login/account-locked))
+         (web/go-to-with-status req :auth/account-locked :login/account-locked :auth/use-htmx?))
 
        ;; Session expired and the time for prolongation has passed.
 
@@ -194,7 +194,7 @@
                        :op      :session
                        :ok?     false
                        :msg     (str "Hard-expired " for-mail))
-         (web/goto-with-status req :auth/session-expired :login/session-expired))
+         (web/go-to-with-status req :auth/session-expired :login/session-expired :session/use-htmx?))
 
        ;; Session expired and we are not reaching an authentication page nor a login page.
        ;; User can re-validate session using a login page.
@@ -204,11 +204,11 @@
 
        (super/prolongation? sess @auth-state @login-data?)
        (let [req           (cleanup-req req @auth-state)
-             use-htmx?     (web/use-hx? req route-data :prolongate/use-htmx?)
+             use-htmx?     (common/use-hx? req route-data :prolongate/use-htmx?)
              ^Session sess (session/allow-soft-expired sess)
              session-field (or (session/id-field sess) "session-id")]
          (if use-htmx?
-           (web/inject-with-status req route-data :auth/prolongate :login/prolongate)
+           (web/hx-go-to-with-status req route-data :auth/prolongate :login/prolongate)
            (let [req-to-save (common/remove-form-params req session-field)]
              (session/put-var! sess
                                :goto {:ts           (t/now)
@@ -219,7 +219,7 @@
                                       :form-params  (get req-to-save :form-params)
                                       :query-params (get req-to-save :query-params)
                                       :params       (get req-to-save :params)})
-             (web/goto-with-status req route-data :auth/prolongate :login/prolongate))))
+             (web/http-go-to-with-status req route-data :auth/prolongate :login/prolongate))))
 
        :----pass
 

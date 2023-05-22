@@ -82,8 +82,8 @@
                 parameterized-page parameterized-page-core
                 page localized-page strictly-localized-page
                 current-page current-page-id current-page-id-or-path login-page auth-page
-                temporary-redirect localized-temporary-redirect move-to
-                see-other localized-see-other go-to])
+                temporary-redirect localized-temporary-redirect
+                see-other localized-see-other])
 
 ;; Language
 
@@ -1158,7 +1158,7 @@
 
 ;; HTMX
 
-(defn inject
+(defn hx-inject
   "Injects HTML fragment by issuing HTMX response with `HX-Retarget` header set to
   `target` (if given and its value is not `false` and not `nil`), `:app/layout` key
   of the `req` set to `false` and `:app/view` key of the `req` set to `view` (if
@@ -1185,81 +1185,6 @@
          req)
        req))))
 
-(defn inject-with-status
-  "Uses `inject` to set a target (`HX-Retarget` header) on a basis of the given
-  application status `app-status` by looking it up in `:status/targets` of a route
-  data map with a fallback to `:error/target`.
-
-  Additionally it sets a fallback view to the given `default-view` (if set) and a
-  flag `:response/set-status!` in `req` to ensure that application status is
-  processed even if an HTTP response status will be `:ok/found` during rendering.
-
-  Returns `req` with added `:response/status` set to the value of `app-status`,
-  updated `:response/headers` and `:response/set-status!` flag."
-  ([req]
-   (inject-with-status req nil :error/internal nil))
-  ([req app-status]
-   (inject-with-status req nil app-status nil))
-  ([req app-status default-view]
-   (inject-with-status req nil app-status default-view))
-  ([req route-data app-status default-view]
-   (let [req        (qassoc req :response/status app-status :response/set-status! true)
-         route-data (or route-data (http/get-route-data req))
-         target     (or (get-in route-data [:status/targets app-status])
-                        (get route-data :error/target))]
-     (log/web-dbg req "Injecting HTML fragment with application status" app-status
-                  (str "(target:" (some-str target) ")"))
-     (if default-view
-       (inject req target default-view)
-       (inject req target)))))
-
-(defn goto-with-status
-  "Uses `go-to` to make a redirect on a basis of the given application status
-  `app-status` by looking it up in `:error/destinations` of a route data map with
-  fallback to a value associated with the `:error/destination` key or to a value of
-  the `default-page` argument (if set)."
-  ([req]
-   (goto-with-status req nil :auth/error nil))
-  ([req app-status]
-   (goto-with-status req nil app-status nil))
-  ([req app-status default-page]
-   (goto-with-status req nil app-status default-page))
-  ([req route-data app-status default-page]
-   (let [route-data (or route-data (http/get-route-data req))]
-     (go-to req
-            (or (get-in route-data [:error/destinations app-status] default-page)
-                (get route-data :error/destination))))))
-
-(defn handle-error
-  "Sets proper HTMX response (when `use-hx?` returns `true` because the request
-  indicated it is HTMX or `:error/use-htmx?` route data key is set or generic
-  `:use-htmx?` route data key is set), or a redirect response, as a result of error
-  encountered. Additionally, sets an HTTP response header named `header-name` (if
-  set) with error status detected (mainly to be used by reverse proxies). If header
-  name is `false`, no header is set. If header name is not set or is `nil`, the name
-  `Error` is used. Returns updated `req`."
-  ([req]
-   (handle-error req nil :auth/error nil nil))
-  ([req app-status]
-   (handle-error req nil app-status nil nil))
-  ([req app-status default-view]
-   (handle-error req nil app-status default-view nil))
-  ([req route-data app-status default-view]
-   (handle-error req route-data app-status default-view nil))
-  ([req route-data app-status default-view header-name]
-   (log/web-dbg req "Handling error:" app-status)
-   (let [route-data     (or route-data (http/get-route-data req))
-         header-name    (cond (nil? header-name)   "Error"
-                              (false? header-name) nil
-                              :else                (or (some-str header-name) "Error"))
-         str-app-status (some-str app-status)
-         req            (if (and str-app-status header-name)
-                          (add-header req header-name str-app-status)
-                          req)]
-     (if (use-hx? req route-data :error/use-htmx?)
-       (inject-with-status req route-data app-status default-view)
-       (goto-with-status   req route-data app-status default-view)))))
-
 (defn hx-transform-redirect
   "Adds the `HX-Redirect` response header set to a value of existing `Location` header
   and removes the last one from the response map `resp`. Additionally forces HTTP
@@ -1278,9 +1203,9 @@
   returns a response; should take at least one single argument which should be a
   URL. The URL will be parameterized with a language. Works almost the same way as
   the `redirect` but it will generate a localized path using a language obtained from
-  a request (under `:language/str` key) and if there will be no language-parameterized
-  variant of the path, it will fail. Use this function to make sure that localized
-  path will be produced, or `nil`."
+  a request (under `:language/str` key) and if there will be no
+  language-parameterized variant of the path, it will fail. Use this function to make
+  sure that localized path will be produced, or `nil`."
   {:arglists '([f]
                [f req]
                [f url]
@@ -1341,8 +1266,92 @@
   ([f req name-or-path lang params query-params & more]
    (hx-transform-redirect (apply common/redirect f req name-or-path lang params query-params more))))
 
+(defn http-go-to
+  "Uses the `localized-page` function to calculate the destination path on a basis of
+  page name (identifier) or a path (a string) and performs a redirect with code 303 to
+  it using `resp/see-other`. If the language is given it uses the `localized-page` function.
+  If there is no language given but the page identified by its name requires
+  a language parameter to be set, it will be obtained from the given request map
+  (under the key `:language/str`).
+
+  The difference between this function and its regular counterpart (if defined) is in
+  binary variants of them (when a request map and a name or a path are given as
+  arguments). The regular function will fail to generate a redirect if there is
+  no language parameter and the given path does not point to an existing
+  page. On the contrary, this function will generate a localized path using a
+  language obtained from a request (under `:language/str` key) and if there will be no
+  language-parameterized variant of the path, it will fail. Use this function to make
+  sure that a localized path will be produced, or `nil`."
+  {:arglists '([]
+               [req]
+               [url]
+               [req url]
+               [req name-or-path]
+               [req name-or-path path-params]
+               [req name-or-path path-params query-params]
+               [req name-or-path lang]
+               [req name-or-path lang path-params]
+               [req name-or-path lang path-params query-params]
+               [req name-or-path lang path-params query-params & more])}
+  ([]
+   (common/localized-redirect common/see-other))
+  ([req-or-url]
+   (common/localized-redirect common/see-other req-or-url))
+  ([req name-or-path]
+   (common/localized-redirect common/see-other req name-or-path))
+  ([req name-or-path lang]
+   (common/localized-redirect common/see-other req name-or-path lang))
+  ([req name-or-path lang params]
+   (common/localized-redirect common/see-other req name-or-path lang params))
+  ([req name-or-path lang params query-params]
+   (common/localized-redirect common/see-other req name-or-path lang params query-params))
+  ([req name-or-path lang params query-params & more]
+   (apply common/localized-redirect common/see-other req name-or-path lang params query-params more)))
+
+(defn http-move-to
+  "Uses the `localized-page` function to calculate the destination path on a basis of
+  page name (identifier) or a path (a string) and performs a redirect with code 307
+  to it using `resp/temporary-redirect`. If the language is given it uses the
+  `localized-page` function.  If there is no language given but the page identified
+  by its name requires a language parameter to be set, it will be obtained from the
+  given request map (under the key `:language/str`).
+
+  The difference between this function and its regular counterpart (if defined) is in
+  binary variants of them (when a request map and a name or a path are given as
+  arguments). The regular function will fail to generate a redirect if there is
+  no language parameter and the given path does not point to an existing
+  page. On the contrary, this function will generate a localized path using a
+  language obtained from a request (under `:language/str` key) and if there will be no
+  language-parameterized variant of the path, it will fail. Use this function to make
+  sure that a localized path will be produced, or `nil`."
+  {:arglists '([]
+               [req]
+               [url]
+               [req url]
+               [req name-or-path]
+               [req name-or-path path-params]
+               [req name-or-path path-params query-params]
+               [req name-or-path lang]
+               [req name-or-path lang path-params]
+               [req name-or-path lang path-params query-params]
+               [req name-or-path lang path-params query-params & more])}
+  ([]
+   (common/localized-redirect common/temporary-redirect))
+  ([req-or-url]
+   (common/localized-redirect common/temporary-redirect req-or-url))
+  ([req name-or-path]
+   (common/localized-redirect common/temporary-redirect req name-or-path))
+  ([req name-or-path lang]
+   (common/localized-redirect common/temporary-redirect req name-or-path lang))
+  ([req name-or-path lang params]
+   (common/localized-redirect common/temporary-redirect req name-or-path lang params))
+  ([req name-or-path lang params query-params]
+   (common/localized-redirect common/temporary-redirect req name-or-path lang params query-params))
+  ([req name-or-path lang params query-params & more]
+   (apply common/localized-redirect common/temporary-redirect req name-or-path lang params query-params more)))
+
 (defn hx-go-to
-  "Same as `go-to` but uses `hx-localized-redirect` internally to generate HTMX
+  "Same as `http-go-to` but uses `hx-transform-redirect` internally to generate HTMX
   redirect."
   {:arglists '([]
                [req]
@@ -1369,6 +1378,191 @@
    (hx-transform-redirect (common/localized-redirect common/see-other req name-or-path lang params query-params)))
   ([req name-or-path lang params query-params & more]
    (hx-transform-redirect (apply common/localized-redirect common/see-other req name-or-path lang params query-params more))))
+
+(defn hx-move-to
+  "Same as `http-move-to` but uses `hx-transform-redirect` internally to generate HTMX
+  redirect."
+  {:arglists '([]
+               [req]
+               [url]
+               [req url]
+               [req name-or-path]
+               [req name-or-path path-params]
+               [req name-or-path path-params query-params]
+               [req name-or-path lang]
+               [req name-or-path lang path-params]
+               [req name-or-path lang path-params query-params]
+               [req name-or-path lang path-params query-params & more])}
+  ([]
+   (hx-transform-redirect (common/localized-redirect common/temporary-redirect)))
+  ([req-or-url]
+   (hx-transform-redirect (common/localized-redirect common/temporary-redirect req-or-url)))
+  ([req name-or-path]
+   (hx-transform-redirect (common/localized-redirect common/temporary-redirect req name-or-path)))
+  ([req name-or-path lang]
+   (hx-transform-redirect (common/localized-redirect common/temporary-redirect req name-or-path lang)))
+  ([req name-or-path lang params]
+   (hx-transform-redirect (common/localized-redirect common/temporary-redirect req name-or-path lang params)))
+  ([req name-or-path lang params query-params]
+   (hx-transform-redirect (common/localized-redirect common/temporary-redirect req name-or-path lang params query-params)))
+  ([req name-or-path lang params query-params & more]
+   (hx-transform-redirect (apply common/localized-redirect common/temporary-redirect req name-or-path lang params query-params more))))
+
+(defn- go-to-fn
+  [req]
+  (if (use-hx? req nil false) hx-go-to http-go-to))
+
+(defn- move-to-fn
+  [req]
+  (if (use-hx? req nil false) hx-move-to http-move-to))
+
+(defn go-to
+  "When HTMX is detected with `use-hx?` calls `hx-go-to`, otherwise calls
+  `http-go-to`."
+  {:arglists '([req]
+               [req url]
+               [req name-or-path]
+               [req name-or-path path-params]
+               [req name-or-path path-params query-params]
+               [req name-or-path lang]
+               [req name-or-path lang path-params]
+               [req name-or-path lang path-params query-params]
+               [req name-or-path lang path-params query-params & more])}
+  ([req]
+   ((go-to-fn req) req))
+  ([req name-or-path]
+   ((go-to-fn req) req name-or-path))
+  ([req name-or-path lang]
+   ((go-to-fn req) req name-or-path lang))
+  ([req name-or-path lang params]
+   ((go-to-fn req) req name-or-path lang params))
+  ([req name-or-path lang params query-params]
+   ((go-to-fn req) req name-or-path lang params query-params))
+  ([req name-or-path lang params query-params & more]
+   (apply (go-to-fn req) req name-or-path lang params query-params more)))
+
+(defn move-to
+  "When HTMX is detected with `use-hx?` calls `hx-move-to`, otherwise calls
+  `http-move-to`."
+  {:arglists '([req]
+               [req url]
+               [req name-or-path]
+               [req name-or-path path-params]
+               [req name-or-path path-params query-params]
+               [req name-or-path lang]
+               [req name-or-path lang path-params]
+               [req name-or-path lang path-params query-params]
+               [req name-or-path lang path-params query-params & more])}
+  ([req]
+   ((move-to-fn req) req))
+  ([req name-or-path]
+   ((move-to-fn req) req name-or-path))
+  ([req name-or-path lang]
+   ((move-to-fn req) req name-or-path lang))
+  ([req name-or-path lang params]
+   ((move-to-fn req) req name-or-path lang params))
+  ([req name-or-path lang params query-params]
+   ((move-to-fn req) req name-or-path lang params query-params))
+  ([req name-or-path lang params query-params & more]
+   (apply (move-to-fn req) req name-or-path lang params query-params more)))
+
+(defn http-go-to-with-status
+  "Uses `http-go-to` to make a redirect on a basis of the given application status
+  `app-status` by looking it up in `:error/destinations` of a route data map with
+  fallback to a value associated with the `:error/destination` key or to a value of
+  the `default-page` argument (if set)."
+  ([req]
+   (http-go-to-with-status req nil :error nil))
+  ([req app-status]
+   (http-go-to-with-status req nil app-status nil))
+  ([req app-status default-page]
+   (http-go-to-with-status req nil app-status default-page))
+  ([req route-data app-status default-page]
+   (let [route-data (or route-data (http/get-route-data req))]
+     (http-go-to req
+                 (or (get-in route-data [:error/destinations app-status] default-page)
+                     (get route-data :error/destination))))))
+
+(defn hx-go-to-with-status
+  "Uses `hx-inject` to set a target (`HX-Retarget` header) on a basis of the given
+  application status `app-status` by looking it up in `:status/targets` of a route
+  data map with a fallback to `:error/target`.
+
+  Additionally it sets a fallback view to the given `default-view` (if set) and a
+  flag `:response/set-status!` in `req` to ensure that application status is
+  processed even if an HTTP response status will be `:ok/found` during rendering.
+
+  Returns `req` with added `:response/status` set to the value of `app-status`,
+  updated `:response/headers` and `:response/set-status!` flag."
+  ([req]
+   (hx-go-to-with-status req nil :error/internal nil))
+  ([req app-status]
+   (hx-go-to-with-status req nil app-status nil))
+  ([req app-status default-view]
+   (hx-go-to-with-status req nil app-status default-view))
+  ([req route-data app-status default-view]
+   (let [req        (qassoc req :response/status app-status :response/set-status! true)
+         route-data (or route-data (http/get-route-data req))
+         target     (or (get-in route-data [:status/targets app-status])
+                        (get route-data :error/target))]
+     (log/web-dbg req "Injecting HTML fragment with application status" app-status
+                  (str "(target:" (some-str target) ")"))
+     (if default-view
+       (hx-inject req target default-view)
+       (hx-inject req target)))))
+
+(defn go-to-with-status
+  "Uses `hx-go-to-with-status` when HTMX is in use (uses `common/use-hx?`),
+  `http-go-to-with-status` otherwise. Takes additional `hx-status-flag` as a key to
+  be checked in route data whether it is associated with a HTMX-enforcement flag."
+  ([req]
+   (go-to-with-status req nil :error nil false))
+  ([req app-status]
+   (go-to-with-status req nil app-status nil false))
+  ([req app-status default-page]
+   (go-to-with-status req nil app-status default-page false))
+  ([req route-data app-status default-page]
+   (go-to-with-status req nil app-status default-page false))
+  ([req route-data app-status default-page hx-status-flag]
+   (let [route-data (or route-data (http/get-route-data req))
+         go-to-fn   (if (use-hx? req route-data hx-status-flag)
+                      hx-go-to-with-status
+                      http-go-to-with-status)]
+     (go-to-fn req
+               (or (get-in route-data [:error/destinations app-status] default-page)
+                   (get route-data :error/destination))))))
+
+;; Business logic errors
+
+(defn handle-error
+  "Sets proper HTMX response (when `common/use-hx?` returns `true` because the
+  request indicated it is HTMX or `:error/use-htmx?` route data key is set or generic
+  `:use-htmx?` route data key is set), or a redirect response, as a result of error
+  encountered. Additionally, sets an HTTP response header named `header-name` (if
+  set) with error status detected (mainly to be used by reverse proxies). If header
+  name is `false`, no header is set. If header name is not set or is `nil`, the name
+  `Error` is used. Returns updated `req`."
+  ([req]
+   (handle-error req nil :auth/error nil nil))
+  ([req app-status]
+   (handle-error req nil app-status nil nil))
+  ([req app-status default-view]
+   (handle-error req nil app-status default-view nil))
+  ([req route-data app-status default-view]
+   (handle-error req route-data app-status default-view nil))
+  ([req route-data app-status default-view header-name]
+   (log/web-dbg req "Handling error:" app-status)
+   (let [route-data     (or route-data (http/get-route-data req))
+         header-name    (cond (nil? header-name)   "Error"
+                              (false? header-name) nil
+                              :else                (or (some-str header-name) "Error"))
+         str-app-status (some-str app-status)
+         req            (if (and str-app-status header-name)
+                          (add-header req header-name str-app-status)
+                          req)]
+     (if (use-hx? req route-data :error/use-htmx?)
+       (hx-go-to-with-status   req route-data app-status default-view)
+       (http-go-to-with-status req route-data app-status default-view)))))
 
 ;; Form errors
 
