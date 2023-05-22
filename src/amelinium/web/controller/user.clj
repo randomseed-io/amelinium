@@ -120,7 +120,7 @@
                           email?            (identical? :email id-type)
                           phone?            (and (not email?) (identical? :phone id-type))
                           user-login        (if email? id-str (if existing-user-id (delay (user/email db :id existing-user-id))))
-                          qtoken            (if (and id-str token) (delay (confirmation/make-qtoken id-str token)))
+                          qtoken            (delay (confirmation/make-qtoken-all id-str token))
                           template-params   (delay {:serviceName      (tr :verify/app-name)
                                                     :expiresInMinutes @in-mins
                                                     :remoteAddress    remote-ip
