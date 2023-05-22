@@ -311,6 +311,7 @@
                                    :response/status   (if prolonged? :auth/prolonged-ok :auth/ok)
                                    :auth/goto         goto-uri
                                    :auth/htmx?        hx?
+                                   :auth/use-htmx?    hx?
                                    :user/id           user-id
                                    :user/account-type ac-type)
                                   (session/inject sess)
