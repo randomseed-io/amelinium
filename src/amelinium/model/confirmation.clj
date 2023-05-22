@@ -711,10 +711,10 @@
                                            "FROM confirmations "
                                            "WHERE id=? AND reason=?"]
                                           [:confirmations id reason])]
-                   (if (qtoken-matches? qtoken id token) (qassoc r :qtoken qtoken)))
+                   (if (qtoken-matches? qtoken id token) (qassoc r :qtoken qtoken :reason (some-keyword reason))))
                  (some #(if (qtoken-matches? qtoken id (get % :token)) (qassoc % :qtoken qtoken))
                        (db/<exec! db
-                                  ["SELECT id,id_type,attempts,expires,token,confirmed"
+                                  ["SELECT id,id_type,attempts,expires,token,confirmed,reason"
                                    "FROM confirmations "
                                    "WHERE id=?"]
                                   [:confirmations id])))]
