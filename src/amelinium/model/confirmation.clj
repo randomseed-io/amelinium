@@ -263,11 +263,6 @@
    {:identity       (or identity-type "email")
     :user-required? user-required?}))
 
-(def ^:const email-confirmation-query (gen-confirmation-query :email true))
-(def ^:const phone-confirmation-query (gen-confirmation-query :phone true))
-(def ^:const email-confirmation-query-nouser (gen-confirmation-query :email false))
-(def ^:const phone-confirmation-query-nouser (gen-confirmation-query :phone false))
-
 (defn- gen-full-confirmation-core
   "Creates a confirmation code for the given identity (an e-mail address or a
   phone).
