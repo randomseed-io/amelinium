@@ -332,7 +332,7 @@
                                 :verify/expired?           expired?
                                 :verify/qtoken             qtoken
                                 :verify/retry-unit         :minutes)]
-             (cond expired? (web/handle-error req :verify/expired)
+             (cond expired? (web/handle-error req (some->> r :reason name (keyword "timeout")))
                    :else    req))
            req)
          req))
