@@ -142,7 +142,8 @@
 
 (defn make-qtoken-all
   "Generates a quick token on a basis of a string representation of the given
-  argument(s) which all must not be an empty string. Returns a string or `nil`."
+  argument(s) which all must not be an empty strings nor `nil` values. Returns a
+  string or `nil`."
   (^String [x]
    (if-some [x (some-str x)] (-> x codecs/str->bytes hash/md5 codecs/bytes->hex)))
   (^String [x y]
