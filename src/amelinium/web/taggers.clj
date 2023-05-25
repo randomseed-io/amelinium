@@ -665,6 +665,18 @@
                  (html-esc param))))))))
 
     (selmer/add-tag!
+     :form-field-value
+     (fn [args ctx]
+       (or (if-some [fe (not-empty (get ctx :form/errors))]
+             (if-some [pa (not-empty (get fe :params))]
+               (if-let [param-id (string-from-param (first args))]
+                 (if-some [param (some-str (get pa param-id))]
+                   (binding [sutil/*escape-variables* true]
+                     (html-esc param))))))
+           (if-some [v (second args)]
+             (selmer/render v ctx {:tag-second \-})))))
+
+    (selmer/add-tag!
      :form-fields
      (fn [args ctx]
        (binding [sutil/*escape-variables* true]
