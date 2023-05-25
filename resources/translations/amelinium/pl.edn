@@ -230,6 +230,7 @@
                            :submit                 "Zatwierdź!"
                            :confirm                "Potwierdź!"
                            :send-again             "Wyślij ponownie!"
+                           :return                 "Powrót!"
                            :email                  :parameter/email
                            :identity               :parameter/identity
                            :password               :parameter/password
