@@ -391,33 +391,38 @@
                wrapper-class
                input-type
                type
-               _field]} field
+               _]}      field
+             _field     _
+             field?     (not (and (contains? field :_)     (false? (pboolean _))))
+             class?     (not (and (contains? field :class) (false? (pboolean class))))
              value?     (contains? params id-str)
              error?     (contains? errors id-str)
              id-str     (string-from-param id)
+             itype      (string-from-param input-type)
+             hidden?    (and itype (= "hidden" (str/lower-case itype)))
+             shown?     (not hidden?)
              name       (string-from-param name)
              autoc      (string-from-param autocomplete)
              ptype      (string-from-param parameter-type)
-             itype      (string-from-param input-type)
              wrapp      (string-from-param wrapper-class)
-             hyper      (string-from-param _field)
+             hyper      (if field? (string-from-param _field))
              itype      (or itype (string-from-param type))
-             class      (if class (string-from-param class))
+             class      (if class? (string-from-param class))
              label      (if (nil? label) id (if-not (false? (pboolean label)) label))
              label      (param-try-tr tr-sub :forms label id)
              phold      (param-try-tr tr-sub :forms placeholder id)
              value      (valuable (if value? (get params id-str) value))
              value      (if value (param-try-tr tr-sub :forms value id))
              ptype      (or ptype (if error? (get errors id-str)))
-             err-msgs   (if error?   (coercion/translate-error @tr-sub id-str ptype))
+             err-msgs   (if (and shown? error?) (coercion/translate-error @tr-sub id-str ptype))
              err-summ   (if err-msgs (some-str (get err-msgs :error/summary)))
              err-desc   (if err-msgs (some-str (get err-msgs :error/description)))
-             error?     (boolean (or err-summ err-desc))
+             error?     (boolean (and shown? (or err-summ err-desc)))
              err-id     (if error? (strb id-str "-validation-fb"))
              html-id    (html-esc id-str)
-             html-hyper (if hyper (html-esc hyper) (get props :_field))
+             html-hyper (if hyper (html-esc hyper) (if field? (get props :_field)))
              html-hyper (if html-hyper (strb " _=\"" html-hyper "\""))
-             html-wrap  (if wrapp (html-esc wrapp) (get props :wrapper-class))
+             html-wrap  (if wrapp (html-esc wrapp) (if shown? (get props :wrapper-class)))
              html-wr-st (if html-wrap (strb "  <div class=\"" html-wrap "\">"))
              html-wr-en (if html-wrap "</div>")
              html-class (if class    (strb (html-esc class) " form-control") "form-control")
@@ -437,7 +442,7 @@
              html-attrs (html-add-attrs field [:htmx? :session? :id :name :label :placeholder
                                                :parameter-type :value :autocomplete
                                                :input-type :type :class :wrapper-class
-                                               :_field])]
+                                               :_])]
          (strs html-wr-st "<input type=\"" html-itype "\" class=\"" html-class
                "\" name=\"" html-name "\" id=\"" html-id "\""
                html-phold html-value html-autoc html-attrs html-ariad html-hyper " />\n"
