@@ -493,14 +493,16 @@
 
 (defn get-form-action
   "Prepares default form action attribute by removing `form-errors` from a query string
-  for current page if the `:action` in `args` is set to `nil`. If the `:action` is
-  not `nil`, it is returned as is. If there is no query params, `nil` is returned. If
-  there is no `form-errors` in query params, `nil` is returned.
+  for current page if the `:action` in `args` is not present. If the `:action` is
+  present`, it is returned as is.
+
+  If the action is missing and there are no query params, `nil` is returned. If there
+  is no `form-errors` in query params, `nil` is returned too.
 
   This function takes care about a corner case where leaving form action empty on a
   rendered form would cause current form errors encoded in a query parameter string
   to be sent again to the same page, giving possibly misleading information about
-  form errors."
+  the form errors."
   [args ctx]
   (if (contains? args :action)
     (get args :action)
@@ -633,7 +635,7 @@
          (strs "<input type=\"hidden\" name=\"" pname "\" value=\"" pvalue "\" hx-history=\"false\" />"))))
 
     (selmer/add-tag!
-     :explain-form-error
+     :form-error-explain
      (fn [args ctx]
        (if-some [fe (get ctx :form/errors)]
          (let [fe         (get fe :errors)
@@ -653,7 +655,7 @@
                        summary description "</div>"))))))))
 
     (selmer/add-tag!
-     :prefill-form-field
+     :form-error-fill-value
      (fn [args ctx]
        (if-some [fe (not-empty (get ctx :form/errors))]
          (if-some [pa (not-empty (get fe :params))]
