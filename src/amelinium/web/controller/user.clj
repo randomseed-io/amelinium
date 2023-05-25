@@ -496,7 +496,7 @@
       req
       (if (identical? :auth/ok (get req :response/status))
         (if-not (= new-password new-repeated)
-          (web/form-params-error! req {:repeated-password :repeated-password})
+          (web/form-params-error! req {:user/repeated-password :repeated-password})
           (super/set-password!
            req
            (or (get req :user/id) (user/id (auth/db req) :email user-email))
@@ -573,7 +573,7 @@
 
       (and set-password? (some? (or token (code id))))
       (if-not (= password password-2)
-        (web/form-params-error! req {:repeated-password :repeated-password})
+        (web/form-params-error! req {:user/repeated-password :repeated-password})
         (let [db   (auth/db req)
               cfrm (confirmation/establish db id code token one-minute "recovery")]
           (if (get cfrm :confirmed?)
@@ -595,8 +595,7 @@
       (let [db   (auth/db req)
             cfrm (confirmation/establish db id code token five-minutes "recovery")]
         (if-not (get cfrm :confirmed?)
-          (web/render-error req (or (:errors cfrm) :verify/bad-result))
-          (let [id         (get cfrm :identity)
+          (web/handle-error req (or (:errors cfrm) :verify/bad-result))
           (let [id         (identity/of-type ::identity/public (get cfrm :identity))
                 id-type    (identity/type id)
                 phone?     (identical? id-type :phone)
