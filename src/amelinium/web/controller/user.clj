@@ -36,7 +36,7 @@
            [amelinium UserData Suites SuitesJSON]))
 
 (def one-minute   (t/new-duration 1 :minutes))
-(def zero-seconds (t/new-duration 0 :seconds))
+(def five-minutes (t/new-duration 5 :minutes))
 
 (defn retry-after
   "Returns an expiration date and time formatted according to the RFC 1123."
@@ -585,15 +585,15 @@
 
       ;; password not present, token or code received
       ;;
-      ;; validates confirmation and displays a form for creating new password;
-      ;; token is extracted from a database response to use it later instead of a code
+      ;; Validates confirmation and displays a form for creating new password; token
+      ;; is extracted from a database response to use it later instead of a code.
       ;;
-      ;; if mobile is detected and mobile application URL is defined,
+      ;; If mobile is detected and mobile application URL is defined,
       ;; renders a link or button to go back to the app and enter password there
 
       (and (not set-password?) (or token (and code id)))
       (let [db   (auth/db req)
-            cfrm (confirmation/establish db id code token one-minute "recovery")]
+            cfrm (confirmation/establish db id code token five-minutes "recovery")]
         (if-not (get cfrm :confirmed?)
           (web/render-error req (or (:errors cfrm) :verify/bad-result))
           (let [id         (get cfrm :identity)
