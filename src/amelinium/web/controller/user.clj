@@ -178,6 +178,12 @@
     (web/hx-go-to-with-status req route-data :auth/prolonged-ok :login/prolonged)
     (auth-ok req route-data lang)))
 
+(defn- get-identity-param
+  [params]
+  (->> [:user/identity :user/login :user/email :user/phone :identity :login :username :email :phone]
+       (qsome params)
+       (identity/of-type ::identity/public)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
 
@@ -207,7 +213,7 @@
          :auth/soft-locked   (web/handle-error req route-data status :login/account-soft-locked :Authentication-Error)
          :auth/bad-password  (web/handle-error req route-data status :login/bad-password        :Authentication-Error)
          :auth/session-error (web/handle-error req route-data status :login/session-error       :Authentication-Error)
-         (web/handle-error req route-data (or status :auth/error) :login/error :Authentication-Error))))))
+         (web/handle-error req route-data (or status :auth/error)    :login/error               :Authentication-Error))))))
 
 (defn authenticate!
   "Logs user in when user e-mail and password are given, or checks if the session is
@@ -296,13 +302,14 @@
        (web/move-to req (get-in route-data [:auth-error/destinations :auth/session-error] :login/session-error))))))
 
 (defn confirmation-status!
+  "Renders status of identity confirmation on a basis of user's identity and quick
+  token obtained from form params. Identity type must belong to a group
+  `:amelinium.identity/public`."
   ([req]             (confirmation-status! req nil nil))
   ([req session-key] (confirmation-status! req session-key nil))
   ([req session-key reason]
    (if-some [params (not-empty (get (get req :parameters) :form))]
-     (let [id     (->> [:user/identity :user/login :user/email :user/phone
-                        :identity :login :email :phone]
-                       (qsome params) (identity/of-type ::identity/public))
+     (let [id     (get-identity-param params)
            qtoken (->> [:verify/qtoken :confirmation/qtoken :qtoken] (qsome params))]
        (if (and id qtoken)
          (if-some [r (confirmation/status (auth/db req) id qtoken reason)]
@@ -497,13 +504,13 @@
         req))))
 
 (defn password-recover!
-  "Displays password recovery form and initiates password recovery by sending an e-mail
-  or SMS message with a verification code or token."
+  "Initiates password recovery by sending an e-mail or SMS message with a verification
+  code or token."
   [req]
   (let [params  (get (get req :parameters) :form)
-        id      (identity/of-type ::identity/public (get params :user/identity))
+        id      (get-identity-param params)
         id-type (identity/type id)
-        req     (web/assoc-app-data req :identity/type id-type)]
+        req     (web/assoc-app-data req :user/identity id :identity/type id-type)]
     (if id-type
 
       ;; initiate recovery
@@ -538,8 +545,7 @@
       req)))
 
 (defn password-update!
-  "Displays password setting form and changes password for a user authenticated with a
-  token or code."
+  "Displays password setting form for a user authenticated with token or code."
   [req]
   (println (str "password-update!"))
   (println "form-params:")
@@ -553,14 +559,8 @@
                           (get form-params :token))
         code          (or (get form-params :confirmation/code)
                           (get form-params :code))
-        email         (or (get form-params :user/email)
-                          (get form-params :email))
-        login         (or (get form-params :user/login)
-                          (get form-params :username)
-                          (get form-params :login)
-                          email)
-        phone         (if-not email (get form-params :phone))
-        [id id-type]  (common/identity-and-type (or email phone) (if email :email (if phone :phone)))
+        id            (get-identity-param form-params)
+        id-type       (identity/type id)
         password      (some-str (or (get form-params :user/new-password)
                                     (get form-params :new-password)))
         password-2    (some-str (or (get form-params :user/repeated-password)
@@ -597,14 +597,14 @@
         (if-not (get cfrm :confirmed?)
           (web/render-error req (or (:errors cfrm) :verify/bad-result))
           (let [id         (get cfrm :identity)
-                user-id    (get cfrm :user/id)
-                id-type    (common/guess-identity-type cfrm id nil)
-                id-str     (identity/->str id-type id)
-                token      (some-str (or token (get cfrm :token)))
-                user-email (some-str (user/email db :id user-id))
-                user-phone (delay (identity/->str (user/phone db :id user-id)))
+          (let [id         (identity/of-type ::identity/public (get cfrm :identity))
+                id-type    (identity/type id)
                 phone?     (identical? id-type :phone)
-                email?     (and (not phone?) (identical? id-type :email))
+                email?     (identical? id-type :email)
+                user-id    (get cfrm :user/id)
+                token      (some-str (or token (get cfrm :token)))
+                user-email (delay (some-str (user/email db :id user-id)))
+                user-phone (delay (identity/->str (user/phone db :id user-id)))
                 mobile?    (delay (common/mobile-agent? req))
                 app-url    (delay (if @mobile? (http/get-route-data req :app.url/recover)))
                 app-link   (delay (if @app-url (str app-url "?"
@@ -617,7 +617,7 @@
              :user/login              user-email
              :user/email              user-email
              :user/phone              user-phone
-             :user/identity           id-str
+             :user/identity           (identity/->str id-type id)
              :identity/type           id-type
              :identity/email?         email?
              :identity/phone?         phone?
