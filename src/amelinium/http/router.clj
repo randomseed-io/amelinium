@@ -72,14 +72,16 @@
   (let [keyz    (seq keyz)
         prepper #(routes-parse % keyz)]
     (b/update config
-              [:* :* :* :* :* :* :* :* :*] prepper
-              [:* :* :* :* :* :* :* :*]    prepper
-              [:* :* :* :* :* :* :*]       prepper
-              [:* :* :* :* :* :*]          prepper
-              [:* :* :* :* :*]             prepper
-              [:* :* :* :*]                prepper
-              [:* :* :*]                   prepper
-              [:* :*]                      prepper)))
+              [:* :* :* :* :* :* :* :* :* :* :*] prepper
+              [:* :* :* :* :* :* :* :* :* :*]    prepper
+              [:* :* :* :* :* :* :* :* :*]       prepper
+              [:* :* :* :* :* :* :* :*]          prepper
+              [:* :* :* :* :* :* :*]             prepper
+              [:* :* :* :* :* :*]                prepper
+              [:* :* :* :* :*]                   prepper
+              [:* :* :* :*]                      prepper
+              [:* :* :*]                         prepper
+              [:* :*]                            prepper)))
 
 (defn prep-routes
   [config]
