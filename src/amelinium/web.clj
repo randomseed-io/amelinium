@@ -1537,11 +1537,11 @@
 (defn handle-error
   "Sets proper HTMX response (when `common/use-hx?` returns `true` because the
   request indicated it is HTMX or `:error/use-htmx?` route data key is set or generic
-  `:use-htmx?` route data key is set), or a redirect response, as a result of error
+  `:use-htmx?` route data key is set), or a HTTP redirect response, as a result of error
   encountered. Additionally, sets an HTTP response header named `header-name` (if
   set) with error status detected (mainly to be used by reverse proxies). If header
-  name is `false`, no header is set. If header name is not set or is `nil`, the name
-  `Error` is used. Returns updated `req`."
+  name is `false`, no header is set. If header name is not set or is set to `nil`,
+  the name `Error` is used. Returns updated `req`."
   ([req]
    (handle-error req nil :auth/error nil nil))
   ([req app-status]
