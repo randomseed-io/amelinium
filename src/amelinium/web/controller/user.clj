@@ -629,3 +629,47 @@
       ;; no token nor code
 
       :else req)))
+
+(defn password-create!
+  "Creates a password on a basis of a token, or on a basis of a code and identity."
+  [req]
+  (println (str "password-create!"))
+  (println "params:")
+  (cprint (get req :parameters))
+  (let [params       (get req :parameters)
+        form-params  (get params :form)
+        query-params (get params :query)
+        path-params  (get params :path)
+        token        (or (get form-params :confirmation/token)
+                         (get path-params :token)
+                         (get form-params :token))
+        code         (or (get form-params :confirmation/code)
+                         (get form-params :code))
+        password     (some-str (or (get form-params :user/new-password)
+                                   (get form-params :new-password)))
+        password-2   (some-str (or (get form-params :user/repeated-password)
+                                   (get form-params :repeated-password)))
+        id           (get-identity-param form-params)
+        id-type      (identity/type id)
+        login        (delay (or (get form-params :user/login)
+                                (get form-params :login)
+                                (get form-params :username)))]
+    (if (not= password password-2)
+      (-> req
+          (web/assoc-app-data :user/login         login
+                              :confirmation/token token
+                              :confirmation/code  code)
+          (web/form-params-error! {:user/repeated-password :repeated-password}))
+      (let [db    (auth/db req)
+            cfrm  (confirmation/establish db id code token one-minute "recovery")
+            login (delay (or (some->> cfrm :user/id (user/email db :id)) @login))
+            req   (web/assoc-app-data req
+                                      :user/login         login
+                                      :confirmation/token token
+                                      :confirmation/code  code)]
+        (if-not (get cfrm :confirmed?)
+          (web/handle-error req (or (:errors cfrm) :verify/bad-result))
+          (let [req (super/set-password! req (get cfrm :user/id) password)]
+            (if (web/response-status? req :pwd/created)
+              (confirmation/delete db (or cfrm id) "recovery"))
+            req))))))
