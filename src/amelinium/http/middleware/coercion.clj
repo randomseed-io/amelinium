@@ -381,9 +381,10 @@
   and remove them from the request map's parameter maps to avoid trouble when
   pre-filling in forms."
   [req form-keep session-key]
-  (if-some [qp (get req :query-params)]
-    (if-let [bad-params (get qp "form-errors")]
-      (let [svar         (some-> (session/valid-of req session-key)
+  (let [qp (get req :query-params)]
+    (if-let [bad-params (if qp (get qp "form-errors"))]
+      (let [_            (log/web-dbg req "Handling form errors. Keeping:" (str/join "," form-keep))
+            svar         (some-> (session/valid-of req session-key)
                                  (session/fetch-var! :form-errors))
             expected-uri (if svar (get svar :dest))
             svar-errors  (if svar (get svar :errors))
@@ -392,20 +393,25 @@
                      (and (map? svar-params) (pos? (count svar-params))))
                  (or (not expected-uri) (= expected-uri (get req :uri))))
           ;; Previous parameters or parameter errors were fetched from a session variable
-          (-> req
-              (remove-params (keys svar-errors) form-keep)
-              (qassoc :form/errors svar))
-          ;; Previous parameters and parameter errors were sent with POST
-          (if-some [qp-errors (parse-errors bad-params)]
+          (do
+            (log/web-dbg req "Form errors read from session variable")
             (-> req
-                (remove-params (keys qp-errors) form-keep)
-                (qassoc :form/errors
-                        (delay {:dest   (get req :uri)
-                                :errors qp-errors
-                                :params (get req :form-params)})))
-            req)))
-      req)
-    req))
+                (remove-params (keys svar-errors) form-keep)
+                (qassoc :form/errors svar)))
+          ;; Previous parameters and parameter errors were sent with HTTP
+          (if-some [qp-errors (parse-errors bad-params)]
+            (do
+              (log/web-dbg req "Form errors were sent with HTTP" )
+              (-> req
+                  (remove-params (keys qp-errors) form-keep)
+                  (qassoc :form/errors
+                          (delay {:dest   (get req :uri)
+                                  :errors qp-errors
+                                  :params (get req :form-params)}))))
+            (do
+              (log/web-dbg req "No form errors specified in query parameter form-errors or session variable.")
+              req))))
+      req)))
 
 ;; Default exception handler
 
