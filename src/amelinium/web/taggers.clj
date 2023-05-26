@@ -60,14 +60,36 @@
   [s]
   (fp/escape-html* s))
 
+(defn get-field-value
+  "Retrieves value of a field `v` from `:params` map of `:form/errors` key of the given
+  `ctx` map. If there is no entry or value is `nil` or `false`, it looks it up
+  directly in `ctx`. Returns a value or an empty string."
+  [ctx v]
+  (or (if-some [fe (not-empty (get ctx :form/errors))]
+        (if-some [pa (not-empty (get fe :params))]
+          (if-let [param-id (some-str v)]
+            (if-some [param (some-str (get pa param-id))]
+              param))))
+      (if-some [v (get ctx v)] v)
+      ""))
+
 (defn render-assignment-value
+  "Interpolates values enclosed within `[[` and `]]` tokens by getting values
+  associated with the obtained keys in `ctx` map. Additionally, parses form field
+  values enclosed within `[-` and `-]` tokens by replacing them with default values
+  transferred from propagated error data or, if there was no error, with values
+  associated with keys in `ctx` map."
   [ctx v]
   (if (nil? ctx)
     v
     (if (seq v)
-      (if-some [r (nth (re-find #"^\s*\[\[\s*([^\]]+)\s*\]\]\s*$" v) 1 nil)]
-        (some->> (str/trimr r) some-keyword (get ctx))
-        v)
+      (let [[_ l kw r] (re-find #"^\s*\[([\[\-])\s*([^\]]+)\s*([\]\-])\]\s*$" v)]
+        (binding [sutil/*escape-variables* true]
+          (html-esc
+           (cond (and kw (= "[" l) (= "]" r)) (some->> (str/trimr kw) keyword-from-param (get ctx))
+                 (and kw (= "-" l r))         (some->> (str/trimr kw) keyword-from-param (get-field-value ctx))
+                 (nil? v)                     ""
+                 :else                        v))))
       "")))
 
 (defn last-char
