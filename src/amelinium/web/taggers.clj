@@ -273,11 +273,12 @@
        (let [tf   (or translations-fn i18n/translations)
              lang (get-lang-id ctx)]
          (fn
-           ([k]       (i18n/translate-with tf lang k))
-           ([k a]     (i18n/translate-with tf lang k a))
-           ([k a b]   (i18n/translate-with tf lang k a b))
-           ([k a b c] (i18n/translate-with tf lang k a b c))
-           ([k a b c & more] (apply i18n/translate-with tf lang k a b c more)))))))
+           ([k]         (i18n/translate-with tf lang k))
+           ([k a]       (i18n/translate-with tf lang k a))
+           ([k a b]     (i18n/translate-with tf lang k a b))
+           ([k a b c]   (i18n/translate-with tf lang k a b c))
+           ([k a b c d] (i18n/translate-with tf lang k a b c d))
+           ([k a b c d & more] (apply i18n/translate-with tf lang k a b c d more)))))))
 
 (defn translator-sub
   "For the given context map `ctx` and optional translation function `translations-fn`
