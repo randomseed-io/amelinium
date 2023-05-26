@@ -1,0 +1,2646 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   version="1.1"
+   viewBox="146.5 72.5 1178.1 1604.0578"
+   width="1178.1"
+   height="1604.0577"
+   id="svg6373"
+   sodipodi:docname="amelinium-workflow.svg"
+   inkscape:version="1.2.1 (9c6d41e4, 2022-07-14)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview6375"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="1.3397159"
+     inkscape:cx="981.92464"
+     inkscape:cy="67.551638"
+     inkscape:window-width="1432"
+     inkscape:window-height="819"
+     inkscape:window-x="0"
+     inkscape:window-y="25"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="Canvas_1_Layer_1" />
+  <defs
+     id="defs5633">
+    <filter
+       id="Shadow"
+       filterUnits="userSpaceOnUse"
+       x="39.400002"
+       y="-73.7808">
+      <feGaussianBlur
+         in="SourceAlpha"
+         result="blur"
+         stdDeviation="1.3030978"
+         id="feGaussianBlur5574" />
+      <feOffset
+         in="blur"
+         result="offset"
+         dx="0"
+         dy="2"
+         id="feOffset5576" />
+      <feFlood
+         flood-color="black"
+         flood-opacity=".2"
+         result="flood"
+         id="feFlood5578" />
+      <feComposite
+         in="flood"
+         in2="offset"
+         operator="in"
+         result="color"
+         id="feComposite5580" />
+      <feMerge
+         id="feMerge5586">
+        <feMergeNode
+           in="color"
+           id="feMergeNode5582" />
+        <feMergeNode
+           in="SourceGraphic"
+           id="feMergeNode5584" />
+      </feMerge>
+    </filter>
+    <marker
+       orient="auto"
+       overflow="visible"
+       markerUnits="strokeWidth"
+       id="FilledArrow_Marker"
+       stroke-linejoin="miter"
+       stroke-miterlimit="10"
+       viewBox="-1 -4 10 8"
+       markerWidth="10"
+       markerHeight="8"
+       color="#000000">
+      <g
+         id="g5591">
+        <path
+           d="M 8,0 0,-3 v 6 z"
+           fill="currentColor"
+           stroke="currentColor"
+           stroke-width="1"
+           id="path5589" />
+      </g>
+    </marker>
+    <marker
+       orient="auto"
+       overflow="visible"
+       markerUnits="strokeWidth"
+       id="FilledArrow_Marker_2"
+       stroke-linejoin="miter"
+       stroke-miterlimit="10"
+       viewBox="-9 -4 10 8"
+       markerWidth="10"
+       markerHeight="8"
+       color="#000000">
+      <g
+         id="g5596">
+        <path
+           d="M -8,0 0,3 V -3 Z"
+           fill="currentColor"
+           stroke="currentColor"
+           stroke-width="1"
+           id="path5594" />
+      </g>
+    </marker>
+    <marker
+       orient="auto"
+       overflow="visible"
+       markerUnits="strokeWidth"
+       id="FilledArrow_Marker_3"
+       stroke-linejoin="miter"
+       stroke-miterlimit="10"
+       viewBox="-1 -4 10 8"
+       markerWidth="10"
+       markerHeight="8"
+       color="#000000">
+      <g
+         id="g5601">
+        <path
+           d="M 8,0 0,-3 v 6 z"
+           fill="currentColor"
+           stroke="currentColor"
+           stroke-width="1"
+           id="path5599" />
+      </g>
+    </marker>
+    <marker
+       orient="auto"
+       overflow="visible"
+       markerUnits="strokeWidth"
+       id="FilledArrow_Marker_4"
+       stroke-linejoin="miter"
+       stroke-miterlimit="10"
+       viewBox="-9 -4 10 8"
+       markerWidth="10"
+       markerHeight="8"
+       color="#000000">
+      <g
+         id="g5606">
+        <path
+           d="M -8,0 0,3 V -3 Z"
+           fill="currentColor"
+           stroke="currentColor"
+           stroke-width="1"
+           id="path5604" />
+      </g>
+    </marker>
+    <marker
+       orient="auto"
+       overflow="visible"
+       markerUnits="strokeWidth"
+       id="FilledArrow_Marker_5"
+       stroke-linejoin="miter"
+       stroke-miterlimit="10"
+       viewBox="-1 -4 10 8"
+       markerWidth="10"
+       markerHeight="8"
+       color="#a5a5a5">
+      <g
+         id="g5611">
+        <path
+           d="M 8,0 0,-3 v 6 z"
+           fill="currentColor"
+           stroke="currentColor"
+           stroke-width="1"
+           id="path5609" />
+      </g>
+    </marker>
+    <marker
+       orient="auto"
+       overflow="visible"
+       markerUnits="strokeWidth"
+       id="FilledArrow_Marker_6"
+       stroke-linejoin="miter"
+       stroke-miterlimit="10"
+       viewBox="-9 -4 10 8"
+       markerWidth="10"
+       markerHeight="8"
+       color="#a5a5a5">
+      <g
+         id="g5616">
+        <path
+           d="M -8,0 0,3 V -3 Z"
+           fill="currentColor"
+           stroke="currentColor"
+           stroke-width="1"
+           id="path5614" />
+      </g>
+    </marker>
+    <linearGradient
+       x1="0"
+       x2="1"
+       id="Gradient"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#dadada"
+         id="stop5619" />
+      <stop
+         offset=".45238096"
+         stop-color="#ededed"
+         id="stop5621" />
+      <stop
+         offset="1"
+         stop-color="white"
+         id="stop5623" />
+    </linearGradient>
+    <linearGradient
+       id="Obj_Gradient"
+       xlink:href="#Gradient"
+       gradientTransform="matrix(-39.99996,0.05624845,-0.05624845,-39.99996,724.0354,499.17257)" />
+    <marker
+       orient="auto"
+       overflow="visible"
+       markerUnits="strokeWidth"
+       id="FilledArrow_Marker_7"
+       stroke-linejoin="miter"
+       stroke-miterlimit="10"
+       viewBox="-1 -4 10 8"
+       markerWidth="10"
+       markerHeight="8"
+       color="#a5a5a5">
+      <g
+         id="g5629">
+        <path
+           d="M 8,0 0,-3 v 6 z"
+           fill="currentColor"
+           stroke="currentColor"
+           stroke-width="1"
+           id="path5627" />
+      </g>
+    </marker>
+    <linearGradient
+       id="Obj_Gradient_2"
+       xlink:href="#Gradient"
+       gradientTransform="matrix(-39.99996,0.05624845,-0.05624845,-39.99996,1183.3406,499.17257)" />
+  </defs>
+  <metadata
+     id="metadata5635"> Produced by OmniGraffle 7.21.2\n2022-12-11 16:48:15 +0000</metadata>
+  <g
+     id="Canvas_1_Layer_1"
+     style="fill:none;fill-opacity:1;stroke:none;stroke-dasharray:none;stroke-opacity:1"
+     transform="translate(107.1,146.28079)">
+    <title
+       id="title5639">Layer 1</title>
+    <g
+       id="Graphic_316">
+      <rect
+         x="828"
+         y="82"
+         width="209"
+         height="224"
+         fill="#ffffff"
+         id="rect5641" />
+      <path
+         d="m 827.7081,82.00007 209.6556,-0.04993 m -0.4414,-0.45389 -0.054,224.96575 m 0.2253,-0.30383 -209.6082,-0.25524 m 0.3359,0.29787 0.1789,-224.69542 m -0.2299,0.37125 209.2142,0.0091 m 0,-0.45202 -0.01,224.66165 m 0.1781,0.0525 -209.272,-0.30281 m -0.0154,0.29318 0.1931,-224.2008"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-dasharray="1, 4"
+         stroke-width="1"
+         id="path5643" />
+    </g>
+    <g
+       id="Graphic_284">
+      <path
+         d="m 186,834 h 184 c 4.4183,0 8,3.5817 8,8 v 177 c 0,4.4183 -3.5817,8 -8,8 H 186 c -4.41828,0 -8,-3.5817 -8,-8 V 842 c 0,-4.4183 3.58172,-8 8,-8 z"
+         fill="#ffffff"
+         id="path5646" />
+      <path
+         d="m 186,834 h 184 c 4.4183,0 8,3.5817 8,8 v 177 c 0,4.4183 -3.5817,8 -8,8 H 186 c -4.41828,0 -8,-3.5817 -8,-8 V 842 c 0,-4.4183 3.58172,-8 8,-8 z"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-dasharray="1, 4"
+         stroke-width="1"
+         id="path5648" />
+    </g>
+    <g
+       id="Graphic_283"
+       filter="url(#Shadow)">
+      <title
+         id="title5651">Class</title>
+      <path
+         d="M 183.67842,146.64343 C 140.6875,139.5 157.8312,79.36405 226.41132,89.625 c 6.36272,-20.00187 86.11218,-16.75534 85.59082,0 50.00536,-21.43029 113.90916,21.30128 71.04596,42.73157 51.43374,10.38996 -0.64906,66.36966 -42.8606,57.01843 -3.3782,15.58627 -78.83974,21.0406 -85.46314,0 -42.73024,22.47035 -131.8296,-12.07906 -71.04594,-42.73157 z"
+         fill="#ffffff"
+         id="path5653" />
+      <path
+         d="M 183.67842,146.64343 C 140.6875,139.5 157.8312,79.36405 226.41132,89.625 c 6.36272,-20.00187 86.11218,-16.75534 85.59082,0 50.00536,-21.43029 113.90916,21.30128 71.04596,42.73157 51.43374,10.38996 -0.64906,66.36966 -42.8606,57.01843 -3.3782,15.58627 -78.83974,21.0406 -85.46314,0 -42.73024,22.47035 -131.8296,-12.07906 -71.04594,-42.73157 z"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-dasharray="4, 4"
+         stroke-width="1"
+         id="path5655" />
+    </g>
+    <g
+       id="Group_89">
+      <title
+         id="title5658">Subsystem</title>
+      <g
+         id="Graphic_91">
+        <title
+           id="title5660">Subsystem</title>
+        <path
+           d="m 662,122.71622 h 95 c 8.2843,0 15,6.71572 15,15 V 155.5 c 0,8.28427 -6.7157,15 -15,15 h -95 c -8.2843,0 -15,-6.71573 -15,-15 v -17.78378 c 0,-8.28428 6.7157,-15 15,-15 z"
+           fill="#999999"
+           id="path5662" />
+        <path
+           d="m 662,122.71622 h 95 c 8.2843,0 15,6.71572 15,15 V 155.5 c 0,8.28427 -6.7157,15 -15,15 h -95 c -8.2843,0 -15,-6.71573 -15,-15 v -17.78378 c 0,-8.28428 6.7157,-15 15,-15 z"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="path5664" />
+      </g>
+      <g
+         id="Graphic_90">
+        <title
+           id="title5667">Subsystem</title>
+        <path
+           d="m 655,118.5 h 95 c 8.2843,0 15,6.71573 15,15 v 17.78378 c 0,8.28428 -6.7157,15 -15,15 h -95 c -8.2843,0 -15,-6.71572 -15,-15 V 133.5 c 0,-8.28427 6.7157,-15 15,-15 z"
+           fill="#ffffff"
+           id="path5669" />
+        <path
+           d="m 655,118.5 h 95 c 8.2843,0 15,6.71573 15,15 v 17.78378 c 0,8.28428 -6.7157,15 -15,15 h -95 c -8.2843,0 -15,-6.71572 -15,-15 V 133.5 c 0,-8.28427 6.7157,-15 15,-15 z"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="path5671" />
+        <text
+           transform="translate(645,133.1679)"
+           fill="#000000"
+           id="text5675"><tspan
+             font-family="'Helvetica Neue'"
+             font-size="16px"
+             fill="#000000"
+             x="13.212"
+             y="15"
+             id="tspan5673">HTTP server</tspan></text>
+      </g>
+    </g>
+    <g
+       id="Graphic_92">
+      <title
+         id="title5679">Other Device</title>
+      <rect
+         x="222"
+         y="122"
+         width="120"
+         height="35"
+         fill="#ffffff"
+         id="rect5681" />
+      <rect
+         x="222"
+         y="122"
+         width="120"
+         height="35"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="rect5683" />
+      <text
+         transform="translate(227,130.276)"
+         fill="#000000"
+         id="text5687"><tspan
+           font-family="'Helvetica Neue'"
+           font-size="16px"
+           fill="#000000"
+           x="7.9039998"
+           y="15"
+           id="tspan5685">Web browser</tspan></text>
+    </g>
+    <g
+       id="Group_93">
+      <title
+         id="title5690">Subsystem</title>
+      <g
+         id="Graphic_95">
+        <title
+           id="title5692">Subsystem</title>
+        <path
+           d="m 888,122.71622 h 95 c 8.2843,0 15,6.71572 15,15 V 155.5 c 0,8.28427 -6.7157,15 -15,15 h -95 c -8.2843,0 -15,-6.71573 -15,-15 v -17.78378 c 0,-8.28428 6.7157,-15 15,-15 z"
+           fill="#999999"
+           id="path5694" />
+        <path
+           d="m 888,122.71622 h 95 c 8.2843,0 15,6.71572 15,15 V 155.5 c 0,8.28427 -6.7157,15 -15,15 h -95 c -8.2843,0 -15,-6.71573 -15,-15 v -17.78378 c 0,-8.28428 6.7157,-15 15,-15 z"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="path5696" />
+      </g>
+      <g
+         id="Graphic_94">
+        <title
+           id="title5699">Subsystem</title>
+        <path
+           d="m 881,118.5 h 95 c 8.2843,0 15,6.71573 15,15 v 17.78378 c 0,8.28428 -6.7157,15 -15,15 h -95 c -8.2843,0 -15,-6.71572 -15,-15 V 133.5 c 0,-8.28427 6.7157,-15 15,-15 z"
+           fill="#ffffff"
+           id="path5701" />
+        <path
+           d="m 881,118.5 h 95 c 8.2843,0 15,6.71573 15,15 v 17.78378 c 0,8.28428 -6.7157,15 -15,15 h -95 c -8.2843,0 -15,-6.71572 -15,-15 V 133.5 c 0,-8.28427 6.7157,-15 15,-15 z"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="path5703" />
+        <text
+           transform="translate(871,133.1679)"
+           fill="#000000"
+           id="text5707"><tspan
+             font-family="'Helvetica Neue'"
+             font-size="16px"
+             fill="#000000"
+             x="12.308"
+             y="15"
+             id="tspan5705">Ring handler</tspan></text>
+      </g>
+    </g>
+    <g
+       id="Line_96">
+      <title
+         id="title5711">Message Bidirectional</title>
+      <line
+         x1="351.89978"
+         y1="139.98071"
+         x2="630.10022"
+         y2="141.89398"
+         marker-end="url(#FilledArrow_Marker)"
+         marker-start="url(#FilledArrow_Marker_2)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-dasharray="8, 4, 1, 4"
+         stroke-width="1"
+         id="line5713" />
+    </g>
+    <g
+       id="Line_97">
+      <title
+         id="title5716">Message Bidirectional</title>
+      <line
+         x1="774.90002"
+         y1="142.39191"
+         x2="856.09998"
+         y2="142.39191"
+         marker-end="url(#FilledArrow_Marker)"
+         marker-start="url(#FilledArrow_Marker_2)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line5718" />
+    </g>
+    <g
+       id="Graphic_104">
+      <title
+         id="title5721">Processor</title>
+      <rect
+         x="649"
+         y="316"
+         width="568"
+         height="1127"
+         fill="#ffffff"
+         id="rect5723" />
+      <path
+         d="m 649,316 h 568 V 1443 H 649 Z"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-dasharray="1, 4"
+         stroke-width="1"
+         id="path5725" />
+      <text
+         transform="translate(654,321)"
+         fill="#000000"
+         id="text5729"><tspan
+           font-family="'Helvetica Neue'"
+           font-size="16px"
+           fill="#000000"
+           x="179.28799"
+           y="15"
+           id="tspan5727">Middleware chain (example)</tspan></text>
+    </g>
+    <g
+       id="Graphic_105">
+      <text
+         transform="translate(670.888,87)"
+         fill="#000000"
+         id="text5734"><tspan
+           font-family="'Helvetica Neue'"
+           font-style="italic"
+           font-size="16px"
+           fill="#000000"
+           x="0"
+           y="15"
+           id="tspan5732">Undertow</tspan></text>
+    </g>
+    <g
+       id="Graphic_106">
+      <text
+         transform="translate(895,87)"
+         fill="#000000"
+         id="text5739"><tspan
+           font-family="'Helvetica Neue'"
+           font-style="italic"
+           font-size="16px"
+           fill="#000000"
+           x="0"
+           y="15"
+           id="tspan5737">Reitit-ring</tspan></text>
+    </g>
+    <g
+       id="Graphic_115">
+      <rect
+         x="670"
+         y="364"
+         width="66"
+         height="44.5"
+         fill="#ffffff"
+         id="rect5742" />
+      <rect
+         x="670"
+         y="364"
+         width="66"
+         height="44.5"
+         stroke="#000000"
+         stroke-linecap="square"
+         stroke-linejoin="miter"
+         stroke-width="1"
+         id="rect5744" />
+      <text
+         transform="translate(675,369)"
+         fill="#000000"
+         id="text5750"><tspan
+           font-family="Helvetica"
+           font-size="12px"
+           fill="#000000"
+           x="7.9873052"
+           y="11"
+           id="tspan5746">request</tspan><tspan
+           font-family="Helvetica"
+           font-size="12px"
+           fill="#000000"
+           x="16.328125"
+           y="25"
+           id="tspan5748">map</tspan></text>
+    </g>
+    <g
+       id="Graphic_116">
+      <rect
+         x="1130"
+         y="364"
+         width="66"
+         height="1051"
+         fill="#ffffff"
+         id="rect5753" />
+      <rect
+         x="1130"
+         y="364"
+         width="66"
+         height="1051"
+         stroke="#000000"
+         stroke-linecap="square"
+         stroke-linejoin="miter"
+         stroke-width="1"
+         id="rect5755" />
+      <text
+         transform="translate(1135,369)"
+         fill="#000000"
+         id="text5761"><tspan
+           font-family="Helvetica"
+           font-size="12px"
+           fill="#000000"
+           x="3.3173831"
+           y="11"
+           id="tspan5757">response</tspan><tspan
+           font-family="Helvetica"
+           font-size="12px"
+           fill="#000000"
+           x="16.328125"
+           y="25"
+           id="tspan5759">map</tspan></text>
+    </g>
+    <g
+       id="Graphic_122">
+      <rect
+         x="671"
+         y="429"
+         width="66"
+         height="986"
+         fill="#ffffff"
+         id="rect5764" />
+      <rect
+         x="671"
+         y="429"
+         width="66"
+         height="986"
+         stroke="#000000"
+         stroke-linecap="square"
+         stroke-linejoin="miter"
+         stroke-width="1"
+         id="rect5766" />
+      <text
+         transform="translate(676,434)"
+         fill="#000000"
+         id="text5772"><tspan
+           font-family="Helvetica"
+           font-size="12px"
+           fill="#000000"
+           x="7.9873052"
+           y="11"
+           id="tspan5768">request</tspan><tspan
+           font-family="Helvetica"
+           font-size="12px"
+           fill="#000000"
+           x="16.328125"
+           y="25"
+           id="tspan5770">map</tspan></text>
+    </g>
+    <g
+       id="Group_129">
+      <g
+         id="Graphic_121">
+        <rect
+           x="792"
+           y="365.5"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect5775" />
+        <rect
+           x="792"
+           y="365.5"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect5777" />
+        <text
+           transform="translate(797,379.5)"
+           fill="#000000"
+           id="text5781"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="101.31836"
+             y="11"
+             id="tspan5779">lazy request</tspan></text>
+      </g>
+      <g
+         id="Group_126">
+        <g
+           id="Graphic_128">
+          <ellipse
+             cx="1056"
+             cy="381.68091"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse5784" />
+          <ellipse
+             cx="1056"
+             cy="381.68091"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse5786" />
+        </g>
+        <g
+           id="Line_127">
+          <path
+             d="m 1060.001,378.121 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path5789" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_130">
+      <line
+         x1="736"
+         y1="386.25"
+         x2="782.1001"
+         y2="386.45581"
+         marker-end="url(#FilledArrow_Marker_3)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line5794" />
+    </g>
+    <g
+       id="Line_132">
+      <path
+         d="m 792,397.73913 c 0,0 -52.986,11.43349 -79.3333,20.28987 -3.1751,1.06725 -5.7834,2.0366 -7.9154,2.91615"
+         marker-end="url(#FilledArrow_Marker_3)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="path5797" />
+    </g>
+    <g
+       id="Group_133">
+      <g
+         id="Graphic_137">
+        <rect
+           x="792"
+           y="429"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect5800" />
+        <rect
+           x="792"
+           y="429"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect5802" />
+        <text
+           transform="translate(797,443)"
+           fill="#000000"
+           id="text5806"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="96.994141"
+             y="11"
+             id="tspan5804">content types</tspan></text>
+      </g>
+      <g
+         id="Group_134">
+        <g
+           id="Graphic_136">
+          <ellipse
+             cx="1056"
+             cy="445.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse5809" />
+          <ellipse
+             cx="1056"
+             cy="445.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse5811" />
+        </g>
+        <g
+           id="Line_135">
+          <path
+             d="m 1060.001,441.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path5814" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_143">
+      <line
+         x1="1083.9"
+         y1="450"
+         x2="1120.1"
+         y2="450"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line5819" />
+    </g>
+    <g
+       id="Group_148">
+      <g
+         id="Graphic_152">
+        <rect
+           x="792"
+           y="494"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect5822" />
+        <rect
+           x="792"
+           y="494"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect5824" />
+        <text
+           transform="translate(797,508)"
+           fill="#000000"
+           id="text5828"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="103.64746"
+             y="11"
+             id="tspan5826">parameters</tspan></text>
+      </g>
+      <g
+         id="Group_149">
+        <g
+           id="Graphic_151">
+          <ellipse
+             cx="1056"
+             cy="510.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse5831" />
+          <ellipse
+             cx="1056"
+             cy="510.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse5833" />
+        </g>
+        <g
+           id="Line_150">
+          <path
+             d="m 1060.001,506.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path5836" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_153">
+      <line
+         x1="782.09998"
+         y1="515"
+         x2="746.90002"
+         y2="515"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line5841" />
+    </g>
+    <g
+       id="Group_154">
+      <g
+         id="Graphic_158">
+        <rect
+           x="792.5"
+           y="556"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect5844" />
+        <rect
+           x="792.5"
+           y="556"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect5846" />
+        <text
+           transform="translate(797.5,570)"
+           fill="#000000"
+           id="text5850"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="108.99414"
+             y="11"
+             id="tspan5848">remote ip</tspan></text>
+      </g>
+      <g
+         id="Group_155">
+        <g
+           id="Graphic_157">
+          <ellipse
+             cx="1056.5"
+             cy="572.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse5853" />
+          <ellipse
+             cx="1056.5"
+             cy="572.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse5855" />
+        </g>
+        <g
+           id="Line_156">
+          <path
+             d="m 1060.501,568.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path5858" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_159">
+      <line
+         x1="782.09998"
+         y1="578"
+         x2="746.90002"
+         y2="578"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line5863" />
+    </g>
+    <g
+       id="Group_161">
+      <g
+         id="Graphic_165">
+        <rect
+           x="792.5"
+           y="620"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect5866" />
+        <rect
+           x="792.5"
+           y="620"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect5868" />
+        <text
+           transform="translate(797.5,634)"
+           fill="#000000"
+           id="text5872"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="113.65527"
+             y="11"
+             id="tspan5870">session</tspan></text>
+      </g>
+      <g
+         id="Group_162">
+        <g
+           id="Graphic_164">
+          <ellipse
+             cx="1056.5"
+             cy="636.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse5875" />
+          <ellipse
+             cx="1056.5"
+             cy="636.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse5877" />
+        </g>
+        <g
+           id="Line_163">
+          <path
+             d="m 1060.501,632.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path5880" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_160">
+      <line
+         x1="782.09998"
+         y1="642"
+         x2="746.90002"
+         y2="642"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line5885" />
+    </g>
+    <g
+       id="Group_167">
+      <g
+         id="Graphic_171">
+        <rect
+           x="792.5"
+           y="684"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect5888" />
+        <rect
+           x="792.5"
+           y="684"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect5890" />
+        <text
+           transform="translate(797.5,698)"
+           fill="#000000"
+           id="text5894"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="121.65918"
+             y="11"
+             id="tspan5892">roles</tspan></text>
+      </g>
+      <g
+         id="Group_168">
+        <g
+           id="Graphic_170">
+          <ellipse
+             cx="1056.5"
+             cy="700.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse5897" />
+          <ellipse
+             cx="1056.5"
+             cy="700.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse5899" />
+        </g>
+        <g
+           id="Line_169">
+          <path
+             d="m 1060.501,696.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path5902" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_166">
+      <line
+         x1="782.09998"
+         y1="706"
+         x2="746.90002"
+         y2="706"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line5907" />
+    </g>
+    <g
+       id="Group_174">
+      <g
+         id="Graphic_178">
+        <rect
+           x="792.5"
+           y="747"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect5910" />
+        <rect
+           x="792.5"
+           y="747"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect5912" />
+        <text
+           transform="translate(797.5,761)"
+           fill="#000000"
+           id="text5916"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="90.000977"
+             y="11"
+             id="tspan5914">populators (pre)</tspan></text>
+      </g>
+      <g
+         id="Group_175">
+        <g
+           id="Graphic_177">
+          <ellipse
+             cx="1056.5"
+             cy="763.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse5919" />
+          <ellipse
+             cx="1056.5"
+             cy="763.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse5921" />
+        </g>
+        <g
+           id="Line_176">
+          <path
+             d="m 1060.501,759.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path5924" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_173">
+      <line
+         x1="782.09998"
+         y1="769"
+         x2="746.90002"
+         y2="769"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line5929" />
+    </g>
+    <g
+       id="Group_179">
+      <title
+         id="title5932">Subsystem</title>
+      <g
+         id="Graphic_181">
+        <title
+           id="title5934">Subsystem</title>
+        <path
+           d="M 503.8788,593.54935 H 561 c 8.2843,0 15,6.71575 15,15 V 767 c 0,8.2843 -6.7157,15 -15,15 h -57.1212 c -8.2843,0 -15,-6.7157 -15,-15 V 608.54935 c 0,-8.28425 6.7157,-15 15,-15 z"
+           fill="#999999"
+           id="path5936" />
+        <path
+           d="M 503.8788,593.54935 H 561 c 8.2843,0 15,6.71575 15,15 V 767 c 0,8.2843 -6.7157,15 -15,15 h -57.1212 c -8.2843,0 -15,-6.7157 -15,-15 V 608.54935 c 0,-8.28425 6.7157,-15 15,-15 z"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="path5938" />
+      </g>
+      <g
+         id="Graphic_180">
+        <title
+           id="title5941">Subsystem</title>
+        <path
+           d="m 499,576.92135 h 57.1212 c 8.2843,0 15,6.71575 15,15 V 750.372 c 0,8.2843 -6.7157,15 -15,15 H 499 c -8.2843,0 -15,-6.7157 -15,-15 V 591.92135 c 0,-8.28425 6.7157,-15 15,-15 z"
+           fill="#ffffff"
+           id="path5943" />
+        <path
+           d="m 499,576.92135 h 57.1212 c 8.2843,0 15,6.71575 15,15 V 750.372 c 0,8.2843 -6.7157,15 -15,15 H 499 c -8.2843,0 -15,-6.7157 -15,-15 V 591.92135 c 0,-8.28425 6.7157,-15 15,-15 z"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="path5945" />
+        <text
+           transform="translate(489,652.6987)"
+           fill="#000000"
+           id="text5951"><tspan
+             font-family="'Helvetica Neue'"
+             font-size="16px"
+             fill="#000000"
+             x="27.448608"
+             y="15"
+             id="tspan5947">DB</tspan><tspan
+             font-family="'Helvetica Neue'"
+             font-size="16px"
+             fill="#000000"
+             x="2.408608"
+             y="33.448002"
+             id="tspan5949">connector</tspan></text>
+      </g>
+    </g>
+    <g
+       id="Line_185">
+      <path
+         d="M 933.5,610.1 V 607 H 616 v 64.1467 h -34.9788"
+         marker-end="url(#FilledArrow_Marker_5)"
+         marker-start="url(#FilledArrow_Marker_6)"
+         stroke="#a5a5a5"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="path5955" />
+    </g>
+    <g
+       id="Group_188">
+      <g
+         id="Graphic_192">
+        <rect
+           x="792.5"
+           y="812"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect5958" />
+        <rect
+           x="792.5"
+           y="812"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect5960" />
+        <text
+           transform="translate(797.5,826)"
+           fill="#000000"
+           id="text5964"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="109.66211"
+             y="11"
+             id="tspan5962">language</tspan></text>
+      </g>
+      <g
+         id="Group_189">
+        <g
+           id="Graphic_191">
+          <ellipse
+             cx="1056.5"
+             cy="828.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse5967" />
+          <ellipse
+             cx="1056.5"
+             cy="828.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse5969" />
+        </g>
+        <g
+           id="Line_190">
+          <path
+             d="m 1060.501,824.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path5972" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_187">
+      <line
+         x1="782.09998"
+         y1="834"
+         x2="746.90002"
+         y2="834"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line5977" />
+    </g>
+    <g
+       id="Line_193">
+      <path
+         d="m 933.5,802.1 v -5 L 616,797 V 671.1467 h -34.9788"
+         marker-end="url(#FilledArrow_Marker_5)"
+         marker-start="url(#FilledArrow_Marker_6)"
+         stroke="#a5a5a5"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="path5980" />
+    </g>
+    <g
+       id="Group_195">
+      <g
+         id="Graphic_199">
+        <rect
+           x="792.5"
+           y="876"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect5983" />
+        <rect
+           x="792.5"
+           y="876"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect5985" />
+        <text
+           transform="translate(797.5,890)"
+           fill="#000000"
+           id="text5989"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="112.9873"
+             y="11"
+             id="tspan5987">headers</tspan></text>
+      </g>
+      <g
+         id="Group_196">
+        <g
+           id="Graphic_198">
+          <ellipse
+             cx="1056.5"
+             cy="892.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse5992" />
+          <ellipse
+             cx="1056.5"
+             cy="892.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse5994" />
+        </g>
+        <g
+           id="Line_197">
+          <path
+             d="m 1060.501,888.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path5997" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Group_201">
+      <g
+         id="Graphic_205">
+        <rect
+           x="792.5"
+           y="940"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect6002" />
+        <rect
+           x="792.5"
+           y="940"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect6004" />
+        <text
+           transform="translate(797.5,954)"
+           fill="#000000"
+           id="text6008"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="86.672852"
+             y="11"
+             id="tspan6006">populators (post)</tspan></text>
+      </g>
+      <g
+         id="Group_202">
+        <g
+           id="Graphic_204">
+          <ellipse
+             cx="1056.5"
+             cy="956.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse6011" />
+          <ellipse
+             cx="1056.5"
+             cy="956.18091"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse6013" />
+        </g>
+        <g
+           id="Line_203">
+          <path
+             d="m 1060.501,952.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path6016" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_200">
+      <line
+         x1="782.09998"
+         y1="962"
+         x2="746.90002"
+         y2="962"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line6021" />
+    </g>
+    <g
+       id="Line_206">
+      <line
+         x1="1083.9"
+         y1="898"
+         x2="1120.1"
+         y2="898"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line6024" />
+    </g>
+    <g
+       id="Group_208">
+      <g
+         id="Graphic_212">
+        <rect
+           x="792.5"
+           y="1004"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect6027" />
+        <rect
+           x="792.5"
+           y="1004"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect6029" />
+        <text
+           transform="translate(797.5,1018)"
+           fill="#000000"
+           id="text6033"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="74.977539"
+             y="11"
+             id="tspan6031">web request preparer</tspan></text>
+      </g>
+      <g
+         id="Group_209">
+        <g
+           id="Graphic_211">
+          <ellipse
+             cx="1056.5"
+             cy="1020.1809"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse6036" />
+          <ellipse
+             cx="1056.5"
+             cy="1020.1809"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse6038" />
+        </g>
+        <g
+           id="Line_210">
+          <path
+             d="m 1060.501,1016.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path6041" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_207">
+      <line
+         x1="782.09998"
+         y1="1026"
+         x2="746.90002"
+         y2="1026"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line6046" />
+    </g>
+    <g
+       id="Group_214">
+      <g
+         id="Graphic_218">
+        <rect
+           x="792.5"
+           y="1068"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect6049" />
+        <rect
+           x="792.5"
+           y="1068"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect6051" />
+        <text
+           transform="translate(797.5,1082)"
+           fill="#000000"
+           id="text6055"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="84.654297"
+             y="11"
+             id="tspan6053">exception handler</tspan></text>
+      </g>
+      <g
+         id="Group_215">
+        <g
+           id="Graphic_217">
+          <ellipse
+             cx="1056.5"
+             cy="1084.1809"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse6058" />
+          <ellipse
+             cx="1056.5"
+             cy="1084.1809"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse6060" />
+        </g>
+        <g
+           id="Line_216">
+          <path
+             d="m 1060.501,1080.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path6063" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_225">
+      <line
+         x1="1083.9"
+         y1="1090"
+         x2="1120.1"
+         y2="1090"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-dasharray="4, 4"
+         stroke-width="1"
+         id="line6068" />
+    </g>
+    <g
+       id="Group_227">
+      <g
+         id="Graphic_231">
+        <rect
+           x="792.5"
+           y="1132"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect6071" />
+        <rect
+           x="792.5"
+           y="1132"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect6073" />
+        <text
+           transform="translate(797.5,1146)"
+           fill="#000000"
+           id="text6077"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="90.976562"
+             y="11"
+             id="tspan6075">request coercer</tspan></text>
+      </g>
+      <g
+         id="Group_228">
+        <g
+           id="Graphic_230">
+          <ellipse
+             cx="1056.5"
+             cy="1148.1809"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse6080" />
+          <ellipse
+             cx="1056.5"
+             cy="1148.1809"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse6082" />
+        </g>
+        <g
+           id="Line_229">
+          <path
+             d="m 1060.501,1144.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path6085" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_226">
+      <line
+         x1="782.09998"
+         y1="1154"
+         x2="746.90002"
+         y2="1154"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line6090" />
+    </g>
+    <g
+       id="Group_232">
+      <g
+         id="Graphic_236">
+        <rect
+           x="792.5"
+           y="1196"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect6093" />
+        <rect
+           x="792.5"
+           y="1196"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect6095" />
+        <text
+           transform="translate(797.5,1210)"
+           fill="#000000"
+           id="text6099"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="85.972656"
+             y="11"
+             id="tspan6097">response coercer</tspan></text>
+      </g>
+      <g
+         id="Group_233">
+        <g
+           id="Graphic_235">
+          <ellipse
+             cx="1056.5"
+             cy="1212.1809"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse6102" />
+          <ellipse
+             cx="1056.5"
+             cy="1212.1809"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse6104" />
+        </g>
+        <g
+           id="Line_234">
+          <path
+             d="m 1060.501,1208.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path6107" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_237">
+      <line
+         x1="1083.9"
+         y1="1218"
+         x2="1120.1"
+         y2="1218"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line6112" />
+    </g>
+    <g
+       id="Graphic_242">
+      <rect
+         x="792.5"
+         y="1260"
+         width="282"
+         height="155"
+         fill="#ffffff"
+         id="rect6115" />
+      <rect
+         x="792.5"
+         y="1260"
+         width="282"
+         height="155"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="rect6117" />
+      <text
+         transform="translate(797.5,1265)"
+         fill="#000000"
+         id="text6121"><tspan
+           font-family="Helvetica"
+           font-weight="bold"
+           font-size="12px"
+           fill="#000000"
+           x="98.318359"
+           y="11"
+           id="tspan6119">web renderer</tspan></text>
+    </g>
+    <g
+       id="Line_243">
+      <path
+         d="m 1074.5,1337.5 h 28.5 v -114 c -5.5,0 -5.5,-11 0,-11 v -117 c -5.5,0 -5.5,-11 0,-11 v -181 c -5.5,0 -5.5,-11 0,-11 v -437 c -5.5,0 -5.5,-11 0,-11 v -95.4 h 64.906 l 0.031,5.43486"
+         marker-end="url(#FilledArrow_Marker_3)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="path6124"
+         sodipodi:nodetypes="ccccccccccccc" />
+    </g>
+    <g
+       id="Line_244">
+      <path
+         d="M 782.1,1495 H 704 v -80"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="path6127" />
+    </g>
+    <g
+       id="Line_186">
+      <path
+         d="M 933.5,674.1 V 671 h -234 l -113.4788,0.1467 h -5"
+         marker-end="url(#FilledArrow_Marker_5)"
+         marker-start="url(#FilledArrow_Marker_6)"
+         stroke="#a5a5a5"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="path6130" />
+    </g>
+    <g
+       id="Graphic_245">
+      <text
+         transform="translate(495,587)"
+         fill="#000000"
+         id="text6135"><tspan
+           font-family="'Helvetica Neue'"
+           font-style="italic"
+           font-size="16px"
+           fill="#000000"
+           x="6.3948852e-13"
+           y="15"
+           id="tspan6133">next.jdbc</tspan></text>
+    </g>
+    <g
+       id="Group_246">
+      <title
+         id="title6138">Subsystem</title>
+      <g
+         id="Graphic_248">
+        <title
+           id="title6140">Subsystem</title>
+        <path
+           d="M 506.8788,850.628 H 564 c 8.2843,0 15,6.7157 15,15 v 158.4507 c 0,8.2842 -6.7157,15 -15,15 h -57.1212 c -8.2843,0 -15,-6.7158 -15,-15 V 865.628 c 0,-8.2843 6.7157,-15 15,-15 z"
+           fill="#999999"
+           id="path6142" />
+        <path
+           d="M 506.8788,850.628 H 564 c 8.2843,0 15,6.7157 15,15 v 158.4507 c 0,8.2842 -6.7157,15 -15,15 h -57.1212 c -8.2843,0 -15,-6.7158 -15,-15 V 865.628 c 0,-8.2843 6.7157,-15 15,-15 z"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="path6144" />
+      </g>
+      <g
+         id="Graphic_247">
+        <title
+           id="title6147">Subsystem</title>
+        <path
+           d="m 502,834 h 57.1212 c 8.2843,0 15,6.7157 15,15 v 158.4507 c 0,8.2842 -6.7157,15 -15,15 H 502 c -8.2843,0 -15,-6.7158 -15,-15 V 849 c 0,-8.2843 6.7157,-15 15,-15 z"
+           fill="#ffffff"
+           id="path6149" />
+        <path
+           d="m 502,834 h 57.1212 c 8.2843,0 15,6.7157 15,15 v 158.4507 c 0,8.2842 -6.7157,15 -15,15 H 502 c -8.2843,0 -15,-6.7158 -15,-15 V 849 c 0,-8.2843 6.7157,-15 15,-15 z"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="path6151" />
+        <text
+           transform="translate(492,902.0953)"
+           fill="#000000"
+           id="text6159"><tspan
+             font-family="'Helvetica Neue'"
+             font-size="15px"
+             fill="#000000"
+             x="28.143108"
+             y="14"
+             id="tspan6153">DB</tspan><tspan
+             font-family="'Helvetica Neue'"
+             font-size="15px"
+             fill="#000000"
+             x="1.3306079"
+             y="31.42"
+             id="tspan6155">connection</tspan><tspan
+             font-family="'Helvetica Neue'"
+             font-size="15px"
+             fill="#000000"
+             x="23.838108"
+             y="48.839996"
+             id="tspan6157">pool</tspan></text>
+      </g>
+    </g>
+    <g
+       id="Graphic_249">
+      <text
+         transform="translate(500,848)"
+         fill="#000000"
+         id="text6165"><tspan
+           font-family="'Helvetica Neue'"
+           font-style="italic"
+           font-size="16px"
+           fill="#000000"
+           x="0"
+           y="15"
+           id="tspan6163">HikariCP</tspan></text>
+    </g>
+    <g
+       id="Line_250">
+      <line
+         x1="528.7757"
+         y1="775.2713"
+         x2="529.34552"
+         y2="824.10071"
+         marker-end="url(#FilledArrow_Marker_3)"
+         marker-start="url(#FilledArrow_Marker_4)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line6168" />
+    </g>
+    <g
+       id="Group_254">
+      <g
+         id="Graphic_251">
+        <title
+           id="title6171">Other Device</title>
+        <rect
+           x="219"
+           y="884"
+           width="120"
+           height="91"
+           fill="#ffffff"
+           id="rect6173" />
+        <rect
+           x="219"
+           y="884"
+           width="120"
+           height="91"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect6175" />
+        <text
+           transform="translate(224,889)"
+           fill="#000000"
+           id="text6179"><tspan
+             font-family="'Helvetica Neue'"
+             font-size="16px"
+             fill="#000000"
+             x="20.92"
+             y="15"
+             id="tspan6177">Database</tspan></text>
+      </g>
+      <g
+         id="Group_252">
+        <title
+           id="title6182">net-db</title>
+        <g
+           id="Graphic_253">
+          <title
+             id="title6184">icn-body</title>
+          <path
+             d="M 279.333,921 C 271.857,921 266,923.636 266,927 v 20 c 0,3.364 5.857,6 13.333,6 7.476,0 13.333,-2.636 13.333,-6 v -20 c 0,-3.364 -5.857,-6 -13.333,-6 z m 12,26 c 0,2.207 -4.928,4.667 -12,4.667 -7.072,0 -12,-2.46 -12,-4.667 v -4.024 c 2.137,2.003 6.647,3.357 12,3.357 5.353,0 9.863,-1.354 12,-3.357 z m 0,-6.667 c 0,2.207 -4.928,4.667 -12,4.667 -7.072,0 -12,-2.46 -12,-4.667 v -4.024 c 2.137,2.003 6.647,3.358 12,3.358 5.353,0 9.863,-1.355 12,-3.358 z m 0,-6.666 c 0,2.206 -4.928,4.666 -12,4.666 -7.072,0 -12,-2.46 -12,-4.666 v -4.024 c 2.137,2.002 6.647,3.357 12,3.357 5.353,0 9.863,-1.355 12,-3.357 z m -12,-2 c -7.072,0 -12,-2.46 -12,-4.667 0,-2.207 4.928,-4.667 12,-4.667 7.072,0 12,2.46 12,4.667 0,2.207 -4.928,4.667 -12,4.667 z"
+             fill="#000000"
+             id="path6186" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_255">
+      <title
+         id="title6191">Message Bidirectional</title>
+      <line
+         x1="348.89987"
+         y1="929.14581"
+         x2="477.1001"
+         y2="928.49622"
+         marker-end="url(#FilledArrow_Marker)"
+         marker-start="url(#FilledArrow_Marker_2)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-dasharray="8, 4, 1, 4"
+         stroke-width="1"
+         id="line6193" />
+    </g>
+    <g
+       id="Graphic_256">
+      <text
+         transform="translate(252.232,848)"
+         fill="#000000"
+         id="text6198"><tspan
+           font-family="'Helvetica Neue'"
+           font-style="italic"
+           font-size="16px"
+           fill="#000000"
+           x="7.1409545e-13"
+           y="15"
+           id="tspan6196">MariaDB</tspan></text>
+    </g>
+    <g
+       id="Group_257">
+      <title
+         id="title6201">Subsystem</title>
+      <g
+         id="Graphic_259">
+        <title
+           id="title6203">Subsystem</title>
+        <path
+           d="M 503.8788,402.4054 H 561 c 8.2843,0 15,6.71573 15,15 V 494 c 0,8.2843 -6.7157,15 -15,15 h -57.1212 c -8.2843,0 -15,-6.7157 -15,-15 v -76.5946 c 0,-8.28427 6.7157,-15 15,-15 z"
+           fill="#999999"
+           id="path6205" />
+        <path
+           d="M 503.8788,402.4054 H 561 c 8.2843,0 15,6.71573 15,15 V 494 c 0,8.2843 -6.7157,15 -15,15 h -57.1212 c -8.2843,0 -15,-6.7157 -15,-15 v -76.5946 c 0,-8.28427 6.7157,-15 15,-15 z"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="path6207" />
+      </g>
+      <g
+         id="Graphic_258">
+        <title
+           id="title6210">Subsystem</title>
+        <path
+           d="m 499,393 h 57.1212 c 8.2843,0 15,6.71573 15,15 v 76.5946 c 0,8.28427 -6.7157,15 -15,15 H 499 c -8.2843,0 -15,-6.71573 -15,-15 V 408 c 0,-8.28427 6.7157,-15 15,-15 z"
+           fill="#ffffff"
+           id="path6212" />
+        <path
+           d="m 499,393 h 57.1212 c 8.2843,0 15,6.71573 15,15 v 76.5946 c 0,8.28427 -6.7157,15 -15,15 H 499 c -8.2843,0 -15,-6.71573 -15,-15 V 408 c 0,-8.28427 6.7157,-15 15,-15 z"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="path6214" />
+        <text
+           transform="translate(489,428.8773)"
+           fill="#000000"
+           id="text6220"><tspan
+             font-family="'Helvetica Neue'"
+             font-size="16px"
+             fill="#000000"
+             x="4.4886079"
+             y="15"
+             id="tspan6216">op logger</tspan><tspan
+             font-family="'Helvetica Neue'"
+             font-size="14px"
+             fill="#000000"
+             x="3.2946081"
+             y="31.447998"
+             id="tspan6218">(populated)</tspan></text>
+      </g>
+    </g>
+    <g
+       id="Line_260">
+      <line
+         x1="527.70203"
+         y1="509.4946"
+         x2="527.84204"
+         y2="572.09998"
+         marker-end="url(#FilledArrow_Marker_5)"
+         marker-start="url(#FilledArrow_Marker_6)"
+         stroke="#a5a5a5"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line6224" />
+    </g>
+    <g
+       id="Graphic_261">
+      <path
+         d="m 694,474.0422 20,-0.0281 0.0426,30.34514 9.99995,-0.014 -19.9718,20.02811 -20.0281,-19.97186 9.99996,-0.0141 z"
+         fill="url(#Obj_Gradient)"
+         id="path6227"
+         style="fill:url(#Obj_Gradient)" />
+      <path
+         d="m 694,474.0422 20,-0.0281 0.0426,30.34514 9.99995,-0.014 -19.9718,20.02811 -20.0281,-19.97186 9.99996,-0.0141 z"
+         stroke="#a5a5a5"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="path6229" />
+    </g>
+    <g
+       id="Graphic_262">
+      <text
+         transform="translate(485.56,340)"
+         fill="#515556"
+         id="text6234"><tspan
+           font-family="Avenir"
+           font-size="13px"
+           fill="#515556"
+           x="0"
+           y="13"
+           id="tspan6232">async message</tspan></text>
+    </g>
+    <g
+       id="Line_263">
+      <line
+         x1="528.90179"
+         y1="358"
+         x2="528.52051"
+         y2="383.10114"
+         marker-end="url(#FilledArrow_Marker_7)"
+         stroke="#a5a5a5"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line6237" />
+    </g>
+    <g
+       id="Graphic_264"
+       transform="translate(2.6868315)">
+      <path
+         d="m 1153.3052,474.0422 20,-0.0281 0.043,30.34514 10,-0.014 -19.9719,20.02811 -20.0281,-19.97186 10,-0.0141 z"
+         fill="url(#Obj_Gradient_2)"
+         id="path6240"
+         style="fill:url(#Obj_Gradient_2)" />
+      <path
+         d="m 1151.0022,474.0422 20,-0.0281 0.043,30.34514 10,-0.014 -19.9719,20.02811 -20.0281,-19.97186 10,-0.0141 z"
+         stroke="#a5a5a5"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="path6242" />
+    </g>
+    <g
+       id="Graphic_265"
+       transform="translate(-20.153527)">
+      <text
+         transform="translate(1098,233.664)"
+         fill="#000000"
+         id="text6247"><tspan
+           font-family="'Helvetica Neue'"
+           font-size="12px"
+           fill="#000000"
+           x="0"
+           y="11"
+           id="tspan6245">response map</tspan></text>
+    </g>
+    <g
+       id="Graphic_266">
+      <text
+         transform="translate(735,233.664)"
+         fill="#000000"
+         id="text6252"><tspan
+           font-family="'Helvetica Neue'"
+           font-size="12px"
+           fill="#000000"
+           x="0"
+           y="11"
+           id="tspan6250">request map</tspan></text>
+    </g>
+    <g
+       id="Group_267">
+      <g
+         id="Graphic_271">
+        <rect
+           x="826"
+           y="1297"
+           width="215"
+           height="34"
+           fill="#ffffff"
+           id="rect6255" />
+        <rect
+           x="826"
+           y="1297"
+           width="215"
+           height="34"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect6257" />
+        <text
+           transform="translate(831,1307)"
+           fill="#000000"
+           id="text6261"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="19.147461"
+             y="11"
+             id="tspan6259">layouts and views templating</tspan></text>
+      </g>
+      <g
+         id="Group_268">
+        <g
+           id="Graphic_270">
+          <ellipse
+             cx="1027.2766"
+             cy="1310.0988"
+             rx="6.0993004"
+             ry="5.7645473"
+             fill="#ffffff"
+             id="ellipse6264" />
+          <ellipse
+             cx="1027.2766"
+             cy="1310.0988"
+             rx="6.0993004"
+             ry="5.7645473"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse6266" />
+        </g>
+        <g
+           id="Line_269">
+          <path
+             d="m 1030.327,1307.217 -3.0499,-2.8827 3.0499,-2.8819"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path6269" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Group_272">
+      <g
+         id="Graphic_274">
+        <ellipse
+           cx="1056"
+           cy="1275.8792"
+           rx="8.0000124"
+           ry="7.1209116"
+           fill="#ffffff"
+           id="ellipse6274" />
+        <ellipse
+           cx="1056"
+           cy="1275.8792"
+           rx="8.0000124"
+           ry="7.1209116"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="0.5"
+           id="ellipse6276" />
+      </g>
+      <g
+         id="Line_273">
+        <path
+           d="m 1060.001,1272.3192 -4.0003,-3.561 4.0003,-3.56"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="path6279" />
+      </g>
+    </g>
+    <g
+       id="Group_286">
+      <g
+         id="Graphic_290">
+        <rect
+           x="793"
+           y="1471"
+           width="282"
+           height="42"
+           fill="#ffffff"
+           id="rect6283" />
+        <rect
+           x="793"
+           y="1471"
+           width="282"
+           height="42"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect6285" />
+        <text
+           transform="translate(798,1485)"
+           fill="#000000"
+           id="text6289"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="57.654301"
+             y="11"
+             id="tspan6287">request handler (controller)</tspan></text>
+      </g>
+      <g
+         id="Group_287">
+        <g
+           id="Graphic_289">
+          <ellipse
+             cx="1057"
+             cy="1487.1809"
+             rx="8.0000124"
+             ry="7.1209116"
+             fill="#ffffff"
+             id="ellipse6292" />
+          <ellipse
+             cx="1057"
+             cy="1487.1809"
+             rx="8.0000124"
+             ry="7.1209116"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse6294" />
+        </g>
+        <g
+           id="Line_288">
+          <path
+             d="m 1061.001,1483.621 -4.0003,-3.561 4.0003,-3.56"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path6297" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Line_296">
+      <line
+         x1="934"
+         y1="1471"
+         x2="933.58838"
+         y2="1424.8997"
+         marker-end="url(#FilledArrow_Marker_3)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line6302" />
+    </g>
+    <g
+       id="Group_297">
+      <g
+         id="Graphic_301">
+        <rect
+           x="826"
+           y="1351"
+           width="215"
+           height="34"
+           fill="#ffffff"
+           id="rect6305" />
+        <rect
+           x="826"
+           y="1351"
+           width="215"
+           height="34"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="rect6307" />
+        <text
+           transform="translate(831,1361)"
+           fill="#000000"
+           id="text6311"><tspan
+             font-family="Helvetica"
+             font-weight="bold"
+             font-size="12px"
+             fill="#000000"
+             x="26.257812"
+             y="11"
+             id="tspan6309">HTTP response generation</tspan></text>
+      </g>
+      <g
+         id="Group_298">
+        <g
+           id="Graphic_300">
+          <ellipse
+             cx="1027.2766"
+             cy="1364.0988"
+             rx="6.0993004"
+             ry="5.7645473"
+             fill="#ffffff"
+             id="ellipse6314" />
+          <ellipse
+             cx="1027.2766"
+             cy="1364.0988"
+             rx="6.0993004"
+             ry="5.7645473"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="0.5"
+             id="ellipse6316" />
+        </g>
+        <g
+           id="Line_299">
+          <path
+             d="m 1030.327,1361.217 -3.0499,-2.8827 3.0499,-2.8819"
+             stroke="#000000"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             stroke-width="1"
+             id="path6319" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="Group_309">
+      <title
+         id="title6324">Subsystem</title>
+      <g
+         id="Graphic_311">
+        <title
+           id="title6326">Subsystem</title>
+        <path
+           d="m 889,224.21622 h 95 c 8.2843,0 15,6.71572 15,15 V 257 c 0,8.28427 -6.7157,15 -15,15 h -95 c -8.2843,0 -15,-6.71573 -15,-15 v -17.78378 c 0,-8.28428 6.7157,-15 15,-15 z"
+           fill="#999999"
+           id="path6328" />
+        <path
+           d="m 889,224.21622 h 95 c 8.2843,0 15,6.71572 15,15 V 257 c 0,8.28427 -6.7157,15 -15,15 h -95 c -8.2843,0 -15,-6.71573 -15,-15 v -17.78378 c 0,-8.28428 6.7157,-15 15,-15 z"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="path6330" />
+      </g>
+      <g
+         id="Graphic_310">
+        <title
+           id="title6333">Subsystem</title>
+        <path
+           d="m 882,220 h 95 c 8.2843,0 15,6.71573 15,15 v 17.78378 c 0,8.28428 -6.7157,15 -15,15 h -95 c -8.2843,0 -15,-6.71572 -15,-15 V 235 c 0,-8.28427 6.7157,-15 15,-15 z"
+           fill="#ffffff"
+           id="path6335" />
+        <path
+           d="m 882,220 h 95 c 8.2843,0 15,6.71573 15,15 v 17.78378 c 0,8.28428 -6.7157,15 -15,15 h -95 c -8.2843,0 -15,-6.71572 -15,-15 V 235 c 0,-8.28427 6.7157,-15 15,-15 z"
+           stroke="#000000"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           stroke-width="1"
+           id="path6337" />
+        <text
+           transform="translate(872,234.6679)"
+           fill="#000000"
+           id="text6341"><tspan
+             font-family="'Helvetica Neue'"
+             font-size="16px"
+             fill="#000000"
+             x="14.092"
+             y="15"
+             id="tspan6339">HTTP router</tspan></text>
+      </g>
+    </g>
+    <g
+       id="Line_312">
+      <title
+         id="title6345">Message Bidirectional</title>
+      <line
+         x1="928.83289"
+         y1="176.1833"
+         x2="929.16711"
+         y2="210.10048"
+         marker-end="url(#FilledArrow_Marker)"
+         marker-start="url(#FilledArrow_Marker_2)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="line6347" />
+    </g>
+    <g
+       id="Graphic_313">
+      <text
+         transform="translate(916,282.552)"
+         fill="#000000"
+         id="text6352"><tspan
+           font-family="'Helvetica Neue'"
+           font-style="italic"
+           font-size="16px"
+           fill="#000000"
+           x="3.9435119e-13"
+           y="15"
+           id="tspan6350">Reitit</tspan></text>
+    </g>
+    <g
+       id="Line_314">
+      <path
+         d="M 828,253 H 706 v 53.1"
+         marker-end="url(#FilledArrow_Marker_3)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="path6355" />
+    </g>
+    <g
+       id="Line_321">
+      <path
+         d="M 1165,316 V 253 H 1046.9"
+         marker-end="url(#FilledArrow_Marker_3)"
+         stroke="#000000"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         stroke-width="1"
+         id="path6358" />
+    </g>
+    <g
+       id="Graphic_322">
+      <text
+         transform="translate(870.4595,341.276)"
+         fill="#000000"
+         id="text6363"><tspan
+           font-family="'Helvetica Neue'"
+           font-size="11px"
+           fill="#000000"
+           x="0"
+           y="10"
+           id="tspan6361">(selected by HTTP router)</tspan></text>
+    </g>
+    <g
+       id="Graphic_323">
+      <text
+         transform="translate(874,1518)"
+         fill="#000000"
+         id="text6368"><tspan
+           font-family="'Helvetica Neue'"
+           font-size="11px"
+           fill="#000000"
+           x="0"
+           y="10"
+           id="tspan6366">(selected by HTTP router)</tspan></text>
+    </g>
+  </g>
+</svg>

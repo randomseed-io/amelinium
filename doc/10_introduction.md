@@ -41,6 +41,9 @@ associates.
 
 * **Cookie-less** session handling.
 
+* [HTMX](https://htmx.org/)-driven **Hypermedia as the Engine of Application State**
+  ([HATEOAS](https://htmx.org/essays/hypermedia-apis-vs-data-apis/)) support.
+
 * **[Role-based access
   control](https://github.com/randomseed-io/amelinium/blob/main/resources/config/amelinium/config.edn#L96)**
   middleware with optional context detection.
@@ -123,7 +126,7 @@ Below is the simplified request processing workflow for a web channel. It may s
 some light on the overall architecture, especially when someone is new to Clojure way
 of handling HTTP with Ring abstraction.
 
-![Web request processing in Amelinium](docs/img/amelinium-workflow-web.svg)
+![Web request processing in Amelinium](doc/img/amelinium-workflow-web.svg)
 
 The HTTP server handles incoming connections with TCP sockets and negotiates
 connection parameters. When the bi-directional stream is ready the control is passed
@@ -268,6 +271,14 @@ Amelinium is based on the following Clojure and Java libraries:
     * [Tongue](https://github.com/tonsky/tongue) for translations
     * [java-wrapper](https://github.com/trptr/java-wrapper) for locale support
 
+* Frontend JavaScript libraries:
+
+    * [HTMX](https:/htmx.org/) for access to AJAX, CSS Transitions, WebSockets and
+      Server Sent Events directly in HTML
+
+    * [_hyperscript](https://hyperscript.org/) for enhancing HTML with concise DOM,
+      event and async features
+
 * Templates:
     * [Selmer](https://github.com/yogthos/Selmer) for rendering HTML views and layouts
 
@@ -355,13 +366,16 @@ Full documentation including usage examples is available at:
 
 ## License
 
-Copyright © 2022 Paweł Wilk
+Copyright © 2022-2023 Paweł Wilk
 
 May contain works from earlier free software projects, copyright © 2019-2022 Paweł Wilk
 
 Amelinium is copyrighted software owned by Paweł Wilk (pw@gnu.org). You may
 redistribute and/or modify this software as long as you comply with the terms of
 the [GNU Lesser General Public License][LICENSE] (version 3).
+
+Amelinium is delivered with the HTMX and _hyperscript JavaScript libraries licensed
+under [BSD-2-Clause license][HTMXLICENSE].
 
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
@@ -413,4 +427,5 @@ bin/repl
 
 Starts REPL and nREPL server (port number is stored in `.nrepl-port`).
 
-[LICENSE]:    https://github.com/randomseed-io/amelinium/blob/master/LICENSE
+[LICENSE]:     https://github.com/randomseed-io/amelinium/blob/master/LICENSE
+[HTMXLICENSE]: https://github.com/randomseed-io/amelinium/blob/master/HTMX-LICENSE

@@ -126,7 +126,7 @@ Below is the simplified request processing workflow for a web channel. It may s
 some light on the overall architecture, especially when someone is new to Clojure way
 of handling HTTP with Ring abstraction.
 
-![Web request processing in Amelinium](docs/img/amelinium-workflow-web.svg)
+![Web request processing in Amelinium](doc/img/amelinium-workflow-web.svg)
 
 The HTTP server handles incoming connections with TCP sockets and negotiates
 connection parameters. When the bi-directional stream is ready the control is passed

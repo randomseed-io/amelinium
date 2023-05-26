@@ -11,7 +11,8 @@ lint:
 docs:
 			echo "# Introduction" > doc/10_introduction.md
 			tail -n +2 README.md >> doc/10_introduction.md
-			cp -r docs/img docs/docs
+			mkdir -p docs/doc
+			cp -r doc/img docs/doc
 			bin/docs "$(VERSION)"
 			cp -r docs/* ../amelinium-docs
 
