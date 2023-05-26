@@ -101,11 +101,16 @@
         (.charAt s (unchecked-dec-int l))))))
 
 (defn- pboolean
+  "Like `clojure.core/parse-boolean` but on steroids. Parses a value `v` and if it is
+  `nil` or `false` or an empty collection, returns false; if it's `true`, returns
+  `true`. Otherwise tries to convert the given value to a string and if the result is
+  `nil` or a string indicating a false or an empty value (semantically), returns
+  `false`. Otherwise it returns `true`."
   [v]
   (if (or (nil? v) (false? v))
     false
     (or (true? v)
-        (if-some [v (some-str v)]
+        (if-some [v (if (valuable? v) (some-str v))]
           (not
            (contains? #{"" " " "\n" "\r" ":"
                         "nil" "null" "false" "no" "not" "none" "off"
