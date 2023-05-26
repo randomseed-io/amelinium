@@ -1252,7 +1252,7 @@
                [f req name-or-path lang path-params query-params]
                [f req name-or-path lang path-params query-params & more])}
   ([f]
-   (hx-transform-redirect (common/redirect f)) )
+   (hx-transform-redirect (common/redirect f)))
   ([f req-or-url]
    (hx-transform-redirect (common/redirect f req-or-url)))
   ([f req name-or-path]
