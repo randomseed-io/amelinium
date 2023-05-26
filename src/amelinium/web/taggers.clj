@@ -93,6 +93,7 @@
       "")))
 
 (defn last-char
+  "Returns last character of the given string `s` or `nil`."
   [^String s]
   (if s
     (let [l (unchecked-int (.length s))]
