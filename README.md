@@ -271,6 +271,14 @@ Amelinium is based on the following Clojure and Java libraries:
     * [Tongue](https://github.com/tonsky/tongue) for translations
     * [java-wrapper](https://github.com/trptr/java-wrapper) for locale support
 
+* Frontend JavaScript libraries:
+
+    * [HTMX](https:/htmx.org/) for access to AJAX, CSS Transitions, WebSockets and
+      Server Sent Events directly in HTML
+
+    * [_hyperscript](https://hyperscript.org/) for enhancing HTML with concise DOM,
+      event and async features
+
 * Templates:
     * [Selmer](https://github.com/yogthos/Selmer) for rendering HTML views and layouts
 
@@ -358,7 +366,7 @@ Full documentation including usage examples is available at:
 
 ## License
 
-Copyright © 2022 Paweł Wilk
+Copyright © 2022-2023 Paweł Wilk
 
 May contain works from earlier free software projects, copyright © 2019-2022 Paweł Wilk
 
@@ -366,7 +374,8 @@ Amelinium is copyrighted software owned by Paweł Wilk (pw@gnu.org). You may
 redistribute and/or modify this software as long as you comply with the terms of
 the [GNU Lesser General Public License][LICENSE] (version 3).
 
-Amelinium is delivered with the HTMX JavaScript library licensed under [BSD-2-Clause license][HTMXLICENSE].
+Amelinium is delivered with the HTMX and _hyperscript JavaScript libraries licensed
+under [BSD-2-Clause license][HTMXLICENSE].
 
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
