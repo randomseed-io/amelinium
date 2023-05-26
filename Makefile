@@ -19,7 +19,6 @@ docs:
 push-docs:
 			cd ../amelinium-docs
 			git push
-			cd -
 
 test-clj:
 			bin/test
