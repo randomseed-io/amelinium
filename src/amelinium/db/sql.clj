@@ -652,7 +652,7 @@
    (let [v# (vec args)
          l# (peek v#)
          r# (subvec v# 0 (unchecked-dec-int (count v#)))]
-     (if (str-convertable? l#)
+     (if (or (const-form? l#) (simple-quote-form? l#))
        `(build-query-core (strspc-squeezed ~a ~b ~@v#))
        `(build-query-core (strspc-squeezed ~a ~b ~@r#) ~l#)))))
 
@@ -732,7 +732,7 @@
    (let [v# (vec args)
          l# (peek v#)
          r# (subvec v# 0 (unchecked-dec-int (count v#)))]
-     (if (str-convertable? l#)
+     (if (or (const-form? l#) (simple-quote-form? l#))
        `(build-query-dynamic-core (strspc-squeezed ~a ~b ~@v#))
        `(build-query-dynamic-core (strspc-squeezed ~a ~b ~@r#) ~l#)))))
 

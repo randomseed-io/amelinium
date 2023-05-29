@@ -179,14 +179,14 @@
      (alter-var-root #'type-string-match
                      (constantly
                       (rdb/memoize
-                       (apply some-fn* type-string-matchers) 4096)))))
+                       (apply utils/some-fn* type-string-matchers) 4096)))))
   ([f & more]
    (locking #'type-string-matchers
      (doseq [f (cons f more)] (alter-var-root #'type-string-matchers conj f))
      (alter-var-root #'type-string-match
                      (constantly
                       (rdb/memoize
-                       (apply some-fn* type-string-matchers) 4096))))))
+                       (apply utils/some-fn* type-string-matchers) 4096))))))
 
 (defn del-type-string-matcher!
   "Deletes identity type string matcher of the given index `n` from a global
@@ -197,7 +197,7 @@
      (alter-var-root #'type-string-match
                      (constantly
                       (rdb/memoize
-                       (apply some-fn* type-string-matchers) 4096)))))
+                       (apply utils/some-fn* type-string-matchers) 4096)))))
   ([n & more]
    (locking #'type-string-matchers
      (doseq [n (cons n more)]
@@ -205,4 +205,4 @@
      (alter-var-root #'type-string-match
                      (constantly
                       (rdb/memoize
-                       (apply some-fn* type-string-matchers) 4096))))))
+                       (apply utils/some-fn* type-string-matchers) 4096))))))
