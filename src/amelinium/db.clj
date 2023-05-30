@@ -1415,7 +1415,8 @@
   [db-k-name ds op id]
   (case op
     :up   (log/msg "Applying DB migration"     id "on" (db-key-name db-k-name ds))
-    :down (log/msg "Rolling back DB migration" id "on" (db-key-name db-k-name ds))))
+    :down (log/msg "Rolling back DB migration" id "on" (db-key-name db-k-name ds))
+    (log/err "Unknown database operation" id "on" (db-key-name db-k-name ds))))
 
 (defn migrator-config
   [config loader migration-dir]

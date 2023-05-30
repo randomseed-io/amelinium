@@ -143,7 +143,8 @@
                                  (twilio/sendsms-async
                                   (get rdata :twilio/sms)
                                   req-updater exc-handler
-                                  id (tr sms-tr-key @template-params))))
+                                  id (tr sms-tr-key @template-params)))
+                        (log/web-wrn req "Unknown identity type:" id-type))
                       (-> req
                           (web/add-status :verify/sent)
                           (web/assoc-app-data

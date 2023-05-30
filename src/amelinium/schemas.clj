@@ -344,7 +344,8 @@
       :pred            #(case (identity/type %)
                           :uid   (uuid?                   (identity/value %))
                           :phone (vc/valid-regular-phone? (identity/value %))
-                          :email (vc/valid-email?         (identity/value %)))
+                          :email (vc/valid-email?         (identity/value %))
+                          false)
       :type-properties {:error/message       "should be a valid standard identity"
                         :decode/string       obj->identity
                         :decode/json         obj->identity
@@ -371,7 +372,8 @@
      {:type            :public-identity
       :pred            #(case (identity/type %)
                           :phone (vc/valid-regular-phone? (identity/value %))
-                          :email (vc/valid-email?         (identity/value %)))
+                          :email (vc/valid-email?         (identity/value %))
+                          false)
       :type-properties {:error/message       "should be an e-mail or a regular phone number"
                         :decode/string       obj->identity
                         :decode/json         obj->identity
