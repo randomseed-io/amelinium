@@ -9,12 +9,12 @@ associates.
 
 ## Important features
 
+* **[JSP model-2, Hypermedia-driven](https://randomseed.io/software/amelinium/20_hypermedia)
+  architecture** with **models**, **controllers**, **views** and **layouts**.
+
 * Configurable with **[EDN
   files](https://github.com/randomseed-io/amelinium/tree/main/resources/config/amelinium)**
   loaded from specified directories.
-
-* **[JSP model-2](https://en.wikipedia.org/wiki/JSP_model_2_architecture)
-  architecture** with **models**, **controllers**, **views** and **layouts**.
 
 * [System management](https://randomseed.io/software/amelinium/amelinium.app)
   functions, including **inspection** of current state, **starting/stopping** and
