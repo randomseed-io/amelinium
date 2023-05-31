@@ -262,8 +262,9 @@
   ([req] (login! req nil))
   ([req session-key]
    (let [^Session sess (session/of req session-key)
-         rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))]
-     (web/assoc-app-data req :lock-remains rem-mins))))
+         rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))
+         user-login    (delay (some-str (get-in req [:parameters :form :user/login])))]
+     (web/assoc-app-data req :lock-remains rem-mins :user/login user-login))))
 
 (defn logout!
   "Logs user out."
