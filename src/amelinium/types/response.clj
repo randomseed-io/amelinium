@@ -12,4 +12,4 @@
 
 (defrecord Response [^long                        status
                      ^clojure.lang.IPersistentMap headers
-                     ^String                      body])
+                     body])

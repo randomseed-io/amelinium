@@ -19,6 +19,7 @@
             [amelinium.api                      :as             api]
             [amelinium.auth                     :as            auth]
             [amelinium.http                     :as            http]
+            [amelinium.http.response            :as            resp]
             [amelinium.http.middleware.session  :as         session]
             [amelinium.http.middleware.language :as        language]
             [amelinium.http.client.twilio       :as          twilio]
@@ -72,7 +73,7 @@
   ([req user-email password ^Session sess route-data lang auth-only-mode session-key]
    (let [sk  (or session-key (session/session-key sess) (get route-data :session-key))
          req (super/auth-user-with-password! req user-email password sess route-data auth-only-mode session-key)]
-     (if (api/response? req)
+     (if (resp/response? req)
        req
        (let [lang   (or lang (common/pick-language req))
              tr-sub (i18n/no-default (common/translator-sub req lang))]

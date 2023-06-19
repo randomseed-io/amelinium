@@ -11,7 +11,7 @@
   (:require [potemkin.namespaces                :as            p]
             [reitit.coercion                    :as     coercion]
             [ring.middleware.keyword-params     :as      ring-kw]
-            [ring.util.http-response            :as         resp]
+            [amelinium.http.response            :as         resp]
             [tick.core                          :as            t]
             [amelinium.logging                  :as          log]
             [amelinium.model.user               :as         user]

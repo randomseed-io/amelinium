@@ -12,7 +12,7 @@
             [potemkin.namespaces                  :as               p]
             [lazy-map.core                        :as        lazy-map]
             [ring.util.response]
-            [ring.util.http-response              :as            resp]
+            [amelinium.http.response              :as            resp]
             [ring.util.request                    :as             req]
             [amelinium.utils                      :refer         :all]
             [amelinium.common                     :as          common]
@@ -125,14 +125,6 @@
          (seq body)
          body)))))
 
-(defn response?
-  "Returns `true` if the `req` context map is already an API response."
-  [req]
-  (and (map? req)
-       (integer?  (:status  req))
-       (or (map?  (:headers req))
-           (coll? (:body    req)))))
-
 (defn render-response
   "API response renderer. Uses the `render` function to render the response
   body (unless the `req` is already a valid response - in such case it is returned
@@ -151,19 +143,13 @@
   ([resp-fn]
    (render-response resp-fn nil))
   ([resp-fn req]
-   (if (response? req)
+   (if (resp/response? req)
      req
-     (let [resp (resp-fn (render req))]
-       (if-some [headers (get req :response/headers)]
-         (qassoc resp :headers headers)
-         resp))))
+     (resp-fn (render req) (or (get req :response/headers) {}))))
   ([resp-fn status req]
-   (if (response? req)
+   (if (resp/response? req)
      req
-     (let [resp (resp-fn (render req status))]
-       (if-some [headers (get req :response/headers)]
-         (qassoc resp :headers headers)
-         resp)))))
+     (resp-fn (render req status) (or (get req :response/headers) {})))))
 
 (defn render-response-force
   "API response renderer. Uses the `render` function to render the response body and
@@ -182,15 +168,9 @@
   ([resp-fn]
    (render-response-force resp-fn nil))
   ([resp-fn req]
-   (let [resp (resp-fn (render req))]
-     (if-some [headers (get req :response/headers)]
-       (qassoc resp :headers headers)
-       resp)))
+   (resp-fn (render req (or (get req :response/headers) {}))))
   ([resp-fn status req]
-   (let [resp (resp-fn (render req status))]
-     (if-some [headers (get req :response/headers)]
-       (qassoc resp :headers headers)
-       resp))))
+   (resp-fn (render req status) (or (get req :response/headers) {}))))
 
 ;; OK response
 
@@ -562,82 +542,134 @@
   `:response/body`). If a name or a path is not given as `name-or-path`, it is looked
   up in `req` under the `:response/location` key."
   ([]
-   (common/render resp/created))
+   (resp/render resp/created))
   ([req]
-   (if-some [resp (common/created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created))))
-  ([req name-or-path]
-   (if-some [resp (common/created req name-or-path)]
-     (qassoc resp :body (render req :ok/created))))
-  ([req name-or-path lang]
-   (if-some [resp (common/created req name-or-path lang)]
-     (qassoc resp :body (render req :ok/created))))
-  ([req name-or-path lang params]
-   (if-some [resp (common/created req name-or-path lang params)]
-     (qassoc resp :body (render req :ok/created))))
-  ([req name-or-path lang params query-params]
-   (if-some [resp (common/created req name-or-path lang params query-params)]
-     (qassoc resp :body (render req :ok/created))))
-  ([req name-or-path lang params query-params & more]
-   (if-some [resp (apply common/created req name-or-path lang params query-params more)]
-     (qassoc resp :body (render req :ok/created)))))
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location page req)))
+  ([req data]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location page req)))
+  ([req data view]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location page req)))
+  ([req data view layout]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location page req)))
+  ([req data view layout lang]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location page req lang)))
+  ([req data view layout lang name-or-path]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (page req name-or-path lang))))
+  ([req data view layout lang name-or-path params]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (page req name-or-path lang params))))
+  ([req data view layout lang name-or-path params query-params]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (page req name-or-path lang params query-params))))
+  ([req data view layout lang name-or-path params query-params & more]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (apply page req name-or-path lang params query-params more)))))
 
 (defn render-localized-created
   "Renders 201 response with a localized redirect and possible body taken from a
   request map (under the `:response/body`). If a name or a path is not given as
   `name-or-path`, it is looked up in `req` under the `:response/location` key."
   ([]
-   (render-response resp/created))
+   (resp/render resp/created))
   ([req]
-   (if-some [resp (common/localized-created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created))))
-  ([req name-or-path]
-   (if-some [resp (common/localized-created req name-or-path)]
-     (qassoc resp :body (render req :ok/created))))
-  ([req name-or-path lang]
-   (if-some [resp (common/localized-created req name-or-path lang)]
-     (qassoc resp :body (render req :ok/created))))
-  ([req name-or-path lang params]
-   (if-some [resp (common/localized-created req name-or-path lang params)]
-     (qassoc resp :body (render req :ok/created))))
-  ([req name-or-path lang params query-params]
-   (if-some [resp (common/localized-created req name-or-path lang params query-params)]
-     (qassoc resp :body (render req :ok/created))))
-  ([req name-or-path lang params query-params & more]
-   (if-some [resp (apply common/localized-created req name-or-path lang params query-params more)]
-     (qassoc resp :body (render req :ok/created)))))
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location localized-page req)))
+  ([req data]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location localized-page req)))
+  ([req data view]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location localized-page req)))
+  ([req data view layout]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location localized-page req)))
+  ([req data view layout lang]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location localized-page req lang)))
+  ([req data view layout lang name-or-path]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (localized-page req name-or-path lang))))
+  ([req data view layout lang name-or-path params]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (localized-page req name-or-path lang params))))
+  ([req data view layout lang name-or-path params query-params]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (localized-page req name-or-path lang params query-params))))
+  ([req data view layout lang name-or-path params query-params & more]
+   (resp/created (render req :ok/created)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (apply localized-page req name-or-path lang params query-params more)))))
 
 ;; Responses without a body
 
 (defn render-continue
   "Renders 100 response without a body."
   ([]           (resp/continue))
-  ([req]        (common/render resp/continue req))
-  ([req & more] (common/render resp/continue req)))
+  ([req]        (resp/render resp/continue req))
+  ([req & more] (resp/render resp/continue req)))
 
 (defn render-switching-protocols
   "Renders 101 response without a body."
   ([]           (resp/switching-protocols))
-  ([req]        (common/render resp/switching-protocols req))
-  ([req & more] (common/render resp/switching-protocols req)))
+  ([req]        (resp/render resp/switching-protocols req))
+  ([req & more] (resp/render resp/switching-protocols req)))
 
 (defn render-processing
   "Renders 102 response without a body."
   ([]           (resp/processing))
-  ([req]        (common/render resp/processing req))
-  ([req & more] (common/render resp/processing req)))
+  ([req]        (resp/render resp/processing req))
+  ([req & more] (resp/render resp/processing req)))
 
 (defn render-no-content
   "Renders 204 response without a body."
   ([]           (resp/no-content))
-  ([req]        (common/render resp/no-content req))
-  ([req & more] (common/render resp/no-content req)))
+  ([req]        (resp/render resp/no-content req))
+  ([req & more] (resp/render resp/no-content req)))
 
 (defn render-reset-content
   "Renders 205 response without a body."
   ([]           (resp/reset-content))
-  ([req]        (common/render resp/reset-content req))
-  ([req & more] (common/render resp/reset-content req)))
+  ([req]        (resp/render resp/reset-content req))
+  ([req & more] (resp/render resp/reset-content req)))
 
 ;; Rendering based on application-logic error
 
@@ -922,8 +954,8 @@
   returned. Otherwise the expressions from `code` are evaluated."
   [req & code]
   (if (and (seq? code) (> (count code) 1))
-    `(let [req# ~req] (if (response? req#) req# (do ~@code)))
-    `(let [req# ~req] (if (response? req#) req# ~@code))))
+    `(let [req# ~req] (if (resp/response? req#) req# (do ~@code)))
+    `(let [req# ~req] (if (resp/response? req#) req# ~@code))))
 
 (defmacro add-body
   "Adds a response body to a request map `req` under its key `:response/body` using

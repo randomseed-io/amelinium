@@ -60,8 +60,10 @@
 (defn most-significant
   "Returns the most significant error from the given `errors` using the given
   `config` (which may be of type `ErrorsConfig`, a request map, or a `Match`
-  object). If `errors` is not a sequence but an identifier, it is returned as-is.
-  Returns `nil` when `config-src` is `nil` or `errors` is `nil`."
+  object).
+
+  If `errors` is not a sequence but an identifier, it is returned. Returns `nil` when
+  `config-src` is `nil` or `errors` is `nil`."
   ^Keyword [^ErrorsConfigurable config-src errors]
   (if errors
     (if (ident? errors)
@@ -91,10 +93,13 @@
     (.default-response config)))
 
 (defn render
-  "Renders an error or status response using `render-fn`. If the response rendering
+  "Renders an error or a status response using `render-fn`. If the response rendering
   function cannot be established, configuration default is used. Returns `nil` when
   `config-src` is `nil`. Any additional arguments, including (and starting from)
-  `req` are passed to the rendering function call."
+  `req` are passed to the rendering function call.
+
+  Most common use of this function is to translate application status to a response
+  function."
   ([^ErrorsConfigurable config-src]
    (render config-src nil nil))
   ([^ErrorsConfigurable config-src error]

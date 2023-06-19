@@ -16,7 +16,7 @@
             [reitit.coercion                       :as        coercion]
             [ring.util.response]
             [ring.util.codec                       :as           codec]
-            [ring.util.http-response               :as            resp]
+            [amelinium.http.response               :as            resp]
             [ring.util.request                     :as             req]
             [clj-uuid                              :as            uuid]
             [jsonista.core                         :as               j]
@@ -97,6 +97,8 @@
   (if-some [lgr (oplog-logger-populated req-or-match)] (lgr message)))
 
 ;; Routing data and settings helpers
+
+(def ^:const fast-url-matcher (re-pattern "^[a-zA-Z0-9\\+\\.\\-]+\\:"))
 
 (defn router-match?
   "Returns true if the given argument is Reitit's Match object."
@@ -187,23 +189,46 @@
          auth?  (boolean (get rd (or auth-page-data  :auth-page?)))]
      [login? auth?])))
 
-;; Path parsing
-
-(def ^:const max-url-len      8192)
-(def ^:const page-cache-len   4096)
-(def ^:const fast-url-matcher (re-pattern "^[a-zA-Z0-9\\+\\.\\-]+\\:"))
-(def ^:const path-splitter    (re-pattern "([^\\?\\#]+)(\\#[^\\?]+)?(\\?.*)?"))
-(def ^:const split-qparams    (re-pattern "[^\\?\\#]+|[\\?\\#].*"))
-(def ^:const on-slash         (re-pattern "/"))
-(def ^:const slash-break      (re-pattern "[^/]+|/"))
-
 (defn is-url?
+  "Returns `true` if the given argument `s` is a non-empty string that begins like an
+  URL. Returns `false` otherwise."
   [s]
   (if (and s (string? s))
     (let [^String s s]
       (and (not-empty-string? s)
            (not= \/ (.charAt s 0))
            (some? (re-find fast-url-matcher s))))))
+
+(defn resolve-location
+  "Tries to get a value of `:response/location` key of the given request map `req`. If
+  it is found and it is a URL, it is returned. If it is found and it is a path or
+  page identifier it is parsed with the function `f`. Optional `lang`, `params`,
+  `qparams` and any other additional arguments are passed as arguments during the
+  call to `f`. If there is no response location, `nil` is returned."
+  ([f req]
+   (if-some [l (get req :response/location)]
+     (if (is-url? l) l (f req l))))
+  ([f req lang]
+   (if-some [l (get req :response/location)]
+     (if (is-url? l) l (f req l lang))))
+  ([f req lang params]
+   (if-some [l (get req :response/location)]
+     (if (is-url? l) l (f req l lang params))))
+  ([f req lang params qparams]
+   (if-some [l (get req :response/location)]
+     (if (is-url? l) l (f req l lang params qparams))))
+  ([f req lang params qparams & more]
+   (if-some [l (get req :response/location)]
+     (if (is-url? l) l (apply f req l lang params qparams more)))))
+
+;; Path parsing
+
+(def ^:const max-url-len      8192)
+(def ^:const page-cache-len   4096)
+(def ^:const path-splitter    (re-pattern "([^\\?\\#]+)(\\#[^\\?]+)?(\\?.*)?"))
+(def ^:const split-qparams    (re-pattern "[^\\?\\#]+|[\\?\\#].*"))
+(def ^:const on-slash         (re-pattern "/"))
+(def ^:const slash-break      (re-pattern "[^/]+|/"))
 
 (defn path-variants-core
   "Generates a list of all possible language variants of a path."
@@ -1034,93 +1059,6 @@
     :headers {}
     :body    body}))
 
-;; Rendering
-
-(defn render
-  "Universal response renderer. Returns the result of calling the `resp-fn` with
-  headers attached (from `:response/headers` key of the `req`) unless the req is
-  already a valid response. Arguments from the third are passed to `resp-fn`
-  function."
-  ([resp-fn]
-   (resp-fn))
-  ([resp-fn req]
-   (if (nil? req)
-     (resp-fn)
-     (if (resp/response? req)
-       req
-       (if-some [headers (get req :response/headers)]
-         (let [r (resp-fn)] (qassoc r :headers (conj (get r :headers) headers)))
-         (resp-fn)))))
-  ([resp-fn req a]
-   (if (nil? req)
-     (resp-fn a)
-     (if (resp/response? req)
-       req
-       (if-some [headers (get req :response/headers)]
-         (let [r (resp-fn a)] (qassoc r :headers (conj (get r :headers) headers)))
-         (resp-fn a)))))
-  ([resp-fn req a b]
-   (if (nil? req)
-     (resp-fn a b)
-     (if (resp/response? req)
-       req
-       (if-some [headers (get req :response/headers)]
-         (let [r (resp-fn a b)] (qassoc r :headers (conj (get r :headers) headers)))
-         (resp-fn a b)))))
-  ([resp-fn req a b c]
-   (if (nil? req)
-     (apply resp-fn a b c)
-     (if (resp/response? req)
-       req
-       (if-some [headers (get req :response/headers)]
-         (let [r (resp-fn a b c)] (qassoc r :headers (conj (get r :headers) headers)))
-         (resp-fn a b c)))))
-  ([resp-fn req a b c & more]
-   (if (nil? req)
-     (apply resp-fn a b c more)
-     (if (resp/response? req)
-       req
-       (if-some [headers (get req :response/headers)]
-         (let [r (apply resp-fn a b c more)] (qassoc r :headers (conj (get r :headers) headers)))
-         (apply resp-fn a b c more))))))
-
-(defn render-force
-  "Universal body-less response renderer. Returns the result of calling the `resp-fn`
-  with headers attached (from `:response/headers` key of the `req`). Arguments from
-  the third are passed to `resp-fn` function."
-  ([resp-fn]
-   (resp-fn))
-  ([resp-fn req]
-   (if (nil? req)
-     (resp-fn)
-     (if-some [headers (get req :response/headers)]
-       (let [r (resp-fn)] (qassoc r :headers (conj (get r :headers) headers)))
-       (resp-fn))))
-  ([resp-fn req a]
-   (if (nil? req)
-     (resp-fn a)
-     (if-some [headers (get req :response/headers)]
-       (let [r (resp-fn a)] (qassoc r :headers (conj (get r :headers) headers)))
-       (resp-fn a))))
-  ([resp-fn req a b]
-   (if (nil? req)
-     (resp-fn a b)
-     (if-some [headers (get req :response/headers)]
-       (let [r (resp-fn a b)] (qassoc r :headers (conj (get r :headers) headers)))
-       (resp-fn a b))))
-  ([resp-fn req a b c]
-   (if (nil? req)
-     (resp-fn a b c)
-     (if-some [headers (get req :response/headers)]
-       (let [r (resp-fn a b c)] (qassoc r :headers (conj (get r :headers) headers)))
-       (resp-fn a b c))))
-  ([resp-fn req a b c & more]
-   (if (nil? req)
-     (apply resp-fn a b c more)
-     (if-some [headers (get req :response/headers)]
-       (let [r (apply resp-fn a b c more)] (qassoc r :headers (conj (get r :headers) headers)))
-       (apply resp-fn a b c more)))))
-
 ;; HTMX
 
 (defn hx-request?
@@ -1189,20 +1127,20 @@
    (f "/"))
   ([f req-or-url]
    (if (map? req-or-url)
-     (render-force f req-or-url (page req-or-url))
-     (render-force f nil req-or-url)))
+     (resp/render-force f req-or-url (page req-or-url))
+     (resp/render-force f nil req-or-url)))
   ([f req name-or-path]
    (if (is-url? name-or-path)
-     (render-force f req name-or-path)
-     (render-force f req (page req name-or-path))))
+     (resp/render-force f req name-or-path)
+     (resp/render-force f req (page req name-or-path))))
   ([f req name-or-path lang]
-   (render-force f req (page req name-or-path lang)))
+   (resp/render-force f req (page req name-or-path lang)))
   ([f req name-or-path lang params]
-   (render-force f req (page req name-or-path lang params)))
+   (resp/render-force f req (page req name-or-path lang params)))
   ([f req name-or-path lang params query-params]
-   (render-force f req (page req name-or-path lang params query-params)))
+   (resp/render-force f req (page req name-or-path lang params query-params)))
   ([f req name-or-path lang params query-params & more]
-   (render-force f req (apply page req name-or-path lang params query-params more))))
+   (resp/render-force f req (apply page req name-or-path lang params query-params more))))
 
 (defn localized-redirect
   "Generic redirect wrapper. The `f` should be a function which takes a request map and
@@ -1227,20 +1165,20 @@
    (f "/"))
   ([f req-or-url]
    (if (map? req-or-url)
-     (render-force f req-or-url (localized-page req-or-url))
-     (render-force f nil req-or-url)))
+     (resp/render-force f req-or-url (localized-page req-or-url))
+     (resp/render-force f nil req-or-url)))
   ([f req name-or-path]
    (if (is-url? name-or-path)
-     (render-force f req name-or-path)
-     (render-force f req (localized-page req name-or-path))))
+     (resp/render-force f req name-or-path)
+     (resp/render-force f req (localized-page req name-or-path))))
   ([f req name-or-path lang]
-   (render-force f req (localized-page req name-or-path lang)))
+   (resp/render-force f req (localized-page req name-or-path lang)))
   ([f req name-or-path lang params]
-   (render-force f req (localized-page req name-or-path lang params)))
+   (resp/render-force f req (localized-page req name-or-path lang params)))
   ([f req name-or-path lang params query-params]
-   (render-force f req (localized-page req name-or-path lang params query-params)))
+   (resp/render-force f req (localized-page req name-or-path lang params query-params)))
   ([f req name-or-path lang params query-params & more]
-   (render-force f req (apply localized-page req name-or-path lang params query-params more))))
+   (resp/render-force f req (apply localized-page req name-or-path lang params query-params more))))
 
 (defmacro def-redirect
   "Generates a language-parameterized redirect function which acts like `redirect`."
@@ -1278,20 +1216,20 @@
            (f# "/"))
           (~'[req-or-url]
            (if (map? ~'req-or-url)
-             (render-force f# ~'req-or-url (page ~'req-or-url))
-             (render-force f# nil ~'req-or-url)))
+             (resp/render-force f# ~'req-or-url (page ~'req-or-url))
+             (resp/render-force f# nil ~'req-or-url)))
           (~'[req name-or-path]
            (if (is-url? ~'name-or-path)
-             (render-force f# ~'req ~'name-or-path)
-             (render-force f# ~'req (page ~'req ~'name-or-path))))
+             (resp/render-force f# ~'req ~'name-or-path)
+             (resp/render-force f# ~'req (page ~'req ~'name-or-path))))
           (~'[req name-or-path lang]
-           (render-force f# ~'req (page ~'req ~'name-or-path ~'lang)))
+           (resp/render-force f# ~'req (page ~'req ~'name-or-path ~'lang)))
           (~'[req name-or-path lang params]
-           (render-force f# ~'req (page ~'req ~'name-or-path ~'lang ~'params)))
+           (resp/render-force f# ~'req (page ~'req ~'name-or-path ~'lang ~'params)))
           (~'[req name-or-path lang params query-params]
-           (render-force f# ~'req (page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
+           (resp/render-force f# ~'req (page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
           (~'[req name-or-path lang params query-params & more]
-           (render-force f# ~'req (apply page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
+           (resp/render-force f# ~'req (apply page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
 
 (defmacro def-localized-redirect
   "Generates a language-parameterized redirect function which acts like
@@ -1339,20 +1277,20 @@
            (f# "/"))
           (~'[req-or-url]
            (if (map? ~'req-or-url)
-             (render-force f# ~'req-or-url (localized-page ~'req-or-url))
-             (render-force f# nil ~'req-or-url)))
+             (resp/render-force f# ~'req-or-url (localized-page ~'req-or-url))
+             (resp/render-force f# nil ~'req-or-url)))
           (~'[req name-or-path]
            (if (is-url? ~'name-or-path)
-             (render-force f# ~'req ~'name-or-path)
-             (render-force f# ~'req (localized-page ~'req ~'name-or-path))))
+             (resp/render-force f# ~'req ~'name-or-path)
+             (resp/render-force f# ~'req (localized-page ~'req ~'name-or-path))))
           (~'[req name-or-path lang]
-           (render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang)))
+           (resp/render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang)))
           (~'[req name-or-path lang params]
-           (render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang ~'params)))
+           (resp/render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang ~'params)))
           (~'[req name-or-path lang params query-params]
-           (render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
+           (resp/render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
           (~'[req name-or-path lang params query-params & more]
-           (render-force f# ~'req (apply localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
+           (resp/render-force f# ~'req (apply localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
 
 (def-redirect           created                      resp/created             201)
 (def-redirect           multiple-choices             resp/multiple-choices    300)
@@ -1376,13 +1314,13 @@
 
 (defn not-modified
   ([]           (resp/not-modified))
-  ([req]        (if (nil? req) (resp/not-modified) (render-force resp/not-modified req)))
-  ([req & more] (if (nil? req) (resp/not-modified) (render-force resp/not-modified req))))
+  ([req]        (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req)))
+  ([req & more] (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req))))
 
 (defn localized-not-modified
   ([]           (resp/not-modified))
-  ([req]        (if (nil? req) (resp/not-modified) (render-force resp/not-modified req)))
-  ([req & more] (if (nil? req) (resp/not-modified) (render-force resp/not-modified req))))
+  ([req]        (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req)))
+  ([req & more] (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req))))
 
 ;; Language
 

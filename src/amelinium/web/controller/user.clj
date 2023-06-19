@@ -10,7 +10,7 @@
 
   (:require [tick.core                          :as               t]
             [clojure.string                     :as             str]
-            [ring.util.http-response            :as            resp]
+            [amelinium.http.response            :as            resp]
             [amelinium.types.session            :refer         :all]
             [amelinium.logging                  :as             log]
             [amelinium.db                       :as              db]
@@ -190,7 +190,8 @@
 
 (defn auth-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
-  conditions and may emit a redirect or render a response."
+  conditions and may emit a redirect or render a response. Uses
+  `amelinium.web/handle-error`."
   ([req user-email password]
    (auth-with-password! req user-email password nil nil nil false nil))
   ([req user-email password sess]
@@ -205,7 +206,7 @@
    (let [route-data (or route-data (http/get-route-data req))
          req        (super/auth-user-with-password! req user-email password sess route-data auth-only? session-key)
          status     (get req :response/status)]
-     (if (web/response? req)
+     (if (resp/response? req)
        req
        (case status
          :auth/ok            (if auth-only? req (auth-ok req route-data lang))
@@ -494,7 +495,7 @@
         old-password (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))
         route-data   (http/get-route-data req)
         req          (auth-with-password! req user-email old-password nil route-data nil true nil)]
-    (if (web/response? req)
+    (if (resp/response? req)
       req
       (if (identical? :auth/ok (get req :response/status))
         (if-not (= new-password new-repeated)

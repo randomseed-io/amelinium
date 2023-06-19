@@ -9,7 +9,7 @@
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require [tick.core                          :as               t]
-            [ring.util.http-response            :as            resp]
+            [amelinium.http.response            :as            resp]
             [clojure.string                     :as             str]
             [amelinium.types.session            :refer         :all]
             [amelinium.logging                  :as             log]
@@ -274,22 +274,29 @@
 (defn render!
   "Renders page after a specific web controller was called. The `:app/view` and
   `:app/layout` keys are added to the request data by controllers to indicate which
-  view and layout file should be used. Data passed to the template system is
-  populated with common keys which should be present in `:app/data`. If the
-  `:response/fn` is set then it will be used instead of `web/render-ok` to render an
-  HTML response."
+  view and layout file should be used.
+
+  Data passed to the template system is populated with common keys which should be
+  present in `:app/data`. If the `:response/fn` is set then it will be used instead
+  of `web/render-ok` to render an HTML response."
   ([req]
-   (if-some [st (get req :response/status)]
-     (web/render-status req st)
-     (if-some [f (get req :response/fn)]
-       (f req)
-       (web/render-ok req))))
-  ([req status-or-fn]
-   (if (ident? status-or-fn)
-     (web/render-status req status-or-fn)
-     (if (fn? status-or-fn)
-       (status-or-fn req)
-       (web/render-ok req)))))
+   (web/response
+    req
+    (log/web-dbg req "Default rendering initiated.")
+    (if-some [st (get req :response/status)]
+      (web/render-status req st)
+      (if-some [f (get req :response/fn)]
+        (f req)
+        (web/render-ok req)))))
+  ([req app-status-or-fn]
+   (web/response
+    req
+    (log/web-dbg req "Default rendering initiated.")
+    (if (ident? app-status-or-fn)
+      (web/render-status req app-status-or-fn)
+      (if (fn? app-status-or-fn)
+        (app-status-or-fn req)
+        (web/render-ok req))))))
 
 (defn default
   [req]

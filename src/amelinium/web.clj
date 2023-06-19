@@ -15,11 +15,13 @@
             [tick.core                            :as               t]
             [reitit.core                          :as               r]
             [ring.util.response]
-            [ring.util.http-response              :as            resp]
+            [amelinium.http.response              :as            resp]
             [ring.util.request                    :as             req]
             [selmer.parser                        :as          selmer]
+            [amelinium                            :refer         :all]
             [amelinium.db                         :as              db]
             [amelinium.i18n                       :as            i18n]
+            [amelinium.types.response             :refer         :all]
             [amelinium.utils                      :refer         :all]
             [amelinium.common                     :as          common]
             [amelinium.errors                     :as          errors]
@@ -36,7 +38,8 @@
             [hiccup.table                         :as           table]
             [lazy-map.core                        :as        lazy-map])
 
-  (:import (reitit.core  Match)
+  (:import (amelinium     Response)
+           (reitit.core   Match)
            (java.io       File)
            (lazy_map.core LazyMapEntry
                           LazyMap)))
@@ -116,6 +119,18 @@
                 roles-for-context roles-for-contexts default-contexts-labeler
                 roles-matrix roles-tabler])
 
+;; Lazy map handling
+
+(defn map-to-lazy
+  "Ensures that the given argument `m` is a lazy map. If it is not a map, it is
+  returned as is. If it is `nil`, empty lazy map is returned."
+  [m]
+  (if (map? m)
+    (map/to-lazy m)
+    (if (nil? m)
+      empty-lazy-map
+      m)))
+
 ;; HTML generators and transformers
 
 (defn roles-table
@@ -129,25 +144,17 @@
      (if (and data labels)
        (html (table/to-table1d data labels))))))
 
-;; HTML rendering and :app/data
-
-(defn map-to-lazy
-  "Ensures that the given argument `m` is a lazy map. If it is not a map, it is
-  returned as is. If it is `nil`, empty lazy map is returned."
-  [m]
-  (if (map? m)
-    (map/to-lazy m)
-    (if (nil? m)
-      empty-lazy-map
-      m)))
+;; HTML response
 
 (defmacro response
   "Creates a response block. If the given `req` is already a response then it is simply
-  returned. Otherwise the expressions from `code` are evaluated."
-  [req & code]
-  (if (and (seq? code) (> (count code) 1))
-    `(let [req# ~req] (if (response? req#) req# (do ~@code)))
-    `(let [req# ~req] (if (response? req#) req# ~@code))))
+  returned. Otherwise the expressions from `body` are evaluated in an implicit `do`."
+  [req & body]
+  (if (and (seq? body) (> (count body) 1))
+    `(let [req# ~req] (if (resp/response? req#) req# (do ~@body)))
+    `(let [req# ~req] (if (resp/response? req#) req# ~@body))))
+
+;; Handling :app/data
 
 (defn get-missing-app-data-from-req
   "Associates missing data identified with keys listed in `keyz` with values taken from
@@ -680,11 +687,6 @@
        (do (log/web-err req "Rendering empty document since no layout nor view was set")
            "")))))
 
-(defn response?
-  "Returns `true` if the given context map `req` is a response."
-  [req]
-  (resp/response? req))
-
 (defn render-response
   "Web response renderer. Uses the `render` function to render a response body (using
   values associated with the `:app/data`, `:app/view`, `:app/layout`, `:app/view-dir`
@@ -736,11 +738,9 @@
   ([resp-fn status req data view layout lang]
    (if (resp/response? req)
      req
-     (let [req (set-target-header req)
-           r   (-> (render req status data view layout lang) (resp-fn))]
-       (if-some [headers (get req :response/headers)]
-         (qassoc r :headers (conj (get r :headers) headers))
-         r)))))
+     (let [req (set-target-header req)]
+       (-> (render req status data view layout lang)
+           (resp-fn (or (get req :response/headers) {})))))))
 
 (defn render-response-force
   "Web response renderer. Uses the `render` function to render a response body
@@ -791,11 +791,9 @@
   ([resp-fn status req data view layout]
    (render-response-force resp-fn status req data view layout nil))
   ([resp-fn status req data view layout lang]
-   (let [req (set-target-header req)
-         r   (-> (render req status data view layout lang) (resp-fn))]
-     (if-some [headers (get req :response/headers)]
-       (qassoc r :headers (conj (get r :headers) headers))
-       r))))
+   (let [req (set-target-header req)]
+     (-> (render req status data view layout lang)
+         (resp-fn (or (get req :response/headers) {}))))))
 
 ;; Rendering functions generation
 
@@ -924,31 +922,45 @@
   `name-or-path` argument or, if not given, from the `:response/location` key of the
   given request map (`req`)."
   ([]
-   (common/render resp/created))
+   (resp/render resp/created))
   ([req]
-   (if-some [resp (common/created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created nil nil nil nil))))
+   (resp/created (render req :ok/created nil nil nil nil)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location page req)))
   ([req data]
-   (if-some [resp (common/created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created data nil nil nil))))
+   (resp/created (render req :ok/created data nil nil nil)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location page req)))
   ([req data view]
-   (if-some [resp (common/created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created data view nil nil))))
+   (resp/created (render req :ok/created data view nil nil)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location page req)))
   ([req data view layout]
-   (if-some [resp (common/created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created data view layout nil))))
+   (resp/created (render req :ok/created data view layout nil)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location page req)))
   ([req data view layout lang]
-   (if-some [resp (common/created req (get req :response/location) lang)]
-     (qassoc resp :body (render req :ok/created data view layout lang))))
+   (resp/created (render req :ok/created data view layout lang)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location page req lang)))
   ([req data view layout lang name-or-path]
-   (if-some [resp (common/created req name-or-path lang)]
-     (qassoc resp :body (render req :ok/created data view layout lang))))
+   (resp/created (render req :ok/created data view layout lang)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (page req name-or-path lang))))
   ([req data view layout lang name-or-path params]
-   (if-some [resp (common/created req name-or-path lang params)]
-     (qassoc resp :body (render req :ok/created data view layout lang))))
+   (resp/created (render req :ok/created data view layout lang)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (page req name-or-path lang params))))
   ([req data view layout lang name-or-path params query-params]
-   (if-some [resp (common/created req name-or-path lang params query-params)]
-     (qassoc resp :body (render req :ok/created data view layout lang)))))
+   (resp/created (render req :ok/created data view layout lang)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (page req name-or-path lang params query-params)))))
 
 (defn localized-render-created
   "Renders 201 response with a redirect (possibly localized if a destination path is
@@ -957,63 +969,77 @@
   to be language parameterized. See `render` documentation to know more about body
   rendering."
   ([]
-   (common/render resp/created))
+   (resp/render resp/created))
   ([req]
-   (if-some [resp (common/localized-created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created nil nil nil nil))))
+   (resp/created (render req :ok/created nil nil nil nil)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location localized-page req)))
   ([req data]
-   (if-some [resp (common/localized-created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created data nil nil nil))))
+   (resp/created (render req :ok/created data nil nil nil)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location localized-page req)))
   ([req data view]
-   (if-some [resp (common/localized-created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created data view nil nil))))
+   (resp/created (render req :ok/created data view nil nil)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location localized-page req)))
   ([req data view layout]
-   (if-some [resp (common/localized-created req (get req :response/location))]
-     (qassoc resp :body (render req :ok/created data view layout nil))))
+   (resp/created (render req :ok/created data view layout nil)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location localized-page req)))
   ([req data view layout lang]
-   (if-some [resp (common/localized-created req (get req :response/location) lang)]
-     (qassoc resp :body (render req :ok/created data view layout lang))))
+   (resp/created (render req :ok/created data view layout lang)
+                 (or (get req :response/headers) {})
+                 (common/resolve-location localized-page req lang)))
   ([req data view layout lang name-or-path]
-   (if-some [resp (common/localized-created req name-or-path lang)]
-     (qassoc resp :body (render req :ok/created data view layout lang))))
+   (resp/created (render req :ok/created data view layout lang)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (localized-page req name-or-path lang))))
   ([req data view layout lang name-or-path params]
-   (if-some [resp (common/localized-created req name-or-path lang params)]
-     (qassoc resp :body (render req :ok/created data view layout lang))))
+   (resp/created (render req :ok/created data view layout lang)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (localized-page req name-or-path lang params))))
   ([req data view layout lang name-or-path params query-params]
-   (if-some [resp (common/localized-created req name-or-path lang params query-params)]
-     (qassoc resp :body (render req :ok/created data view layout lang)))))
+   (resp/created (render req :ok/created data view layout lang)
+                 (or (get req :response/headers) {})
+                 (if (common/is-url? name-or-path)
+                   name-or-path
+                   (localized-page req name-or-path lang params query-params)))))
 
 ;; Responses without bodies
 
 (defn render-continue
   "Renders 100 response without a body."
   ([]              (resp/continue))
-  ([req]           (common/render resp/continue req))
-  ([req & ignored] (common/render resp/continue req)))
+  ([req]           (resp/render resp/continue req))
+  ([req & ignored] (resp/render resp/continue req)))
 
 (defn render-switching-protocols
   "Renders 101 response without a body."
   ([]              (resp/switching-protocols))
-  ([req]           (common/render resp/switching-protocols req))
-  ([req & ignored] (common/render resp/switching-protocols req)))
+  ([req]           (resp/render resp/switching-protocols req))
+  ([req & ignored] (resp/render resp/switching-protocols req)))
 
 (defn render-processing
   "Renders 102 response without a body."
   ([]              (resp/processing))
-  ([req]           (common/render resp/processing req))
-  ([req & ignored] (common/render resp/processing req)))
+  ([req]           (resp/render resp/processing req))
+  ([req & ignored] (resp/render resp/processing req)))
 
 (defn render-no-content
   "Renders 204 response without a body."
   ([]              (resp/no-content))
-  ([req]           (common/render resp/no-content req))
-  ([req & ignored] (common/render resp/no-content req)))
+  ([req]           (resp/render resp/no-content req))
+  ([req & ignored] (resp/render resp/no-content req)))
 
 (defn render-reset-content
   "Renders 205 response without a body."
   ([]              (resp/reset-content))
-  ([req]           (common/render resp/reset-content req))
-  ([req & ignored] (common/render resp/reset-content req)))
+  ([req]           (resp/render resp/reset-content req))
+  ([req & ignored] (resp/render resp/reset-content req)))
 
 ;; Rendering based on application-logic error
 
@@ -1034,7 +1060,18 @@
    (update-status req sub-status lang sub-key title-key description-key)))
 
 (defn render-error
-  "Renders error response."
+  "Renders error response on a basis of `app-status` or `app-statuses`, and optional
+  `default` rendering function (which is used when no function can be found by
+  looking up status in error configuration obtained from a request map). Optional
+  `data` should be a data map merged with existing data map (from the request) and
+  used during rendering to provide data for templates.
+
+  Optional `layout`, `lang` and other arguments are passed to
+  `amelinium.errors/render` function and then are passed to the established rendering
+  function.
+
+  When the given status is not mapped to any rendering function and there is no
+  default function given, `render-internal-server-error` is used."
   {:arglists '([]
                [req]
                [req app-status]
@@ -1054,45 +1091,72 @@
   ([]
    (render-internal-server-error))
   ([req]
-   (errors/render req nil render-internal-server-error req))
+   (response
+    req
+    (errors/render req nil render-internal-server-error req)))
   ([req app-status]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
-     (errors/render err-config app-status render-internal-server-error req)))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+      (errors/render err-config app-status render-internal-server-error req))))
   ([req app-status default]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
-     (errors/render err-config app-status (or default render-internal-server-error) req)))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+      (errors/render err-config app-status (or default render-internal-server-error) req))))
   ([req app-status default data]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
-     (errors/render err-config app-status (or default render-internal-server-error) req data)))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+      (errors/render err-config app-status (or default render-internal-server-error) req data))))
   ([req app-status default data view]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
-     (errors/render err-config app-status (or default render-internal-server-error) req data view)))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+      (errors/render err-config app-status (or default render-internal-server-error) req data view))))
   ([req app-status default data view layout]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
-     (errors/render err-config app-status (or default render-internal-server-error) req data view layout)))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+      (errors/render err-config app-status (or default render-internal-server-error) req data view layout))))
   ([req app-status default data view layout lang]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
-     (errors/render err-config app-status (or default render-internal-server-error) req data view layout lang)))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+      (errors/render err-config app-status (or default render-internal-server-error) req data view layout lang))))
   ([req app-status default data view layout lang & more]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
-     (apply errors/render err-config app-status (or default render-internal-server-error) req data view layout lang more))))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+      (apply errors/render err-config app-status (or default render-internal-server-error) req data view layout lang more)))))
 
 (defn render-status
-  "Renders status response."
+  "Renders status response on a basis of `app-status` or `app-statuses`, and optional
+  `default` rendering function (which is used when no function can be found by
+  looking up status in error configuration obtained from a request map). Optional
+  `data` should be a data map merged with existing data map (from the request) and
+  used during rendering to provide data for templates.
+
+  Optional `layout`, `lang` and other arguments are passed to
+  `amelinium.errors/render` function and then are passed to the established rendering
+  function.
+
+  When the given status is not mapped to any rendering function and there is no
+  default function given, `render-ok` is be used."
   {:arglists '([]
                [req]
                [req app-status]
@@ -1112,49 +1176,63 @@
   ([]
    (render-ok))
   ([req]
-   (errors/render req nil render-ok req))
+   (response req (errors/render req nil render-ok req)))
   ([req app-status]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
-     (log/web-dbg req "Rendering response with application status" app-status)
-     (errors/render err-config app-status render-ok req)))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+      (log/web-dbg req "Rendering response with application status" app-status)
+      (errors/render err-config app-status render-ok req))))
   ([req app-status default]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
-     (log/web-dbg req "Rendering response with application status" app-status)
-     (errors/render err-config app-status (or default render-ok) req)))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+      (log/web-dbg req "Rendering response with application status" app-status)
+      (errors/render err-config app-status (or default render-ok) req))))
   ([req app-status default data]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
-     (log/web-dbg req "Rendering response with application status" app-status)
-     (errors/render err-config app-status (or default render-ok) req data)))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+      (log/web-dbg req "Rendering response with application status" app-status)
+      (errors/render err-config app-status (or default render-ok) req data))))
   ([req app-status default data view]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
-     (log/web-dbg req "Rendering response with application status" app-status)
-     (errors/render err-config app-status (or default render-ok) req data view)))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+      (log/web-dbg req "Rendering response with application status" app-status)
+      (errors/render err-config app-status (or default render-ok) req data view))))
   ([req app-status default data view layout]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
-     (log/web-dbg req "Rendering response with application status" app-status)
-     (errors/render err-config app-status (or default render-ok) req data view layout)))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+      (log/web-dbg req "Rendering response with application status" app-status)
+      (errors/render err-config app-status (or default render-ok) req data view layout))))
   ([req app-status default data view layout lang]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
-     (log/web-dbg req "Rendering response with application status" app-status)
-     (errors/render err-config app-status (or default render-ok) req data view layout lang)))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+      (log/web-dbg req "Rendering response with application status" app-status)
+      (errors/render err-config app-status (or default render-ok) req data view layout lang))))
   ([req app-status default data view layout lang & more]
-   (let [err-config (errors/config req)
-         app-status (errors/most-significant err-config app-status)
-         data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
-     (log/web-dbg req "Rendering response with application status" app-status)
-     (apply errors/render err-config app-status (or default render-ok) req data view layout lang more))))
+   (response
+    req
+    (let [err-config (errors/config req)
+          app-status (errors/most-significant err-config app-status)
+          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+      (log/web-dbg req "Rendering response with application status" app-status)
+      (apply errors/render err-config app-status (or default render-ok) req data view layout lang more)))))
 
 ;; HTMX
 
@@ -1488,9 +1566,9 @@
   application status `app-status` by looking it up in `:status/targets` of a route
   data map with a fallback to `:error/target`.
 
-  Additionally it sets a fallback view to the given `default-view` (if set) and a
-  flag `:response/set-status!` in `req` to ensure that application status is
-  processed even if an HTTP response status will be `:ok/found` during rendering.
+  Additionally, sets a fallback view to the given `default-view` (if set) and a flag
+  `:response/set-status!` in `req` to ensure that application status is processed
+  even if an HTTP response status will be `:ok/found` during rendering.
 
   Returns `req` with added `:response/status` set to the value of `app-status`,
   updated `:response/headers` and `:response/set-status!` flag."
@@ -1505,7 +1583,7 @@
          route-data (or route-data (http/get-route-data req))
          target     (or (get-in route-data [:status/targets app-status])
                         (get route-data :error/target))]
-     (log/web-dbg req "Injecting HTML fragment with application status" app-status
+     (log/web-dbg req "Injecting HTML fragment with app status" app-status
                   (str "(target:" (some-str target) ")"))
      (if default-view
        (hx-inject req target default-view)
@@ -1535,13 +1613,21 @@
 ;; Business logic errors
 
 (defn handle-error
-  "Sets proper HTMX response (when `common/use-hx?` returns `true` because the
-  request indicated it is HTMX or `:error/use-htmx?` route data key is set or generic
-  `:use-htmx?` route data key is set), or a HTTP redirect response, as a result of error
-  encountered. Additionally, sets an HTTP response header named `header-name` (if
-  set) with error status detected (mainly to be used by reverse proxies). If header
-  name is `false`, no header is set. If header name is not set or is set to `nil`,
-  the name `Error` is used. Returns updated `req`."
+  "Sets the right response function (which sets HTTP status code) and optional HTTP
+  header on a basis of the given `app-status`.
+
+  Returns proper HTMX response (when `common/use-hx?` returns `true` because the request
+  indicated it is HTMX, or `:error/use-htmx?` route data key is set, or generic
+  `:use-htmx?` route data key is set), or a HTTP redirect response (if HTMX is not in
+  use or disabled), as a result of error encountered.
+
+  Additionally, sets an HTTP response header named `header-name` (if set) with error
+  status detected (mainly to be used by reverse proxies). If header name is `false`,
+  no header is set. If header name is not set or is set to `nil`, the name `Error` is
+  used. Returns updated `req`.
+
+  For HTMX uses `hx-go-to-with-status`, for regular web uses
+  `http-go-to-with-status`."
   ([req]
    (handle-error req nil :auth/error nil nil))
   ([req app-status]
@@ -1551,7 +1637,7 @@
   ([req route-data app-status default-view]
    (handle-error req route-data app-status default-view nil))
   ([req route-data app-status default-view header-name]
-   (log/web-dbg req "Handling error:" app-status)
+   (log/web-dbg req "Handling status:" app-status)
    (let [route-data     (or route-data (http/get-route-data req))
          header-name    (cond (nil? header-name)   "Error"
                               (false? header-name) nil

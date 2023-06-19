@@ -17,7 +17,7 @@
             [next.jdbc.sql                     :as        sql]
             [next.jdbc                         :as       jdbc]
             [reitit.ring                       :as       ring]
-            [ring.util.http-response           :as       resp]
+            [amelinium.http.response           :as       resp]
             [amelinium.db                      :as         db]
             [amelinium.logging                 :as        log]
             [amelinium.system                  :as     system]
