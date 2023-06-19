@@ -7,10 +7,15 @@
     amelinium.proto.auth
 
   (:require [amelinium] [amelinium.types.auth])
-  (:import  [amelinium   AccountTypes AuthLocking AuthConfirmation AuthPasswords AuthConfig AuthSettings]
-            [javax.sql   DataSource]
-            [java.time   Duration]
-            [reitit.core Match]))
+  (:import  (amelinium   AccountTypes
+                         AuthLocking
+                         AuthConfirmation
+                         AuthPasswords
+                         AuthConfig
+                         AuthSettings)
+            (javax.sql   DataSource)
+            (java.time   Duration)
+            (reitit.core Match)))
 
 (defprotocol Authenticable
   "This protocol is used to access authentication settings and configuration."

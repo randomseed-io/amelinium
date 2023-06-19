@@ -11,7 +11,7 @@
             [clojure.test.check.rose-tree  :as  rose]
             [clojure.test.check.generators :as  gens])
 
-  (:import [java.util Random]))
+  (:import (java.util Random)))
 
 (def amelinium
   (gens/no-shrink

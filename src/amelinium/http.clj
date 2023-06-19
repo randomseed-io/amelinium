@@ -15,7 +15,7 @@
             [io.randomseed.utils.map         :refer     [qassoc]]
             [io.randomseed.utils.reitit.http :as            http])
 
-  (:import [reitit.core Match]))
+  (:import (reitit.core Match)))
 
 (p/import-vars [io.randomseed.utils.reitit.http
                 router? router match match?

@@ -9,9 +9,10 @@
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require [tick.core                          :as               t]
-            [amelinium.http.response            :as            resp]
             [clojure.string                     :as             str]
             [amelinium.types.session            :refer         :all]
+            [amelinium.types.response           :refer         :all]
+            [amelinium]
             [amelinium.logging                  :as             log]
             [amelinium.model.user               :as            user]
             [amelinium.utils                    :refer         :all]
@@ -21,16 +22,18 @@
             [amelinium.web                      :as             web]
             [amelinium.auth                     :as            auth]
             [amelinium.http                     :as            http]
+            [amelinium.http.response            :as            resp]
             [amelinium.http.middleware.session  :as         session]
             [amelinium.http.middleware.language :as        language]
             [amelinium.http.middleware.coercion :as        coercion]
             [io.randomseed.utils.map            :as             map]
-            [io.randomseed.utils.map            :refer     [qassoc
-                                                            qupdate]]
+            [io.randomseed.utils.map            :refer    [qassoc
+                                                           qupdate]]
             [io.randomseed.utils                :refer         :all]
             [potpuri.core                       :refer [deep-merge]])
 
-  (:import [amelinium Session]))
+  (:import (amelinium Session
+                      Response)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Authentication
@@ -111,10 +114,11 @@
 
 (defn login-data?
   "Returns true if `:form-params` map of a request map `req` contains login data."
-  [req]
+  ^Boolean [req]
   (if-some [fparams (get req :form-params)]
     (and (or (contains? fparams "user/password") (contains? fparams "password"))
-         (or (contains? fparams "user/login")    (contains? fparams "login")))))
+         (or (contains? fparams "user/login")    (contains? fparams "login")))
+    false))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions
@@ -279,7 +283,11 @@
   Data passed to the template system is populated with common keys which should be
   present in `:app/data`. If the `:response/fn` is set then it will be used instead
   of `web/render-ok` to render an HTML response."
-  ([req]
+  {:arglists '(^Response [req]
+               ^Response [req ^Keyword app-status]
+               ^Response [req ^ISeq app-statuses]
+               ^Response [req ^IFn response-fn])}
+  (^Response [req]
    (web/response
     req
     (log/web-dbg req "Default rendering initiated.")
@@ -288,7 +296,7 @@
       (if-some [f (get req :response/fn)]
         (f req)
         (web/render-ok req)))))
-  ([req app-status-or-fn]
+  (^Response [req app-status-or-fn]
    (web/response
     req
     (log/web-dbg req "Default rendering initiated.")

@@ -19,10 +19,16 @@
             [io.randomseed.utils.map :refer [qassoc]]
             [io.randomseed.utils     :refer     :all])
 
-  (:import  [java.net InetAddress Inet4Address Inet6Address]
-            [inet.ipaddr IPAddress IPAddressString IPAddressNetwork]
-            [inet.ipaddr.ipv4 IPv4Address IPv4AddressTrie]
-            [inet.ipaddr.ipv6 IPv6Address IPv6AddressTrie]))
+  (:import  (java.net         InetAddress
+                              Inet4Address
+                              Inet6Address)
+            (inet.ipaddr      IPAddress
+                              IPAddressString
+                              IPAddressNetwork)
+            (inet.ipaddr.ipv4 IPv4Address
+                              IPv4AddressTrie)
+            (inet.ipaddr.ipv6 IPv6Address
+                              IPv6AddressTrie)))
 
 (def ^:const proxy-header "x-forwarded-for")
 (def ^:const ip-separator (re-pattern "[,\\s]+"))

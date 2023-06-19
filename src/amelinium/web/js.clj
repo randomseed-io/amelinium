@@ -23,7 +23,7 @@
             [io.randomseed.utils.map              :as        map]
             [io.randomseed.utils                  :refer    :all])
 
-  (:import [java.net URLEncoder]))
+  (:import (java.net URLEncoder)))
 
 ;; Configuration initializers
 

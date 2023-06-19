@@ -26,7 +26,7 @@
             [amelinium.types.session            :refer      :all]
             [puget.printer                      :refer  [cprint]])
 
-  (:import [amelinium Session]))
+  (:import (amelinium Session)))
 
 (def ^:const keywordize-params? false)
 

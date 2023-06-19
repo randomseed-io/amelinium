@@ -30,7 +30,7 @@
             [io.randomseed.utils.map           :as        map]
             [io.randomseed.utils.ip            :as         ip])
 
-  (:import [amelinium Session]))
+  (:import (amelinium Session)))
 
 (defn known?
   [config role]

@@ -18,7 +18,6 @@
             [amelinium.http.response              :as            resp]
             [ring.util.request                    :as             req]
             [selmer.parser                        :as          selmer]
-            [amelinium                            :refer         :all]
             [amelinium.db                         :as              db]
             [amelinium.i18n                       :as            i18n]
             [amelinium.types.response             :refer         :all]
@@ -31,6 +30,7 @@
             [amelinium.http.middleware.coercion   :as        coercion]
             [amelinium.http.middleware.validators :as      validators]
             [amelinium.logging                    :as             log]
+            [amelinium                            :refer         :all]
             [io.randomseed.utils.map              :as             map]
             [io.randomseed.utils.map              :refer     [qassoc]]
             [io.randomseed.utils                  :refer         :all]
@@ -39,6 +39,7 @@
             [lazy-map.core                        :as        lazy-map])
 
   (:import (amelinium     Response)
+           (clojure.lang  IFn)
            (reitit.core   Match)
            (java.io       File)
            (lazy_map.core LazyMapEntry
@@ -721,21 +722,21 @@
   - value of `status` looked up in a map under `:status/views` (in a  route data or a request map),
   - value of `:app/error-view` (in a route data or a request map),
   - \"error\"."
-  ([]
+  (^Response []
    (render-response resp/ok :ok/found nil nil nil nil nil))
-  ([resp-fn]
+  (^Response [resp-fn]
    (render-response resp-fn nil nil nil nil nil nil))
-  ([resp-fn req]
+  (^Response [resp-fn req]
    (render-response resp-fn nil req nil nil nil nil))
-  ([resp-fn status req]
+  (^Response [resp-fn status req]
    (render-response resp-fn status req nil nil nil nil))
-  ([resp-fn status req data]
+  (^Response [resp-fn status req data]
    (render-response resp-fn status req data nil nil nil))
-  ([resp-fn status req data view]
+  (^Response [resp-fn status req data view]
    (render-response resp-fn status req data view nil nil))
-  ([resp-fn status req data view layout]
+  (^Response [resp-fn status req data view layout]
    (render-response resp-fn status req data view layout nil))
-  ([resp-fn status req data view layout lang]
+  (^Response [resp-fn status req data view layout lang]
    (if (resp/response? req)
      req
      (let [req (set-target-header req)]
@@ -826,21 +827,21 @@
                     "and `:status/description` if possible).")))
         f status))))
   ([name doc f status]
-   `(let [f# ~f
+   `(let [^IFn f# ~f
           c# ~status
           c# (if c# (keyword c#))]
       (defn ~name ~doc
-        ([]
+        (^Response []
          (render-response f# c# nil nil nil nil nil))
-        (~'[req]
+        (^Response ~'[req]
          (render-response f# c# ~'req nil nil nil nil))
-        (~'[req data]
+        (^Response ~'[req data]
          (render-response f# c# ~'req ~'data nil nil nil))
-        (~'[req data view]
+        (^Response ~'[req data view]
          (render-response f# c# ~'req ~'data ~'view nil nil))
-        (~'[req data view layout]
+        (^Response ~'[req data view layout]
          (render-response f# c# ~'req ~'data ~'view ~'layout nil))
-        (~'[req data view layout lang]
+        (^Response ~'[req data view layout lang]
          (render-response f# c# ~'req ~'data ~'view ~'layout ~'lang))))))
 
 ;; OK response
@@ -921,41 +922,41 @@
   more about body rendering. The destination for a redirect is taken from
   `name-or-path` argument or, if not given, from the `:response/location` key of the
   given request map (`req`)."
-  ([]
+  (^Response []
    (resp/render resp/created))
-  ([req]
+  (^Response [req]
    (resp/created (render req :ok/created nil nil nil nil)
                  (or (get req :response/headers) {})
                  (common/resolve-location page req)))
-  ([req data]
+  (^Response [req data]
    (resp/created (render req :ok/created data nil nil nil)
                  (or (get req :response/headers) {})
                  (common/resolve-location page req)))
-  ([req data view]
+  (^Response [req data view]
    (resp/created (render req :ok/created data view nil nil)
                  (or (get req :response/headers) {})
                  (common/resolve-location page req)))
-  ([req data view layout]
+  (^Response [req data view layout]
    (resp/created (render req :ok/created data view layout nil)
                  (or (get req :response/headers) {})
                  (common/resolve-location page req)))
-  ([req data view layout lang]
+  (^Response [req data view layout lang]
    (resp/created (render req :ok/created data view layout lang)
                  (or (get req :response/headers) {})
                  (common/resolve-location page req lang)))
-  ([req data view layout lang name-or-path]
+  (^Response [req data view layout lang name-or-path]
    (resp/created (render req :ok/created data view layout lang)
                  (or (get req :response/headers) {})
                  (if (common/is-url? name-or-path)
                    name-or-path
                    (page req name-or-path lang))))
-  ([req data view layout lang name-or-path params]
+  (^Response [req data view layout lang name-or-path params]
    (resp/created (render req :ok/created data view layout lang)
                  (or (get req :response/headers) {})
                  (if (common/is-url? name-or-path)
                    name-or-path
                    (page req name-or-path lang params))))
-  ([req data view layout lang name-or-path params query-params]
+  (^Response [req data view layout lang name-or-path params query-params]
    (resp/created (render req :ok/created data view layout lang)
                  (or (get req :response/headers) {})
                  (if (common/is-url? name-or-path)
@@ -968,41 +969,41 @@
   URL (specified by arguments or by the `:response/location` key of the given `req`)
   to be language parameterized. See `render` documentation to know more about body
   rendering."
-  ([]
+  (^Response []
    (resp/render resp/created))
-  ([req]
+  (^Response [req]
    (resp/created (render req :ok/created nil nil nil nil)
                  (or (get req :response/headers) {})
                  (common/resolve-location localized-page req)))
-  ([req data]
+  (^Response [req data]
    (resp/created (render req :ok/created data nil nil nil)
                  (or (get req :response/headers) {})
                  (common/resolve-location localized-page req)))
-  ([req data view]
+  (^Response [req data view]
    (resp/created (render req :ok/created data view nil nil)
                  (or (get req :response/headers) {})
                  (common/resolve-location localized-page req)))
-  ([req data view layout]
+  (^Response [req data view layout]
    (resp/created (render req :ok/created data view layout nil)
                  (or (get req :response/headers) {})
                  (common/resolve-location localized-page req)))
-  ([req data view layout lang]
+  (^Response [req data view layout lang]
    (resp/created (render req :ok/created data view layout lang)
                  (or (get req :response/headers) {})
                  (common/resolve-location localized-page req lang)))
-  ([req data view layout lang name-or-path]
+  (^Response [req data view layout lang name-or-path]
    (resp/created (render req :ok/created data view layout lang)
                  (or (get req :response/headers) {})
                  (if (common/is-url? name-or-path)
                    name-or-path
                    (localized-page req name-or-path lang))))
-  ([req data view layout lang name-or-path params]
+  (^Response [req data view layout lang name-or-path params]
    (resp/created (render req :ok/created data view layout lang)
                  (or (get req :response/headers) {})
                  (if (common/is-url? name-or-path)
                    name-or-path
                    (localized-page req name-or-path lang params))))
-  ([req data view layout lang name-or-path params query-params]
+  (^Response [req data view layout lang name-or-path params query-params]
    (resp/created (render req :ok/created data view layout lang)
                  (or (get req :response/headers) {})
                  (if (common/is-url? name-or-path)
@@ -1013,33 +1014,33 @@
 
 (defn render-continue
   "Renders 100 response without a body."
-  ([]              (resp/continue))
-  ([req]           (resp/render resp/continue req))
-  ([req & ignored] (resp/render resp/continue req)))
+  (^Response []              (resp/continue))
+  (^Response [req]           (resp/render resp/continue req))
+  (^Response [req & ignored] (resp/render resp/continue req)))
 
 (defn render-switching-protocols
   "Renders 101 response without a body."
-  ([]              (resp/switching-protocols))
-  ([req]           (resp/render resp/switching-protocols req))
-  ([req & ignored] (resp/render resp/switching-protocols req)))
+  (^Response []              (resp/switching-protocols))
+  (^Response [req]           (resp/render resp/switching-protocols req))
+  (^Response [req & ignored] (resp/render resp/switching-protocols req)))
 
 (defn render-processing
   "Renders 102 response without a body."
-  ([]              (resp/processing))
-  ([req]           (resp/render resp/processing req))
-  ([req & ignored] (resp/render resp/processing req)))
+  (^Response []              (resp/processing))
+  (^Response [req]           (resp/render resp/processing req))
+  (^Response [req & ignored] (resp/render resp/processing req)))
 
 (defn render-no-content
   "Renders 204 response without a body."
-  ([]              (resp/no-content))
-  ([req]           (resp/render resp/no-content req))
-  ([req & ignored] (resp/render resp/no-content req)))
+  (^Response []              (resp/no-content))
+  (^Response [req]           (resp/render resp/no-content req))
+  (^Response [req & ignored] (resp/render resp/no-content req)))
 
 (defn render-reset-content
   "Renders 205 response without a body."
-  ([]              (resp/reset-content))
-  ([req]           (resp/render resp/reset-content req))
-  ([req & ignored] (resp/render resp/reset-content req)))
+  (^Response []              (resp/reset-content))
+  (^Response [req]           (resp/render resp/reset-content req))
+  (^Response [req & ignored] (resp/render resp/reset-content req)))
 
 ;; Rendering based on application-logic error
 
@@ -1072,71 +1073,71 @@
 
   When the given status is not mapped to any rendering function and there is no
   default function given, `render-internal-server-error` is used."
-  {:arglists '([]
-               [req]
-               [req app-status]
-               [req app-statuses]
-               [req app-status default]
-               [req app-statuses default]
-               [req app-status default data]
-               [req app-statuses default data]
-               [req app-status default data view]
-               [req app-statuses default data view]
-               [req app-status default data view layout]
-               [req app-statuses default data view layout]
-               [req app-status default data view layout lang]
-               [req app-statuses default data view layout lang]
-               [req app-status default data view layout lang & more]
-               [req app-statuses default data view layout lang & more])}
-  ([]
+  {:arglists '(^Response []
+               ^Response [req]
+               ^Response [req app-status]
+               ^Response [req app-statuses]
+               ^Response [req app-status default]
+               ^Response [req app-statuses default]
+               ^Response [req app-status default data]
+               ^Response [req app-statuses default data]
+               ^Response [req app-status default data view]
+               ^Response [req app-statuses default data view]
+               ^Response [req app-status default data view layout]
+               ^Response [req app-statuses default data view layout]
+               ^Response [req app-status default data view layout lang]
+               ^Response [req app-statuses default data view layout lang]
+               ^Response [req app-status default data view layout lang & more]
+               ^Response [req app-statuses default data view layout lang & more])}
+  (^Response []
    (render-internal-server-error))
-  ([req]
+  (^Response [req]
    (response
     req
     (errors/render req nil render-internal-server-error req)))
-  ([req app-status]
+  (^Response [req app-status]
    (response
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
           req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
       (errors/render err-config app-status render-internal-server-error req))))
-  ([req app-status default]
+  (^Response [req app-status default]
    (response
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
           req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
       (errors/render err-config app-status (or default render-internal-server-error) req))))
-  ([req app-status default data]
+  (^Response [req app-status default data]
    (response
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
           data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
       (errors/render err-config app-status (or default render-internal-server-error) req data))))
-  ([req app-status default data view]
+  (^Response [req app-status default data view]
    (response
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
           data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
       (errors/render err-config app-status (or default render-internal-server-error) req data view))))
-  ([req app-status default data view layout]
+  (^Response [req app-status default data view layout]
    (response
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
           data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
       (errors/render err-config app-status (or default render-internal-server-error) req data view layout))))
-  ([req app-status default data view layout lang]
+  (^Response [req app-status default data view layout lang]
    (response
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
           data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
       (errors/render err-config app-status (or default render-internal-server-error) req data view layout lang))))
-  ([req app-status default data view layout lang & more]
+  (^Response [req app-status default data view layout lang & more]
    (response
     req
     (let [err-config (errors/config req)
@@ -1157,27 +1158,27 @@
 
   When the given status is not mapped to any rendering function and there is no
   default function given, `render-ok` is be used."
-  {:arglists '([]
-               [req]
-               [req app-status]
-               [req app-statuses]
-               [req app-status default]
-               [req app-statuses default]
-               [req app-status default data]
-               [req app-statuses default data]
-               [req app-status default data view]
-               [req app-statuses default data view]
-               [req app-status default data view layout]
-               [req app-statuses default data view layout]
-               [req app-status default data view layout lang]
-               [req app-statuses default data view layout lang]
-               [req app-status default data view layout lang & more]
-               [req app-statuses default data view layout lang & more])}
-  ([]
+  {:arglists '(^Response []
+               ^Response [req]
+               ^Response [req app-status]
+               ^Response [req app-statuses]
+               ^Response [req app-status default]
+               ^Response [req app-statuses default]
+               ^Response [req app-status default data]
+               ^Response [req app-statuses default data]
+               ^Response [req app-status default data view]
+               ^Response [req app-statuses default data view]
+               ^Response [req app-status default data view layout]
+               ^Response [req app-statuses default data view layout]
+               ^Response [req app-status default data view layout lang]
+               ^Response [req app-statuses default data view layout lang]
+               ^Response [req app-status default data view layout lang & more]
+               ^Response [req app-statuses default data view layout lang & more])}
+  (^Response []
    (render-ok))
-  ([req]
+  (^Response [req]
    (response req (errors/render req nil render-ok req)))
-  ([req app-status]
+  (^Response [req app-status]
    (response
     req
     (let [err-config (errors/config req)
@@ -1185,7 +1186,7 @@
           req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
       (log/web-dbg req "Rendering response with application status" app-status)
       (errors/render err-config app-status render-ok req))))
-  ([req app-status default]
+  (^Response [req app-status default]
    (response
     req
     (let [err-config (errors/config req)
@@ -1193,7 +1194,7 @@
           req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
       (log/web-dbg req "Rendering response with application status" app-status)
       (errors/render err-config app-status (or default render-ok) req))))
-  ([req app-status default data]
+  (^Response [req app-status default data]
    (response
     req
     (let [err-config (errors/config req)
@@ -1201,7 +1202,7 @@
           data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
       (log/web-dbg req "Rendering response with application status" app-status)
       (errors/render err-config app-status (or default render-ok) req data))))
-  ([req app-status default data view]
+  (^Response [req app-status default data view]
    (response
     req
     (let [err-config (errors/config req)
@@ -1209,7 +1210,7 @@
           data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
       (log/web-dbg req "Rendering response with application status" app-status)
       (errors/render err-config app-status (or default render-ok) req data view))))
-  ([req app-status default data view layout]
+  (^Response [req app-status default data view layout]
    (response
     req
     (let [err-config (errors/config req)
@@ -1217,7 +1218,7 @@
           data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
       (log/web-dbg req "Rendering response with application status" app-status)
       (errors/render err-config app-status (or default render-ok) req data view layout))))
-  ([req app-status default data view layout lang]
+  (^Response [req app-status default data view layout lang]
    (response
     req
     (let [err-config (errors/config req)
@@ -1225,7 +1226,7 @@
           data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
       (log/web-dbg req "Rendering response with application status" app-status)
       (errors/render err-config app-status (or default render-ok) req data view layout lang))))
-  ([req app-status default data view layout lang & more]
+  (^Response [req app-status default data view layout lang & more]
    (response
     req
     (let [err-config (errors/config req)
@@ -1284,30 +1285,30 @@
   a request (under `:language/str` key) and if there will be no
   language-parameterized variant of the path, it will fail. Use this function to make
   sure that localized path will be produced, or `nil`."
-  {:arglists '([f]
-               [f req]
-               [f url]
-               [f req url]
-               [f req name-or-path]
-               [f req name-or-path path-params]
-               [f req name-or-path path-params query-params]
-               [f req name-or-path lang]
-               [f req name-or-path lang path-params]
-               [f req name-or-path lang path-params query-params]
-               [f req name-or-path lang path-params query-params & more])}
-  ([f]
+  {:arglists '(^Response [^IFn f]
+               ^Response [^IFn f req]
+               ^Response [^IFn f url]
+               ^Response [^IFn f req url]
+               ^Response [^IFn f req name-or-path]
+               ^Response [^IFn f req name-or-path path-params]
+               ^Response [^IFn f req name-or-path path-params query-params]
+               ^Response [^IFn f req name-or-path lang]
+               ^Response [^IFn f req name-or-path lang path-params]
+               ^Response [^IFn f req name-or-path lang path-params query-params]
+               ^Response [^IFn f req name-or-path lang path-params query-params & more])}
+  (^Response [^IFn f]
    (hx-transform-redirect (common/localized-redirect f)) )
-  ([f req-or-url]
+  (^Response [^IFn f req-or-url]
    (hx-transform-redirect (common/localized-redirect f req-or-url)))
-  ([f req name-or-path]
+  (^Response [^IFn f req name-or-path]
    (hx-transform-redirect (common/localized-redirect f req name-or-path)))
-  ([f req name-or-path lang]
+  (^Response [^IFn f req name-or-path lang]
    (hx-transform-redirect (common/localized-redirect f req name-or-path lang)))
-  ([f req name-or-path lang params]
+  (^Response [^IFn f req name-or-path lang params]
    (hx-transform-redirect (common/localized-redirect f req name-or-path lang params)))
-  ([f req name-or-path lang params query-params]
+  (^Response [^IFn f req name-or-path lang params query-params]
    (hx-transform-redirect (common/localized-redirect f req name-or-path lang params query-params)))
-  ([f req name-or-path lang params query-params & more]
+  (^Response [^IFn f req name-or-path lang params query-params & more]
    (hx-transform-redirect (apply common/localized-redirect f req name-or-path lang params query-params more))))
 
 (defn hx-redirect
@@ -1318,30 +1319,30 @@
   language is given it uses the `localized-page` function. If there is no language
   given but the page identified by its name requires a language parameter to be set,
   it will be obtained from the given request map (under the key `:language/str`)."
-  {:arglists '([f]
-               [f req]
-               [f url]
-               [f req url]
-               [f req name-or-path]
-               [f req name-or-path path-params]
-               [f req name-or-path path-params query-params]
-               [f req name-or-path lang]
-               [f req name-or-path lang path-params]
-               [f req name-or-path lang path-params query-params]
-               [f req name-or-path lang path-params query-params & more])}
-  ([f]
+  {:arglists '(^Response [^IFn f]
+               ^Response [^IFn f req]
+               ^Response [^IFn f url]
+               ^Response [^IFn f req url]
+               ^Response [^IFn f req name-or-path]
+               ^Response [^IFn f req name-or-path path-params]
+               ^Response [^IFn f req name-or-path path-params query-params]
+               ^Response [^IFn f req name-or-path lang]
+               ^Response [^IFn f req name-or-path lang path-params]
+               ^Response [^IFn f req name-or-path lang path-params query-params]
+               ^Response [^IFn f req name-or-path lang path-params query-params & more])}
+  (^Response [^IFn f]
    (hx-transform-redirect (common/redirect f)))
-  ([f req-or-url]
+  (^Response [^IFn f req-or-url]
    (hx-transform-redirect (common/redirect f req-or-url)))
-  ([f req name-or-path]
+  (^Response [^IFn f req name-or-path]
    (hx-transform-redirect (common/redirect f req name-or-path)))
-  ([f req name-or-path lang]
+  (^Response [^IFn f req name-or-path lang]
    (hx-transform-redirect (common/redirect f req name-or-path lang)))
-  ([f req name-or-path lang params]
+  (^Response [^IFn f req name-or-path lang params]
    (hx-transform-redirect (common/redirect f req name-or-path lang params)))
-  ([f req name-or-path lang params query-params]
+  (^Response [^IFn f req name-or-path lang params query-params]
    (hx-transform-redirect (common/redirect f req name-or-path lang params query-params)))
-  ([f req name-or-path lang params query-params & more]
+  (^Response [^IFn f req name-or-path lang params query-params & more]
    (hx-transform-redirect (apply common/redirect f req name-or-path lang params query-params more))))
 
 (defn http-go-to
@@ -1360,30 +1361,30 @@
   language obtained from a request (under `:language/str` key) and if there will be no
   language-parameterized variant of the path, it will fail. Use this function to make
   sure that a localized path will be produced, or `nil`."
-  {:arglists '([]
-               [req]
-               [url]
-               [req url]
-               [req name-or-path]
-               [req name-or-path path-params]
-               [req name-or-path path-params query-params]
-               [req name-or-path lang]
-               [req name-or-path lang path-params]
-               [req name-or-path lang path-params query-params]
-               [req name-or-path lang path-params query-params & more])}
-  ([]
+  {:arglists '(^Response []
+               ^Response [req]
+               ^Response [url]
+               ^Response [req url]
+               ^Response [req name-or-path]
+               ^Response [req name-or-path path-params]
+               ^Response [req name-or-path path-params query-params]
+               ^Response [req name-or-path lang]
+               ^Response [req name-or-path lang path-params]
+               ^Response [req name-or-path lang path-params query-params]
+               ^Response [req name-or-path lang path-params query-params & more])}
+  (^Response []
    (common/localized-redirect common/see-other))
-  ([req-or-url]
+  (^Response [req-or-url]
    (common/localized-redirect common/see-other req-or-url))
-  ([req name-or-path]
+  (^Response [req name-or-path]
    (common/localized-redirect common/see-other req name-or-path))
-  ([req name-or-path lang]
+  (^Response [req name-or-path lang]
    (common/localized-redirect common/see-other req name-or-path lang))
-  ([req name-or-path lang params]
+  (^Response [req name-or-path lang params]
    (common/localized-redirect common/see-other req name-or-path lang params))
-  ([req name-or-path lang params query-params]
+  (^Response [req name-or-path lang params query-params]
    (common/localized-redirect common/see-other req name-or-path lang params query-params))
-  ([req name-or-path lang params query-params & more]
+  (^Response [req name-or-path lang params query-params & more]
    (apply common/localized-redirect common/see-other req name-or-path lang params query-params more)))
 
 (defn http-move-to
@@ -1402,146 +1403,146 @@
   language obtained from a request (under `:language/str` key) and if there will be no
   language-parameterized variant of the path, it will fail. Use this function to make
   sure that a localized path will be produced, or `nil`."
-  {:arglists '([]
-               [req]
-               [url]
-               [req url]
-               [req name-or-path]
-               [req name-or-path path-params]
-               [req name-or-path path-params query-params]
-               [req name-or-path lang]
-               [req name-or-path lang path-params]
-               [req name-or-path lang path-params query-params]
-               [req name-or-path lang path-params query-params & more])}
-  ([]
+  {:arglists '(^Response []
+               ^Response [req]
+               ^Response [url]
+               ^Response [req url]
+               ^Response [req name-or-path]
+               ^Response [req name-or-path path-params]
+               ^Response [req name-or-path path-params query-params]
+               ^Response [req name-or-path lang]
+               ^Response [req name-or-path lang path-params]
+               ^Response [req name-or-path lang path-params query-params]
+               ^Response [req name-or-path lang path-params query-params & more])}
+  (^Response []
    (common/localized-redirect common/temporary-redirect))
-  ([req-or-url]
+  (^Response [req-or-url]
    (common/localized-redirect common/temporary-redirect req-or-url))
-  ([req name-or-path]
+  (^Response [req name-or-path]
    (common/localized-redirect common/temporary-redirect req name-or-path))
-  ([req name-or-path lang]
+  (^Response [req name-or-path lang]
    (common/localized-redirect common/temporary-redirect req name-or-path lang))
-  ([req name-or-path lang params]
+  (^Response [req name-or-path lang params]
    (common/localized-redirect common/temporary-redirect req name-or-path lang params))
-  ([req name-or-path lang params query-params]
+  (^Response [req name-or-path lang params query-params]
    (common/localized-redirect common/temporary-redirect req name-or-path lang params query-params))
-  ([req name-or-path lang params query-params & more]
+  (^Response [req name-or-path lang params query-params & more]
    (apply common/localized-redirect common/temporary-redirect req name-or-path lang params query-params more)))
 
 (defn hx-go-to
   "Same as `http-go-to` but uses `hx-transform-redirect` internally to generate HTMX
   redirect."
-  {:arglists '([]
-               [req]
-               [url]
-               [req url]
-               [req name-or-path]
-               [req name-or-path path-params]
-               [req name-or-path path-params query-params]
-               [req name-or-path lang]
-               [req name-or-path lang path-params]
-               [req name-or-path lang path-params query-params]
-               [req name-or-path lang path-params query-params & more])}
-  ([]
+  {:arglists '(^Response []
+               ^Response [req]
+               ^Response [url]
+               ^Response [req url]
+               ^Response [req name-or-path]
+               ^Response [req name-or-path path-params]
+               ^Response [req name-or-path path-params query-params]
+               ^Response [req name-or-path lang]
+               ^Response [req name-or-path lang path-params]
+               ^Response [req name-or-path lang path-params query-params]
+               ^Response [req name-or-path lang path-params query-params & more])}
+  (^Response []
    (hx-transform-redirect (common/localized-redirect common/see-other)))
-  ([req-or-url]
+  (^Response [req-or-url]
    (hx-transform-redirect (common/localized-redirect common/see-other req-or-url)))
-  ([req name-or-path]
+  (^Response [req name-or-path]
    (hx-transform-redirect (common/localized-redirect common/see-other req name-or-path)))
-  ([req name-or-path lang]
+  (^Response [req name-or-path lang]
    (hx-transform-redirect (common/localized-redirect common/see-other req name-or-path lang)))
-  ([req name-or-path lang params]
+  (^Response [req name-or-path lang params]
    (hx-transform-redirect (common/localized-redirect common/see-other req name-or-path lang params)))
-  ([req name-or-path lang params query-params]
+  (^Response [req name-or-path lang params query-params]
    (hx-transform-redirect (common/localized-redirect common/see-other req name-or-path lang params query-params)))
-  ([req name-or-path lang params query-params & more]
+  (^Response [req name-or-path lang params query-params & more]
    (hx-transform-redirect (apply common/localized-redirect common/see-other req name-or-path lang params query-params more))))
 
 (defn hx-move-to
   "Same as `http-move-to` but uses `hx-transform-redirect` internally to generate HTMX
   redirect."
-  {:arglists '([]
-               [req]
-               [url]
-               [req url]
-               [req name-or-path]
-               [req name-or-path path-params]
-               [req name-or-path path-params query-params]
-               [req name-or-path lang]
-               [req name-or-path lang path-params]
-               [req name-or-path lang path-params query-params]
-               [req name-or-path lang path-params query-params & more])}
-  ([]
+  {:arglists '(^Response []
+               ^Response [req]
+               ^Response [url]
+               ^Response [req url]
+               ^Response [req name-or-path]
+               ^Response [req name-or-path path-params]
+               ^Response [req name-or-path path-params query-params]
+               ^Response [req name-or-path lang]
+               ^Response [req name-or-path lang path-params]
+               ^Response [req name-or-path lang path-params query-params]
+               ^Response [req name-or-path lang path-params query-params & more])}
+  (^Response []
    (hx-transform-redirect (common/localized-redirect common/temporary-redirect)))
-  ([req-or-url]
+  (^Response [req-or-url]
    (hx-transform-redirect (common/localized-redirect common/temporary-redirect req-or-url)))
-  ([req name-or-path]
+  (^Response [req name-or-path]
    (hx-transform-redirect (common/localized-redirect common/temporary-redirect req name-or-path)))
-  ([req name-or-path lang]
+  (^Response [req name-or-path lang]
    (hx-transform-redirect (common/localized-redirect common/temporary-redirect req name-or-path lang)))
-  ([req name-or-path lang params]
+  (^Response [req name-or-path lang params]
    (hx-transform-redirect (common/localized-redirect common/temporary-redirect req name-or-path lang params)))
-  ([req name-or-path lang params query-params]
+  (^Response [req name-or-path lang params query-params]
    (hx-transform-redirect (common/localized-redirect common/temporary-redirect req name-or-path lang params query-params)))
-  ([req name-or-path lang params query-params & more]
+  (^Response [req name-or-path lang params query-params & more]
    (hx-transform-redirect (apply common/localized-redirect common/temporary-redirect req name-or-path lang params query-params more))))
 
 (defn- go-to-fn
-  [req]
+  ^IFn [req]
   (if (use-hx? req nil false) hx-go-to http-go-to))
 
 (defn- move-to-fn
-  [req]
+  ^IFn [req]
   (if (use-hx? req nil false) hx-move-to http-move-to))
 
 (defn go-to
   "When HTMX is detected with `use-hx?` calls `hx-go-to`, otherwise calls
   `http-go-to`."
-  {:arglists '([req]
-               [req url]
-               [req name-or-path]
-               [req name-or-path path-params]
-               [req name-or-path path-params query-params]
-               [req name-or-path lang]
-               [req name-or-path lang path-params]
-               [req name-or-path lang path-params query-params]
-               [req name-or-path lang path-params query-params & more])}
-  ([req]
+  {:arglists '(^Response [req]
+               ^Response [req url]
+               ^Response [req name-or-path]
+               ^Response [req name-or-path path-params]
+               ^Response [req name-or-path path-params query-params]
+               ^Response [req name-or-path lang]
+               ^Response [req name-or-path lang path-params]
+               ^Response [req name-or-path lang path-params query-params]
+               ^Response [req name-or-path lang path-params query-params & more])}
+  (^Response [req]
    ((go-to-fn req) req))
-  ([req name-or-path]
+  (^Response [req name-or-path]
    ((go-to-fn req) req name-or-path))
-  ([req name-or-path lang]
+  (^Response [req name-or-path lang]
    ((go-to-fn req) req name-or-path lang))
-  ([req name-or-path lang params]
+  (^Response [req name-or-path lang params]
    ((go-to-fn req) req name-or-path lang params))
-  ([req name-or-path lang params query-params]
+  (^Response [req name-or-path lang params query-params]
    ((go-to-fn req) req name-or-path lang params query-params))
-  ([req name-or-path lang params query-params & more]
+  (^Response [req name-or-path lang params query-params & more]
    (apply (go-to-fn req) req name-or-path lang params query-params more)))
 
 (defn move-to
   "When HTMX is detected with `use-hx?` calls `hx-move-to`, otherwise calls
   `http-move-to`."
-  {:arglists '([req]
-               [req url]
-               [req name-or-path]
-               [req name-or-path path-params]
-               [req name-or-path path-params query-params]
-               [req name-or-path lang]
-               [req name-or-path lang path-params]
-               [req name-or-path lang path-params query-params]
-               [req name-or-path lang path-params query-params & more])}
-  ([req]
+  {:arglists '(^Response [req]
+               ^Response [req url]
+               ^Response [req name-or-path]
+               ^Response [req name-or-path path-params]
+               ^Response [req name-or-path path-params query-params]
+               ^Response [req name-or-path lang]
+               ^Response [req name-or-path lang path-params]
+               ^Response [req name-or-path lang path-params query-params]
+               ^Response [req name-or-path lang path-params query-params & more])}
+  (^Response [req]
    ((move-to-fn req) req))
-  ([req name-or-path]
+  (^Response [req name-or-path]
    ((move-to-fn req) req name-or-path))
-  ([req name-or-path lang]
+  (^Response [req name-or-path lang]
    ((move-to-fn req) req name-or-path lang))
-  ([req name-or-path lang params]
+  (^Response [req name-or-path lang params]
    ((move-to-fn req) req name-or-path lang params))
-  ([req name-or-path lang params query-params]
+  (^Response [req name-or-path lang params query-params]
    ((move-to-fn req) req name-or-path lang params query-params))
-  ([req name-or-path lang params query-params & more]
+  (^Response [req name-or-path lang params query-params & more]
    (apply (move-to-fn req) req name-or-path lang params query-params more)))
 
 (defn http-go-to-with-status
@@ -1549,13 +1550,13 @@
   `app-status` by looking it up in `:error/destinations` of a route data map with
   fallback to a value associated with the `:error/destination` key or to a value of
   the `default-page` argument (if set)."
-  ([req]
+  (^Response [req]
    (http-go-to-with-status req nil :error nil))
-  ([req app-status]
+  (^Response [req app-status]
    (http-go-to-with-status req nil app-status nil))
-  ([req app-status default-page]
+  (^Response [req app-status default-page]
    (http-go-to-with-status req nil app-status default-page))
-  ([req route-data app-status default-page]
+  (^Response [req route-data app-status default-page]
    (let [route-data (or route-data (http/get-route-data req))]
      (http-go-to req
                  (or (get-in route-data [:error/destinations app-status] default-page)
@@ -1572,13 +1573,13 @@
 
   Returns `req` with added `:response/status` set to the value of `app-status`,
   updated `:response/headers` and `:response/set-status!` flag."
-  ([req]
+  (^Response [req]
    (hx-go-to-with-status req nil :error/internal nil))
-  ([req app-status]
+  (^Response [req app-status]
    (hx-go-to-with-status req nil app-status nil))
-  ([req app-status default-view]
+  (^Response [req app-status default-view]
    (hx-go-to-with-status req nil app-status default-view))
-  ([req route-data app-status default-view]
+  (^Response [req route-data app-status default-view]
    (let [req        (qassoc req :response/status app-status :response/set-status! true)
          route-data (or route-data (http/get-route-data req))
          target     (or (get-in route-data [:status/targets app-status])
@@ -1593,15 +1594,15 @@
   "Uses `hx-go-to-with-status` when HTMX is in use (uses `common/use-hx?`),
   `http-go-to-with-status` otherwise. Takes additional `hx-status-flag` as a key to
   be checked in route data whether it is associated with a HTMX-enforcement flag."
-  ([req]
+  (^Response [req]
    (go-to-with-status req nil :error nil false))
-  ([req app-status]
+  (^Response [req app-status]
    (go-to-with-status req nil app-status nil false))
-  ([req app-status default-page]
+  (^Response [req app-status default-page]
    (go-to-with-status req nil app-status default-page false))
-  ([req route-data app-status default-page]
+  (^Response [req route-data app-status default-page]
    (go-to-with-status req nil app-status default-page false))
-  ([req route-data app-status default-page hx-status-flag]
+  (^Response [req route-data app-status default-page hx-status-flag]
    (let [route-data (or route-data (http/get-route-data req))
          go-to-fn   (if (use-hx? req route-data hx-status-flag)
                       hx-go-to-with-status
@@ -1628,15 +1629,15 @@
 
   For HTMX uses `hx-go-to-with-status`, for regular web uses
   `http-go-to-with-status`."
-  ([req]
+  (^Response [req]
    (handle-error req nil :auth/error nil nil))
-  ([req app-status]
+  (^Response [req app-status]
    (handle-error req nil app-status nil nil))
-  ([req app-status default-view]
+  (^Response [req app-status default-view]
    (handle-error req nil app-status default-view nil))
-  ([req route-data app-status default-view]
+  (^Response [req route-data app-status default-view]
    (handle-error req route-data app-status default-view nil))
-  ([req route-data app-status default-view header-name]
+  (^Response [req route-data app-status default-view header-name]
    (log/web-dbg req "Handling status:" app-status)
    (let [route-data     (or route-data (http/get-route-data req))
          header-name    (cond (nil? header-name)   "Error"
@@ -1649,6 +1650,42 @@
      (if (use-hx? req route-data :error/use-htmx?)
        (hx-go-to-with-status   req route-data app-status default-view)
        (http-go-to-with-status req route-data app-status default-view)))))
+
+(defn response!
+  "Returns a response on a basis of `app-status` (or `:response/status` key of the
+  `req` if status is not given).
+
+  Optional `fallback-view` will be used if there is no assignment of a view to the
+  application status in a map under the key `:` of route data.
+
+  Optional `error-header` may be given which will be used to communicate status. If
+  it is not given, application status does not exist, or is set to `false` or `nil`,
+  then it will not be used. Otherwise the header of the given name will be added to
+  a response with a string representation of the status as its value.
+
+  Optional route data map may be given as `route-data` and will be used instead
+  of getting it from the request map.
+
+  If there is no application status or the given `req` is already a response, it
+  simply returns an unmodified request map."
+  (^Response [req]
+   (response! req nil nil nil nil))
+  (^Response [req app-status]
+   (response! req app-status nil nil nil))
+  (^Response [req app-status fallback-view]
+   (response! req app-status fallback-view nil nil))
+  (^Response [req app-status fallback-view error-header]
+   (response! req app-status fallback-view error-header nil))
+  (^Response [req app-status fallback-view error-header route-data]
+   (response
+    req
+    (if-let [status (some-keyword (or app-status (get req :response/status)))]
+      (handle-error req
+                    (or route-data (http/get-route-data req))
+                    status
+                    fallback-view
+                    (if error-header error-header))
+      req))))
 
 ;; Form errors
 
@@ -1775,7 +1812,7 @@
   header.
 
   Sets `HX-Retarget` response header to a value set in route data option
-  `:form-errors/target`."
+  `:form-errors/target` and returns a response."
   ([req route-data errors]
    (hx-handle-bad-request-form-params req route-data errors nil nil nil))
   ([req route-data errors values]

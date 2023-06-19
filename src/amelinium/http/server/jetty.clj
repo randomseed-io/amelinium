@@ -15,8 +15,9 @@
              [io.randomseed.utils          :as      utils]
              [io.randomseed.utils.fs       :as         fs])
 
-  (:import [org.eclipse.jetty.server.handler.gzip GzipHandler]
-           [org.eclipse.jetty.server Server Handler]))
+  (:import (org.eclipse.jetty.server.handler.gzip GzipHandler)
+           (org.eclipse.jetty.server              Server
+                                                  Handler)))
 
 (set! *warn-on-reflection* true)
 

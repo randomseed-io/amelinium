@@ -32,8 +32,13 @@
             [io.randomseed.utils                :refer         :all]
             [puget.printer :refer [cprint]])
 
-  (:import [amelinium Session AuthSettings AuthConfig AuthConfirmation]
-           [amelinium UserData Suites SuitesJSON]))
+  (:import (amelinium Session
+                      AuthSettings
+                      AuthConfig
+                      AuthConfirmation
+                      UserData
+                      Suites
+                      SuitesJSON)))
 
 (def one-minute   (t/new-duration 1 :minutes))
 (def five-minutes (t/new-duration 5 :minutes))

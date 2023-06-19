@@ -26,9 +26,13 @@
             [io.randomseed.utils.map      :refer     [qassoc]]
             [potpuri.core                 :refer [deep-merge]])
 
-  (:import [clojure.lang            Keyword PersistentVector IPersistentMap IFn Fn]
-           [amelinium.proto.twilio  TwilioControl]
-           [amelinium               TwilioConfig]))
+  (:import (clojure.lang            Keyword
+                                    PersistentVector
+                                    IPersistentMap
+                                    IFn
+                                    Fn)
+           (amelinium.proto.twilio  TwilioControl)
+           (amelinium               TwilioConfig)))
 
 (defonce ^:redef sms    (constantly nil))
 (defonce ^:redef email  (constantly nil))

@@ -15,8 +15,10 @@
             [io.randomseed.utils       :as        utils]
             [io.randomseed.utils       :refer [defdoc!]])
 
-  (:import  [amelinium    Identity]
-            [clojure.lang Keyword PersistentVector IPersistentMap]))
+  (:import  (amelinium    Identity)
+            (clojure.lang Keyword
+                          PersistentVector
+                          IPersistentMap)))
 
 (defonce ^{:doc "A type hierarchy for identity types expressed as unqualified and qualified
   keywords. Any tag derived from `:amelinium.identity/valid` will be considered

@@ -17,14 +17,15 @@
             [io.randomseed.utils             :refer [some-str-spc
                                                      some-str]])
 
-  (:import  [logback_bundle.json                 FlatJsonLayout ValueDecoder]
-            [ch.qos.logback.contrib.jackson      JacksonJsonFormatter]
-            [ch.qos.logback.core.encoder         LayoutWrappingEncoder]
-            [ch.qos.logback.contrib.json.classic JsonLayout]
-            [ch.qos.logback.classic.filter       ThresholdFilter]
-            [ch.qos.logback.classic.encoder      PatternLayoutEncoder]
-            [ch.qos.logback.core                 ConsoleAppender]
-            [java.nio.charset                    Charset]))
+  (:import  (logback_bundle.json                 FlatJsonLayout
+                                                 ValueDecoder)
+            (ch.qos.logback.contrib.jackson      JacksonJsonFormatter)
+            (ch.qos.logback.core.encoder         LayoutWrappingEncoder)
+            (ch.qos.logback.contrib.json.classic JsonLayout)
+            (ch.qos.logback.classic.filter       ThresholdFilter)
+            (ch.qos.logback.classic.encoder      PatternLayoutEncoder)
+            (ch.qos.logback.core                 ConsoleAppender)
+            (java.nio.charset                    Charset)))
 
 (def ^:dynamic *pseudo-salt* "98jj348jvj28ncJIJ21398")
 

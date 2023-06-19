@@ -24,10 +24,10 @@
             [amelinium.http.middleware.session  :as         session]
             [amelinium.http.middleware.coercion :as        coercion]
             [amelinium.types.session            :refer         :all]
-            [amelinium                          :refer         :all]
+            [amelinium]
             [puget.printer                      :refer     [cprint]])
 
-  (:import [amelinium Session]))
+  (:import (amelinium Session)))
 
 ;; Helpers
 

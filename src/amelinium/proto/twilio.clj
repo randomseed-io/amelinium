@@ -9,7 +9,7 @@
   (:refer-clojure :exclude [empty empty?])
 
   (:require [amelinium] [amelinium.types.twilio])
-  (:import  [amelinium TwilioConfig]))
+  (:import  (amelinium TwilioConfig)))
 
 (defprotocol TwilioControl
   "This protocol promises access to Twilio client configuration data and basic actions

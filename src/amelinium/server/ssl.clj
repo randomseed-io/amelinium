@@ -17,13 +17,16 @@
             [io.randomseed.utils.var    :as        var]
             [io.randomseed.utils.crypto :as     crypto])
 
-  (:import [java.io File FileInputStream IOException]
-           [java.security KeyStore]
-           [java.security.cert Certificate]
-           [java.security.cert X509Certificate]
-           [javax.security.auth.x500 X500Principal]
-           [io.undertow.server HttpServerExchange ConnectionSSLSessionInfo]
-           [io.undertow.server.protocol.http HttpServerConnection]))
+  (:import (java.io                          File
+                                             FileInputStream
+                                             IOException)
+           (java.security                    KeyStore)
+           (java.security.cert               Certificate)
+           (java.security.cert               X509Certificate)
+           (javax.security.auth.x500         X500Principal)
+           (io.undertow.server               HttpServerExchange
+                                             ConnectionSSLSessionInfo)
+           (io.undertow.server.protocol.http HttpServerConnection)))
 
 ;; Keystore and truststore handling
 

@@ -18,12 +18,17 @@
             [io.randomseed.utils.map  :as           map]
             [io.randomseed.utils.var  :as           var]
             [io.randomseed.utils      :refer       :all]
-            [amelinium                :refer       :all]
-            [amelinium.types.errors   :refer       :all])
+            [amelinium.types.response :refer       :all]
+            [amelinium.types.errors   :refer       :all]
+            [amelinium                :refer       :all])
 
-  (:import [clojure.lang           Keyword IFn IPersistentMap]
-           [amelinium              ErrorsConfig]
-           [amelinium.proto.errors ErrorsConfigurable]))
+  (:import (clojure.lang           Keyword
+                                   ISeq
+                                   IFn
+                                   IPersistentMap)
+           (amelinium              Response
+                                   ErrorsConfig)
+           (amelinium.proto.errors ErrorsConfigurable)))
 
 (extend-protocol p/ErrorsConfigurable
 

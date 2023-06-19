@@ -16,18 +16,19 @@
             [reitit.coercion                       :as        coercion]
             [ring.util.response]
             [ring.util.codec                       :as           codec]
-            [amelinium.http.response               :as            resp]
             [ring.util.request                     :as             req]
             [clj-uuid                              :as            uuid]
             [jsonista.core                         :as               j]
             [amelinium                             :refer         :all]
             [amelinium.utils                       :refer         :all]
+            [amelinium.types.response              :refer         :all]
             [amelinium.types.session               :refer         :all]
             [amelinium.types.auth                  :refer         :all]
             [amelinium.proto.identity              :as             pid]
             [amelinium.identity                    :as        identity]
             [amelinium.auth                        :as            auth]
             [amelinium.http                        :as            http]
+            [amelinium.http.response               :as            resp]
             [amelinium.http.middleware.roles       :as           roles]
             [amelinium.http.middleware.language    :as        language]
             [amelinium.http.middleware.session     :as         session]
@@ -42,9 +43,16 @@
             [io.randomseed.utils.db                :as              db]
             [io.randomseed.utils                   :refer         :all])
 
-  (:import [amelinium        Session AuthSettings AuthConfig]
-           [lazy_map.core    LazyMapEntry LazyMap]
-           [reitit.core      Match]))
+  (:import (amelinium        Response
+                             Session
+                             AuthSettings
+                             AuthConfig)
+           (clojure.lang     Keyword
+                             ISeq
+                             IFn)
+           (lazy_map.core    LazyMapEntry
+                             LazyMap)
+           (reitit.core      Match)))
 
 ;; Operations logging
 
@@ -102,24 +110,24 @@
 
 (defn router-match?
   "Returns true if the given argument is Reitit's Match object."
-  [v]
+  ^Boolean [v]
   (instance? Match v))
 
 (defn on-page?
   "Checks if a current page matches the given route name (if an identifier is given) or
   the exact path. For multiple page names or paths, it returns true when any of them
   matches."
-  ([]
+  (^Boolean []
    false)
   ([req]
    true)
-  ([req page-id-or-path]
+  (^Boolean [req page-id-or-path]
    (if (ident? page-id-or-path)
      (let [rn (http/route-name req)]
        (and (some? rn) (identical? page-id-or-path rn)))
      (let [pn (http/path req)]
        (and (some? pn) (= page-id-or-path pn)))))
-  ([req page-id-or-path & more]
+  (^Boolean [req page-id-or-path & more]
    (let [ar (cons page-id-or-path more)
          mt (http/match req)
          rn (http/route-name mt)
@@ -156,14 +164,14 @@
 (defn login-page?
   "Returns true if the current (or given as a match) page is a login page (has
   `:login-page?` route data set to a truthy value)."
-  ([req]            (boolean (http/get-route-data req :login-page?)))
-  ([req ring-match] (boolean (http/get-route-data ring-match req :login-page?))))
+  (^Boolean [req]            (boolean (http/get-route-data req :login-page?)))
+  (^Boolean [req ring-match] (boolean (http/get-route-data ring-match req :login-page?))))
 
 (defn auth-page?
   "Returns true if the current (or given as a match) page is an authentication
   page (has :auth-page? route data set to a truthy value)."
-  ([req]            (boolean (http/get-route-data req :auth-page?)))
-  ([req ring-match] (boolean (http/get-route-data ring-match req :auth-page?))))
+  (^Boolean [req]            (boolean (http/get-route-data req :auth-page?)))
+  (^Boolean [req ring-match] (boolean (http/get-route-data ring-match req :auth-page?))))
 
 (defn login-auth-state
   "Helper which returns 2-element vector telling if the current (or given as a match)
@@ -192,7 +200,7 @@
 (defn is-url?
   "Returns `true` if the given argument `s` is a non-empty string that begins like an
   URL. Returns `false` otherwise."
-  [s]
+  ^Boolean [s]
   (if (and s (string? s))
     (let [^String s s]
       (and (not-empty-string? s)
@@ -365,10 +373,11 @@
 (defn has-param?
   "Checks if the given route match can be parameterized with a parameter of the given
   id."
-  [match param]
+  ^Boolean [match param]
   (if-some [param (some-keyword-simple param)]
     (or (contains? (get match :required) param)
-        (if-some [t (get match :template)] (some? (some #{(str param)} (re-seq slash-break t)))))))
+        (if-some [t (get match :template)] (some? (some #{(str param)} (re-seq slash-break t)))))
+    false))
 
 (defn template-path
   "Replaces parameters in the given path using a template."
@@ -1112,34 +1121,34 @@
   given it uses the `localized-page` function. If there is no language given but the
   page identified by its name requires a language parameter to be set, it will be
   obtained from the given request map (under the key `:language/str`)."
-  {:arglists '([f]
-               [f req]
-               [f url]
-               [f req url]
-               [f req name-or-path]
-               [f req name-or-path path-params]
-               [f req name-or-path path-params query-params]
-               [f req name-or-path lang]
-               [f req name-or-path lang path-params]
-               [f req name-or-path lang path-params query-params]
-               [f req name-or-path lang path-params query-params & more])}
-  ([f]
+  {:arglists '(^Response [^IFn f]
+               ^Response [^IFn f req]
+               ^Response [^IFn f url]
+               ^Response [^IFn f req url]
+               ^Response [^IFn f req name-or-path]
+               ^Response [^IFn f req name-or-path path-params]
+               ^Response [^IFn f req name-or-path path-params query-params]
+               ^Response [^IFn f req name-or-path lang]
+               ^Response [^IFn f req name-or-path lang path-params]
+               ^Response [^IFn f req name-or-path lang path-params query-params]
+               ^Response [^IFn f req name-or-path lang path-params query-params & more])}
+  (^Response [^IFn f]
    (f "/"))
-  ([f req-or-url]
+  (^Response [^IFn f req-or-url]
    (if (map? req-or-url)
      (resp/render-force f req-or-url (page req-or-url))
      (resp/render-force f nil req-or-url)))
-  ([f req name-or-path]
+  (^Response [^IFn f req name-or-path]
    (if (is-url? name-or-path)
      (resp/render-force f req name-or-path)
      (resp/render-force f req (page req name-or-path))))
-  ([f req name-or-path lang]
+  (^Response [^IFn f req name-or-path lang]
    (resp/render-force f req (page req name-or-path lang)))
-  ([f req name-or-path lang params]
+  (^Response [^IFn f req name-or-path lang params]
    (resp/render-force f req (page req name-or-path lang params)))
-  ([f req name-or-path lang params query-params]
+  (^Response [^IFn f req name-or-path lang params query-params]
    (resp/render-force f req (page req name-or-path lang params query-params)))
-  ([f req name-or-path lang params query-params & more]
+  (^Response [^IFn f req name-or-path lang params query-params & more]
    (resp/render-force f req (apply page req name-or-path lang params query-params more))))
 
 (defn localized-redirect
@@ -1150,34 +1159,34 @@
   a request (under `:language/str` key) and if there will be no
   language-parameterized variant of the path, it will fail. Use this function to make
   sure that localized path will be produced, or `nil`."
-  {:arglists '([f]
-               [f req]
-               [f url]
-               [f req url]
-               [f req name-or-path]
-               [f req name-or-path path-params]
-               [f req name-or-path path-params query-params]
-               [f req name-or-path lang]
-               [f req name-or-path lang path-params]
-               [f req name-or-path lang path-params query-params]
-               [f req name-or-path lang path-params query-params & more])}
-  ([f]
+  {:arglists '(^Response [^IFn f]
+               ^Response [^IFn f req]
+               ^Response [^IFn f url]
+               ^Response [^IFn f req url]
+               ^Response [^IFn f req name-or-path]
+               ^Response [^IFn f req name-or-path path-params]
+               ^Response [^IFn f req name-or-path path-params query-params]
+               ^Response [^IFn f req name-or-path lang]
+               ^Response [^IFn f req name-or-path lang path-params]
+               ^Response [^IFn f req name-or-path lang path-params query-params]
+               ^Response [^IFn f req name-or-path lang path-params query-params & more])}
+  (^Response [^IFn f]
    (f "/"))
-  ([f req-or-url]
+  (^Response [^IFn f req-or-url]
    (if (map? req-or-url)
      (resp/render-force f req-or-url (localized-page req-or-url))
      (resp/render-force f nil req-or-url)))
-  ([f req name-or-path]
+  (^Response [^IFn f req name-or-path]
    (if (is-url? name-or-path)
      (resp/render-force f req name-or-path)
      (resp/render-force f req (localized-page req name-or-path))))
-  ([f req name-or-path lang]
+  (^Response [^IFn f req name-or-path lang]
    (resp/render-force f req (localized-page req name-or-path lang)))
-  ([f req name-or-path lang params]
+  (^Response [^IFn f req name-or-path lang params]
    (resp/render-force f req (localized-page req name-or-path lang params)))
-  ([f req name-or-path lang params query-params]
+  (^Response [^IFn f req name-or-path lang params query-params]
    (resp/render-force f req (localized-page req name-or-path lang params query-params)))
-  ([f req name-or-path lang params query-params & more]
+  (^Response [^IFn f req name-or-path lang params query-params & more]
    (resp/render-force f req (apply localized-page req name-or-path lang params query-params more))))
 
 (defmacro def-redirect
@@ -1199,36 +1208,36 @@
   ([name doc-or-f f-or-code]
    (if (pos-int? f-or-code)
      (#'def-redirect &form &env name doc-or-f f-or-code nil)
-     `(let [f# ~f-or-code]
+     `(let [^IFn f# ~f-or-code]
         (defn ~name ~doc-or-f
-          {:arglists '([]
-                       ~'[req]
-                       ~'[url]
-                       ~'[req url]
-                       ~'[req name-or-path]
-                       ~'[req name-or-path path-params]
-                       ~'[req name-or-path path-params query-params]
-                       ~'[req name-or-path lang]
-                       ~'[req name-or-path lang path-params]
-                       ~'[req name-or-path lang path-params query-params]
-                       ~'[req name-or-path lang path-params query-params & more])}
-          ([]
+          {:arglists '(^Response []
+                       ^Response ~'[req]
+                       ^Response ~'[url]
+                       ^Response ~'[req url]
+                       ^Response ~'[req name-or-path]
+                       ^Response ~'[req name-or-path path-params]
+                       ^Response ~'[req name-or-path path-params query-params]
+                       ^Response ~'[req name-or-path lang]
+                       ^Response ~'[req name-or-path lang path-params]
+                       ^Response ~'[req name-or-path lang path-params query-params]
+                       ^Response ~'[req name-or-path lang path-params query-params & more])}
+          (^Response []
            (f# "/"))
-          (~'[req-or-url]
+          (^Response ~'[req-or-url]
            (if (map? ~'req-or-url)
              (resp/render-force f# ~'req-or-url (page ~'req-or-url))
              (resp/render-force f# nil ~'req-or-url)))
-          (~'[req name-or-path]
+          (^Response ~'[req name-or-path]
            (if (is-url? ~'name-or-path)
              (resp/render-force f# ~'req ~'name-or-path)
              (resp/render-force f# ~'req (page ~'req ~'name-or-path))))
-          (~'[req name-or-path lang]
+          (^Response ~'[req name-or-path lang]
            (resp/render-force f# ~'req (page ~'req ~'name-or-path ~'lang)))
-          (~'[req name-or-path lang params]
+          (^Response ~'[req name-or-path lang params]
            (resp/render-force f# ~'req (page ~'req ~'name-or-path ~'lang ~'params)))
-          (~'[req name-or-path lang params query-params]
+          (^Response ~'[req name-or-path lang params query-params]
            (resp/render-force f# ~'req (page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
-          (~'[req name-or-path lang params query-params & more]
+          (^Response ~'[req name-or-path lang params query-params & more]
            (resp/render-force f# ~'req (apply page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
 
 (defmacro def-localized-redirect
@@ -1260,36 +1269,36 @@
   ([name doc-or-f f-or-code]
    (if (pos-int? f-or-code)
      (#'def-localized-redirect &form &env name doc-or-f f-or-code nil)
-     `(let [f# ~f-or-code]
+     `(let [^IFn f# ~f-or-code]
         (defn ~name ~doc-or-f
-          {:arglists '([]
-                       ~'[req]
-                       ~'[url]
-                       ~'[req url]
-                       ~'[req name-or-path]
-                       ~'[req name-or-path path-params]
-                       ~'[req name-or-path path-params query-params]
-                       ~'[req name-or-path lang]
-                       ~'[req name-or-path lang path-params]
-                       ~'[req name-or-path lang path-params query-params]
-                       ~'[req name-or-path lang path-params query-params & more])}
-          ([]
+          {:arglists '(^Response []
+                       ^Response ~'[req]
+                       ^Response ~'[url]
+                       ^Response ~'[req url]
+                       ^Response ~'[req name-or-path]
+                       ^Response ~'[req name-or-path path-params]
+                       ^Response ~'[req name-or-path path-params query-params]
+                       ^Response ~'[req name-or-path lang]
+                       ^Response ~'[req name-or-path lang path-params]
+                       ^Response ~'[req name-or-path lang path-params query-params]
+                       ^Response ~'[req name-or-path lang path-params query-params & more])}
+          (^Response []
            (f# "/"))
-          (~'[req-or-url]
+          (^Response ~'[req-or-url]
            (if (map? ~'req-or-url)
              (resp/render-force f# ~'req-or-url (localized-page ~'req-or-url))
              (resp/render-force f# nil ~'req-or-url)))
-          (~'[req name-or-path]
+          (^Response ~'[req name-or-path]
            (if (is-url? ~'name-or-path)
              (resp/render-force f# ~'req ~'name-or-path)
              (resp/render-force f# ~'req (localized-page ~'req ~'name-or-path))))
-          (~'[req name-or-path lang]
+          (^Response ~'[req name-or-path lang]
            (resp/render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang)))
-          (~'[req name-or-path lang params]
+          (^Response ~'[req name-or-path lang params]
            (resp/render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang ~'params)))
-          (~'[req name-or-path lang params query-params]
+          (^Response ~'[req name-or-path lang params query-params]
            (resp/render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
-          (~'[req name-or-path lang params query-params & more]
+          (^Response ~'[req name-or-path lang params query-params & more]
            (resp/render-force f# ~'req (apply localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
 
 (def-redirect           created                      resp/created             201)
@@ -1313,18 +1322,18 @@
 (def-localized-redirect localized-permanent-redirect resp/permanent-redirect  308)
 
 (defn not-modified
-  ([]           (resp/not-modified))
-  ([req]        (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req)))
-  ([req & more] (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req))))
+  (^Response []           (resp/not-modified))
+  (^Response [req]        (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req)))
+  (^Response [req & more] (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req))))
 
 (defn localized-not-modified
-  ([]           (resp/not-modified))
-  ([req]        (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req)))
-  ([req & more] (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req))))
+  (^Response []           (resp/not-modified))
+  (^Response [req]        (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req)))
+  (^Response [req & more] (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req))))
 
 ;; Language
 
-(def ^{:tag      clojure.lang.Keyword
+(def ^{:tag      Keyword
        :arglists '([req]
                    [req pickers]
                    [req picker-id]
@@ -1348,7 +1357,7 @@
   triggers configured pickers from a default or given chain. Returns a string."
   (comp some-str language/pick))
 
-(def ^{:tag      clojure.lang.Keyword
+(def ^{:tag      Keyword
        :arglists '([req]
                    [req pickers]
                    [req picker-id]
@@ -2154,12 +2163,12 @@
   (or (get (get req :language/settings) :param) :lang))
 
 (defn lang-id
-  ^clojure.lang.Keyword [req]
+  ^Keyword [req]
   (or (get req :language/id)
       (get req :language/default)))
 
 (defn lang-id-or-nil
-  ^clojure.lang.Keyword [req]
+  ^Keyword [req]
   (get req :language/id))
 
 (defn lang-str

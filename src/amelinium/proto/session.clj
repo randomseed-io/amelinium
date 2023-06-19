@@ -9,9 +9,11 @@
   (:refer-clojure :exclude [empty empty?])
 
   (:require [amelinium] [amelinium.types.session])
-  (:import  [amelinium            Session SessionError SessionConfig]
-            [clojure.core.memoize PluggableMemoization]
-            [java.time            Instant]))
+  (:import  (amelinium            Session
+                                  SessionError
+                                  SessionConfig)
+            (clojure.core.memoize PluggableMemoization)
+            (java.time            Instant)))
 
 (defprotocol SessionControl
   "This protocol promises access to session configuration data and basic actions which

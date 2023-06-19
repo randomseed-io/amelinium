@@ -25,8 +25,8 @@
             [amelinium.locale                      :as      locale]
             [amelinium.identity                    :as    identity])
 
-  (:import [java.util UUID]
-           [java.time Duration]))
+  (:import (java.util UUID)
+           (java.time Duration)))
 
 ;; Helpers
 

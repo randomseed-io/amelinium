@@ -16,14 +16,20 @@
              [io.randomseed.utils          :as      utils]
              [io.randomseed.utils.fs       :as         fs])
 
-  (:import [java.net InetSocketAddress]
-           [io.undertow Undertow UndertowOptions Undertow$Builder Undertow$ListenerInfo]
-           [io.undertow.server HttpHandler]
-           [io.undertow.server.handlers BlockingHandler]
-           [io.undertow.server.handlers.encoding EncodingHandler$Builder]
-           [io.undertow.server.handlers.encoding EncodingHandler ContentEncodingRepository]
-           [io.undertow.server.handlers.encoding GzipEncodingProvider DeflateEncodingProvider]
-           [io.undertow.predicate Predicate Predicates]))
+  (:import (java.net                             InetSocketAddress)
+           (io.undertow                          Undertow
+                                                 UndertowOptions
+                                                 Undertow$Builder
+                                                 Undertow$ListenerInfo)
+           (io.undertow.server                   HttpHandler)
+           (io.undertow.server.handlers          BlockingHandler)
+           (io.undertow.server.handlers.encoding EncodingHandler$Builder)
+           (io.undertow.server.handlers.encoding EncodingHandler
+                                                 ContentEncodingRepository)
+           (io.undertow.server.handlers.encoding GzipEncodingProvider
+                                                 DeflateEncodingProvider)
+           (io.undertow.predicate                Predicate
+                                                 Predicates)))
 
 (set! *warn-on-reflection* true)
 

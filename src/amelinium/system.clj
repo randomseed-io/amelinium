@@ -20,7 +20,7 @@
             [io.randomseed.utils.var  :as        var]
             [io.randomseed.utils.fs   :as         fs])
 
-  (:import [java.util TimeZone]))
+  (:import (java.util TimeZone)))
 
 ;; integrant wrappers
 

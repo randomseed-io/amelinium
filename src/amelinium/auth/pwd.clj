@@ -8,7 +8,7 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:import  [java.security SecureRandom])
+  (:import  (java.security SecureRandom))
 
   (:require [clojure.spec.alpha      :as               s]
             [crypto.equality         :as          crypto]
@@ -25,7 +25,8 @@
             [amelinium.types.auth    :refer         :all]
             [amelinium               :refer         :all])
 
-  (:import [amelinium Suites SuitesJSON]))
+  (:import (amelinium Suites
+                      SuitesJSON)))
 
 (defonce ^:private lock 'lock)
 
