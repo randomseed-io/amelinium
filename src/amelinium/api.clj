@@ -202,8 +202,8 @@
 (defn render-early-hints
   "Renders 103 response with possible body taken from a request map (under the
   `:response/body`)."
-  (^Response []    (render-response common/early-hints nil))
-  (^Response [req] (render-response common/early-hints :info/early-hints req)))
+  (^Response []    (render-response resp/early-hints nil))
+  (^Response [req] (render-response resp/early-hints :info/early-hints req)))
 
 ;; Success responses with bodies
 
@@ -362,8 +362,8 @@
 (defn render-im-a-teapot
   "Renders 418 response with possible body taken from a request map (under the
   `:response/body`)."
-  (^Response []    (render-response common/im-a-teapot nil))
-  (^Response [req] (render-response common/im-a-teapot :error/im-a-teapot req)))
+  (^Response []    (render-response resp/im-a-teapot nil))
+  (^Response [req] (render-response resp/im-a-teapot :error/im-a-teapot req)))
 
 (defn render-enhance-your-calm
   "Renders 420 response with possible body taken from a request map (under the
@@ -374,8 +374,8 @@
 (defn render-misdirected-request
   "Renders 421 response with possible body taken from a request map (under the
   `:response/body`)."
-  (^Response []    (render-response common/misdirected-request nil))
-  (^Response [req] (render-response common/misdirected-request :error/misdirected-request req)))
+  (^Response []    (render-response resp/misdirected-request nil))
+  (^Response [req] (render-response resp/misdirected-request :error/misdirected-request req)))
 
 (defn render-unprocessable-entity
   "Renders 422 response with possible body taken from a request map (under the
