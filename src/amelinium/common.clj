@@ -1038,36 +1038,6 @@
   (^String [req]         (page req :user/welcome))
   (^String [req lang-id] (page req :user/welcome lang-id)))
 
-;; Additional responses
-
-(defn im-a-teapot
-  "418 I'm a teapot
-  The server cannot brew coffee because it is, permanently, a teapot."
-  ([] (im-a-teapot nil))
-  ([body]
-   {:status  418
-    :headers {}
-    :body    body}))
-
-(defn misdirected-request
-  "421 Misdirected Request
-  The request was directed at a server that is not able to produce a response
-  (e.g. network balancer forwarded traffic to a wrong server)."
-  ([] (misdirected-request nil))
-  ([body]
-   {:status  421
-    :headers {}
-    :body    body}))
-
-(defn early-hints
-  "103 Early Hints
-   The server sends some response headers (e.g. HTML resource links) before final HTTP message."
-  ([] (early-hints nil))
-  ([body]
-   {:status  103
-    :headers {}
-    :body    body}))
-
 ;; HTMX
 
 (defn hx-request?

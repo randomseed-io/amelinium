@@ -861,7 +861,7 @@
 
 ;; Informational responses with bodies
 
-(def-render render-early-hints                     common/early-hints                   :info/early-hints)
+(def-render render-early-hints                     resp/early-hints                     :info/early-hints)
 
 ;; Error responses with possible bodies
 
@@ -883,9 +883,9 @@
 (def-render render-unsupported-media-type          resp/unsupported-media-type          :error/unsupported-media-type)
 (def-render render-requested-range-not-satisfiable resp/requested-range-not-satisfiable :error/requested-range-not-satisfiable)
 (def-render render-expectation-failed              resp/expectation-failed              :error/expectation-failed)
-(def-render render-im-a-teapot                     common/im-a-teapot                   :error/im-a-teapot)
+(def-render render-im-a-teapot                     resp/im-a-teapot                     :error/im-a-teapot)
 (def-render render-enhance-your-calm               resp/enhance-your-calm               :error/enhance-your-calm)
-(def-render render-misdirected-request             common/misdirected-request           :error/misdirected-request)
+(def-render render-misdirected-request             resp/misdirected-request             :error/misdirected-request)
 (def-render render-unprocessable-entity            resp/unprocessable-entity            :error/unprocessable-entity)
 (def-render render-bad-params                      resp/unprocessable-entity            :error/bad-parameters)
 (def-render render-locked                          resp/locked                          :error/render-locked)
