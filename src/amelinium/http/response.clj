@@ -141,7 +141,11 @@
   (^Response []                 (->Response 201 nil nil))
   (^Response [body]             (->Response 201 {} body))
   (^Response [body headers]     (->Response 201 headers body))
-  (^Response [body headers url] (->Response 201 (if headers (qassoc headers "Location" url) {"Location" url}) body)))
+  (^Response [body headers url] (->Response 201
+                                            (if headers
+                                              (qassoc headers "Location" url)
+                                              {"Location" url})
+                                            body)))
 
 (defn accepted
   "202 Accepted (Success). The request has been accepted for processing but the
@@ -205,57 +209,57 @@
 (defn multiple-choices
   "300 Multiple Choices (Redirection). There are multiple options for the resource that
   the client may follow."
+  (^Response []                  (->Response 300 {} nil))
   (^Response [url]               (->Response 300 {"Location" url} ""))
-  (^Response [url _]             (->Response 300 {"Location" url} ""))
-  (^Response [url _ headers]     (->Response 300 (qassoc headers "Location" url) "")))
+  (^Response [url headers]       (->Response 300 (qassoc headers "Location" url) "")))
 
 (defn moved-permanently
   "301 Moved Permanently (Redirection). This and all future requests should be directed
   to the given URI."
+  (^Response []                  (->Response 301 {} nil))
   (^Response [url]               (->Response 301 {"Location" url} ""))
-  (^Response [url _]             (->Response 301 {"Location" url} ""))
-  (^Response [url _ headers]     (->Response 301 (qassoc headers "Location" url) "")))
+  (^Response [url headers]       (->Response 301 (qassoc headers "Location" url) "")))
 
 (defn found
   "302 Found (Redirection). The resource was found but at a different URI."
+  (^Response []                  (->Response 302 {} nil))
   (^Response [url]               (->Response 302 {"Location" url} ""))
-  (^Response [url _]             (->Response 302 {"Location" url} ""))
-  (^Response [url _ headers]     (->Response 302 (qassoc headers "Location" url) "")))
+  (^Response [url headers]       (->Response 302 (qassoc headers "Location" url) "")))
 
 (defn see-other
   "303 See Other (Redirection). The response to the request can be found under another
   URI using a GET method."
+  (^Response []                  (->Response 303 {} nil))
   (^Response [url]               (->Response 303 {"Location" url} ""))
-  (^Response [url _]             (->Response 303 {"Location" url} ""))
-  (^Response [url _ headers]     (->Response 303 (qassoc headers "Location" url) "")))
+  (^Response [url headers]       (->Response 303 (qassoc headers "Location" url) "")))
 
 (defn not-modified
   "304 Not Modified (Redirection). The resource has not been modified since last
   requested."
   (^Response []                  (->Response 304 {} ""))
-  (^Response [-]                 (->Response 304 {} ""))
+  (^Response [_]                 (->Response 304 {} ""))
   (^Response [_ headers]         (->Response 304 headers "")))
 
 (defn use-proxy
   "305 Use Proxy (Redirection). This single request is to be repeated via the proxy
   given by the Location field."
+  (^Response []                  (->Response 305 {} nil))
   (^Response [url]               (->Response 305 {"Location" url} ""))
-  (^Response [url _]             (->Response 305 {"Location" url} ""))
-  (^Response [url _ headers]     (->Response 305 (qassoc headers "Location" url) "")))
+  (^Response [url headers]       (->Response 305 (qassoc headers "Location" url) "")))
 
 (defn temporary-redirect
   "307 Temporary Redirect (Redirection). The request should be repeated with another
   URI but future requests can still use the original URI."
+  (^Response []                  (->Response 307 {} nil))
   (^Response [url]               (->Response 307 {"Location" url} ""))
-  (^Response [url _]             (->Response 307 {"Location" url} ""))
-  (^Response [url _ headers]     (->Response 307 (qassoc headers "Location" url) "")))
+  (^Response [url headers]       (->Response 307 (qassoc headers "Location" url) "")))
 
 (defn permanent-redirect
   "308 Permanent Redirect (Redirection). The request and all future requests should be
   repeated using another URI."
+  (^Response []                  (->Response 308 {} nil))
   (^Response [url]               (->Response 308 {"Location" url} ""))
-  (^Response [url _]             (->Response 308 {"Location" url} ""))
-  (^Response [url _ headers]     (->Response 308 (qassoc headers "Location" url) "")))
+  (^Response [url headers]       (->Response 308 (qassoc headers "Location" url) "")))
 
 (defn bad-request
   "400 Bad Request (Client Error). The request contains bad syntax or cannot be

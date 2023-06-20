@@ -547,49 +547,49 @@
   `:response/body`). If a name or a path is not given as `name-or-path`, it is looked
   up in `req` under the `:response/location` key."
   (^Response []
-   (resp/render resp/created))
+   (resp/created))
   (^Response [req]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (common/resolve-location page req)))
+                 (resp/location req page)))
   (^Response [req data]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (common/resolve-location page req)))
+                 (resp/location req page)))
   (^Response [req data view]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (common/resolve-location page req)))
+                 (resp/location req page)))
   (^Response [req data view layout]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (common/resolve-location page req)))
+                 (resp/location req page)))
   (^Response [req data view layout lang]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (common/resolve-location page req lang)))
+                 (resp/location req page lang)))
   (^Response [req data view layout lang name-or-path]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (if (common/is-url? name-or-path)
+                 (if (is-url? name-or-path)
                    name-or-path
                    (page req name-or-path lang))))
   (^Response [req data view layout lang name-or-path params]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (if (common/is-url? name-or-path)
+                 (if (is-url? name-or-path)
                    name-or-path
                    (page req name-or-path lang params))))
   (^Response [req data view layout lang name-or-path params query-params]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (if (common/is-url? name-or-path)
+                 (if (is-url? name-or-path)
                    name-or-path
                    (page req name-or-path lang params query-params))))
   (^Response [req data view layout lang name-or-path params query-params & more]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (if (common/is-url? name-or-path)
+                 (if (is-url? name-or-path)
                    name-or-path
                    (apply page req name-or-path lang params query-params more)))))
 
@@ -598,49 +598,49 @@
   request map (under the `:response/body`). If a name or a path is not given as
   `name-or-path`, it is looked up in `req` under the `:response/location` key."
   (^Response []
-   (resp/render resp/created))
+   (resp/created))
   (^Response [req]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (common/resolve-location localized-page req)))
+                 (resp/location req localized-page)))
   (^Response [req data]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (common/resolve-location localized-page req)))
+                 (resp/location req localized-page)))
   (^Response [req data view]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (common/resolve-location localized-page req)))
+                 (resp/location req localized-page)))
   (^Response [req data view layout]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (common/resolve-location localized-page req)))
+                 (resp/location req localized-page)))
   (^Response [req data view layout lang]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (common/resolve-location localized-page req lang)))
+                 (resp/location req localized-page lang)))
   (^Response [req data view layout lang name-or-path]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (if (common/is-url? name-or-path)
+                 (if (is-url? name-or-path)
                    name-or-path
                    (localized-page req name-or-path lang))))
   (^Response [req data view layout lang name-or-path params]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (if (common/is-url? name-or-path)
+                 (if (is-url? name-or-path)
                    name-or-path
                    (localized-page req name-or-path lang params))))
   (^Response [req data view layout lang name-or-path params query-params]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (if (common/is-url? name-or-path)
+                 (if (is-url? name-or-path)
                    name-or-path
                    (localized-page req name-or-path lang params query-params))))
   (^Response [req data view layout lang name-or-path params query-params & more]
    (resp/created (render req :ok/created)
                  (or (get req :response/headers) {})
-                 (if (common/is-url? name-or-path)
+                 (if (is-url? name-or-path)
                    name-or-path
                    (apply localized-page req name-or-path lang params query-params more)))))
 
@@ -648,33 +648,33 @@
 
 (defn render-continue
   "Renders 100 response without a body."
-  (^Response []           (resp/continue))
-  (^Response [req]        (resp/render resp/continue req))
-  (^Response [req & more] (resp/render resp/continue req)))
+  (^Response []        (resp/continue))
+  (^Response [req]     (resp/continue nil (resp/headers req)))
+  (^Response [req & _] (resp/continue nil (resp/headers req))))
 
 (defn render-switching-protocols
   "Renders 101 response without a body."
-  (^Response []           (resp/switching-protocols))
-  (^Response [req]        (resp/render resp/switching-protocols req))
-  (^Response [req & more] (resp/render resp/switching-protocols req)))
+  (^Response []        (resp/switching-protocols))
+  (^Response [req]     (resp/switching-protocols nil (resp/headers req)))
+  (^Response [req & _] (resp/switching-protocols nil (resp/headers req))))
 
 (defn render-processing
   "Renders 102 response without a body."
-  (^Response []           (resp/processing))
-  (^Response [req]        (resp/render resp/processing req))
-  (^Response [req & more] (resp/render resp/processing req)))
+  (^Response []        (resp/processing))
+  (^Response [req]     (resp/processing nil (resp/headers req)))
+  (^Response [req & _] (resp/processing nil (resp/headers req))))
 
 (defn render-no-content
   "Renders 204 response without a body."
-  (^Response []           (resp/no-content))
-  (^Response [req]        (resp/render resp/no-content req))
-  (^Response [req & more] (resp/render resp/no-content req)))
+  (^Response []        (resp/no-content))
+  (^Response [req]     (resp/no-content nil (resp/headers req)))
+  (^Response [req & _] (resp/no-content nil (resp/headers req))))
 
 (defn render-reset-content
   "Renders 205 response without a body."
-  (^Response []           (resp/reset-content))
-  (^Response [req]        (resp/render resp/reset-content req))
-  (^Response [req & more] (resp/render resp/reset-content req)))
+  (^Response []        (resp/reset-content))
+  (^Response [req]     (resp/reset-content nil (resp/headers req)))
+  (^Response [req & _] (resp/reset-content nil (resp/headers req))))
 
 ;; Rendering based on application-logic error
 

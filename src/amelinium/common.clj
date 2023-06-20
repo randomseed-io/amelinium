@@ -1132,23 +1132,23 @@
                ^Response [^IFn f req name-or-path lang path-params query-params]
                ^Response [^IFn f req name-or-path lang path-params query-params & more])}
   (^Response [^IFn f]
-   (f "/"))
+   (f))
   (^Response [^IFn f req-or-url]
    (if (map? req-or-url)
-     (resp/render-force f req-or-url (page req-or-url))
-     (resp/render-force f nil req-or-url)))
+     (f (resp/location req-or-url page) (resp/headers req-or-url))
+     (f req-or-url)))
   (^Response [^IFn f req name-or-path]
    (if (is-url? name-or-path)
-     (resp/render-force f req name-or-path)
-     (resp/render-force f req (page req name-or-path))))
+     (f name-or-path (resp/headers req))
+     (f (page req name-or-path) (resp/headers req))))
   (^Response [^IFn f req name-or-path lang]
-   (resp/render-force f req (page req name-or-path lang)))
+   (f (page req name-or-path lang) (resp/headers req)))
   (^Response [^IFn f req name-or-path lang params]
-   (resp/render-force f req (page req name-or-path lang params)))
+   (f (page req name-or-path lang params) (resp/headers req)))
   (^Response [^IFn f req name-or-path lang params query-params]
-   (resp/render-force f req (page req name-or-path lang params query-params)))
+   (f (page req name-or-path lang params query-params) (resp/headers req)))
   (^Response [^IFn f req name-or-path lang params query-params & more]
-   (resp/render-force f req (apply page req name-or-path lang params query-params more))))
+   (f (apply page req name-or-path lang params query-params more) (resp/headers req))))
 
 (defn localized-redirect
   "Generic redirect wrapper. The `f` should be a function which takes a request map and
@@ -1170,23 +1170,23 @@
                ^Response [^IFn f req name-or-path lang path-params query-params]
                ^Response [^IFn f req name-or-path lang path-params query-params & more])}
   (^Response [^IFn f]
-   (f "/"))
+   (f))
   (^Response [^IFn f req-or-url]
    (if (map? req-or-url)
-     (resp/render-force f req-or-url (localized-page req-or-url))
-     (resp/render-force f nil req-or-url)))
+     (f (resp/location req-or-url localized-page) (resp/headers req-or-url))
+     (f req-or-url)))
   (^Response [^IFn f req name-or-path]
    (if (is-url? name-or-path)
-     (resp/render-force f req name-or-path)
-     (resp/render-force f req (localized-page req name-or-path))))
+     (f name-or-path (resp/headers req))
+     (f (localized-page req name-or-path) (resp/headers req))))
   (^Response [^IFn f req name-or-path lang]
-   (resp/render-force f req (localized-page req name-or-path lang)))
+   (f (localized-page req name-or-path lang) (resp/headers req)))
   (^Response [^IFn f req name-or-path lang params]
-   (resp/render-force f req (localized-page req name-or-path lang params)))
+   (f (localized-page req name-or-path lang params) (resp/headers req)))
   (^Response [^IFn f req name-or-path lang params query-params]
-   (resp/render-force f req (localized-page req name-or-path lang params query-params)))
+   (f (localized-page req name-or-path lang params query-params) (resp/headers req)))
   (^Response [^IFn f req name-or-path lang params query-params & more]
-   (resp/render-force f req (apply localized-page req name-or-path lang params query-params more))))
+   (f (apply localized-page req name-or-path lang params query-params more) (resp/headers req))))
 
 (defmacro def-redirect
   "Generates a language-parameterized redirect function which acts like `redirect`."
@@ -1221,23 +1221,24 @@
                        ^Response ~'[req name-or-path lang path-params query-params]
                        ^Response ~'[req name-or-path lang path-params query-params & more])}
           (^Response []
-           (f# "/"))
+           (f#))
           (^Response ~'[req-or-url]
            (if (map? ~'req-or-url)
-             (resp/render-force f# ~'req-or-url (page ~'req-or-url))
-             (resp/render-force f# nil ~'req-or-url)))
+             (f# (resp/location page ~'req-or-url) (resp/headers ~'req-or-url))
+             (f# ~'req-or-url)))
           (^Response ~'[req name-or-path]
            (if (is-url? ~'name-or-path)
-             (resp/render-force f# ~'req ~'name-or-path)
-             (resp/render-force f# ~'req (page ~'req ~'name-or-path))))
+             (f# ~'name-or-path (resp/headers ~'req))
+             (f# (page ~'req ~'name-or-path) (resp/headers ~'req))))
           (^Response ~'[req name-or-path lang]
-           (resp/render-force f# ~'req (page ~'req ~'name-or-path ~'lang)))
+           (f# (page ~'req ~'name-or-path ~'lang)) (resp/headers ~'req))
           (^Response ~'[req name-or-path lang params]
-           (resp/render-force f# ~'req (page ~'req ~'name-or-path ~'lang ~'params)))
+           (f# (page ~'req ~'name-or-path ~'lang ~'params)) (resp/headers ~'req))
           (^Response ~'[req name-or-path lang params query-params]
-           (resp/render-force f# ~'req (page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
+           (f# (page ~'req ~'name-or-path ~'lang ~'params ~'query-params)) (resp/headers ~'req))
           (^Response ~'[req name-or-path lang params query-params & more]
-           (resp/render-force f# ~'req (apply page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
+           (f# (apply page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more)
+               (resp/headers ~'req))))))))
 
 (defmacro def-localized-redirect
   "Generates a language-parameterized redirect function which acts like
@@ -1282,25 +1283,25 @@
                        ^Response ~'[req name-or-path lang path-params query-params]
                        ^Response ~'[req name-or-path lang path-params query-params & more])}
           (^Response []
-           (f# "/"))
+           (f#))
           (^Response ~'[req-or-url]
            (if (map? ~'req-or-url)
-             (resp/render-force f# ~'req-or-url (localized-page ~'req-or-url))
-             (resp/render-force f# nil ~'req-or-url)))
+             (f# (resp/location localized-page ~'req-or-url) (resp/headers ~'req-or-url))
+             (f# ~'req-or-url)))
           (^Response ~'[req name-or-path]
            (if (is-url? ~'name-or-path)
-             (resp/render-force f# ~'req ~'name-or-path)
-             (resp/render-force f# ~'req (localized-page ~'req ~'name-or-path))))
+             (f# ~'name-or-path (resp/headers ~'req))
+             (f# (localized-page ~'req ~'name-or-path) (resp/headers ~'req))))
           (^Response ~'[req name-or-path lang]
-           (resp/render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang)))
+           (f# (localized-page ~'req ~'name-or-path ~'lang)) (resp/headers ~'req))
           (^Response ~'[req name-or-path lang params]
-           (resp/render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang ~'params)))
+           (f# (localized-page ~'req ~'name-or-path ~'lang ~'params)) (resp/headers ~'req))
           (^Response ~'[req name-or-path lang params query-params]
-           (resp/render-force f# ~'req (localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params)))
+           (f# (localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params)) (resp/headers ~'req))
           (^Response ~'[req name-or-path lang params query-params & more]
-           (resp/render-force f# ~'req (apply localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more))))))))
+           (f# (apply localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more)
+               (resp/headers ~'req))))))))
 
-(def-redirect           created                      resp/created             201)
 (def-redirect           multiple-choices             resp/multiple-choices    300)
 (def-redirect           moved-permanently            resp/moved-permanently   301)
 (def-redirect           found                        resp/found               302)
@@ -1309,7 +1310,6 @@
 (def-redirect           temporary-redirect           resp/temporary-redirect  307)
 (def-redirect           permanent-redirect           resp/permanent-redirect  308)
 
-(def-localized-redirect localized-created            resp/created             201)
 (def-localized-redirect localized-multiple-choices   resp/multiple-choices    300)
 (def-localized-redirect localized-moved-permanently  resp/moved-permanently   301)
 (def-localized-redirect localized-found              resp/found               302)
@@ -1321,14 +1321,117 @@
 (def-localized-redirect localized-permanent-redirect resp/permanent-redirect  308)
 
 (defn not-modified
-  (^Response []           (resp/not-modified))
-  (^Response [req]        (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req)))
-  (^Response [req & more] (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req))))
+  (^Response []        (resp/not-modified))
+  (^Response [req]     (if (nil? req) (resp/not-modified) (resp/not-modified nil (resp/headers req))))
+  (^Response [req & _] (if (nil? req) (resp/not-modified) (resp/not-modified nil (resp/headers req)))))
 
 (defn localized-not-modified
-  (^Response []           (resp/not-modified))
-  (^Response [req]        (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req)))
-  (^Response [req & more] (if (nil? req) (resp/not-modified) (resp/render-force resp/not-modified req))))
+  (^Response []        (resp/not-modified))
+  (^Response [req]     (if (nil? req) (resp/not-modified) (resp/not-modified nil (resp/headers req))))
+  (^Response [req & _] (if (nil? req) (resp/not-modified) (resp/not-modified nil (resp/headers req)))))
+
+(defn created
+  "Renders 201 response with a redirect (possibly localized if a destination path is
+  language-parameterized) with possible body (taken from `:response/body` of the
+  `req` if not given). The destination for a redirect is taken from `name-or-path`
+  argument or, if not given, from the `:response/location` key of the given request
+  map. Additional parameters of the `page` call can be provided (`lang`, `params`,
+  `query-params` and more)."
+  {:arglists '(^Response []
+               ^Response [req]
+               ^Response [url]
+               ^Response [req url]
+               ^Response [req name-or-path]
+               ^Response [req name-or-path path-params]
+               ^Response [req name-or-path path-params query-params]
+               ^Response [req name-or-path lang]
+               ^Response [req name-or-path lang path-params]
+               ^Response [req name-or-path lang path-params query-params]
+               ^Response [req name-or-path lang path-params query-params & more])}
+  (^Response []
+   (resp/created))
+  (^Response [req-or-url]
+   (if (map? req-or-url)
+     (resp/created (resp/body req-or-url)
+                   (resp/location req-or-url page)
+                   (resp/headers req-or-url))
+     (resp/created nil nil req-or-url)))
+  (^Response [req name-or-path]
+   (if (is-url? name-or-path)
+     (resp/created name-or-path (resp/headers req))
+     (resp/created (resp/body req)
+                   (resp/headers req)
+                   (page req name-or-path))))
+  (^Response [req name-or-path lang]
+   (resp/created (resp/body req)
+                 (resp/headers req)
+                 (page req name-or-path lang)))
+  (^Response [req name-or-path lang params]
+   (resp/created (resp/body req)
+                 (resp/headers req)
+                 (page req name-or-path lang params)))
+  (^Response [req name-or-path lang params query-params]
+   (resp/created (resp/body req)
+                 (resp/headers req)
+                 (page req name-or-path lang params query-params)))
+  (^Response [req name-or-path lang params query-params & more]
+   (resp/created (resp/body req)
+                 (resp/headers req)
+                 (apply page req name-or-path lang params query-params more))))
+
+(defn localized-created
+  "Renders 201 response with a redirect (possibly localized if a destination path is
+  language-parameterized) with possible body (taken from `:response/body` of the
+  `req` if not given). The destination for a redirect is taken from `name-or-path`
+  argument or, if not given, from the `:response/location` key of the given request
+  map. Additional parameters of the `localized-page` call can be provided (`lang`,
+  `params`, `query-params` and more).
+
+  This function will generate a localized path using a language provided as `lang` or
+  obtained from a request (under `:language/str` key) and if there will be no
+  language-parameterized variant of the destination path, it will fail. Use this
+  function to make sure that a localized redirect will be produced, or `nil`."
+  {:arglists '(^Response []
+               ^Response [req]
+               ^Response [url]
+               ^Response [req url]
+               ^Response [req name-or-path]
+               ^Response [req name-or-path path-params]
+               ^Response [req name-or-path path-params query-params]
+               ^Response [req name-or-path lang]
+               ^Response [req name-or-path lang path-params]
+               ^Response [req name-or-path lang path-params query-params]
+               ^Response [req name-or-path lang path-params query-params & more])}
+  (^Response []
+   (resp/created))
+  (^Response [req-or-url]
+   (if (map? req-or-url)
+     (resp/created (resp/body req-or-url)
+                   (resp/location req-or-url localized-page)
+                   (resp/headers req-or-url))
+     (resp/created nil nil req-or-url)))
+  (^Response [req name-or-path]
+   (if (is-url? name-or-path)
+     (resp/created name-or-path (resp/headers req))
+     (resp/created (resp/body req)
+                   (resp/headers req)
+                   (localized-page req name-or-path))))
+  (^Response [req name-or-path lang]
+   (resp/created (resp/body req)
+                 (resp/headers req)
+                 (localized-page req name-or-path lang)))
+  (^Response [req name-or-path lang params]
+   (resp/created (resp/body req)
+                 (resp/headers req)
+                 (localized-page req name-or-path lang params)))
+  (^Response [req name-or-path lang params query-params]
+   (resp/created (resp/body req)
+                 (resp/headers req)
+                 (localized-page req name-or-path lang params query-params)))
+  (^Response [req name-or-path lang params query-params & more]
+   (resp/created (resp/body req)
+                 (resp/headers req)
+                 (apply localized-page req name-or-path lang params query-params more))))
 
 ;; Language
 
