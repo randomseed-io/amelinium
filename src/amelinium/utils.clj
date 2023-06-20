@@ -118,3 +118,17 @@
   (when duration
     (if-some [millis (t/millis duration)]
       (if (neg? millis) nil (t/minutes duration)))))
+
+;; URLs
+
+(def ^:const fast-url-matcher (re-pattern "^[a-zA-Z0-9\\+\\.\\-]+\\:"))
+
+(defn is-url?
+  "Returns `true` if the given argument `s` is a non-empty string that begins like an
+  URL. Returns `false` otherwise."
+  ^Boolean [s]
+  (if (and s (string? s))
+    (let [^String s s]
+      (and (not-empty-string? s)
+           (not= \/ (.charAt s 0))
+           (some? (re-find fast-url-matcher s))))))
