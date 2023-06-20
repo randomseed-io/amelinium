@@ -1373,19 +1373,19 @@
                ^Response [req name-or-path lang path-params query-params]
                ^Response [req name-or-path lang path-params query-params & more])}
   (^Response []
-   (common/localized-redirect common/see-other))
+   (common/localized-redirect resp/see-other))
   (^Response [req-or-url]
-   (common/localized-redirect common/see-other req-or-url))
+   (common/localized-redirect resp/see-other req-or-url))
   (^Response [req name-or-path]
-   (common/localized-redirect common/see-other req name-or-path))
+   (common/localized-redirect resp/see-other req name-or-path))
   (^Response [req name-or-path lang]
-   (common/localized-redirect common/see-other req name-or-path lang))
+   (common/localized-redirect resp/see-other req name-or-path lang))
   (^Response [req name-or-path lang params]
-   (common/localized-redirect common/see-other req name-or-path lang params))
+   (common/localized-redirect resp/see-other req name-or-path lang params))
   (^Response [req name-or-path lang params query-params]
-   (common/localized-redirect common/see-other req name-or-path lang params query-params))
+   (common/localized-redirect resp/see-other req name-or-path lang params query-params))
   (^Response [req name-or-path lang params query-params & more]
-   (apply common/localized-redirect common/see-other req name-or-path lang params query-params more)))
+   (apply common/localized-redirect resp/see-other req name-or-path lang params query-params more)))
 
 (defn http-move-to
   "Uses the `localized-page` function to calculate the destination path on a basis of
@@ -1415,19 +1415,19 @@
                ^Response [req name-or-path lang path-params query-params]
                ^Response [req name-or-path lang path-params query-params & more])}
   (^Response []
-   (common/localized-redirect common/temporary-redirect))
+   (common/localized-redirect resp/temporary-redirect))
   (^Response [req-or-url]
-   (common/localized-redirect common/temporary-redirect req-or-url))
+   (common/localized-redirect resp/temporary-redirect req-or-url))
   (^Response [req name-or-path]
-   (common/localized-redirect common/temporary-redirect req name-or-path))
+   (common/localized-redirect resp/temporary-redirect req name-or-path))
   (^Response [req name-or-path lang]
-   (common/localized-redirect common/temporary-redirect req name-or-path lang))
+   (common/localized-redirect resp/temporary-redirect req name-or-path lang))
   (^Response [req name-or-path lang params]
-   (common/localized-redirect common/temporary-redirect req name-or-path lang params))
+   (common/localized-redirect resp/temporary-redirect req name-or-path lang params))
   (^Response [req name-or-path lang params query-params]
-   (common/localized-redirect common/temporary-redirect req name-or-path lang params query-params))
+   (common/localized-redirect resp/temporary-redirect req name-or-path lang params query-params))
   (^Response [req name-or-path lang params query-params & more]
-   (apply common/localized-redirect common/temporary-redirect req name-or-path lang params query-params more)))
+   (apply common/localized-redirect resp/temporary-redirect req name-or-path lang params query-params more)))
 
 (defn hx-go-to
   "Same as `http-go-to` but uses `hx-transform-redirect` internally to generate HTMX
@@ -1444,19 +1444,19 @@
                ^Response [req name-or-path lang path-params query-params]
                ^Response [req name-or-path lang path-params query-params & more])}
   (^Response []
-   (hx-transform-redirect (common/localized-redirect common/see-other)))
+   (hx-transform-redirect (common/localized-redirect resp/see-other)))
   (^Response [req-or-url]
-   (hx-transform-redirect (common/localized-redirect common/see-other req-or-url)))
+   (hx-transform-redirect (common/localized-redirect resp/see-other req-or-url)))
   (^Response [req name-or-path]
-   (hx-transform-redirect (common/localized-redirect common/see-other req name-or-path)))
+   (hx-transform-redirect (common/localized-redirect resp/see-other req name-or-path)))
   (^Response [req name-or-path lang]
-   (hx-transform-redirect (common/localized-redirect common/see-other req name-or-path lang)))
+   (hx-transform-redirect (common/localized-redirect resp/see-other req name-or-path lang)))
   (^Response [req name-or-path lang params]
-   (hx-transform-redirect (common/localized-redirect common/see-other req name-or-path lang params)))
+   (hx-transform-redirect (common/localized-redirect resp/see-other req name-or-path lang params)))
   (^Response [req name-or-path lang params query-params]
-   (hx-transform-redirect (common/localized-redirect common/see-other req name-or-path lang params query-params)))
+   (hx-transform-redirect (common/localized-redirect resp/see-other req name-or-path lang params query-params)))
   (^Response [req name-or-path lang params query-params & more]
-   (hx-transform-redirect (apply common/localized-redirect common/see-other req name-or-path lang params query-params more))))
+   (hx-transform-redirect (apply common/localized-redirect resp/see-other req name-or-path lang params query-params more))))
 
 (defn hx-move-to
   "Same as `http-move-to` but uses `hx-transform-redirect` internally to generate HTMX
@@ -1473,19 +1473,19 @@
                ^Response [req name-or-path lang path-params query-params]
                ^Response [req name-or-path lang path-params query-params & more])}
   (^Response []
-   (hx-transform-redirect (common/localized-redirect common/temporary-redirect)))
+   (hx-transform-redirect (common/localized-redirect resp/temporary-redirect)))
   (^Response [req-or-url]
-   (hx-transform-redirect (common/localized-redirect common/temporary-redirect req-or-url)))
+   (hx-transform-redirect (common/localized-redirect resp/temporary-redirect req-or-url)))
   (^Response [req name-or-path]
-   (hx-transform-redirect (common/localized-redirect common/temporary-redirect req name-or-path)))
+   (hx-transform-redirect (common/localized-redirect resp/temporary-redirect req name-or-path)))
   (^Response [req name-or-path lang]
-   (hx-transform-redirect (common/localized-redirect common/temporary-redirect req name-or-path lang)))
+   (hx-transform-redirect (common/localized-redirect resp/temporary-redirect req name-or-path lang)))
   (^Response [req name-or-path lang params]
-   (hx-transform-redirect (common/localized-redirect common/temporary-redirect req name-or-path lang params)))
+   (hx-transform-redirect (common/localized-redirect resp/temporary-redirect req name-or-path lang params)))
   (^Response [req name-or-path lang params query-params]
-   (hx-transform-redirect (common/localized-redirect common/temporary-redirect req name-or-path lang params query-params)))
+   (hx-transform-redirect (common/localized-redirect resp/temporary-redirect req name-or-path lang params query-params)))
   (^Response [req name-or-path lang params query-params & more]
-   (hx-transform-redirect (apply common/localized-redirect common/temporary-redirect req name-or-path lang params query-params more))))
+   (hx-transform-redirect (apply common/localized-redirect resp/temporary-redirect req name-or-path lang params query-params more))))
 
 (defn- go-to-fn
   ^IFn [req]
