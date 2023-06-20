@@ -13,11 +13,14 @@
             [ring.util.http-response     :as            resp]
             [ring.util.request           :as             req]
             [amelinium.types.response    :refer         :all]
+            [amelinium.proto.http        :as            http]
             [amelinium                   :refer         :all]
             [io.randomseed.utils.map     :as             map]
             [io.randomseed.utils.map     :refer     [qassoc]])
 
-  (:import (amelinium Response)))
+  (:import (clojure.lang         IPersistentMap)
+           (amelinium            Response)
+           (amelinium.proto.http HTTP)))
 
 ;; Imports
 
@@ -30,8 +33,71 @@
 ;; Response testing
 
 (defn response?
-  ^Boolean [req]
-  (instance? Response req))
+  "Returns `true` if the given value is a kind of `amelinium.Response`, `false`
+  otherwise."
+  ^Boolean [obj]
+  (instance? Response obj))
+
+;; HTTP protocol
+
+(extend-protocol http/HTTP
+
+  Response
+
+  (request?           ^Boolean        [resp] false)
+  (response?          ^Boolean        [resp] true)
+  (app-status                         [resp] nil)
+  (response-status                    [resp] (.status  ^Response resp))
+  (response-headers   ^IPersistentMap [resp] (.headers ^Response resp))
+  (response-body                      [resp] (.body    ^Response resp))
+  (response-location
+    ([resp]     (get (.headers ^Response resp) "Location"))
+    ([resp _]   (get (.headers ^Response resp) "Location"))
+    ([resp _ _] (get (.headers ^Response resp) "Location"))))
+
+;; Response components
+
+(defn headers
+  "Returns response headers map from the response record or a request map."
+  [src]
+  (http/response-headers src))
+
+(defn body
+  "Returns response body from the response record or a request map."
+  [src]
+  (http/response-body src))
+
+(defn status
+  "Returns response status code from the response record. For a request map given as
+  `src` it returns `nil`."
+  [src]
+  (http/response-status src))
+
+(defn app-status?
+  "Returns `true` if the given application status is not `nil` and equal to the
+  application status obtained from the request's key `:app/status`. If the obtained
+  application status is a set, it will check if for the existence of `app-status`
+  within that set. If the values or not equal and there is not element in a set (in
+  case of set), returns `false`."
+  [src app-status]
+  (if-some [st (http/response-status src)]
+    (or (identical? st app-status)
+        (and (set? st) (contains? st app-status)))
+    false))
+
+(defn location
+  "Returns response location header. For a request map given as `src` returns a value
+  associated with its `:response/location` key. In this case the following is applied:
+  If it is found and it is a URL, it is returned. If it is found and it is a path or
+  page identifier it is parsed with the function `f`. Optional `lang`, `params`,
+  `qparams` and any other additional arguments are passed as arguments during the
+  call to `f`. If there is no response location, `nil` is returned."
+  ([src] (http/response-location src))
+  ([src f] (http/response-location src f))
+  ([src f lang] (http/response-location src f [lang]))
+  ([src f lang params] (http/response-location src f [lang params]))
+  ([src f lang params query-params] (http/response-location src f [lang params query-params]))
+  ([src f lang params query-params & more] (http/response-location src f (list* lang params query-params more))))
 
 ;; HTTP responses
 

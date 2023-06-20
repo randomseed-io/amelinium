@@ -11,11 +11,18 @@
   (:require [potemkin.namespaces             :as               p]
             [reitit.core                     :as               r]
             [reitit.ring                     :as            ring]
+            [lazy-map.core                   :as        lazy-map]
+            [amelinium.proto.http            :as            http]
+            [amelinium                       :refer         :all]
             [io.randomseed.utils             :refer         :all]
             [io.randomseed.utils.map         :refer     [qassoc]]
-            [io.randomseed.utils.reitit.http :as            http])
+            [io.randomseed.utils.reitit.http])
 
-  (:import (reitit.core Match)))
+  (:import (clojure.lang         Associative
+                                 IPersistentMap)
+           (amelinium.proto.http HTTP)
+           (lazy_map.core        LazyMap)
+           (reitit.core          Match)))
 
 (p/import-vars [io.randomseed.utils.reitit.http
                 router? router match match?
@@ -86,3 +93,18 @@
 (defn inject-route-data
   [req]
   (qassoc req :route/data (get (get req ::r/match) :data)))
+
+(extend-protocol http/HTTP
+
+  nil
+
+  (request?            ^Boolean [_] false)
+  (response?           ^Boolean [_] false)
+  (app-status                   [_] nil)
+  (response-headers             [_] nil)
+  (response-status              [_] nil)
+  (response-body                [_] nil)
+  (response-location
+    ([_]        nil)
+    ([_ f]      nil)
+    ([_ f args] nil)))

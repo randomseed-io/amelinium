@@ -11,6 +11,7 @@
   (:require [clojure.set                  :as        set]
             [clojure.string               :as        str]
             [clojure.core.memoize         :as        mem]
+            [lazy-map.core                :as   lazy-map]
             [crypto.equality              :as     crypto]
             [tick.core                    :as          t]
             [buddy.core.hash              :as       hash]

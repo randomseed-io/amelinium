@@ -11,6 +11,7 @@
   (:require [clojure.string           :as           str]
             [tick.core                :as             t]
             [clj-uuid                 :as          uuid]
+            [lazy-map.core            :as      lazy-map]
             [amelinium.system         :as        system]
             [amelinium.http           :as          http]
             [amelinium.proto.errors   :as             p]
@@ -25,10 +26,12 @@
   (:import (clojure.lang           Keyword
                                    ISeq
                                    IFn
+                                   Associative
                                    IPersistentMap)
            (amelinium              Response
                                    ErrorsConfig)
-           (amelinium.proto.errors ErrorsConfigurable)))
+           (amelinium.proto.errors ErrorsConfigurable)
+           (lazy_map.core          LazyMap)))
 
 (extend-protocol p/ErrorsConfigurable
 

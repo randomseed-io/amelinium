@@ -18,14 +18,17 @@
             [ring.util.codec                       :as           codec]
             [ring.util.request                     :as             req]
             [clj-uuid                              :as            uuid]
+            [lazy-map.core                         :as        lazy-map]
             [jsonista.core                         :as               j]
             [amelinium                             :refer         :all]
             [amelinium.utils                       :refer         :all]
             [amelinium.types.response              :refer         :all]
             [amelinium.types.session               :refer         :all]
             [amelinium.types.auth                  :refer         :all]
+            [amelinium.proto.http                  :as           phttp]
             [amelinium.proto.identity              :as             pid]
             [amelinium.identity                    :as        identity]
+            [amelinium.errors                      :as          errors]
             [amelinium.auth                        :as            auth]
             [amelinium.http                        :as            http]
             [amelinium.http.response               :as            resp]
@@ -43,16 +46,19 @@
             [io.randomseed.utils.db                :as              db]
             [io.randomseed.utils                   :refer         :all])
 
-  (:import (amelinium        Response
-                             Session
-                             AuthSettings
-                             AuthConfig)
-           (clojure.lang     Keyword
-                             ISeq
-                             IFn)
-           (lazy_map.core    LazyMapEntry
-                             LazyMap)
-           (reitit.core      Match)))
+  (:import (amelinium            Response
+                                 Session
+                                 AuthSettings
+                                 AuthConfig)
+           (amelinium.proto.http HTTP)
+           (clojure.lang         Associative
+                                 IPersistentMap
+                                 Keyword
+                                 ISeq
+                                 IFn)
+           (lazy_map.core        LazyMapEntry
+                                 LazyMap)
+           (reitit.core          Match)))
 
 ;; Operations logging
 
@@ -105,8 +111,6 @@
   (if-some [lgr (oplog-logger-populated req-or-match)] (lgr message)))
 
 ;; Routing data and settings helpers
-
-(def ^:const fast-url-matcher (re-pattern "^[a-zA-Z0-9\\+\\.\\-]+\\:"))
 
 (defn router-match?
   "Returns true if the given argument is Reitit's Match object."
@@ -196,38 +200,6 @@
          login? (boolean (get rd (or login-page-data :login-page?)))
          auth?  (boolean (get rd (or auth-page-data  :auth-page?)))]
      [login? auth?])))
-
-(defn is-url?
-  "Returns `true` if the given argument `s` is a non-empty string that begins like an
-  URL. Returns `false` otherwise."
-  ^Boolean [s]
-  (if (and s (string? s))
-    (let [^String s s]
-      (and (not-empty-string? s)
-           (not= \/ (.charAt s 0))
-           (some? (re-find fast-url-matcher s))))))
-
-(defn resolve-location
-  "Tries to get a value of `:response/location` key of the given request map `req`. If
-  it is found and it is a URL, it is returned. If it is found and it is a path or
-  page identifier it is parsed with the function `f`. Optional `lang`, `params`,
-  `qparams` and any other additional arguments are passed as arguments during the
-  call to `f`. If there is no response location, `nil` is returned."
-  ([f req]
-   (if-some [l (get req :response/location)]
-     (if (is-url? l) l (f req l))))
-  ([f req lang]
-   (if-some [l (get req :response/location)]
-     (if (is-url? l) l (f req l lang))))
-  ([f req lang params]
-   (if-some [l (get req :response/location)]
-     (if (is-url? l) l (f req l lang params))))
-  ([f req lang params qparams]
-   (if-some [l (get req :response/location)]
-     (if (is-url? l) l (f req l lang params qparams))))
-  ([f req lang params qparams & more]
-   (if-some [l (get req :response/location)]
-     (if (is-url? l) l (apply f req l lang params qparams more)))))
 
 ;; Path parsing
 
@@ -1037,6 +1009,63 @@
   "Returns a path for the authentication page. The page must have ID of `:user/welcome`."
   (^String [req]         (page req :user/welcome))
   (^String [req lang-id] (page req :user/welcome lang-id)))
+
+(defn get-location
+  "Tries to get a value of `:response/location` key of the given request map `req`. If
+  it is found and it is a URL, it is returned. If it is found and it is a path or
+  page identifier it is parsed with the function `f`. Optional arguments `args` can
+  be passed, and they will be passed as arguments during the call to `f`. If there is
+  no response location, `nil` is returned."
+  ([req]
+   (if-some [l (get req :response/location)]
+     (if (is-url? l) l (page req l))))
+  ([req f]
+   (if-some [l (get req :response/location)]
+     (if (is-url? l) l (f req l))))
+  ([req f args]
+   (if-some [l (get req :response/location)]
+     (if (is-url? l)
+       l
+       (case (count args)
+         1 (f req (first args))
+         2 (f req (first args) (second args))
+         3 (f req (first args) (second args) (second (rest args)))
+         0 (f req)
+         (apply f req args))))))
+
+(extend-protocol phttp/HTTP
+
+  Associative
+
+  (request?           ^Boolean        [req] true)
+  (response?          ^Boolean        [req] false)
+  (response-status                    [req] nil)
+  (response-headers   ^IPersistentMap [req] (get req :response/headers))
+  (response-body                      [req] (get req :response/body))
+
+  (app-status
+    [req]
+    (if-some [st (get req :app/status)]
+      (if (keyword? st) st (keyword (errors/most-significant req st)))))
+
+  (response-location
+    ([req] (get-location req))
+    ([req f] (get-location req f))
+    ([req f args] (get-location req f args)))
+
+  String
+
+  (request?         ^Boolean [s] false)
+  (response?        ^Boolean [s] false)
+  (response-status           [s] nil)
+  (response-headers          [s] nil)
+  (response-body             [s] nil)
+  (app-status                [s] nil)
+
+  (response-location
+    ([s] s)
+    ([s f] (if (is-url? s) s (f s)))
+    ([s f args] (if (is-url? s) s (f s args)))))
 
 ;; HTMX
 
@@ -2439,15 +2468,15 @@
 ;; Response status
 
 (defmacro add-status
-  "Adds response status to a request map `req` under its key `:response/status` using
+  "Adds app status to a request map `req` under its key `:app/status` using
   `qassoc`. The status is a result of evaluating expressions passed as additional
   arguments. Returns updated `req`. Assumes that `req` is always a map."
   [req & body]
   (if (and (seq? body) (> (count body) 1))
-    `(qassoc ~req :response/status (do ~@body))
-    `(qassoc ~req :response/status ~@body)))
+    `(qassoc ~req :app/status (do ~@body))
+    `(qassoc ~req :app/status ~@body)))
 
 (defmacro remove-status
-  "Removes `:response/status` from `req` using `clojure.core/dissoc`."
+  "Removes `:app/status` from `req` using `clojure.core/dissoc`."
   [req]
-  `(dissoc ~req :response/status))
+  `(dissoc ~req :app/status))
