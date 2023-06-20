@@ -11,6 +11,7 @@
   (:require [clojure.set                  :as         set]
             [clojure.string               :as         str]
             [clj-uuid                     :as        uuid]
+            [lazy-map.core                :as    lazy-map]
             [amelinium.proto.identity     :as           p]
             [amelinium.types.identity     :refer     :all]
             [amelinium                    :refer     :all]
@@ -25,10 +26,12 @@
   (:import  (java.util                    UUID)
             (clojure.lang                 Symbol
                                           Keyword
+                                          Associative
                                           PersistentVector
                                           IPersistentMap)
             (amelinium                    Identity)
             (amelinium.proto.identity     Identifiable)
+            (lazy_map.core                LazyMap)
             (com.google.i18n.phonenumbers Phonenumber$PhoneNumber)))
 
 ;; Standard identity types
@@ -603,7 +606,7 @@
     (^Identity [v ^Keyword identity-type]
      (if (not-empty-string? v) (parse identity-type v))))
 
-  clojure.lang.IPersistentMap
+  Associative
 
   (literal? ^Boolean [v] false)
 

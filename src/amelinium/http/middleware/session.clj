@@ -34,6 +34,7 @@
             [io.randomseed.utils.db.types :as      types])
 
   (:import (clojure.lang             Keyword
+                                     Associative
                                      PersistentVector
                                      IPersistentMap
                                      IFn
@@ -44,6 +45,7 @@
            (inet.ipaddr              IPAddress)
            (clojure.core.memoize     PluggableMemoization)
            (clojure.core.cache       TTLCacheQ)
+           (lazy_map.core            LazyMap)
            (amelinium.proto.session  SessionControl
                                      Sessionable)
            (amelinium                Session
@@ -150,7 +152,7 @@
   (control (^SessionControl [src] src) (^SessionControl [src _] src))
   (^Boolean -empty? [src] (not (config? (p/config src))))
 
-  clojure.lang.Associative
+  Associative
 
   (session
     (^Session [req] (get-session-by-key req))

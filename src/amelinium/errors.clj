@@ -40,7 +40,7 @@
   (config ^ErrorsConfig [src] src)
   (configurable? [src] true)
 
-  clojure.lang.IPersistentMap
+  Associative
 
   (config ^ErrorsConfig [src] (http/get-route-data src :errors/config))
   (configurable? [src] (p/configurable? (http/get-route-data src :errors/config)))

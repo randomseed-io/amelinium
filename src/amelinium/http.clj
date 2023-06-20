@@ -48,23 +48,7 @@
               (if-some [^Match m (get req ::r/match)] (.data ^Match match)))
           param)))
 
-  clojure.lang.IPersistentMap
-
-  (get-route-data
-    ([req]
-     (or (get req :route/data)
-         (if-some [^Match m (get req ::r/match)] (.data ^Match match))))
-    ([req param]
-     (get (or (get req :route/data)
-              (if-some [^Match m (get req ::r/match)] (.data ^Match match)))
-          param))
-    ([req match param]
-     (get (or (get req :route/data)
-              (get match :data)
-              (if-some [^Match m (get req ::r/match)] (.data ^Match match)))
-          param)))
-
-  clojure.lang.Associative
+  Associative
 
   (get-route-data
     ([req]

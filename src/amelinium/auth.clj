@@ -23,16 +23,19 @@
             [io.randomseed.utils.map  :as       map]
             [tick.core                :as         t])
 
-  (:import (amelinium    AccountTypes
-                         AuthLocking
-                         AuthConfirmation
-                         AuthPasswords
-                         AuthConfig
-                         AuthSettings)
-           (clojure.lang Keyword)
-           (javax.sql    DataSource)
-           (java.time    Duration)
-           (reitit.core  Match)))
+  (:import (amelinium     AccountTypes
+                          AuthLocking
+                          AuthConfirmation
+                          AuthPasswords
+                          AuthConfig
+                          AuthSettings)
+           (clojure.lang  Keyword
+                          Associative
+                          IPersistentMap)
+           (lazy_map.core LazyMap)
+           (javax.sql     DataSource)
+           (java.time     Duration)
+           (reitit.core   Match)))
 
 (defonce ^:redef setup nil)
 
@@ -203,34 +206,7 @@
            (if-some [^AuthConfig ac (get (.types ^AuthSettings as) at)]
              (.db ^AuthConfig ac)))))))
 
-  clojure.lang.IPersistentMap
-
-  (settings
-    ^AuthSettings [req]
-    (http/get-route-data req :auth/setup))
-
-  (config
-    (^AuthConfig [req]
-     (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
-       (.default ^AuthSettings as)))
-    (^AuthConfig [req account-type]
-     (if account-type
-       (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
-         (get (.types ^AuthSettings as)
-              (if (keyword? account-type) account-type (keyword account-type)))))))
-
-  (db
-    (^DataSource [req]
-     (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
-       (.db ^AuthSettings as)))
-    (^DataSource [req account-type]
-     (if account-type
-       (if-some [^AuthSettings as (http/get-route-data req :auth/setup)]
-         (let [at (if (keyword? account-type) account-type (keyword account-type))]
-           (if-some [^AuthConfig ac (get (.types ^AuthSettings as) at)]
-             (.db ^AuthConfig ac)))))))
-
-  clojure.lang.Associative
+  Associative
 
   (settings
     ^AuthSettings [req]
