@@ -1639,18 +1639,23 @@
   (^Response [req route-data app-status default-view]
    (handle-error req route-data app-status default-view nil))
   (^Response [req route-data app-status default-view header-name]
-   (log/web-dbg req "Handling status:" app-status)
-   (let [route-data     (or route-data (http/get-route-data req))
-         header-name    (cond (nil? header-name)   "Error"
-                              (false? header-name) nil
-                              :else                (or (some-str header-name) "Error"))
-         str-app-status (some-str app-status)
-         req            (if (and str-app-status header-name)
-                          (add-header req header-name str-app-status)
-                          req)]
-     (if (use-hx? req route-data :error/use-htmx?)
-       (hx-go-to-with-status   req route-data app-status default-view)
-       (http-go-to-with-status req route-data app-status default-view)))))
+   (let [route-data    (or route-data (http/get-route-data req))
+         app-st-single (if-not (keyword? app-status)
+                         (errors/most-significant (get route-data :errors/config) app-status))
+         reduced?      (and app-st-single (not (identical? app-status app-st-single)))
+         app-status    (if reduced? app-st-single app-status)
+         req           (if reduced? (qassoc req :app/status app-status) req)]
+     (log/web-dbg req "Handling status:" app-status)
+     (let [header-name    (cond (nil? header-name)   "Error"
+                                (false? header-name) nil
+                                :else                (or (some-str header-name) "Error"))
+           str-app-status (some-str app-status)
+           req            (if (and str-app-status header-name)
+                            (add-header req header-name str-app-status)
+                            req)]
+       (if (use-hx? req route-data :error/use-htmx?)
+         (hx-go-to-with-status   req route-data app-status default-view)
+         (http-go-to-with-status req route-data app-status default-view))))))
 
 (defn response!
   "Returns a response on a basis of `app-status` (or `:response/status` key of the
