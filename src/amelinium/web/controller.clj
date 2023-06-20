@@ -290,7 +290,7 @@
   (^Response [req]
    (web/response
     req
-    (log/web-dbg req "Default rendering initiated.")
+    (log/web-dbg req "Default rendering initiated")
     (if-some [st (get req :response/status)]
       (web/render-status req st)
       (if-some [f (get req :response/fn)]
@@ -299,7 +299,7 @@
   (^Response [req app-status-or-fn]
    (web/response
     req
-    (log/web-dbg req "Default rendering initiated.")
+    (log/web-dbg req "Default rendering initiated")
     (if (ident? app-status-or-fn)
       (web/render-status req app-status-or-fn)
       (if (fn? app-status-or-fn)

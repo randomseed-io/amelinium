@@ -597,7 +597,7 @@
          [layout view]
          (let [app-status (get req :response/status)]
            (log/web-dbg req "Getting layout/view for"
-                        (if app-status (str "application status " app-status " and"))
+                        (if app-status (str "application status " (some-str app-status) " and"))
                         "HTTP response status" status)
            [(if no-layout
               (or-some (get-for-status req route-data :status/layouts app-status status)
@@ -1615,7 +1615,8 @@
 
 (defn handle-error
   "Sets the right response function (which sets HTTP status code) and optional HTTP
-  header on a basis of the given `app-status`.
+  header on a basis of the given `app-status`. If `app-status` is sequential and contains
+  multiple statuses, it will be replaced by the most accurate one.
 
   Returns proper HTMX response (when `common/use-hx?` returns `true` because the request
   indicated it is HTMX, or `:error/use-htmx?` route data key is set, or generic
