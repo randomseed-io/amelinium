@@ -1266,7 +1266,18 @@
 
 (defn hx-transform-redirect
   "Adds the `HX-Redirect` response header set to a value of existing `Location` header
-  and removes the last one from the response map `resp`. Additionally forces HTTP
+  and removes the last one from the response map `resp`."
+  ^Response [^Response resp]
+  (if (instance? Response resp)
+    (->Response (.status resp)
+                (let [headers (.headers resp)]
+                  (-> (qassoc headers "HX-Redirect" (get headers "Location"))
+                      (dissoc "Location")))
+                (.body resp))))
+
+(defn hx-transform-redirect-200
+  "Adds the `HX-Redirect` response header set to a value of existing `Location` header
+  and removes the last one from the response map `resp`. Additionally, forces HTTP
   status of the response to be 200."
   ^Response [^Response resp]
   (if (instance? Response resp)
