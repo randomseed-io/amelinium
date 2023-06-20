@@ -927,7 +927,7 @@
     (or (some-keyword (get (session/error smap) :cause)) :session/unknown-error)))
 
 (defn body-add-session-status
-  "Gets the value of `:response/status` key of the given `req` and if it is set to
+  "Gets the value of `:app/status` key of the given `req` and if it is set to
   `:auth/session-error` or `:error/session`, adds `:session-status` to a response
   body with a value set to a result of calling `session-status` on a current
   session. If there is no session error detected, it simply calls `body-add-session`
@@ -942,7 +942,7 @@
   ([req smap]
    (body-add-session-status req smap nil))
   ([req smap translate-sub]
-   (let [rstatus (get req :response/status)
+   (let [rstatus (get req :app/status)
          smap    (if (keyword? smap) (session/of req smap) (session/of smap))]
      (if (or (identical? rstatus :auth/session-error)
              (identical? rstatus :error/session)

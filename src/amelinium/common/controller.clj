@@ -205,13 +205,13 @@
 (defn auth-user-with-password!
   "Authentication helper. Used by other controllers. Short-circuits on certain
   conditions and may emit a redirect (if a go-to was detected) or set the
-  `:response/status` in the returned request map (but not in the response map!).
+  `:app/status` in the returned request map (but not in the response map!).
 
   In case of successful authentication it will set `:auth/ok` to `true` and
   `:response-status` to `:auth/ok`.
 
   In case of session prolongation and successful authentication it will set
-  `:auth/ok?` to `true` and `:response/status` to `:auth/prolonged-ok`.
+  `:auth/ok?` to `true` and `:app/status` to `:auth/prolonged-ok`.
 
   The last, `auth-only-mode` argument, when set to `true` (default is `false` when
   not given) causes session creation and prolongation to be skipped if the
@@ -251,13 +251,13 @@
                           (oplog false :info "Permanent lock" for-mail)
                           (qassoc req :user/authorized? false :user/authenticated? false
                                   :user/id user-id :user/account-type ac-type
-                                  :auth/ok? false :response/status :auth/locked))
+                                  :auth/ok? false :app/status :auth/locked))
 
        (soft-locked?) (do (log/msg "Account locked temporarily" for-user)
                           (oplog false :info "Temporary lock" for-mail)
                           (qassoc req :user/authenticated? false :user/authorized? false
                                   :user/id user-id :user/account-type ac-type
-                                  :auth/ok? false :response/status :auth/soft-locked))
+                                  :auth/ok? false :app/status :auth/soft-locked))
 
        (invalid-pwd?) (do (log/wrn "Incorrect password or user not found" for-user)
                           (when user-id
@@ -265,12 +265,12 @@
                             (user/update-login-failed @auth-config user-id ipaddr))
                           (qassoc req :user/authorized? false :user/authenticated? false
                                   :user/id user-id :user/account-type ac-type
-                                  :auth/ok? false :response/status :auth/bad-password))
+                                  :auth/ok? false :app/status :auth/bad-password))
 
        auth-only-mode (do (log/msg "Authentication successful" for-user)
                           (oplog true :info "Authentication OK" for-mail)
                           (user/update-login-ok auth-db user-id ipaddr)
-                          (qassoc req :auth/ok? true :response/status :auth/ok
+                          (qassoc req :auth/ok? true :app/status :auth/ok
                                   :user/id user-id :user/account-type ac-type
                                   :user/authenticated? true))
 
@@ -299,7 +299,7 @@
                                   (oplog-fn :level s :user-id user-id :op :session :ok? false :msg c))
                                 (qassoc req
                                         :auth/ok?            false
-                                        :response/status     :auth/session-error
+                                        :app/status          :auth/session-error
                                         :user/authenticated? false
                                         :user/authorized?    false
                                         :user/id             user-id
@@ -308,7 +308,7 @@
                               (-> req
                                   (qassoc
                                    :auth/ok?          true
-                                   :response/status   (if prolonged? :auth/prolonged-ok :auth/ok)
+                                   :app/status        (if prolonged? :auth/prolonged-ok :auth/ok)
                                    :auth/goto         goto-uri
                                    :auth/htmx?        hx?
                                    :auth/use-htmx?    hx?
@@ -365,7 +365,7 @@
   succeed."
   [req user-id password]
   (qassoc
-   req :response/status
+   req :app/status
    (let [auth-settings (auth/settings req)
          auth-db       (auth/db auth-settings)]
      (if-some [ac-type (user/account-type auth-db :id user-id)]

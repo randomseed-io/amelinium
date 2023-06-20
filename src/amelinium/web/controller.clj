@@ -291,7 +291,7 @@
    (web/response
     req
     (log/web-dbg req "Default rendering initiated")
-    (if-some [st (get req :response/status)]
+    (if-some [st (get req :app/status)]
       (web/render-status req st)
       (if-some [f (get req :response/fn)]
         (f req)

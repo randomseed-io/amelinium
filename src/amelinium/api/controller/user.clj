@@ -358,7 +358,7 @@
               password      (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))
               form-params   (dissoc form-params :password :user/password)
               auth-result   (super/auth-user-with-password! req user-email password smap route-data true nil)
-              auth-bad?     (not= :auth/ok (:response/status auth-result))
+              auth-bad?     (not= :auth/ok (:app/status auth-result))
               auth-settings (if-not auth-bad? (auth/settings req))
               auth-db       (auth/db auth-settings)
               auth-failed?  (or auth-bad? (not auth-db))]
@@ -486,12 +486,12 @@
           session      (session/valid-of req session-key)
           user-email   (session/user-email session)
           req          (super/auth-user-with-password! req user-email old-password nil route-data true nil)]
-      (if (identical? :auth/ok (get req :response/status))
+      (if (identical? :auth/ok (get req :app/status))
         (let [user-id (or (get req :user/id)
                           (session/user-email session)
                           (user/id-of :email (auth/db req) user-email))
               req     (super/set-password! req user-id new-password)]
-          (if (and session-invalidator (identical? :pwd/created (get req :response/status)))
+          (if (and session-invalidator (identical? :pwd/created (get req :app/status)))
             (session-invalidator req nil :user/email user-email user-id))
           req)
         req)))))
@@ -519,7 +519,7 @@
               confirmed?   (boolean (if confirmation (get confirmation :confirmed?)))
               user-id      (if confirmation (get confirmation :user/id))
               req          (if confirmed? (super/set-password! req user-id new-password) req)
-              updated?     (if confirmed? (identical? (get req :response/status) :pwd/created))]
+              updated?     (if confirmed? (identical? (get req :app/status) :pwd/created))]
           (cond
             (nil? confirmation) (api/render-error req :verify/bad-result)
             updated?            (do (if session-invalidator

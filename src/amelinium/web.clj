@@ -497,10 +497,10 @@
 (p/import-vars [amelinium.common
                 add-header add-headers add-status remove-status])
 
-(defn response-status?
-  "Returns `true` if the response status of the given `req` is equal to `k`."
+(defn app-status?
+  "Returns `true` if the app status of the given `req` is equal to `k`."
   [req k]
-  (identical? (some-keyword k) (get req :response/status)))
+  (identical? (some-keyword k) (get req :app/status)))
 
 (defn- update-status
   "Updates `:app/data` map of the `req` by setting its status key `status-key` to
@@ -564,14 +564,14 @@
 
   To establish a layout it will check for `:status/layouts` key in `req` and then in
   `route-data` to obtain a mapping of statuses to layouts. It will then look for an
-  application status (taken from `:response/status` of the given `req`) and if that
+  application status (taken from `:app/status` of the given `req`) and if that
   will return `nil` it will look for an HTTP status `status` in the same map. If that
   will fail, it will try `:error/layout` key of the `req` and the `:error/layout` key
   of the `route-data`. Finally, it will return a string `\"error\"`.
 
   To establish a view it will check for `:status/views` key in `req` and then in
   `route-data` to obtain a mapping of statuses to views. It will then look for an
-  application status (taken from `:response/status` of the given `req`) and if that
+  application status (taken from `:app/status` of the given `req`) and if that
   will return `nil` it will look for an HTTP status `status` in the same map. If that
   will fail, it will try `:error/layout` key of the `req` and then `:error/layout`
   key of the `route-data`. Finally, it will return a string `\"error\"`.
@@ -595,7 +595,7 @@
            no-view   (nil? view)]
        (if (not (or no-layout no-view))
          [layout view]
-         (let [app-status (get req :response/status)]
+         (let [app-status (get req :app/status)]
            (log/web-dbg req "Getting layout/view for"
                         (if app-status (str "application status " (some-str app-status) " and"))
                         "HTTP response status" status)
@@ -1571,7 +1571,7 @@
   `:response/set-status!` in `req` to ensure that application status is processed
   even if an HTTP response status will be `:ok/found` during rendering.
 
-  Returns `req` with added `:response/status` set to the value of `app-status`,
+  Returns `req` with added `:app/status` set to the value of `app-status`,
   updated `:response/headers` and `:response/set-status!` flag."
   (^Response [req]
    (hx-go-to-with-status req nil :error/internal nil))
@@ -1580,7 +1580,7 @@
   (^Response [req app-status default-view]
    (hx-go-to-with-status req nil app-status default-view))
   (^Response [req route-data app-status default-view]
-   (let [req        (qassoc req :response/status app-status :response/set-status! true)
+   (let [req        (qassoc req :app/status app-status :response/set-status! true)
          route-data (or route-data (http/get-route-data req))
          target     (or (get-in route-data [:status/targets app-status])
                         (get route-data :error/target))]
@@ -1658,7 +1658,7 @@
          (http-go-to-with-status req route-data app-status default-view))))))
 
 (defn response!
-  "Returns a response on a basis of `app-status` (or `:response/status` key of the
+  "Returns a response on a basis of `app-status` (or `:app/status` key of the
   `req` if status is not given).
 
   Optional `fallback-view` will be used if there is no assignment of a view to the
@@ -1685,7 +1685,7 @@
   (^Response [req app-status fallback-view error-header route-data]
    (response
     req
-    (if-let [status (some-keyword (or app-status (get req :response/status)))]
+    (if-let [status (some-keyword (or app-status (get req :app/status)))]
       (handle-error req
                     (or route-data (http/get-route-data req))
                     status

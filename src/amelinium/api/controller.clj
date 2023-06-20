@@ -156,12 +156,12 @@
 
 (defn render!
   "Renders a response by calling `render-ok` on a `req` request map. If
-  `:response/status` key is present in `req` and is not `nil`, it will call
+  `:app/status` key is present in `req` and is not `nil`, it will call
   `render-status` instead with `req` and a value associated with this key (which
   should be a keyword). If `:response/fn` key is present in `req` and it is not
   `nil`, it should be a function which will be called with `req` argument."
   ([req]
-   (if-some [st (get req :response/status)]
+   (if-some [st (get req :app/status)]
      (api/render-status req st)
      (if-some [f (get req :response/fn)]
        (f req)

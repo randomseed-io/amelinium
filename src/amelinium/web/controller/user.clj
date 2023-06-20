@@ -210,7 +210,7 @@
   ([req user-email password sess route-data lang auth-only? session-key]
    (let [route-data (or route-data (http/get-route-data req))
          req        (super/auth-user-with-password! req user-email password sess route-data auth-only? session-key)
-         status     (get req :response/status)]
+         status     (get req :app/status)]
      (if (resp/response? req)
        req
        (case status
@@ -482,7 +482,7 @@
   ([req]
    (pwd-status req (http/get-route-data req)))
   ([req route-data]
-   (case (get req :response/status)
+   (case (get req :app/status)
      :pwd/created      req
      :pwd/updated      req
      :pwd/bad-password (common/move-to req (get-in route-data [:error/destinations :auth/bad-password] :login/bad-password))
@@ -502,7 +502,7 @@
         req          (auth-with-password! req user-email old-password nil route-data nil true nil)]
     (if (resp/response? req)
       req
-      (if (identical? :auth/ok (get req :response/status))
+      (if (identical? :auth/ok (get req :app/status))
         (if-not (= new-password new-repeated)
           (web/form-params-error! req {:user/repeated-password :repeated-password})
           (super/set-password!
@@ -586,7 +586,7 @@
               cfrm (confirmation/establish db id code token one-minute "recovery")]
           (if (get cfrm :confirmed?)
             (let [req (super/set-password! req (get cfrm :user/id) password)]
-              (if (web/response-status? req :pwd/created)
+              (if (resp/app-status? req :pwd/created)
                 (confirmation/delete db (or cfrm id) "recovery"))
               req)
             (web/render-error req (or (:errors cfrm) :verify/bad-result)))))
@@ -678,6 +678,6 @@
         (if-not (get cfrm :confirmed?)
           (web/handle-error req (or (:errors cfrm) :verify/bad-result))
           (let [req (super/set-password! req (get cfrm :user/id) password)]
-            (if (web/response-status? req :pwd/created)
+            (if (resp/app-status? req :pwd/created)
               (confirmation/delete db (or cfrm id) "recovery"))
             req))))))
