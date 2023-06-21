@@ -291,20 +291,22 @@
    (web/response
     req
     (log/web-dbg req "Default rendering initiated")
-    (if-some [st (get req :app/status)]
-      (web/render-status req st)
-      (if-some [f (get req :response/fn)]
-        (f req)
+    (if-some [f (get req :response/fn)]
+      (f req)
+      (if-some [st (get req :app/status)]
+        (web/render-status req st)
         (web/render-ok req)))))
   (^Response [req app-status-or-fn]
    (web/response
     req
-    (log/web-dbg req "Default rendering initiated")
-    (if (ident? app-status-or-fn)
-      (web/render-status req app-status-or-fn)
-      (if (fn? app-status-or-fn)
-        (app-status-or-fn req)
-        (web/render-ok req))))))
+    (log/web-dbg req "Default rendering initiated (with app status or fn)")
+    (if (fn? app-status-or-fn)
+      (app-status-or-fn req)
+      (if-some [f (get req :response/fn)]
+        (f req)
+        (if app-status-or-fn
+          (web/render-status req app-status-or-fn)
+          (web/render-ok req)))))))
 
 (defn default
   [req]
