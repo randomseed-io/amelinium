@@ -1507,9 +1507,10 @@
   "Redirects to a best-suited language version of the URI. Uses `:browser` pickers
   chain to get the right language if the path is language-parameterized."
   [req]
-  (move-to req
-           (or (http/get-route-data req :destination) "/")
-           (pick-language-str req :browser)))
+  (let [rd (http/get-route-data req)]
+    (move-to req
+             (or (get rd :destination) (get rd :response/location) "/")
+             (pick-language-str req :browser))))
 
 ;; Accounts
 
