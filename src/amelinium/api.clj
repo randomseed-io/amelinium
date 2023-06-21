@@ -150,11 +150,11 @@
   (^Response [^IFn resp-fn req]
    (if (resp/response? req)
      req
-     (resp-fn (render req) (or (get req :response/headers) {}))))
+     (resp-fn (render req) (or (resp/headers req) {}))))
   (^Response [^IFn resp-fn status req]
    (if (resp/response? req)
      req
-     (resp-fn (render req status) (or (get req :response/headers) {})))))
+     (resp-fn (render req status) (or (resp/headers req) {})))))
 
 (defn render-response-force
   "API response renderer. Uses the `render` function to render the response body and
@@ -173,9 +173,9 @@
   (^Response [^IFn resp-fn]
    (render-response-force resp-fn nil))
   (^Response [^IFn resp-fn req]
-   (resp-fn (render req (or (get req :response/headers) {}))))
+   (resp-fn (render req (or (resp/headers req) {}))))
   (^Response [^IFn resp-fn status req]
-   (resp-fn (render req status) (or (get req :response/headers) {}))))
+   (resp-fn (render req status) (or (resp/headers req) {}))))
 
 ;; OK response
 
@@ -550,45 +550,45 @@
    (resp/created))
   (^Response [req]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (resp/location req page)))
   (^Response [req data]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (resp/location req page)))
   (^Response [req data view]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (resp/location req page)))
   (^Response [req data view layout]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (resp/location req page)))
   (^Response [req data view layout lang]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (resp/location req page lang)))
   (^Response [req data view layout lang name-or-path]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (page req name-or-path lang))))
   (^Response [req data view layout lang name-or-path params]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (page req name-or-path lang params))))
   (^Response [req data view layout lang name-or-path params query-params]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (page req name-or-path lang params query-params))))
   (^Response [req data view layout lang name-or-path params query-params & more]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (apply page req name-or-path lang params query-params more)))))
@@ -601,45 +601,45 @@
    (resp/created))
   (^Response [req]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (resp/location req localized-page)))
   (^Response [req data]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (resp/location req localized-page)))
   (^Response [req data view]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (resp/location req localized-page)))
   (^Response [req data view layout]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (resp/location req localized-page)))
   (^Response [req data view layout lang]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (resp/location req localized-page lang)))
   (^Response [req data view layout lang name-or-path]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (localized-page req name-or-path lang))))
   (^Response [req data view layout lang name-or-path params]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (localized-page req name-or-path lang params))))
   (^Response [req data view layout lang name-or-path params query-params]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (localized-page req name-or-path lang params query-params))))
   (^Response [req data view layout lang name-or-path params query-params & more]
    (resp/created (render req :ok/created)
-                 (or (get req :response/headers) {})
+                 (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (apply localized-page req name-or-path lang params query-params more)))))
