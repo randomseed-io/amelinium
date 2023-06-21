@@ -1231,11 +1231,11 @@
              (f# ~'name-or-path (resp/headers ~'req))
              (f# (page ~'req ~'name-or-path) (resp/headers ~'req))))
           (^Response ~'[req name-or-path lang]
-           (f# (page ~'req ~'name-or-path ~'lang)) (resp/headers ~'req))
+           (f# (page ~'req ~'name-or-path ~'lang) (resp/headers ~'req)))
           (^Response ~'[req name-or-path lang params]
-           (f# (page ~'req ~'name-or-path ~'lang ~'params)) (resp/headers ~'req))
+           (f# (page ~'req ~'name-or-path ~'lang ~'params) (resp/headers ~'req)))
           (^Response ~'[req name-or-path lang params query-params]
-           (f# (page ~'req ~'name-or-path ~'lang ~'params ~'query-params)) (resp/headers ~'req))
+           (f# (page ~'req ~'name-or-path ~'lang ~'params ~'query-params) (resp/headers ~'req)))
           (^Response ~'[req name-or-path lang params query-params & more]
            (f# (apply page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more)
                (resp/headers ~'req))))))))
@@ -1293,11 +1293,11 @@
              (f# ~'name-or-path (resp/headers ~'req))
              (f# (localized-page ~'req ~'name-or-path) (resp/headers ~'req))))
           (^Response ~'[req name-or-path lang]
-           (f# (localized-page ~'req ~'name-or-path ~'lang)) (resp/headers ~'req))
+           (f# (localized-page ~'req ~'name-or-path ~'lang) (resp/headers ~'req)))
           (^Response ~'[req name-or-path lang params]
-           (f# (localized-page ~'req ~'name-or-path ~'lang ~'params)) (resp/headers ~'req))
+           (f# (localized-page ~'req ~'name-or-path ~'lang ~'params) (resp/headers ~'req)))
           (^Response ~'[req name-or-path lang params query-params]
-           (f# (localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params)) (resp/headers ~'req))
+           (f# (localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params) (resp/headers ~'req)))
           (^Response ~'[req name-or-path lang params query-params & more]
            (f# (apply localized-page ~'req ~'name-or-path ~'lang ~'params ~'query-params ~'more)
                (resp/headers ~'req))))))))
