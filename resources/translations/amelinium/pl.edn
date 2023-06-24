@@ -101,6 +101,8 @@
                            :locked        "Konto zablokowane! Skontaktuj się z pomocą techniczną."
                            :soft-locked   "Dostęp tymczasowo zablokowany z powodu zbyt wielu nieudanych prób logowania."
                            :bad-password  "Nieprawidłowa nazwa użytkownika lub hasło."}
+   :timeout               {:recovery      "Przekroczono czas oczekiwania."
+                           :recovery.full "Upłynął czas na potwierdzenie tożsamości podczas zmiany hasła. Rozpocznij odzyskiwanie od początku."}
    :roles-table           {:present-label "TAK"
                            :missing-label "—"
                            :global-label  "[KAŻDY]"
@@ -231,6 +233,7 @@
                            :confirm                "Potwierdź!"
                            :send-again             "Wyślij ponownie!"
                            :return                 "Powrót!"
+                           :start-over             "Spróbuj ponownie…"
                            :email                  :parameter/email
                            :identity               :parameter/identity
                            :password               :parameter/password

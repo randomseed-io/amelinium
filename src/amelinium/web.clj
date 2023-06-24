@@ -1596,7 +1596,7 @@
          target     (or (get-in route-data [:status/targets app-status])
                         (get route-data :error/target))]
      (log/web-dbg req "Injecting HTML fragment with app status" app-status
-                  (str "(target:" (some-str target) ")"))
+                  (if target (str "(target:" (some-str target) ")")))
      (if default-view
        (hx-inject req target default-view)
        (hx-inject req target)))))

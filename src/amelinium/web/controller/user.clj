@@ -321,34 +321,40 @@
            qtoken (->> [:verify/qtoken :confirmation/qtoken :qtoken] (qsome params))]
        (if (and id qtoken)
          (if-some [r (confirmation/status (auth/db req) id qtoken reason)]
-           (let [lang          (or (common/pick-language req :registration) (common/lang-id req))
-                 tr            (i18n/no-default (common/translator req lang))
-                 retry-dur     (simple-duration (get r :expires))
-                 attempts      (get r :attempts)
-                 attempts?     (int? attempts)
-                 attempts-left (if attempts? (if (neg? attempts) 0 attempts))
-                 max-attempts? (if attempts? (zero? attempts-left))
-                 expired?      (timeout? retry-dur)
-                 retry-in      (delay (retry-in-mins retry-dur))
-                 id-type       (delay (common/guess-identity-type r id nil nil))
-                 req           (web/assoc-app-data
-                                req
-                                :user/id-type              id-type
-                                :user/identity             (delay (identity/->str @id-type id))
-                                :verify/confirmed?         (delay (get r :confirmed?))
-                                :verify/in-mins            (delay (tr :in-mins     @retry-in))
-                                :verify/retry-in-mins      (delay (tr :try-in-mins @retry-in))
-                                :verify/mins-left          (delay (tr :mins-left   @retry-in))
-                                :verify/attempts-left-word (delay (tr :attempts-left attempts-left))
-                                :verify/attempts-left      attempts-left
-                                :verify/retry-in           retry-in
-                                :verify/retry-dur          retry-dur
-                                :verify/max-attempts?      max-attempts?
-                                :verify/expired?           expired?
-                                :verify/qtoken             qtoken
-                                :verify/retry-unit         :minutes)]
-             (cond expired? (web/handle-error req (some->> r :reason name (keyword "timeout")))
-                   :else    req))
+           (let [lang           (or (common/pick-language req :registration) (common/lang-id req))
+                 tr             (i18n/no-default (common/translator req lang))
+                 retry-dur      (simple-duration (get r :expires))
+                 attempts       (get r :attempts)
+                 attempts?      (int? attempts)
+                 attempts-left  (if attempts? (if (neg? attempts) 0 attempts))
+                 max-attempts?  (if attempts? (zero? attempts-left))
+                 expired?       (timeout? retry-dur)
+                 reason         (get r :reason)
+                 reason-str     (delay (some->> reason name))
+                 start-over-url (delay (if reason (common/route-data-page-in req [:reason/returns reason])))
+                 retry-in       (delay (retry-in-mins retry-dur))
+                 id-type        (delay (common/guess-identity-type r id nil nil))
+                 start-over?    (or expired? false)
+                 req            (web/assoc-app-data
+                                 req
+                                 :url/start-over            (if start-over? start-over-url)
+                                 :user/id-type              id-type
+                                 :user/identity             (delay (identity/->str @id-type id))
+                                 :verify/confirmed?         (delay (get r :confirmed?))
+                                 :verify/in-mins            (delay (tr :in-mins     @retry-in))
+                                 :verify/retry-in-mins      (delay (tr :try-in-mins @retry-in))
+                                 :verify/mins-left          (delay (tr :mins-left   @retry-in))
+                                 :verify/attempts-left-word (delay (tr :attempts-left attempts-left))
+                                 :verify/attempts-left      attempts-left
+                                 :verify/retry-in           retry-in
+                                 :verify/retry-dur          retry-dur
+                                 :verify/max-attempts?      max-attempts?
+                                 :verify/expired?           expired?
+                                 :verify/qtoken             qtoken
+                                 :verify/retry-unit         :minutes)]
+             (cond
+               expired? (web/handle-error req (if @reason-str (keyword "timeout" @reason-str)))
+               :else    req))
            req)
          req))
      req)))

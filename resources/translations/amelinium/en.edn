@@ -96,6 +96,8 @@
                            :locked        "Account is locked! Contact support if you think it's a mistake."
                            :soft-locked   "Access is blocked temporarily due to exceeded number of log-in attempts."
                            :bad-password  "Incorrect user name or password."}
+   :timeout               {:recovery "Confirmation timeout."
+                           :recovery.full "Time for confirmation required for password recovery has passed. You may go back and start over."}
    :roles-table           {:present-label "YES"
                            :missing-label "—"
                            :global-label  "[ANY]"
@@ -232,6 +234,7 @@
                            :submit                 "Submit!"
                            :confirm                "Confirm!"
                            :return                 "Return!"
+                           :start-over             "Start again…"
                            :email                  :parameter/email
                            :password               :parameter/password
                            :new-password           :parameter/password
