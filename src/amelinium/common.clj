@@ -1010,6 +1010,28 @@
   (^String [req]         (page req :user/welcome))
   (^String [req lang-id] (page req :user/welcome lang-id)))
 
+(defn route-data-page
+  "Returns a path for the page which path or identifier is associated with the key `k`
+  in a current route data. The `k` should be a keyword or value that can be converted
+  to a keyword."
+  ([req k]
+   (route-data-page req k nil))
+  ([req k route-data]
+   (if-some [k (some-keyword k)]
+     (if-some [name-or-path (get (or route-data (http/get-route-data req)) k)]
+       (page req name-or-path)))))
+
+(defn route-data-page-in
+  "Returns a path for the page which path or identifier is associated in a current
+  route data with the nested keys `ks` given as a sequence. Each subsequent key
+  should be a keyword or value that can be converted to a keyword."
+  ([req ks]
+   (route-data-page-in req ks nil))
+  ([req ks route-data]
+   (if-some [ks (not-empty (map some-keyword ks))]
+     (if-some [name-or-path (get-in (or route-data (http/get-route-data req)) ks)]
+       (page req name-or-path)))))
+
 (defn get-location
   "Tries to get a value of `:response/location` key of the given request map `req`. If
   it is found and it is a URL, it is returned. If it is found and it is a path or
