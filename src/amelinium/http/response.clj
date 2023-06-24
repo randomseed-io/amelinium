@@ -80,7 +80,7 @@
   within that set. If the values or not equal and there is not element in a set (in
   case of set), returns `false`."
   [src app-status]
-  (if-some [st (http/response-status src)]
+  (if-some [st (http/app-status src)]
     (or (identical? st app-status)
         (and (set? st) (contains? st app-status)))
     false))

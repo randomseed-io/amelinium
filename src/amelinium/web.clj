@@ -497,11 +497,6 @@
 (p/import-vars [amelinium.common
                 add-header add-headers add-status remove-status])
 
-(defn app-status?
-  "Returns `true` if the app status of the given `req` is equal to `k`."
-  [req k]
-  (identical? (some-keyword k) (get req :app/status)))
-
 (defn- update-status
   "Updates `:app/data` map of the `req` by setting its status key `status-key` to
   `status`, `title-key` to translated `status` and `description-key` to translated

@@ -1064,11 +1064,7 @@
   (response-status                    [req] nil)
   (response-headers   ^IPersistentMap [req] (get req :response/headers))
   (response-body                      [req] (get req :response/body))
-
-  (app-status
-    [req]
-    (if-some [st (get req :app/status)]
-      (if (keyword? st) st (keyword (errors/most-significant req st)))))
+  (app-status                         [req] (get req :app/status))
 
   (response-location
     ([req] (get-location req))
@@ -1088,6 +1084,21 @@
     ([s] s)
     ([s f] (if (is-url? s) s (f s)))
     ([s f args] (if (is-url? s) s (f s args)))))
+
+(defn app-status-single
+  "Returns a single keyword which is a value of current application
+  status (`:app/status` key of the request map). The given `src` should be a request
+  map, although it will also work with a response map. The optional `err-config`
+  should be a source of error configuration (dedicated object being a result of
+  calling `amelinium.errors/config` on a request map, or a request map). If the
+  application status is a collection of statuses, most significant status will be
+  returned."
+  ([src]
+   (app-status-single src nil))
+  ([src err-config]
+   (if-some [st (phttp/app-status src)]
+     (let [st (if (coll? st) (errors/most-significant (or err-config src) st) st)]
+       (if (keyword? st) st (if st (some-keyword st)))))))
 
 ;; HTMX
 
