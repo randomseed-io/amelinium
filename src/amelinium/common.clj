@@ -2256,6 +2256,60 @@
   ([params]
    (map/map-keys (comp keyword name) params)))
 
+(defn all-params
+  "Synonym of `(get req :parameters)`."
+  [req]
+  (get req :parameters))
+
+(defn params
+  "Synonym of `(get-in req [:parameters params-type])` (in binary variant) and
+  `(get req :parameters)` (in unary variant)."
+  ([req params-type]
+   (get (get req :parameters) params-type))
+  ([req]
+   (get req :parameters)))
+
+(defn form-params
+  "Synonym of `(get-in req [:parameters :form])` (in unary variant) and
+  `(get-in req [:parameters :form param])` (in binary variant)."
+  ([req]
+   (get (get req :parameters) :form))
+  ([req param]
+   (get (get (get req :parameters) :form) param)))
+
+(defn path-params
+  "Synonym of `(get-in req [:parameters :path])` (in unary variant) and
+  `(get-in req [:parameters :path param])` (in binary variant)."
+  ([req]
+   (get (get req :parameters) :path))
+  ([req param]
+   (get (get (get req :parameters) :path) param)))
+
+(defn body-params
+  "Synonym of `(get-in req [:parameters :body])` (in unary variant) and
+  `(get-in req [:parameters :body param])` (in binary variant)."
+  ([req]
+   (get (get req :parameters) :body))
+  ([req param]
+   (get (get (get req :parameters) :body) param)))
+
+(defn identity-param
+  "For the given map of parameters `m` tries to get existing and non-nil value
+  associated with a first existing key in a sequence of `:user/identity`,
+  `:user/login`, `:user/email`, `:user/phone`, `:identity`, `:login`, `:username`,
+  `:email`, `:phone`. Next, converts it to `amelinium.Identity` record (with the
+  constraint that the identity must belong to the `::identity/public` identity type),
+  and returns it.
+
+  Optional, custom sequence of parameter names to be looked up can be given as the
+  `params` second argument."
+  ([m]
+   (if m (->> [:user/identity :user/login :user/email :user/phone
+               :identity :login :username :email :phone]
+              (qsome m) (identity/of-type ::identity/public))))
+  ([m params]
+   (if m (->> params (qsome m) (identity/of-type ::identity/public)))))
+
 ;; Language helpers
 
 (defn lang-url

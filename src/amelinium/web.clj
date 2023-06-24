@@ -1896,7 +1896,7 @@
 (defn- param-current-vals
   [req]
   (if-let [form-params (get req :form-params)]
-    (let [good-params (->> (get (get req :parameters) :form)
+    (let [good-params (->> (common/form-params req)
                            (map/remove-empty-values)
                            (map/map-keys some-str))]
       (->> form-params

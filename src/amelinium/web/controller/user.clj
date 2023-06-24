@@ -184,12 +184,6 @@
     (web/hx-go-to-with-status req route-data :auth/prolonged-ok :login/prolonged)
     (auth-ok req route-data lang)))
 
-(defn- get-identity-param
-  [params]
-  (->> [:user/identity :user/login :user/email :user/phone :identity :login :username :email :phone]
-       (qsome params)
-       (identity/of-type ::identity/public)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
 
@@ -248,7 +242,7 @@
   ([req]
    (authenticate! req nil))
   ([req session-key]
-   (let [form-params        (get (get req :parameters) :form)
+   (let [form-params        (common/form-params req)
          route-data         (delay (http/get-route-data req))
          ^String user-email (some-str (or (get form-params :user/login) (get form-params :login)))
          ^String password   (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))
@@ -269,7 +263,7 @@
   ([req session-key]
    (let [^Session sess (session/of req session-key)
          rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))
-         user-login    (delay (some-str (get-in req [:parameters :form :user/login])))]
+         user-login    (delay (some-str (common/form-params req :user/login)))]
      (web/assoc-app-data req :lock-remains rem-mins :user/login user-login))))
 
 (defn logout!
@@ -316,8 +310,8 @@
   ([req]             (confirmation-status! req nil nil))
   ([req session-key] (confirmation-status! req session-key nil))
   ([req session-key reason]
-   (if-some [params (not-empty (get (get req :parameters) :form))]
-     (let [id     (get-identity-param params)
+   (if-some [params (not-empty (common/form-params req))]
+     (let [id     (common/identity-param params)
            qtoken (->> [:verify/qtoken :confirmation/qtoken :qtoken] (qsome params))]
        (if (and id qtoken)
          (if-some [r (confirmation/status (auth/db req) id qtoken reason)]
@@ -363,7 +357,7 @@
   "Initiates user registration process by receiving e-mail, password and name."
   ([req] (register! req nil))
   ([req session-key]
-   (let [params       (not-empty (get (get req :parameters) :form))
+   (let [params       (not-empty (common/form-params req))
          new-password (if params (get params :user/new-password))]
      (if new-password
        (if (not= (:user/new-password params) (:user/repeated-password params))
@@ -399,7 +393,7 @@
   [req]
   (let [auth-config  (auth/config req)
         db           (auth/db auth-config)
-        all-params   (get req :parameters)
+        all-params   (common/params req)
         path-params  (get all-params :path)
         params       (get all-params :form)
         token        (get path-params :token)
@@ -438,7 +432,7 @@
   ([req session-invalidator]
    (let [auth-config  (auth/config req)
          db           (auth/db auth-config)
-         all-params   (get req :parameters)
+         all-params   (common/params req)
          path-params  (get all-params  :path)
          form-params  (get all-params  :form)
          code         (or (get form-params :confirmation/code)  (get form-params :code))
@@ -499,7 +493,7 @@
   "Changes password for the user authenticated with an old password and e-mail or sets
   the password for the given `user-id`."
   [req]
-  (let [form-params  (get (get req :parameters) :form)
+  (let [form-params  (common/form-params req)
         user-email   (some-str (or (get form-params :user/login) (get form-params :login) (get form-params :username)))
         new-password (or (get form-params :user/new-password)      (get form-params :new-password))
         new-repeated (or (get form-params :user/repeated-password) (get form-params :repeated-password))
@@ -521,8 +515,8 @@
   "Initiates password recovery by sending an e-mail or SMS message with a verification
   code or token."
   [req]
-  (let [params  (get (get req :parameters) :form)
-        id      (get-identity-param params)
+  (let [params  (common/form-params req)
+        id      (common/identity-param params)
         id-type (identity/type id)
         req     (web/assoc-app-data req :user/identity id :identity/type id-type)]
     (if id-type
@@ -561,10 +555,7 @@
 (defn password-update!
   "Displays password setting form for a user authenticated with token or code."
   [req]
-  (println (str "password-update!"))
-  (println "form-params:")
-  (cprint (get req :form-params))
-  (let [params        (get req :parameters)
+  (let [params        (common/params req)
         form-params   (get params :form)
         query-params  (get params :query)
         path-params   (get params :path)
@@ -573,7 +564,7 @@
                           (get form-params :token))
         code          (or (get form-params :confirmation/code)
                           (get form-params :code))
-        id            (get-identity-param form-params)
+        id            (common/identity-param form-params)
         id-type       (identity/type id)
         password      (some-str (or (get form-params :user/new-password)
                                     (get form-params :new-password)))
@@ -647,10 +638,7 @@
 (defn password-create!
   "Creates a password on a basis of a token, or on a basis of a code and identity."
   [req]
-  (println (str "password-create!"))
-  (println "params:")
-  (cprint (get req :parameters))
-  (let [params       (get req :parameters)
+  (let [params       (common/params req)
         form-params  (get params :form)
         query-params (get params :query)
         path-params  (get params :path)
@@ -663,7 +651,7 @@
                                    (get form-params :new-password)))
         password-2   (some-str (or (get form-params :user/repeated-password)
                                    (get form-params :repeated-password)))
-        id           (get-identity-param form-params)
+        id           (common/identity-param form-params)
         id-type      (identity/type id)
         login        (delay (or (get form-params :user/login)
                                 (get form-params :login)
