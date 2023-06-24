@@ -584,7 +584,8 @@
           (if (get cfrm :confirmed?)
             (let [req (super/set-password! req (get cfrm :user/id) password)]
               (if (resp/app-status? req :pwd/created)
-                (confirmation/delete db (or cfrm id) "recovery"))
+                (do (log/web-dbg req "Removing confirmation entry for updated password")
+                    (confirmation/delete db (or cfrm id) "recovery")))
               req)
             (web/render-error req (or (:errors cfrm) :verify/bad-result)))))
 
@@ -673,5 +674,6 @@
           (web/handle-error req (or (:errors cfrm) :verify/bad-result))
           (let [req (super/set-password! req (get cfrm :user/id) password)]
             (if (resp/app-status? req :pwd/created)
-              (confirmation/delete db (or cfrm id) "recovery"))
+              (do (log/web-dbg req "Removing confirmation entry for created password")
+                  (confirmation/delete db (or cfrm id) "recovery")))
             req))))))
