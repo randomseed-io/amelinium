@@ -152,6 +152,7 @@
    (let [req           (qassoc req :app/data-required [] :app/data empty-lazy-map)
          route-data    (http/get-route-data req)
          ^Session sess (session/not-empty-of req (or session-key (get route-data :session-key)))
+         sess-err      (if sess (session/error sess))
          auth-state    (delay (common/login-auth-state req :login-page? :auth-page?))
          login-data?   (delay (login-data? req))
          auth-db       (delay (auth/db req))]
@@ -162,6 +163,13 @@
 
        (not (get req :validators/params-valid?))
        (web/render-bad-params req nil ["error" "bad-params"] "error")
+
+       ;; Unauthorized (RBAC)
+
+       (not (or (get req :user/authorized?) sess-err))
+       (if (get req :user/authenticated?)
+         (web/render-error req :auth/access-denied  :login/access-denied)
+         (web/render-error req :auth/login-required :login/login-required))
 
        ;; There is no real session. Short-circuit.
 
@@ -250,7 +258,7 @@
                              :op      :session
                              :ok?     false
                              :msg     (str "Expired " for-mail)))
-             (when-some [sess-err (session/error sess)]
+             (when sess-err
                (common/oplog req
                              :user-id (session/user-id sess)
                              :op      :session
