@@ -83,6 +83,7 @@
    :session               {:ok                   "Sesja jest poprawna."
                            :created              "Utworzono sesję użytkownika."
                            :unknown-id           "Odebrano nieznany identyfikator sesji."
+                           :unknown-id.full      "Otrzymany identyfikator sesji użytkownika wygasł lub jest niepoprawny. Wymagane ponowne zalogowanie."
                            :no-session-id        "Brak wymaganego identyfikatora sesji."
                            :malformed-session-id "Identyfikator sesji jest uszkodzony."
                            :malformed-user-id    "Identyfikator użytkownika jest niepoprawny."

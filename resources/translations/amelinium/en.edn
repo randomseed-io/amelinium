@@ -78,6 +78,7 @@
    :session               {:ok                   "Session is correct."
                            :created              "User session has been created."
                            :unknown-id           "Unknown session ID has been received."
+                           :unknown-id.full      "Received session identifier is invalid or expired. Please login again."
                            :no-session-id        "No required session ID."
                            :malformed-session-id "Malformed session ID."
                            :malformed-user-id    "User ID is invalid."
@@ -96,7 +97,7 @@
                            :locked        "Account is locked! Contact support if you think it's a mistake."
                            :soft-locked   "Access is blocked temporarily due to exceeded number of log-in attempts."
                            :bad-password  "Incorrect user name or password."}
-   :timeout               {:recovery "Confirmation timeout."
+   :timeout               {:recovery      "Confirmation timeout."
                            :recovery.full "Time for confirmation required for password recovery has passed. You may go back and start over."}
    :roles-table           {:present-label "YES"
                            :missing-label "—"
