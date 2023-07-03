@@ -907,6 +907,7 @@
   ([req smap]
    (let [smap (if (keyword? smap) (session/of req smap) (session/of smap))
          k    (or (session/id-field smap) :session-id)
+         k    (if (string? k) (keyword k) k)
          sid  (session/id smap)]
      (if sid
        (qupdate req :response/body qassoc k sid)
@@ -914,6 +915,7 @@
   ([req smap field]
    (let [smap (if (keyword? smap) (session/of req smap) (session/of smap))
          k    (or field (session/id-field smap) :session-id)
+         k    (if (string? k) (keyword k) k)
          sid  (session/id smap)]
      (if sid
        (qupdate req :response/body qassoc k sid)
