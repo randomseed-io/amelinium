@@ -183,6 +183,7 @@
         max-attempts?     (if attempts? (zero? attempts-left))
         bad-result?       (not (or errors? attempts?))
         retry-dur         (delay (simple-duration expires))
+        expired?          (delay (timeout? @retry-dur))
         retry-in          (delay (retry-in-mins @retry-dur))]
     (cond
       bad-result?   (api/render-error  req (or no-data :verify/bad-result))
@@ -198,21 +199,29 @@
                                         :sub-status/description (tr :try-in-mins @retry-in)))
       :send!        (let [{:keys [token code
                                   exists?]} result
+                          id-str            (identity/->str id-type id)
                           lang-str          (some-str lang)
                           remote-ip         (get req :remote-ip/str)
                           rdata             (or route-data (http/get-route-data req))
                           existing-uid      (if exists? (some-str (get result :existing-user/uid)))
+                          existing-user-id  (if exists? (get result :existing-user/id))
+                          user-login        (delay (if (identical? :email id-type)
+                                                     id-str
+                                                     (if existing-user-id (user/email db :id existing-user-id))))
                           lang-qs           (common/query-string-encode req {"lang" lang-str})
                           url-type          (common/id-type->url-type id-type reason)
                           verify-link       (str (get rdata url-type) token "/?" lang-qs)
                           recovery-link     (if existing-uid (str (get rdata :url/recover) existing-uid "/?" lang-qs))
                           req-updater       (get opts :async/responder super/verify-request-id-update)
                           exc-handler       (get opts :async/raiser super/verify-process-error)
-                          req-updater       #(req-updater db id-type id code token %)
-                          exc-handler       #(exc-handler db id-type id code token %)
+                          req-updater       #(req-updater db id-type id-str code token %)
+                          exc-handler       #(exc-handler db id-type id-str code token %)
                           add-retry-fields  (fn [req]
                                               (api/assoc-body
                                                req
+                                               :user/identity        id-str
+                                               :identity/type        id-type
+                                               :verify/expired?      @expired?
                                                :verify/retry-in      @retry-in
                                                :verify/retry-unit    :minutes
                                                :verify/retry-dur     @retry-dur
@@ -230,7 +239,7 @@
                                  (twilio/sendmail-l10n-template-async
                                   (get rdata :twilio/email)
                                   req-updater exc-handler
-                                  lang id
+                                  lang id-str
                                   template
                                   @template-params))
                         :phone (if-some [sms-tr-key (get opts (if exists?
@@ -239,7 +248,7 @@
                                  (twilio/sendsms-async
                                   (get rdata :twilio/sms)
                                   req-updater exc-handler
-                                  id (tr sms-tr-key @template-params)))
+                                  id-str (tr sms-tr-key @template-params)))
                         (log/web-wrn req "Unknown identity type:" id-type))
                       (-> req
                           (api/add-status :verify/sent)
