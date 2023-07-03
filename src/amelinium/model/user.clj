@@ -860,7 +860,7 @@
 
   (get-user-auth-data
     ([^AuthConfig src email ^AuthQueries queries]
-     (if email
+     (if-some [email (identity/->db :email email)]
        (if-some [ac-types (.account-types ^AuthConfig src)]
          (if-some [db (.db ^AuthConfig src)]
            (let [ac-names (.names ^AccountTypes ac-types)
@@ -870,7 +870,7 @@
              (jdbc/execute-one! db (cons query (cons email ac-names)) db/opts-simple-map))))))
     ([^AuthConfig src email ac-type ^AuthQueries queries]
      (if-some [ac-type (if (keyword? ac-type) ac-type (some-keyword ac-type))]
-       (if email
+       (if-some [email (identity/->db :email email)]
          (if-some [db (.db ^AuthConfig src)]
            (if-some [ac-ids (.ids ^AccountTypes (.account-types ^AuthConfig src))]
              (if (contains? ac-ids ac-type)

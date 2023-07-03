@@ -14,6 +14,7 @@
             [amelinium.http.response            :as         resp]
             [tick.core                          :as            t]
             [amelinium.logging                  :as          log]
+            [amelinium.identity                 :as     identity]
             [amelinium.model.user               :as         user]
             [amelinium.model.confirmation       :as confirmation]
             [amelinium.common                   :as       common]
@@ -235,8 +236,9 @@
          ac-type       (get user :account-type)
          pwd-suites    (select-keys user [:intrinsic :shared])
          auth-config   (delay (auth/config auth-settings ac-type))
-         for-user      (log/for-user user-id user-email ipplain)
-         for-mail      (log/for-user nil user-email ipplain)
+         email-str     (identity/->str :email user-email)
+         for-user      (log/for-user user-id email-str ipplain)
+         for-mail      (log/for-user nil email-str ipplain)
          opname        (if auth-only-mode :auth :login)
          oplog-fn      (common/oplog-logger-populated req route-data)
          oplog         (fn [ok? l m a] (oplog-fn :ok? ok? :user-id user-id :opname opname
@@ -287,7 +289,7 @@
                                 prolonged?    (or hx-pl? goto?)
                                 ^Session sess (if prolonged?
                                                 (session/prolong sess ipaddr)
-                                                (session/create  sess user-id user-email ipaddr))]
+                                                (session/create  sess user-id email-str ipaddr))]
 
                             (if-not (session/valid? sess)
 
@@ -340,7 +342,6 @@
    (authenticate! req user-email user-password nil))
   ([req user-email user-password session-key]
    (let [route-data             (delay (http/get-route-data req))
-         ^String  user-email    (some-str user-email)
          ^String  user-password (if user-email (some-str user-password))
          ^Session sess          (session/of req (or session-key (get @route-data :session-key)))]
 

@@ -99,7 +99,7 @@
           (if (and (> (unchecked-dec-int l) idx 0))
             (str (subs v 0 idx) (str/lower-case (subs v idx l)))))))))
 
-(defn parse-email
+(defn of-email
   "Parses e-mail by doing basic checks and transforming it to an Identity object."
   ^Identity [v]
   (if-some [^String v (preparse-email v)]
@@ -112,7 +112,7 @@
     (if (pos-int? v)
       v)))
 
-(defn parse-id
+(defn of-id
   "Parses user ID by doing basic checks and transforming it to an Identity record."
   ^Identity [v]
   (if-some [^Long v (preparse-id v)]
@@ -125,7 +125,7 @@
   (phutil/try-parse
    (phone/number-optraw v)))
 
-(defn parse-phone
+(defn of-phone
   "Tries to interpret `v` as a phone number and returns an Identity record."
   ^Identity [v]
   (if-some [v (preparse-phone v)]
@@ -138,7 +138,7 @@
       (if (and v (uuid/uuidable? v))
         (uuid/as-uuid v))))
 
-(defn parse-uid
+(defn of-uid
   "Tries to interpret `v` as a UUID and returns an Identity record."
   ^Identity [v]
   (if-some [u (preparse-uid v)]
@@ -347,10 +347,10 @@
         (sort-by #(nth % 0))
         (map #(nth % 1)))))
 
-(defmethod parser :email   [_] parse-email)
-(defmethod parser :phone   [_] parse-phone)
-(defmethod parser :uid     [_] parse-uid)
-(defmethod parser :id      [_] parse-id)
+(defmethod parser :email   [_] of-email)
+(defmethod parser :phone   [_] of-phone)
+(defmethod parser :uid     [_] of-uid)
+(defmethod parser :id      [_] of-id)
 (defmethod parser ::any    [_] parse)
 (defmethod parser :default [_] (constantly nil))
 

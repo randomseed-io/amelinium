@@ -82,10 +82,9 @@
        req
        (let [lang   (or lang (common/pick-language req))
              tr-sub (i18n/no-default (common/translator-sub req lang))]
-         (do
-           (-> req
-               (language/force lang)
-               (api/body-add-session-status session-key tr-sub))))))))
+         (-> req
+             (language/force lang)
+             (api/body-add-session-status session-key tr-sub)))))))
 
 ;; Controllers
 
@@ -114,7 +113,7 @@
    (api/response
     req
     (let [form-params    (common/form-params req)
-          user-email     (some-str (or (get form-params :user/login) (get form-params :login)))
+          user-email     (or (get form-params :user/login) (get form-params :login))
           password       (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))
           route-data     (delay (http/get-route-data req))
           session-key    (or session-key (get @route-data :session-key))
@@ -144,7 +143,7 @@
   (api/response
    req
    (let [form-params (common/form-params req)
-         user-email  (some-str (or (get form-params :user/login) (get form-params :login)))
+         user-email  (or (get form-params :user/login) (get form-params :login))
          password    (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))]
      (super/auth-user-with-password! req user-email password nil nil true nil))))
 
@@ -308,7 +307,6 @@
     (let [smap        (session/of req session-key)
           auth-db     (auth/db req)
           user-id     (session/user-id    smap)
-          user-email  (session/user-email smap)
           form-params (common/form-params req)
           to-change   (-> (common/pick-params form-params [:user/first-name
                                                            :user/last-name
@@ -354,7 +352,7 @@
         (api/render-error req :verify/multiple-ids)
         (let [route-data    (http/get-route-data req)
               smap          (session/of req (or session-key (get route-data :session-key)))
-              user-email    (session/user-email smap)
+              user-email    (identity/of-email (session/user-email smap))
               password      (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))
               form-params   (dissoc form-params :password :user/password)
               auth-result   (super/auth-user-with-password! req user-email password smap route-data true nil)
@@ -484,15 +482,16 @@
           route-data   (http/get-route-data req)
           session-key  (or session-key (get route-data :session-key))
           session      (session/valid-of req session-key)
-          user-email   (session/user-email session)
+          email-str    (session/user-email session)
+          user-email   (identity/of-email email-str)
           req          (super/auth-user-with-password! req user-email old-password nil route-data true nil)]
       (if (identical? :auth/ok (get req :app/status))
         (let [user-id (or (get req :user/id)
-                          (session/user-email session)
+                          (session/user-id session)
                           (user/id-of :email (auth/db req) user-email))
               req     (super/set-password! req user-id new-password)]
           (if (and session-invalidator (identical? :pwd/created (get req :app/status)))
-            (session-invalidator req nil :user/email user-email user-id))
+            (session-invalidator req nil :user/email email-str user-id))
           req)
         req)))))
 
