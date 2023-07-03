@@ -46,7 +46,7 @@
 
 (defn filter-in-context
   "Filters roles map by the given context, merging-in global roles when needed. Returns
-  a set of roles matching the context or nil."
+  a set of roles matching the context or `nil`."
   ([req]
    (filter-in-context (get req :roles/context) (get req :roles) (get req :roles/config)))
   ([context roles config]
