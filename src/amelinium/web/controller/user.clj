@@ -76,7 +76,6 @@
                 attempts
                 expires]} result
         id-type           (common/guess-identity-type result id id-type)
-        id-str            (identity/->str id-type id)
         errors?           (some? (seq errors))
         attempts?         (and (not errors?) (int? attempts))
         attempts-left     (if attempts? (if (neg? attempts) 0 attempts))
@@ -124,6 +123,7 @@
                           exc-handler       #(exc-handler db id-type id code token %)
                           email?            (identical? :email id-type)
                           phone?            (and (not email?) (identical? :phone id-type))
+                          id-str            (identity/->str id-type id)
                           user-login        (if email? id-str (if existing-user-id (delay (user/email db :id existing-user-id))))
                           qtoken            (delay (confirmation/make-qtoken-all id-str token))
                           template-params   (delay {:serviceName      (tr :verify/app-name)
