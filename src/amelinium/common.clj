@@ -1057,19 +1057,42 @@
 
 (extend-protocol phttp/HTTP
 
-  Associative
+  LazyMap
 
-  (request?           ^Boolean        [req] true)
-  (response?          ^Boolean        [req] false)
   (response-status                    [req] nil)
   (response-headers   ^IPersistentMap [req] (get req :response/headers))
   (response-body                      [req] (get req :response/body))
   (app-status                         [req] (get req :app/status))
+  (response?                 ^Boolean [req] false)
+  (request?                  ^Boolean [req] true)
 
   (response-location
     ([req] (get-location req))
     ([req f] (get-location req f))
     ([req f args] (get-location req f args)))
+
+  Associative
+
+  (response-status                    [req] (if (phttp/response? req) (get req :status)))
+  (response-headers   ^IPersistentMap [req] (get req :response/headers))
+  (response-body                      [req] (get req :response/body))
+  (app-status                         [req] (get req :app/status))
+
+  (response?
+    ^Boolean [req]
+    (if-some [s (find req :status)]
+      (and (or (contains? req :body) (contains? req :headers))
+           (integer? (val s)))
+      false))
+
+  (request?
+    ^Boolean [req]
+    (not (phttp/response? req)))
+
+  (response-location
+    ([req] (if (phttp/response? req) (get (get req :headers) "Location") (get-location req)))
+    ([req f] (if (phttp/response? req) (get (get req :headers) "Location") (get-location req f)))
+    ([req f args] (if (phttp/response? req) (get (get req :headers) "Location") (get-location req f args))))
 
   String
 

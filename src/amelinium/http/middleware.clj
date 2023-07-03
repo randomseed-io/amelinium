@@ -9,7 +9,7 @@
   (:refer-clojure :exclude [uuid random-uuid parse-long])
 
   (:require [ring.util.response]
-            [ring.util.http-response   :as  response]
+            [amelinium.http.response   :as      resp]
             [amelinium.logging         :as       log]
             [amelinium.system          :as    system]
             [io.randomseed.utils       :refer   :all]
@@ -28,10 +28,12 @@
        :compile (fn [data opts]
                   (fn [handler]
                     (fn [req]
-                      (let [resp (handler req)]
-                        (if (response/response? resp)
-                          resp
-                          (web-handler resp))))))})))
+                      (if (resp/response? req)
+                        req
+                        (let [resp (handler req)]
+                          (if (resp/response? resp)
+                            resp
+                            (web-handler resp)))))))})))
 
 (defn init-preparer
   "Generic middleware which prepares a request for the controller."
@@ -45,7 +47,7 @@
                   (fn [handler]
                     (fn [req]
                       (let [resp (preparer req)]
-                        (if (response/response? resp) resp (handler resp))))))})))
+                        (if (resp/response? resp) resp (handler resp))))))})))
 
 (defn prep-chain
   [config]

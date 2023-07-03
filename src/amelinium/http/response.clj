@@ -30,14 +30,6 @@
                 charset get-charset set-cookie resource-data
                 url-response resource-response])
 
-;; Response testing
-
-(defn response?
-  "Returns `true` if the given value is a kind of `amelinium.Response`, `false`
-  otherwise."
-  ^Boolean [obj]
-  (instance? Response obj))
-
 ;; HTTP protocol
 
 (extend-protocol http/HTTP
@@ -55,23 +47,44 @@
     ([resp _]   (get (.headers ^Response resp) "Location"))
     ([resp _ _] (get (.headers ^Response resp) "Location"))))
 
+;; Response testing
+
+(defn response?
+  "Returns `true` if the given value is a kind of `amelinium.Response` or it is a
+  response map (produced by some external handlers), `false` otherwise.
+
+  An object of type other than `amelinium.Response` is considered a response map if:
+  - it is an associative structure,
+  - it is NOT a lazy map (of type `lazy_map.core.LazyMap`),
+  - it has a `:status` key and its value is an integer,
+  - it has a `:body` or `:headers` key present."
+  ^Boolean [obj]
+  (http/response? obj))
+
 ;; Response components
 
 (defn headers
-  "Returns response headers map from the response record or a request map."
+  "Returns response headers map from a response record, response map, or a request
+  map."
   [src]
   (http/response-headers src))
 
 (defn body
-  "Returns response body from the response record or a request map."
+  "Returns a response body from a response record, response map, or a request map."
   [src]
   (http/response-body src))
 
 (defn status
-  "Returns response status code from the response record. For a request map given as
-  `src` it returns `nil`."
+  "Returns a response status code from the response record or a response map. For a
+  request map given as `src` it returns `nil`."
   [src]
   (http/response-status src))
+
+(defn app-status
+  "Returns an application status found under the key `:app/status` of the given request
+  map `req`. For a response, or if the status cannot be found, it returns `nil`."
+  [req]
+  (http/app-status req))
 
 (defn app-status?
   "Returns `true` if the given application status is not `nil` and equal to the
@@ -86,12 +99,20 @@
     false))
 
 (defn location
-  "Returns response location header. For a request map given as `src` returns a value
-  associated with its `:response/location` key. In this case the following is applied:
-  If it is found and it is a URL, it is returned. If it is found and it is a path or
-  page identifier it is parsed with the function `f`. Optional `lang`, `params`,
-  `qparams` and any other additional arguments are passed as arguments during the
-  call to `f`. If there is no response location, `nil` is returned."
+  "Returns a response location header.
+
+  For a response object given as `src`, it simply returns its `Location` header.
+
+  For a request map given as `src`, it returns a value associated with its
+  `:response/location` key. In this case the following is applied:
+
+  - If it is found and it is a URL, it is returned.
+  - If it is found and it is a path or page identifier it is parsed using the
+    given function `f`.
+  - Optional `lang`, `params`, `qparams` and other additional arguments are passed
+    as arguments during the call to `f`.
+
+  If there is no response location, `nil` is returned."
   ([src] (http/response-location src))
   ([src f] (http/response-location src f))
   ([src f lang] (http/response-location src f [lang]))
