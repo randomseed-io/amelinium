@@ -426,6 +426,53 @@
       :error!          (web/render-error req (or (not-empty (:errors confirmation))
                                                  (not-empty (:errors creation)))))))
 
+;; TODO: invalidate all user's sessions after password recovery
+
+(defn identity-update!
+  "Initiates identity change for logged-in user by displaying a form and handles
+  new identity confirmation with a code or token."
+  ([req]
+   (identity-update! req nil))
+  ([req session-key]
+   (let [route-data (delay (http/get-route-data req))
+         sess       (session/of req (or session-key (get @route-data :session-key)))
+         params     (common/form-params req)
+         id         (common/identity-param params)
+         id-type    (identity/type id)
+         req        (web/assoc-app-data req :user/identity id :identity/type id-type)]
+     (if id-type
+
+       ;; initiate change
+       ;; by generating a verification code and token
+       ;; associated with the given identity
+       ;; and sending e-mail or SMS message
+
+       (let [user-auth (user/auth-config req id id-type)
+             user-id   (if user-auth (get (get user-auth :user/properties) :id))
+             auth-cfrm (if user-auth (get user-auth :confirmation))
+             auth-db   (if user-auth (get user-auth :db))
+             attempts  (if auth-cfrm (get auth-cfrm :max-attempts))
+             exp       (if auth-cfrm (get auth-cfrm :expires))
+             result    (confirmation/create-for-recovery auth-db id user-id exp attempts id-type)
+             req       (verify! req {:id               id
+                                     :db               auth-db
+                                     :lang             (common/lang-id req)
+                                     :id-type          id-type
+                                     :reason           "recovery"
+                                     :result           result
+                                     :confirm-once?    false
+                                     :tpl/phone-exists :verify/sms-recovery
+                                     :tpl/email-exists :recovery/verify})]
+         (web/response
+          ;; verify! returned an error response, short-circuit
+          req
+
+          ;; display a form for entering verification code
+          (qassoc req :app/view :user/password-recover-sent)))
+
+       ;; display initial identity update form
+       req))))
+
 (defn identity-create!
   "Verifies confirmation token against a database and if it matches, updates the
   identity (phone or e-mail)."
