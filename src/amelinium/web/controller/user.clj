@@ -126,12 +126,12 @@
                           id-str            (identity/->str id-type id)
                           user-login        (if email? id-str (if existing-user-id (delay (user/email db :id existing-user-id))))
                           qtoken            (delay (confirmation/make-qtoken-all id-str token))
-                          template-params   (delay {:serviceName      (tr :verify/app-name)
-                                                    :expiresInMinutes @in-mins
-                                                    :remoteAddress    remote-ip
-                                                    :verifyCode       (str code)
-                                                    :verifyLink       verify-link
-                                                    :recoveryLink     recovery-link})]
+                          template-params   {:serviceName      (tr :verify/app-name)
+                                             :expiresInMinutes @in-mins
+                                             :remoteAddress    remote-ip
+                                             :verifyCode       (str code)
+                                             :verifyLink       verify-link
+                                             :recoveryLink     recovery-link}]
                       (case id-type
                         :email (if-some [template (get opts (if exists?
                                                               :tpl/email-exists
@@ -139,16 +139,18 @@
                                  (twilio/sendmail-l10n-template-async
                                   (get rdata :twilio/email)
                                   req-updater exc-handler
-                                  lang id
+                                  lang id-str
                                   template
-                                  @template-params))
+                                  template-params)
+                                 (log/web-wrn req "No template, not sending e-mail to:" id-str))
                         :phone (if-some [sms-tr-key (get opts (if exists?
                                                                 :tpl/phone-exists
                                                                 :tpl/phone-verify))]
                                  (twilio/sendsms-async
                                   (get rdata :twilio/sms)
                                   req-updater exc-handler
-                                  id (tr sms-tr-key @template-params)))
+                                  id-str (tr sms-tr-key template-params))
+                                 (log/web-wrn req "No template, not sending SMS to:" id-str))
                         (log/web-wrn req "Unknown identity type:" id-type))
                       (-> req
                           (web/add-status :verify/sent)

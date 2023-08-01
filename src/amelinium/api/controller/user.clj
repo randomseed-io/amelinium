@@ -226,12 +226,12 @@
                                                :verify/retry-unit    :minutes
                                                :verify/retry-dur     @retry-dur
                                                :verify/attempts-left attempts-left))
-                          template-params   (delay {:serviceName      (tr :verify/app-name)
-                                                    :expiresInMinutes (tr :in-mins @retry-in)
-                                                    :remoteAddress    remote-ip
-                                                    :verifyCode       (str code)
-                                                    :verifyLink       verify-link
-                                                    :recoveryLink     recovery-link})]
+                          template-params   {:serviceName      (tr :verify/app-name)
+                                             :expiresInMinutes (tr :in-mins @retry-in)
+                                             :remoteAddress    remote-ip
+                                             :verifyCode       (str code)
+                                             :verifyLink       verify-link
+                                             :recoveryLink     recovery-link}]
                       (case id-type
                         :email (if-some [template (get opts (if exists?
                                                               :tpl/email-exists
@@ -241,15 +241,17 @@
                                   req-updater exc-handler
                                   lang id-str
                                   template
-                                  @template-params))
+                                  template-params)
+                                 (log/web-wrn req "No template, not sending e-mail to:" id-str))
                         :phone (if-some [sms-tr-key (get opts (if exists?
                                                                 :tpl/phone-exists
                                                                 :tpl/phone-verify))]
                                  (twilio/sendsms-async
                                   (get rdata :twilio/sms)
                                   req-updater exc-handler
-                                  id-str (tr sms-tr-key @template-params)))
-                        (log/web-wrn req "Unknown identity type:" id-type))
+                                  id-str (tr sms-tr-key @template-params))
+                                 (log/web-wrn req "No template, not sending SMS to:" id-str))
+                        (log/web-wrn req "Unknown identity type" id-type "for identity:" id-str))
                       (-> req
                           (api/add-status :verify/sent)
                           (add-retry-fields))))))
