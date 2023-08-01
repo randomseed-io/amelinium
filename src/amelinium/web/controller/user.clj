@@ -494,24 +494,27 @@
 (defn password-change!
   "Changes password for the user authenticated with an old password and e-mail or sets
   the password for the given `user-id`."
-  [req]
-  (let [form-params  (common/form-params req)
-        user-email   (some-str (or (get form-params :user/login) (get form-params :login) (get form-params :username)))
-        new-password (or (get form-params :user/new-password)      (get form-params :new-password))
-        new-repeated (or (get form-params :user/repeated-password) (get form-params :repeated-password))
-        old-password (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))
-        route-data   (http/get-route-data req)
-        req          (auth-with-password! req user-email old-password nil route-data nil true nil)]
-    (if (resp/response? req)
-      req
-      (if (identical? :auth/ok (get req :app/status))
-        (if-not (= new-password new-repeated)
-          (web/form-params-error! req {:user/repeated-password :repeated-password})
-          (super/set-password!
-           req
-           (or (get req :user/id) (user/id (auth/db req) :email user-email))
-           new-password))
-        req))))
+  ([req]
+   (password-change! req super/invalidate-user-sessions!))
+  ([req session-invalidator]
+   (let [form-params  (common/form-params req)
+         user-email   (some-str (or (get form-params :user/login)   (get form-params :login) (get form-params :username)))
+         new-password (or (get form-params :user/new-password)      (get form-params :new-password))
+         new-repeated (or (get form-params :user/repeated-password) (get form-params :repeated-password))
+         old-password (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))
+         route-data   (http/get-route-data req)
+         req          (auth-with-password! req user-email old-password nil route-data nil true nil)]
+     (if (resp/response? req)
+       req
+       (if (identical? :auth/ok (get req :app/status))
+         (if-not (= new-password new-repeated)
+           (web/form-params-error! req {:user/repeated-password :repeated-password})
+           (let [user-id (or (get req :user/id) (user/id (auth/db req) :email user-email))
+                 req     (super/set-password! req user-id new-password)]
+             (if (and session-invalidator (identical? :pwd/created (get req :app/status)))
+               (session-invalidator req route-data :email user-email user-id)
+               req)))
+         req)))))
 
 (defn password-recover!
   "Initiates password recovery by sending an e-mail or SMS message with a verification
