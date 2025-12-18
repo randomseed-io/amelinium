@@ -94,12 +94,12 @@
 ;;
 
 (defn mask         [_] "************")
-(defn pseudonimize [v] (-> (hash/md5 (str v *pseudo-salt*)) (codecs/bytes->hex)))
+(defn pseudonymize [v] (-> (hash/md5 (str v *pseudo-salt*)) (codecs/bytes->hex)))
 (defn pr-session   [v] (if-not (map? v) v (assoc v :data "--------------" :api  "--------------")))
 
 (def ctx-transformer
   {mask         [:user/password :user/repeated-password :repeated-password :password :pwd :private-key :private :secret :signature :request-id :anti-phisihng-code]
-   pseudonimize [:user/login :login :user/email :email :user :username :nick :nickname]
+   pseudonymize [:user/login :login :user/email :email :user :username :nick :nickname]
    str          [:currency]
    pr-session   [:session]})
 
