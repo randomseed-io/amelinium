@@ -146,7 +146,7 @@
   (if-some [r (recode-errors-simple data)]
     (map #(into % (translate-error translate-sub %)) r)))
 
-(defn list-errors-simple
+(defn list-errors-simple-seqs
   "Returns a sequence of coercion errors consisting of 3-element sequences. First
   element of each being a parameter identifier (a string), second element being
   a parameter type described by schema (if detected, a string), and third being
@@ -158,6 +158,27 @@
         err (get dat :errors)
         err (if (coll? err) err (if (some? err) (cons err nil)))]
     (->> err (filter identity) (map (juxt-seq (comp some-str first :path) param-type :value)))))
+
+(defn list-errors-simple
+  "Returns a sequence of coercion errors consisting of 3-element vectors. First
+  element of each being a parameter identifier (a string), second element being
+  a parameter type described by schema (if detected, a string), and third being
+  its current value. Takes an exception data map which should contain the `:coercion` key.
+  Used, among other applications, to expose form errors to another page which should
+  indicate them to a visitor."
+  [data]
+  (let [dat (coercion/encode-error data)
+        err (get dat :errors)
+        err (cond
+              (nil?  err) nil
+              (coll? err) err
+              :else (list err))]
+    (keep (fn [e]
+            (when e
+              [(some-str (first (get e :path)))
+               (param-type e)
+               (get e :value)]))
+          err)))
 
 (defn map-errors-simple
   "Like `list-errors-simple` but returns a map in which keys are parameter names and

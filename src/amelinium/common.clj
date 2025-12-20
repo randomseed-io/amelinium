@@ -206,9 +206,20 @@
 (def ^:const max-url-len      8192)
 (def ^:const page-cache-len   4096)
 (def ^:const path-splitter    (re-pattern "([^\\?\\#]+)(\\#[^\\?]+)?(\\?.*)?"))
-(def ^:const split-qparams    (re-pattern "[^\\?\\#]+|[\\?\\#].*"))
 (def ^:const on-slash         (re-pattern "/"))
 (def ^:const slash-break      (re-pattern "[^/]+|/"))
+
+(defn- split-qparams
+  [path]
+  (let [q (.indexOf ^String path "?")
+        h (.indexOf ^String path "#")
+        i (cond
+            (neg? q) h
+            (neg? h) q
+            :else (min q h))
+        p (if (neg? i) path (subs path 0 i))
+        s (when-not (neg? i) (subs path i))]
+    [p s]))
 
 (defn path-variants-core
   "Generates a list of all possible language variants of a path."
@@ -216,7 +227,7 @@
   ([path lang-id]
    (if-some [path (some-str path)]
      (if-some [lang (some-str lang-id)]
-       (let [[p s] (re-seq split-qparams path)]
+       (let [[p s] (split-qparams path)]
          (path-variants-core p lang s)))))
   ([path lang suffix]
    (let [pathc (count path)]
@@ -289,17 +300,15 @@
   "Splits path into 2 components: path string and location / query params
   string. Returns a sequence."
   [path]
-  (if path (re-seq split-qparams path)))
+  (if path (split-qparams path)))
 
 (defn split-query-params
   "Splits path into 3 string components: path, location and query params. Returns a
   vector."
   [path]
   (if path
-    (if-some [segs (first (re-seq path-splitter path))]
-      (if (and (= 4 (count segs)) (some? (nth segs 1)))
-        (subvec segs 1)
-        [path nil nil])
+    (if-let [[_ p loc q] (re-matches path-splitter path)]
+      [p loc q]
       [path nil nil])))
 
 (defn- req-param-path
