@@ -2,10 +2,11 @@
 
 **Opinionated Clojure Web Engine.**
 
-Welcome to Amelinium, yet another set of libraries and helper functions to serve
-a dynamic web content. It is quite opinionated since its primary purpose is to be the
-web and API engine for a bunch of projects run by *random:seed*, the author and
-associates.
+Welcome to Amelinium, a server-side MVC framework with a front-controller pipeline,
+designed for hypermedia-driven apps (HTML over the wire, HTMX-friendly) and APIs.
+
+It is quite opinionated since its primary purpose is to be a web and API engine
+for a bunch of projects run by *random:seed*, the author and associates.
 
 ## Important features
 
