@@ -144,6 +144,7 @@
             file-seq
             (map fs/basename)
             (filter #(str/ends-with? % ".edn"))
+            (sort)
             (map (comp utils/some-str (partial io/file (str d))))))
   ([d & more]
    (some->> (cons d more)
