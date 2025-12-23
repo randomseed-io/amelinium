@@ -308,6 +308,11 @@
            :validators         validators                ;; validators provided in config
            :validators/all     validators-map)))         ;; all validators (manual and auto-created)
 
+(defn expand-validators
+  "See amelinium.http.middleware.validators/prep-validators"
+  [k config]
+  {k (prep-validators config)})
+
 (defn wrap-validators
   "Validators wrapping middleware initializer. Processes the configuration expressed as
   a map which may have the following keys specified:
@@ -427,8 +432,8 @@
                                                         check-fn))]
                              (qassoc req config-key config result-key result))))))))))})
 
-(system/add-prep  ::default [_ config] (prep-validators config))
-(system/add-init  ::default [k config] (wrap-validators k (if (:required/cat config)
+(system/add-expand ::default [k config] (expand-validators k config))
+(system/add-init   ::default [k config] (wrap-validators k (if (:required/cat config)
                                                             config
                                                             (prep-validators config))))
 (system/add-halt! ::default [_ config] nil)

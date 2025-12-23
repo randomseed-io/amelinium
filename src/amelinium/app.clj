@@ -165,6 +165,8 @@
 (defonce ^:redef start-args         [])  ;; arguments used to start this application
 (defonce ^:redef phase        :stopped)  ;; phase flag
 
+(defn expanding?   [] (locking lock (identical? :expanding  phase)))
+(defn expanded?    [] (locking lock (identical? :expanded   phase)))
 (defn starting?    [] (locking lock (identical? :starting   phase)))
 (defn failed?      [] (locking lock (identical? :failed     phase)))
 (defn running?     [] (locking lock (identical? :running    phase)))
@@ -201,13 +203,13 @@
   paths to be scanned for EDN files with configuration maps to be merged with
   `meta-merge`).
 
-  Uses `amelinium.system/read-configs` to load EDN files and merge them, and then
-  sets the global variable `amelinium.app/config` to contain it. The next step is to
-  call `amelinium.system/prep` and update the global variable
+  Uses `amelinium.system/read-configs` to load EDN and ENV files and merge them, and then
+  sets the global variable `amelinium.app/config` that contains them. The next step is to
+  call `amelinium.system/expand` and update the global variable
   `amelinium.app/post-config` with its result.
 
   If `keys` are given then `amelinium.system/config` is only updated when it does not
-  yet have a truthy value, and after that the `amelinium.system/prep` is called with
+  yet have a truthy value, and after that the `amelinium.system/expand` is called with
   `keys` passed to only prepare values for the specified keys. The result of this
   call is stored in `amelinium.app/post-config`.
 
@@ -220,11 +222,11 @@
        (if-some [keys (seq keys)]
          (do (if-not config
                (var/reset config (apply system/read-configs local-config-file rc-dirs)))
-             (var/reset post-config (system/prep config keys)))
+             (var/reset post-config (system/expand config identity keys)))
          (do (if (and (nil? local-config-file) (nil? rc-dirs))
                (var/reset config (apply system/read-configs config))
                (var/reset config (apply system/read-configs local-config-file rc-dirs)))
-             (var/reset post-config (system/prep config))))))
+             (var/reset post-config (system/expand config))))))
    :configured))
 
 (defn start-app
@@ -307,11 +309,21 @@
     phase))
 
 (defn expand-app
-  [& keys]
+  [& ks]
   (locking lock
-    (if (seq keys)
-      (system/expand state keys)
-      (system/expand state))))
+    (var/reset phase :expanding)
+    (if (seq ks)
+      (let [fkey (some-> ks first)]
+        (if (or (fn? fkey) (and (not (keyword? fkey)) (ifn? fkey)))
+          (system/expand state fkey (next ks))
+          (system/expand state identity ks)))
+      (system/expand state))
+    (var/reset phase :expanded)
+    phase))
+
+(defn prep-app
+[& keys]
+(apply expand-app keys))
 
 ;;
 ;; application control
@@ -365,6 +377,8 @@
 (defdoc! state       "A nested map containing current state of application when it is running.")
 (defdoc! exception   "Unhandled exception object thrown during starting, stopping or suspending.")
 
+(defdoc! expanding?  "Returns `true` when application is in expanding phase.")
+(defdoc! expanded?   "Returns `true` when application is in expanded phase.")
 (defdoc! starting?   "Returns `true` when application is in starting phase.")
 (defdoc! failed?     "Returns `true` when application is in failed phase.")
 (defdoc! running?    "Returns `true` when application is in running phase.")
@@ -376,8 +390,9 @@
 (defdoc! configured? "Returns `true` when application is configured.")
 
 (defdoc! phase
-  "A keyword describing current phase (`:stopping`, `:stoppped`, `:starting`,
-`:running`, `:suspended`, `:suspending`, `:resuming`, `:failed`).")
+  "A keyword describing current phase (`:stopping`, `:stoppped`, `:expanding`,
+`:expanded`, `:starting`, `:running`, `:suspended`, `:suspending`, `:resuming`,
+`:failed`).")
 
 (defdoc! print-state        "Prints current state of application.")
 (defdoc! print-config       "Prints current configuration (not parsed) of application.")
@@ -394,7 +409,7 @@
   `amelinium.app/with-watch-dirs`.")
 
 (defdoc! *local-config*
-  "A local configuration file in EDN format which will be loaded after all other
+"A local configuration file in EDN format which will be loaded after all other
   configuration files so its entries will replace any existing entries during
   merge. Be aware that `meta-merge` is used in the process so values of nested maps
   are replaced not the whole branches. Used when `amelinium.app/configure!` is

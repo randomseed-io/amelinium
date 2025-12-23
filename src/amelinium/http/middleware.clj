@@ -55,15 +55,19 @@
     config
     (mapv var/deref-symbol config)))
 
-(system/add-prep  ::chain    [_ config] (prep-chain config))
-(system/add-init  ::chain    [k config] (var/make k (prep-chain config)))
-(system/add-halt! ::chain    [k config] (var/make k nil))
+(defn expand-chain
+  [k config]
+  {k (prep-chain config)})
 
-(system/add-init  ::renderer [k config] (init-renderer k config))
-(system/add-halt! ::renderer [_ config] nil)
+(system/add-expand ::chain    [k config] (expand-chain k config))
+(system/add-init   ::chain    [k config] (var/make k (prep-chain config)))
+(system/add-halt!  ::chain    [k config] (var/make k nil))
 
-(system/add-init  ::preparer [k config] (init-preparer k config))
-(system/add-halt! ::preparer [_ config] nil)
+(system/add-init   ::renderer [k config] (init-renderer k config))
+(system/add-halt!  ::renderer [_ config] nil)
+
+(system/add-init   ::preparer [k config] (init-preparer k config))
+(system/add-halt!  ::preparer [_ config] nil)
 
 (derive ::default       ::chain)
 (derive ::default-chain ::chain)

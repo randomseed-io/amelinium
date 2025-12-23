@@ -58,9 +58,13 @@
         (update :charset  (fnil identity ["utf-8"]))
         (update :encoding (fnil identity ["identity"])))))
 
-(system/add-init  ::default [k config] (wrap-accept k (prep-accept config)))
-(system/add-prep  ::default [_ config] (prep-accept config))
-(system/add-halt! ::default [_ config] nil)
+(defn expand-accept
+  [k config]
+  {k (prep-accept config)})
+
+(system/add-expand ::default [k config] (expand-accept k config))
+(system/add-init   ::default [k config] (wrap-accept k (prep-accept config)))
+(system/add-halt!  ::default [_ config] nil)
 
 (derive ::web ::default)
 (derive ::api ::default)

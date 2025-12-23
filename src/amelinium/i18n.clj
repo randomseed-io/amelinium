@@ -295,6 +295,10 @@
        (map/map-values-with-path (partial handle-val config))
        zero-missing-keys))
 
+(defn expand-translations
+  [k config]
+  {k (prep-translations config)})
+
 (defn init-translations
   [config]
   (-> config
@@ -302,6 +306,6 @@
       tongue/build-translate
       wrap-translate))
 
-(system/add-prep  ::translations [_ config] (prep-translations config))
-(system/add-init  ::translations [k config] (var/make k (init-translations config)))
-(system/add-halt! ::translations [k config] (var/make k nil))
+(system/add-expand ::translations [k config] (expand-translations k config))
+(system/add-init   ::translations [k config] (var/make k (init-translations config)))
+(system/add-halt!  ::translations [k config] (var/make k nil))

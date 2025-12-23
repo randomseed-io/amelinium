@@ -474,6 +474,10 @@
       (update            :authorize-default? boolean)
       update-built-in-roles))
 
+(defn expand-config
+  [k config]
+  {k (prep-config config)})
+
 (defn wrap-roles
   "Role-based access maintaining middleware. Uses the function associated with
   `:handler` configuration key (`handler` by default) to process roles information.
@@ -545,9 +549,9 @@
                                          global-context authorize-default? session-key
                                          roles-forbidden roles-any roles-all)))))))})))
 
-(system/add-prep  ::default [_ config] (prep-config config))
-(system/add-init  ::default [_ config] (wrap-roles  config))
-(system/add-halt! ::default [_ config] nil)
+(system/add-expand ::default [k config] (expand-config k config))
+(system/add-init   ::default [_ config] (wrap-roles config))
+(system/add-halt!  ::default [_ config] nil)
 
 (derive ::web ::default)
 (derive ::api ::default)

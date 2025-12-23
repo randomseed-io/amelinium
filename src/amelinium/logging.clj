@@ -142,10 +142,10 @@
   [m]
   (if m (map/map-keys var/deref-symbol m)))
 
-(system/add-prep
- ::unilog [_ config]
- (log/preprocess-config
-  (map/update-existing config :context-transformer prep-context-transformer)))
+(system/add-expand
+ ::unilog [k config]
+ {k (log/preprocess-config
+      (map/update-existing config :context-transformer prep-context-transformer))})
 
 (system/add-init
  ::unilog

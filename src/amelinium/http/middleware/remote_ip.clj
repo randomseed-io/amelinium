@@ -156,9 +156,13 @@
     p
     (ip/preprocess-ip-list p)))
 
-(system/add-prep  ::reserved [_ config] (new-reserved config))
-(system/add-init  ::reserved [_ config] config)
-(system/add-halt! ::reserved [_ config] nil)
+(defn expand-reserved
+  [k p]
+  {k (new-reserved p)})
+
+(system/add-expand ::reserved [k config] (expand-reserved k config))
+(system/add-init   ::reserved [_ config] config)
+(system/add-halt!  ::reserved [_ config] nil)
 
 (system/add-init  ::default  [k config] (wrap-ip k
                                                  (:handler      config)

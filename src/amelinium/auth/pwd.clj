@@ -487,8 +487,12 @@
    (s/assert :amelinium.auth.pwd/settings config)
    config))
 
-(system/add-prep  ::pwd [_ config] (prepare-settings config))
-(system/add-halt! ::pwd [_ config] nil)
+(defn expand-settings
+  [k config]
+  {k (prepare-settings config)})
+
+(system/add-expand ::pwd [k config] (expand-settings k config))
+(system/add-halt!  ::pwd [_ config] nil)
 
 (derive ::settings.strong ::pwd)
 (derive ::settings.simple ::pwd)

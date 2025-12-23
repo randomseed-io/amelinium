@@ -1345,10 +1345,15 @@
     (c/-> config
           (map/update-existing :dbname         fs/parse-java-properties)
           (map/update-existing :migrations-dir fs/parse-java-properties)
-          (map/assoc-missing  :user            (get config :username))
-          (map/assoc-missing  :username        (get config :user))
-          (map/dissoc-if      :username        nil?)
-          (map/dissoc-if      :user            nil?))))
+          (map/assoc-missing   :user           (get config :username))
+          (map/assoc-missing   :username       (get config :user))
+          (map/dissoc-if       :username       nil?)
+          (map/dissoc-if       :user           nil?))))
+
+(defn expand-db
+  "Expands database configuration."
+  [k config]
+  {k (prep-db config)})
 
 (defn init-db
   "Initializes database configuration `config` for the configuration key `k`."
@@ -1457,17 +1462,17 @@
       (close-db k config)
       nil)))
 
-(system/add-prep     ::properties  [_ config] (prep-db config))
+(system/add-expand   ::properties  [k config] (expand-db k config))
 (system/add-init     ::properties  [_ config] config)
 (system/add-halt!    ::properties  [_ config] nil)
 
-(system/add-prep     ::initializer [_ config] (prep-db config))
+(system/add-expand   ::initializer [k config] (expand-db k config))
 (system/add-init     ::initializer [k config] (let [d (init-db k config)] (var/make k (ds d)) d))
 (system/add-suspend! ::initializer [k config] (suspend-db k config))
 (system/add-resume   ::initializer [k config old-config old-impl] (resume-db k config old-config old-impl))
 (system/add-halt!    ::initializer [k config] (var/make k (close-db k config)))
 
-(system/add-prep     ::migrator    [_ config] (prep-db config))
+(system/add-expand   ::migrator    [k config] (expand-db k config))
 (system/add-init     ::migrator    [k config] (var/make k (init-mig  k config)))
 (system/add-halt!    ::migrator    [k config] (var/make k (close-mig k config)))
 

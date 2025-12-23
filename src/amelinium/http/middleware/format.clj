@@ -56,9 +56,13 @@
         (update :charsets    (comp set (partial vec/of-strings system/ref?)))
         (update :formats     prep-formats))))
 
-(system/add-init  ::default [k config] (init-format k (prep-format config)))
-(system/add-prep  ::default [_ config] (prep-format config))
-(system/add-halt! ::default [_ config] nil)
+(defn expand-format
+  [k config]
+  {k (prep-format config)})
+
+(system/add-expand ::default [k config] (expand-format k config))
+(system/add-init   ::default [k config] (init-format k (prep-format config)))
+(system/add-halt!  ::default [_ config] nil)
 
 (derive ::web ::default)
 (derive ::api ::default)

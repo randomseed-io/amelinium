@@ -20,5 +20,6 @@
             [io.randomseed.utils.fs     :as          fs]))
 
 (defn regex
+  "Tagged literal reader function for regular expressions."
   [rgx]
   (re-pattern rgx))

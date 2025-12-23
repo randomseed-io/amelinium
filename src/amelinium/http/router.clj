@@ -93,13 +93,21 @@
   [config]
   (deref-symbols config nil))
 
-(system/add-prep  ::routes  [_ config] (prep-routes config))
-(system/add-init  ::routes  [k config] (var/make k (new-routes config)))
-(system/add-halt! ::routes  [k config] (var/make k nil))
+(defn expand-routes
+  [k config]
+  {k (prep-routes config)})
 
-(system/add-prep  ::default [_ config] (prep-router config))
-(system/add-init  ::default [k config] (var/make k (new-router config)))
-(system/add-halt! ::default [k config] (var/make k nil))
+(defn expand-router
+  [k config]
+  {k (prep-router config)})
+
+(system/add-expand ::routes  [k config] (expand-routes k config))
+(system/add-init   ::routes  [k config] (var/make k (new-routes config)))
+(system/add-halt!  ::routes  [k config] (var/make k nil))
+
+(system/add-expand ::default [k config] (expand-router k config))
+(system/add-init   ::default [k config] (var/make k (new-router config)))
+(system/add-halt!  ::default [k config] (var/make k nil))
 
 (derive ::web        ::default)
 (derive ::api        ::default)

@@ -288,6 +288,10 @@
         prep-client-opts
         prep-request-opts)))
 
+(defn expand-twilio
+  [k config]
+  {k (prep-twilio config)})
+
 (defn- stringify-params
   [p]
   (if p (map/map-keys some-str p)))
@@ -376,9 +380,9 @@
           (request [_]
             (hc/request req-opts)))))))
 
-(system/add-init  ::default [k config] (var/make k (init-twilio k (prep-twilio config))))
-(system/add-prep  ::default [_ config] (prep-twilio config))
-(system/add-halt! ::default [k config] (var/make k nil))
+(system/add-expand ::default [k config] (expand-twilio k config))
+(system/add-init   ::default [k config] (var/make k (init-twilio k (prep-twilio config))))
+(system/add-halt!  ::default [k config] (var/make k nil))
 
 (derive ::sms    ::default)
 (derive ::email  ::default)

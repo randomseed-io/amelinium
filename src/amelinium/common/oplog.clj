@@ -157,6 +157,6 @@
     (log/msg "Operations logger" k "stopped"))
   nil)
 
-(system/add-prep  ::log [k config] (map/assoc-missing config :table (some-keyword-simple k)))
-(system/add-init  ::log [k config] (let [c (init! k config)] (var/make k (:fn/reporter c)) c))
-(system/add-halt! ::log [k config] (stop! k config) (var/make k nil))
+(system/add-expand ::log [k config] {k (map/assoc-missing config :table (some-keyword-simple k))})
+(system/add-init   ::log [k config] (let [c (init! k config)] (var/make k (:fn/reporter c)) c))
+(system/add-halt!  ::log [k config] (stop! k config) (var/make k nil))

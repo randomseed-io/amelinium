@@ -366,6 +366,10 @@
               v (valuable (vec v))]
           v))))
 
+(defn expand-supported
+  [k v]
+  {k (prep-supported v)})
+
 (defn prep-language
   [config]
   (let [default (or (some-keyword-simple (:default config)) default-fallback-language)]
@@ -376,6 +380,10 @@
         (update :supported #(if (system/ref? %) % (or (not-empty %) #{default})))
         (update :param     (fnil some-keyword-simple :lang))
         init-pickers)))
+
+(defn expand-language
+  [k config]
+  {k (prep-language config)})
 
 (defn wrap-language
   "Language wrapping middleware."
@@ -400,13 +408,13 @@
                                        :language/id       lang-id
                                        :language/str      lang-str))))))}))
 
-(system/add-init  ::default [k config] (wrap-language k (prep-language config)))
-(system/add-prep  ::default [_ config] (prep-language config))
-(system/add-halt! ::default [_ config] nil)
+(system/add-expand ::default [k config] (expand-language k config))
+(system/add-init   ::default [k config] (wrap-language k (prep-language config)))
+(system/add-halt!  ::default [_ config] nil)
 
-(system/add-init  ::supported [_ config] (prep-supported config))
-(system/add-prep  ::supported [_ config] (prep-supported config))
-(system/add-halt! ::supported [_ config] nil)
+(system/add-expand ::supported [k config] (expand-supported k config))
+(system/add-init   ::supported [_ config] (prep-supported config))
+(system/add-halt!  ::supported [_ config] nil)
 
 (system/add-init  ::pickers   [_ config] config)
 (system/add-halt! ::pickers   [_ config] nil)

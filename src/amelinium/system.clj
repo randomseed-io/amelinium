@@ -25,14 +25,14 @@
 ;; integrant wrappers
 
 (defmacro add-init        [& more] `(defmethod ig/init-key     ~@more))
-(defmacro add-prep        [& more] `(defmethod ig/prep-key     ~@more))
+(defmacro add-expand      [& more] `(defmethod ig/expand-key   ~@more))
 (defmacro add-suspend!    [& more] `(defmethod ig/suspend-key! ~@more))
 (defmacro add-resume      [& more] `(defmethod ig/resume-key   ~@more))
 (defmacro add-resolve     [& more] `(defmethod ig/resolve-key  ~@more))
 (defmacro add-halt!       [& more] `(defmethod ig/halt-key!    ~@more))
 
 (defmacro init-key        [& more] `(ig/init-key     ~@more))
-(defmacro prep-key        [& more] `(ig/prep-key     ~@more))
+(defmacro expand-key      [& more] `(ig/expand-key   ~@more))
 (defmacro suspend-key!    [& more] `(ig/suspend-key! ~@more))
 (defmacro resume-key      [& more] `(ig/resume-key   ~@more))
 (defmacro resolve-key     [& more] `(ig/resolve-key  ~@more))
@@ -41,56 +41,84 @@
 (defmacro ref             [& more] `(ig/ref          ~@more))
 (defmacro refset          [& more] `(ig/refset       ~@more))
 
+(defmacro add-prep
+  [dispatch-value argvec & body]
+  (let [k#    (gensym "k")
+        v#    (gensym "v")
+        kform (nth argvec 0 '_)
+        vform (nth argvec 1 '_)]
+    `(defmethod ig/expand-key ~dispatch-value [~k# ~v#]
+       (let [~kform ~k#
+             ~vform ~v#
+             prepared# (do ~@body)]
+         {~k# prepared#}))))
+
+(defmacro prep-key
+  [k v]
+  `(let [k# ~k
+         m# (ig/expand-key k# ~v)]
+     (when-not (map? m#)
+       (throw (ex-info "ig/expand-key must return a map" {:k k# :returned m#})))
+     (when-not (contains? m# k#)
+       (throw (ex-info "ig/expand-key did not produce value for key" {:k k# :returned m#})))
+     (get m# k#)))
+
+(defn expand
+  ([cfg]
+   (expand cfg identity nil))
+  ([cfg innerf]
+   (expand cfg innerf nil))
+  ([cfg innerf ks]
+   (let [csrc     (get cfg ::config-sources)
+         ksrc     (get cfg ::keys)
+         pure-cfg (dissoc cfg ::keys ::config-sources)
+         ks       (or (seq ks) (keys cfg))]
+       (assoc (ig/expand pure-cfg innerf ks) ::keys ksrc ::config-sources csrc))))
+
 (defn prep
   ([cfg]
-   (prep cfg nil))
+   (expand cfg))
   ([cfg keys]
-   (let [pure-cfg (dissoc cfg ::keys ::config-sources)]
-     (if-some [keys (or (seq keys) (seq (::keys cfg)))]
-       (assoc (ig/prep pure-cfg keys) ::keys keys)
-       (ig/prep pure-cfg)))))
+   (expand cfg identity keys)))
 
 (defn init
   ([cfg]
    (init cfg nil))
-  ([cfg keys]
-   (let [pure-cfg (dissoc cfg ::keys ::config-sources)]
-     (if-some [keys (or (seq keys) (seq (::keys cfg)))]
-       (assoc (ig/init pure-cfg keys) ::keys keys)
-       (ig/init pure-cfg)))))
+  ([cfg ks]
+   (let [csrc     (get cfg ::config-sources)
+         ksrc     (get cfg ::keys)
+         pure-cfg (dissoc cfg ::keys ::config-sources)
+         ks       (or (seq ks) (keys cfg))]
+     (assoc (ig/init pure-cfg ks) ::keys ksrc ::config-sources csrc))))
 
 (defn suspend!
   ([cfg]
    (suspend! cfg nil))
-  ([cfg keys]
+  ([cfg ks]
    (let [pure-cfg (dissoc cfg ::keys ::config-sources)]
-     (if-some [keys (seq keys)]
-       (ig/suspend! pure-cfg keys)
+     (if-some [ks (seq ks)]
+       (ig/suspend! pure-cfg ks)
        (ig/suspend! pure-cfg)))))
 
 (defn resume
   ([cfg system]
    (resume cfg system nil))
-  ([cfg system keys]
-   (let [pure-cfg (dissoc cfg    ::keys ::config-sources)
-         pure-sys (dissoc system ::keys ::config-sources)]
-     (if-some [keys (seq keys)]
-       (ig/resume pure-cfg pure-sys keys)
-       (ig/resume pure-cfg pure-sys)))))
+  ([cfg system ks]
+   (let [csrc     (get cfg ::config-sources)
+         ksrc     (get cfg ::keys)
+         pure-cfg (dissoc cfg    ::keys ::config-sources)
+         pure-sys (dissoc system ::keys ::config-sources)
+         new-sys  (if (seq ks) (ig/resume pure-cfg pure-sys ks) (ig/resume pure-cfg pure-sys))]
+     (assoc new-sys ::config-sources csrc ::keys ksrc))))
 
 (defn halt!
   ([cfg]
    (halt! cfg nil))
-  ([cfg keys]
+  ([cfg ks]
    (let [pure-cfg (dissoc cfg ::keys ::config-sources)]
-     (if-some [keys (seq keys)]
+     (if-some [ks (seq ks)]
        (ig/halt! pure-cfg keys)
        (ig/halt! pure-cfg)))))
-
-(defn expand
-  [cfg]
-  (let [pure-cfg (dissoc cfg ::keys ::config-sources)]
-    (ig/expand cfg)))
 
 (defn ref?
   [v]
@@ -99,8 +127,9 @@
 ;; var-object pre-processing (allows to dereference Vars by symbols or keywords);
 ;; functions (symbols/keywords in lists) will be called in the init phase
 
-(defn prep-var-process [v] (var/resolve v))
-(defn init-var-process [v] (var/deref   v))
+(defn expand-var-process [k v] {k (var/resolve v)})
+(defn prep-var-process   [  v]    (var/resolve v))
+(defn init-var-process   [  v]    (var/deref   v))
 
 ;;
 ;; configuration loading
@@ -215,16 +244,16 @@
 
 ;; initialization shortcuts
 
-(add-init  ::key         [k v] k)
-(add-init  ::function    [k v] (v k))
-(add-init  ::nil         [_ _] nil)
-(add-init  ::var         [_ v] (init-var-process v))
-(add-prep  ::prepped-var [_ v] (prep-var-process v))
-(add-init  ::prepped-var [_ v] (init-var-process v))
-(add-init  ::value       [_ v] v)
-(add-halt! ::value       [_ v] v)
-(add-init  ::var-make    [k v] (var/make k v))
-(add-halt! ::var-make    [k _] (var/make k nil))
+(add-init   ::key         [k v] k)
+(add-init   ::function    [k v] (v k))
+(add-init   ::nil         [_ _] nil)
+(add-init   ::var         [_ v] (init-var-process v))
+(add-expand ::prepped-var [k v] (expand-var-process k v))
+(add-init   ::prepped-var [_ v] (init-var-process v))
+(add-init   ::value       [_ v] v)
+(add-halt!  ::value       [_ v] v)
+(add-init   ::var-make    [k v] (var/make k v))
+(add-halt!  ::var-make    [k _] (var/make k nil))
 
 ;; properties shortcut
 
