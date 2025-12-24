@@ -261,7 +261,7 @@
                              {:data {:compile       reitit.coercion/compile-request-coercers
                                      :middleware    #ref :amelinium.http.middleware/web
                                      :translations  #ref :amelinium.i18n/translations
-                                     :errors/config #ref :amelinium.errors/settings
+                                     ;;:errors/config #ref :amelinium.errors/settings
                                      :auth/setup    #ref :amelinium.auth/setup
                                      :oplog/config  #ref :amelinium.common.oplog.auth/log
                                      :coercion      #ref :amelinium.http.middleware.coercion/coercer

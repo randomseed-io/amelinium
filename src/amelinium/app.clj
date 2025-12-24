@@ -12,6 +12,7 @@
             [ns-tracker.core          :as         ns-tracker]
             [amelinium.system         :as             system]
             [amelinium.logging        :as                log]
+            [amelinium.env            :as                env]
             [tick.core                :as                  t]
             [io.randomseed.utils.map  :as                map]
             [io.randomseed.utils.var  :as                var]
@@ -201,7 +202,7 @@
 (defn configure-app
   "Configures the application using `local-config-file` and `rc-dirs` (list of relative
   paths to be scanned for EDN files with configuration maps to be merged with
-  `meta-merge`).
+  `meta-merge` and ENV files containing key=value pairs in a shell-like format).
 
   Uses `amelinium.system/read-configs` to load EDN and ENV files and merge them, and then
   sets the global variable `amelinium.app/config` that contains them. The next step is to
@@ -275,13 +276,13 @@
     phase))
 
 (defn restart-app
- [& keys]
- (locking lock
-   (let [new-keys (or (seq keys) (seq (peek start-args)))]
-     (apply stop-app new-keys)
-     (if-some [new-args (when (seq start-args) (pop start-args))]
-         (apply start-app (concat new-args new-keys))
-         (apply start-app *local-config* *resource-config-dirs* new-keys))))
+  [& keys]
+  (locking lock
+    (let [new-keys (or (seq keys) (seq (peek start-args)))]
+      (apply stop-app new-keys)
+      (if-some [new-args (when (seq start-args) (pop start-args))]
+        (apply start-app (concat new-args new-keys))
+        (apply start-app *local-config* *resource-config-dirs* new-keys)))))
 
 (defn suspend-app
   [& keys]
@@ -409,7 +410,7 @@
   `amelinium.app/with-watch-dirs`.")
 
 (defdoc! *local-config*
-"A local configuration file in EDN format which will be loaded after all other
+  "A local configuration file in EDN format which will be loaded after all other
   configuration files so its entries will replace any existing entries during
   merge. Be aware that `meta-merge` is used in the process so values of nested maps
   are replaced not the whole branches. Used when `amelinium.app/configure!` is

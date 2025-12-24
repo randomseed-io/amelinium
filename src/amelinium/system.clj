@@ -13,6 +13,7 @@
             [cambium.core             :as        log]
             [amelinium                :as  amelinium]
             [amelinium.readers        :as    readers]
+            [amelinium.env.file       :as    envfile]
             [tick.core                :as          t]
             [clojure.java.io          :as         io]
             [clojure.string           :as        str]
@@ -166,13 +167,28 @@
   [f]
   (if f (conf/file f integrant-readers)))
 
+(defn slurp-resource-or-file
+  [p]
+  (when-some [p (not-empty (str p))]
+    (if-let [r (io/resource p)]
+      (slurp r)
+      (slurp p))))
+
+(defn edn-path?
+  [p]
+  (and p (str/ends-with? (str p) ".edn")))
+
+(defn env-path?
+  [p]
+  (and p (str/ends-with? (str p) ".env")))
+
 (defn conf-dirs->resource-names
   ([d]
    (some->> d
             fs/resource-file
             file-seq
             (map fs/basename)
-            (filter #(str/ends-with? % ".edn"))
+            (filter (some-fn edn-path? env-path?))
             (sort)
             (map (comp utils/some-str (partial io/file (str d))))))
   ([d & more]
@@ -203,13 +219,14 @@
 ;; getting system configuration from file(s)
 
 (defn read-configs
-  "Reads configuration files in EDN format. For 2 or more arguments it loads
-  `local-file` from a filesystem (unless it's `nil`) and scans all resource
+  "Reads configuration files in EDN or ENV format. For 2 or more arguments
+  it loads `local-file` from a filesystem (unless it's `nil`) and scans all resource
   directories specified as other arguments. For each directory it tries to find
-  filenames ending with `.edn` and loads them all in order. The local file is being
-  loaded last.
+  filenames ending with `.edn` or `.env` and loads them all in order. The local
+  file is being loaded last.
 
-  The function returns a single configuration map merged from all loaded maps. The
+  The function returns a single configuration map merged from all loaded maps (EDN-sourced)
+  with a special key ::config-. The
   configuration sources are preserved in this map under a key
   `:amelinium.app/config-sources`, containing the following keys: `:resource-dirs`,
   `:resource-files` and `:local-file`.
@@ -226,16 +243,28 @@
      (read-configs nil resource-config-dir-or-map)
      (let [config-sources   (::config-sources resource-config-dir-or-map)
            local-file       (:local-file config-sources)
-           file-conf        (if local-file (conf-file local-file))
-           file-confs       (if file-conf (cons file-conf nil))
            resource-dirs    (seq (filter identity (:resource-dirs  config-sources)))
            resource-files   (seq (filter identity (:resource-files config-sources)))
-           resource-files   (or resource-files (apply conf-dirs->resource-names resource-dirs))
-           config-sources   (assoc config-sources :resource-dirs resource-dirs :resource-files resource-files)
-           resource-confs   (apply conf-resource resource-files)
-           configs-to-build (concat resource-confs file-confs)]
-       (-> (apply conf/build-config configs-to-build)
-           load-with-namespaces
+           resource-files   (or resource-files
+                                (apply conf-dirs->resource-names resource-dirs))
+           config-sources   (assoc config-sources
+                                   :resource-dirs resource-dirs
+                                   :resource-files resource-files)
+           edn-resources    (seq (filter edn-path? resource-files))
+           env-resources    (seq (filter env-path? resource-files))
+           edn-file         (when (edn-path? local-file) local-file)
+           env-file         (when (and (nil? edn-file) (env-path? local-file)) local-file)
+           edn-res-confs    (when edn-resources (apply conf-resource edn-resources))
+           edn-file-confs   (some-> edn-file not-empty conf-file (cons '()))
+           env-file-confs   (some-> env-file not-empty (cons '()))
+           edn-configs      (concat edn-res-confs edn-file-confs)
+           env-configs      (concat env-resources env-file-confs)
+           edn-config-data  (some->> edn-configs seq
+                                     (apply conf/build-config)
+                                     load-with-namespaces)
+           env-config-data  (some->> env-configs seq (apply envfile/parse))]
+       (envfile/derive-keys! env-config-data)
+       (-> (merge edn-config-data env-config-data)
            (assoc ::config-sources config-sources)))))
   ([local-file resource-config-dir & more-dirs]
    (read-configs
