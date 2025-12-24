@@ -39,25 +39,28 @@
                                        "config/amelinium-admin"])
 
 (defmacro with-config-dirs
-  "Sets the dynamic variable `amelinium.app/*resource-config-dirs*` and executes body."
+  "Binds `amelinium.app/*resource-config-dirs*` to `dirs` for the dynamic extent
+  of `body`. Intended for ad-hoc overrides of the default resource config
+  directories."
   [dirs & body]
   `(binding [*resource-config-dirs* ~dirs]
      ~@body))
 
 (defmacro with-local-config
-  "Sets the dynamic variable `amelinium.app/*local-config*` and executes body."
+  "Binds `amelinium.app/*local-config*` to `local-file` for the dynamic extent of `body`.
+  Useful for temporarily overriding the local (filesystem) config source."
   [local-file & body]
   `(binding [*local-config* ~local-file]
      ~@body))
 
 (defmacro with-configs
-  "Sets the dynamic variables `amelinium.app/*resource-config-dirs*`,
-  `amelinium.app/*resource-dev-dirs*`, `amelinium.app/*resource-admin-dirs*`
-  and `amelinium.app/*local-config*` to the given values and executes body.
-  May be helpful in overriding defaults when instantiating `app.clj`
-  and creating custom wrappers around common management functions
-  (like `amelinium.app/start!`, `amelinium.app/stop!`, `amelinium.app/reload!`
-  and others)."
+  "Binds all config-source dynamic vars for the dynamic extent of `body`:
+  `amelinium.app/*resource-config-dirs*`, `amelinium.app/*resource-dev-dirs*`,
+  `amelinium.app/*resource-admin-dirs*`, and `amelinium.app/*local-config*`.
+
+  Useful for instantiating `app.clj` with custom defaults and building wrappers
+  around common management functions such as `amelinium.app/start!`,
+  `amelinium.app/stop!`, `amelinium.app/reload!`, etc."
   [local-file dirs dev-dirs admin-dirs & body]
   `(binding [*resource-config-dirs* ~dirs
              *resource-dev-dirs*    ~dev-dirs
@@ -66,16 +69,17 @@
      ~@body))
 
 (defmacro with-watch-dirs
-  "Sets the dynamic variable `amelinium.app/*ns-reload-watch-dirs*` to the given value and executes
-  body. May be helpful when creating custom namespace tracker (and setting
-  `amelinium.app/*ns-tracker*` value) in instantiated `app.clj`."
+  "Binds `amelinium.app/*ns-reload-watch-dirs*` to `watch-dirs` for the dynamic extent
+  of `body`. Useful when building a custom namespace tracker (see
+  `amelinium.app/*ns-tracker*`)."
   [watch-dirs & body]
   `(binding [*ns-reload-watch-dirs* ~watch-dirs]
      ~@body))
 
 (defmacro with-ns-tracker
-  "Sets `amelinium.app/*ns-tracker*` to the given value and executes body. Helpful when
-  creating custom `amelinium.app/reload!` function in instantiated `app.clj`."
+  "Binds `amelinium.app/*ns-tracker*` to `tracker` for the dynamic extent of `body`.
+  The tracker is typically created with `amelinium.app/make-ns-tracker` and later
+  used by `amelinium.app/reload-namespaces` / `amelinium.app/reload!`."
   [ns-tracker & body]
   `(binding [*ns-tracker* ~ns-tracker]
      ~@body))
@@ -115,8 +119,9 @@
 ;;
 
 (defn make-ns-tracker
-  "Creates `ns-tracker` instance for tracking code changes in directories specified
-  with `amelinium.app/*ns-reload-watch-dirs*`."
+  "Creates an `ns-tracker` instance for tracking code changes in directories configured
+  by `amelinium.app/*ns-reload-watch-dirs*`. Returns nil when no watch dirs are
+  configured."
   []
   (if-some [wdirs *ns-reload-watch-dirs*]
     (if-some [wdirs (and (sequential? wdirs) (seq wdirs))]
@@ -126,8 +131,9 @@
   (make-ns-tracker))
 
 (defn reload-namespaces
-  "Reloads code (using `clojure.core/require` with `:reload` flag) in namespaces found
-  in files listed in `amelinium.app/*ns-reload-watch-dirs*`."
+  "Reloads namespaces reported by `amelinium.app/*ns-tracker*` using
+  `clojure.core/require` with the `:reload` flag. Does nothing when no tracker is
+  configured."
   []
   (if-some [nstracker *ns-tracker*]
     (doseq [ns-sym (nstracker)]
@@ -179,6 +185,47 @@
 (defn configured?  [] (locking lock (some? post-config)))
 (defn start-args?  [] (locking lock (not (empty? start-args))))
 
+(defdoc! expanding?
+  "Returns true when the application is currently in the `:expanding` phase.")
+
+(defdoc! expanded?
+  "Returns true when the last expand/prep operation finished and the application is in the
+`:expanded` phase.")
+
+(defdoc! starting?
+  "Returns true when the application is currently in the `:starting` phase.")
+
+(defdoc! failed?
+  "Returns true when the application is in the `:failed` phase (i.e. the last lifecycle
+operation ended with an exception stored in `amelinium.app/exception`).")
+
+(defdoc! running?
+  "Returns true when the application is running (phase is `:running`).")
+
+(defdoc! stopping?
+  "Returns true when the application is currently stopping (phase is `:stopping`).")
+
+(defdoc! stopped?
+  "Returns true when the application is stopped (phase is `:stopped`).")
+
+(defdoc! suspended?
+  "Returns true when the application is suspended (phase is `:suspended`).")
+
+(defdoc! resuming?
+  "Returns true when the application is currently resuming (phase is `:resuming`).")
+
+(defdoc! suspending?
+  "Returns true when the application is currently suspending (phase is
+  `:suspending`).")
+
+(defdoc! configured?
+  "Returns true when `amelinium.app/post-config` is present (i.e. configuration has
+  been read and expanded/prepared).")
+
+(defdoc! start-args?
+  "Returns true when the application has remembered startup arguments in
+  `amelinium.app/start-args`.")
+
 ;;
 ;; application management helpers
 ;;
@@ -188,10 +235,15 @@
 (declare resume-app)
 
 (defn state-from-exception
-  "Takes an exception object and sets the global variable `amelinium.app/state` to
-  contain the exception data extracted from it. Additionally sets the current value
-  of global variable `amelinium.app/phase` to `:failed` and uses logging to notify
-  about this event (with the log level set to error)."
+  "Takes an exception object and updates the global application state to reflect
+  failure.
+
+  Sets:
+  - `amelinium.app/exception` to the exception,
+  - `amelinium.app/phase` to `:failed`,
+  and logs the exception (error level).
+
+  Returns `:failed`."
   [ex]
   (locking lock
     (var/reset exception ex)
@@ -200,21 +252,19 @@
     (var/reset phase :failed)))
 
 (defn configure-app
-  "Configures the application using `local-config-file` and `rc-dirs` (list of relative
-  paths to be scanned for EDN files with configuration maps to be merged with
-  `meta-merge` and ENV files containing key=value pairs in a shell-like format).
+  "Reads and expands configuration for the application.
 
-  Uses `amelinium.system/read-configs` to load EDN and ENV files and merge them, and then
-  sets the global variable `amelinium.app/config` that contains them. The next step is to
-  call `amelinium.system/expand` and update the global variable
-  `amelinium.app/post-config` with its result.
+  `local-config-file` is a filesystem config overlay (EDN or ENV). `rc-dirs` is a
+  list (or single value) of classpath resource directories scanned for `.edn` and
+  `.env` configuration sources.
 
-  If `keys` are given then `amelinium.system/config` is only updated when it does not
-  yet have a truthy value, and after that the `amelinium.system/expand` is called with
-  `keys` passed to only prepare values for the specified keys. The result of this
-  call is stored in `amelinium.app/post-config`.
+  Uses `amelinium.system/read-configs` to produce `amelinium.app/config`, then uses
+  `amelinium.system/expand` to produce `amelinium.app/post-config`.
 
-  The function returns `:configured` keyword. See also `amelinium.app/configure!`."
+  When `keys` are provided, `config` is only read if it is not already present, and
+  only the specified keys are expanded.
+
+  Returns `:configured`."
   ([]
    (configure-app nil nil))
   ([local-config-file rc-dirs & keys]
@@ -231,7 +281,15 @@
    :configured))
 
 (defn start-app
-  ""
+  "Starts (initializes) the application Integrant system.
+
+  If the app is suspended, delegates to `amelinium.app/resume-app`. If the app is not
+  configured, calls `amelinium.app/configure-app` with the given config sources.
+  Then initializes the Integrant system via `amelinium.system/init`, optionally
+  restricted to `keys`.
+
+  Remembers startup arguments in `amelinium.app/start-args` and updates lifecycle
+  `phase`.  Returns the current `phase` keyword."
   ([]
    (start-app nil nil))
   ([local-config-file rc-dirs & keys]
@@ -257,6 +315,16 @@
      phase)))
 
 (defn stop-app
+  "Stops (halts) the application Integrant system.
+
+  With no `keys`, halts the whole system, clears `amelinium.app/state`,
+  `amelinium.app/config`, and `amelinium.app/post-config`, and sets phase to
+  `:stopped`.
+
+  With `keys`, halts only the selected components and nils them out in
+  `amelinium.app/state`.
+
+  Returns the current `phase` keyword."
   [& keys]
   (locking lock
     (if-not (stopped?)
@@ -276,6 +344,13 @@
     phase))
 
 (defn restart-app
+  "Restarts the application.
+
+  Stops selected `keys` (or the last remembered key set from
+  `amelinium.app/start-args`) and then starts again using the last remembered startup
+  arguments when available; otherwise uses the current dynamic
+  defaults (`amelinium.app/*local-config*` and
+  `amelinium.app/*resource-config-dirs*`)."
   [& keys]
   (locking lock
     (let [new-keys (or (seq keys) (seq (peek start-args)))]
@@ -285,6 +360,12 @@
         (apply start-app *local-config* *resource-config-dirs* new-keys)))))
 
 (defn suspend-app
+  "Suspends the running application via `amelinium.system/suspend!`.
+
+  Optionally restricts suspension to selected `keys`.
+
+  Updates lifecycle `phase` to `:suspended` on success and stores exceptions via
+  `state-from-exception`.  Returns the current `phase` keyword."
   [& keys]
   (locking lock
     (if (running?)
@@ -297,6 +378,12 @@
     phase))
 
 (defn resume-app
+  "Resumes a suspended application via `amelinium.system/resume`.
+
+  Optionally restricts resume to selected `keys`.
+
+  If the app is stopped, falls back to `amelinium.app/restart-app`.
+  Returns the current `phase` keyword."
   [& keys]
   (locking lock
     (if (suspended?)
@@ -310,6 +397,17 @@
     phase))
 
 (defn expand-app
+  "Expands the current runtime state with `amelinium.system/expand`.
+
+  With no args, expands using the default expansion strategy.
+
+  With args, supports either:
+  - an explicit expansion function as the first arg (any `ifn?` that is not a keyword),
+    followed by keys, or
+  - a list of keys (expanded with `identity`).
+
+  Updates lifecycle `phase` to `:expanded` on success and returns the current `phase`
+  keyword."
   [& ks]
   (locking lock
     (var/reset phase :expanding)
@@ -323,8 +421,9 @@
     phase))
 
 (defn prep-app
-[& keys]
-(apply expand-app keys))
+  "Alias for `amelinium.app/expand-app` (historically used as “prep”)."
+  [& keys]
+  (apply expand-app keys))
 
 ;;
 ;; application control
@@ -343,10 +442,65 @@
 (defn start-dev!         [& k] (apply start-app  *local-config* *resource-dev-dirs*    k))
 (defn start-admin!       [& k] (apply start-app  *local-config* *resource-admin-dirs*  k))
 
+(defdoc! configure!
+  "Configures the application using the current defaults:
+`amelinium.app/*local-config*` and `amelinium.app/*resource-config-dirs*`.
+
+Delegates to `amelinium.app/configure-app`.")
+
+(defdoc! configure-dev!
+  "Configures the application using the current dev defaults:
+`amelinium.app/*local-config*` and `amelinium.app/*resource-dev-dirs*`.
+
+Delegates to `amelinium.app/configure-app`.")
+
+(defdoc! configure-admin!
+  "Configures the application using the current admin defaults:
+`amelinium.app/*local-config*` and `amelinium.app/*resource-admin-dirs*`.
+
+Delegates to `amelinium.app/configure-app`.")
+
+(defdoc! start!
+  "Starts the application using the current defaults:
+`amelinium.app/*local-config*` and `amelinium.app/*resource-config-dirs*`.
+
+Delegates to `amelinium.app/start-app`.")
+
+(defdoc! stop!
+  "Stops the application (optionally only selected keys).
+
+Delegates to `amelinium.app/stop-app`.")
+
+(defdoc! restart!
+  "Restarts the application (optionally only selected keys).
+
+Delegates to `amelinium.app/restart-app`.")
+
+(defdoc! suspend!
+  "Suspends the running application (optionally only selected keys).
+
+Delegates to `amelinium.app/suspend-app`.")
+
+(defdoc! resume!
+  "Resumes a suspended application (optionally only selected keys).
+
+Delegates to `amelinium.app/resume-app`.")
+
+(defdoc! start-dev!
+  "Starts the application using dev config defaults:
+`amelinium.app/*local-config*` and `amelinium.app/*resource-dev-dirs*`.
+
+Delegates to `amelinium.app/start-app`.")
+
+(defdoc! start-admin!
+  "Starts the application using admin config defaults:
+`amelinium.app/*local-config*` and `amelinium.app/*resource-admin-dirs*`.
+
+Delegates to `amelinium.app/start-app`.")
+
 (defn reload!
-  "When the application is stopped, reloads code (using
-  `amelinium.app/reload-namespaces`). Otherwise stops the application, reloads
-  namespaces and starts it again."
+  "If the application is stopped, reloads code via `amelinium.app/reload-namespaces`.
+  Otherwise, stops the application, reloads namespaces, and starts it again."
   [& k]
   (if (stopped?)
     (reload-namespaces)
@@ -364,11 +518,45 @@
 (defn cprint-post-config [ ] (cprint post-config))
 (defn cprint-start-args  [ ] (cprint start-args))
 
+(defdoc! print-state
+  "Pretty-prints the current application runtime `amelinium.app/state` using
+`puget.printer/pprint`.")
+
+(defdoc! print-config
+  "Pretty-prints the last loaded raw configuration (`amelinium.app/config`) using
+`puget.printer/pprint`.")
+
+(defdoc! print-post-config
+  "Pretty-prints the expanded/prepared configuration (`amelinium.app/post-config`)
+using `puget.printer/pprint`.")
+
+(defdoc! print-start-args
+  "Pretty-prints the remembered startup arguments (`amelinium.app/start-args`) using
+`puget.printer/pprint`.")
+
+(defdoc! cprint-state
+  "Color-prints the current application runtime `amelinium.app/state` using
+`puget.printer/cprint`.")
+
+(defdoc! cprint-config
+  "Color-prints the last loaded raw configuration (`amelinium.app/config`) using
+`puget.printer/cprint`.")
+
+(defdoc! cprint-post-config
+  "Color-prints the expanded/prepared configuration (`amelinium.app/post-config`)
+using `puget.printer/cprint`.")
+
+(defdoc! cprint-start-args
+  "Color-prints the remembered startup arguments (`amelinium.app/start-args`) using
+`puget.printer/cprint`.")
+
 ;;
 ;; main function
 ;;
 
-(defn -main []
+(defn -main
+  "Program entry point. Starts the application using `amelinium.app/start!`."
+  []
   (start!))
 
 ;; documentation
@@ -378,30 +566,10 @@
 (defdoc! state       "A nested map containing current state of application when it is running.")
 (defdoc! exception   "Unhandled exception object thrown during starting, stopping or suspending.")
 
-(defdoc! expanding?  "Returns `true` when application is in expanding phase.")
-(defdoc! expanded?   "Returns `true` when application is in expanded phase.")
-(defdoc! starting?   "Returns `true` when application is in starting phase.")
-(defdoc! failed?     "Returns `true` when application is in failed phase.")
-(defdoc! running?    "Returns `true` when application is in running phase.")
-(defdoc! stopping?   "Returns `true` when application is in stopping phase.")
-(defdoc! stopped?    "Returns `true` when application is in stopped phase.")
-(defdoc! suspended?  "Returns `true` when application is in suspended phase.")
-(defdoc! resuming?   "Returns `true` when application is in resuming phase.")
-(defdoc! suspending? "Returns `true` when application is in suspending phase.")
-(defdoc! configured? "Returns `true` when application is configured.")
-
 (defdoc! phase
   "A keyword describing current phase (`:stopping`, `:stoppped`, `:expanding`,
 `:expanded`, `:starting`, `:running`, `:suspended`, `:suspending`, `:resuming`,
 `:failed`).")
-
-(defdoc! print-state        "Prints current state of application.")
-(defdoc! print-config       "Prints current configuration (not parsed) of application.")
-(defdoc! print-post-config  "Prints current, pre-parsed configuration of application.")
-
-(defdoc! cprint-state       "Prints current state of application using `cprint`.")
-(defdoc! cprint-config      "Prints current configuration (not parsed) of application using `cprint`.")
-(defdoc! cprint-post-config "Prints current, pre-parsed configuration of application using `cprint`.")
 
 (defdoc! *ns-reload-watch-dirs*
   "A sequence of directories to be watched when reloading code. Used by
@@ -446,73 +614,3 @@
   is initialized by calling `ns-tracker.core/ns-tracker` (from
   `amelinium.app/make-ns-tracker`) with a sequence of directories from
   `amelinium.app/*ns-reload-watch-dirs*`.")
-
-(defdoc! configure!
-  "Configures the application. Calls `amelinium.app/configure-app` passing values of
-  `amelinium.app/*local-config*` and `amelinium.app/*resource-config-dirs*`. See also
-  `amelinium.app/start!`.")
-
-(defdoc! configure-dev!
-  "Configures the application in development mode. Calls `amelinium.app/configure-app`
-  passing it values of `amelinium.app/*local-config*` and
-  `amelinium.app/*resource-dev-dirs*`.")
-
-(defdoc! configure-admin!
-  "Configures the application in administrative mode. Calls
-  `amelinium.app/configure-app` passing it values of `amelinium.app/*local-config*`
-  and `amelinium.app/*resource-admin-dirs*`. See also `amelinium.app/start-admin!`.")
-
-(defdoc! start!
-  "Starts or resumes the application. Calls `amelinium.app/start-app` passing values of
-  `amelinium.app/*local-config*`, `amelinium.app/*resource-config-dirs*` and optional
-  keys identifying components which should be configured and started. If no
-  components are given, all are started. If the application is in a suspended state,
-  it is resumed (see `amelinium.app/resume!`).")
-
-(defdoc! restart!
-  "Restarts the application. Calls `amelinium.app/stop-app` (passing optional keys
-  identifying components which should be stopped and then started) and then calls
-  `amelinium.app/start-app` passing parameters used during previous start or (if this
-  is a first call to it) passing `amelinium.app/*local-config*`,
-  `amelinium.app/*resource-config-dirs*` and optional keys identifying components
-  to be started. If no components are given then only those which were previously
-  started are stopped and then started. Application configuration is re-initialized
-  during the process.")
-
-(defdoc! stop!
-  "Stops the application. Calls `amelinium.app/stop-app` passing it optional keys
-  identifying components which should be stopped. If no components are given then
-  only those which were previously started are stopped. After successful stop,
-  application configuration is removed.")
-
-(defdoc! suspend!
-  "Suspends the application. Calls `amelinium.app/suspend-app` passing it optional keys
-  identifying components which should be suspended. If no components are given then
-  only those which were previously started are suspended.")
-
-(defdoc! resume!
-  "Resumes the application which was previously suspended. Calls
-  `amelinium.app/resume-app` passing it optional keys identifying components which
-  should be resumed. If no components are given then only those which were previously
-  suspended are resumed.")
-
-(defdoc! start-dev!
-  "Starts or resumes the application using development configuration. Calls
-  `amelinium.app/start-app` passing values of `amelinium.app/*local-config*`,
-  `amelinium.app/*resource-dev-dirs*` and optional keys identifying components
-  which should be configured and started. If no components are given, all are
-  started. If the application is in suspended state, it is resumed (see
-  `amelinium.app/resume!`).")
-
-(defdoc! start-admin!
-  "Starts or resumes the application using administrative configuration. Calls
-  `amelinium.app/start-app` passing values of `amelinium.app/*local-config*`,
-  `amelinium.app/*resource-admin-dirs*` and optional keys identifying components
-  which should be configured and started. If no components are given, all are
-  started. If the application is in suspended state, it is resumed (see
-  `amelinium.app/resume!`).
-
-  This mode is intended to be used when performing administrative tasks (like
-  database migrations) requiring different or additional setup (e.g. specially
-  configured data sources with different credentials used to create database
-  connections).")

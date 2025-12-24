@@ -8,18 +8,19 @@
 
   (:refer-clojure :exclude [ref])
 
-  (:require [integrant.core           :as         ig]
-            [maailma.core             :as       conf]
-            [cambium.core             :as        log]
-            [amelinium                :as  amelinium]
-            [amelinium.readers        :as    readers]
-            [amelinium.env.file       :as    envfile]
-            [tick.core                :as          t]
-            [clojure.java.io          :as         io]
-            [clojure.string           :as        str]
-            [io.randomseed.utils      :as      utils]
-            [io.randomseed.utils.var  :as        var]
-            [io.randomseed.utils.fs   :as         fs])
+  (:require [integrant.core           :as           ig]
+            [maailma.core             :as         conf]
+            [cambium.core             :as          log]
+            [amelinium                :as    amelinium]
+            [amelinium.readers        :as      readers]
+            [amelinium.env.file       :as      envfile]
+            [tick.core                :as            t]
+            [clojure.java.io          :as           io]
+            [clojure.string           :as          str]
+            [io.randomseed.utils      :as        utils]
+            [io.randomseed.utils.var  :as          var]
+            [io.randomseed.utils.fs   :as           fs]
+            [io.randomseed.utils      :refer [defdoc!]])
 
   (:import (java.util TimeZone)))
 
@@ -42,7 +43,81 @@
 (defmacro ref             [& more] `(ig/ref          ~@more))
 (defmacro refset          [& more] `(ig/refset       ~@more))
 
+(defdoc! add-init
+  "Defines an `integrant.core/init-key` multimethod implementation.
+This is a thin wrapper over `(defmethod integrant.core/init-key ...)`
+to keep system component registrations visually consistent.")
+
+(defdoc! add-expand
+  "Defines an `integrant.core/expand-key` multimethod implementation.
+Thin wrapper over `(defmethod integrant.core/expand-key ...)`.")
+
+(defdoc! add-suspend!
+  "Defines an `integrant.core/suspend-key!` multimethod implementation.
+Thin wrapper over `(defmethod integrant.core/suspend-key! ...)`.")
+
+(defdoc! add-resume
+  "Defines an `integrant.core/resume-key` multimethod implementation.
+Thin wrapper over `(defmethod integrant.core/resume-key ...)`.")
+
+(defdoc! add-resolve
+  "Defines an `integrant.core/resolve-key` multimethod implementation.
+Thin wrapper over `(defmethod integrant.core/resolve-key ...)`.")
+
+(defdoc! add-halt!
+  "Defines an `integrant.core/halt-key!` multimethod implementation.
+Thin wrapper over `(defmethod integrant.core/halt-key! ...)`.")
+
+(defdoc! init-key
+  "Calls `integrant.core/init-key`.
+
+Convenience macro mirroring Integrant’s API while keeping all calls under
+this namespace.")
+
+(defdoc! expand-key
+  "Calls `integrant.core/expand-key`.
+
+Convenience macro mirroring Integrant’s API while keeping all calls under
+this namespace.")
+
+(defdoc! suspend-key!
+  "Calls `integrant.core/suspend-key!`.
+
+Convenience macro mirroring Integrant’s API while keeping all calls under
+this namespace.")
+
+(defdoc! resume-key
+  "Calls `integrant.core/resume-key`.
+
+Convenience macro mirroring Integrant’s API while keeping all calls under
+this namespace.")
+
+(defdoc! resolve-key
+  "Calls `integrant.core/resolve-key`.
+
+Convenience macro mirroring Integrant’s API while keeping all calls under
+this namespace.")
+
+(defdoc! halt-key!
+  "Calls `integrant.core/halt-key!`.
+
+Convenience macro mirroring Integrant’s API while keeping all calls under
+this namespace.")
+
+(defdoc! ref
+  "Creates an Integrant reference via `integrant.core/ref`.
+Convenience macro used in configs and code to reference other components.")
+
+(defdoc! refset
+  "Creates an Integrant ref-set via `integrant.core/refset`.
+Convenience macro used in configs and code to reference sets of components.")
+
 (defmacro add-prep
+  "Defines an `integrant.core/expand-key` method that computes a prepared value
+  from `[k v]` and returns it wrapped as `{k prepared}`.
+
+  This matches Integrant’s expectation that `expand-key` returns a map keyed by the
+  expanded key."
   [dispatch-value argvec & body]
   (let [k#    (gensym "k")
         v#    (gensym "v")
@@ -55,6 +130,11 @@
          {~k# prepared#}))))
 
 (defmacro prep-key
+  "Expands a single key/value pair using `integrant.core/expand-key` and returns
+  the produced value for that key.
+
+  Throws `ex-info` when `expand-key` does not return a map or does not include the
+  requested key."
   [k v]
   `(let [k# ~k
          m# (ig/expand-key k# ~v)]
@@ -65,6 +145,11 @@
      (get m# k#)))
 
 (defn expand
+  "Wrapper over `integrant.core/expand` that preserves `::keys` and
+  `::config-sources` metadata inside the returned config map.
+
+  Accepts an optional `innerf` (as in Integrant) and optional `ks` restricting
+  which top-level keys to expand."
   ([cfg]
    (expand cfg identity nil))
   ([cfg innerf]
@@ -74,15 +159,20 @@
          ksrc     (get cfg ::keys)
          pure-cfg (dissoc cfg ::keys ::config-sources)
          ks       (or (seq ks) (keys cfg))]
-       (assoc (ig/expand pure-cfg innerf ks) ::keys ksrc ::config-sources csrc))))
+     (assoc (ig/expand pure-cfg innerf ks) ::keys ksrc ::config-sources csrc))))
 
 (defn prep
+  "Alias for `expand`. With one arg, expands the whole config; with `keys`,
+  expands only the requested top-level keys."
   ([cfg]
    (expand cfg))
   ([cfg keys]
    (expand cfg identity keys)))
 
 (defn init
+  "Wrapper over `integrant.core/init` that strips `::keys` and
+  `::config-sources` before initialization, then re-attaches them to the returned
+  system map. Optionally accepts `ks` to initialize only selected top-level keys."
   ([cfg]
    (init cfg nil))
   ([cfg ks]
@@ -93,6 +183,9 @@
      (assoc (ig/init pure-cfg ks) ::keys ksrc ::config-sources csrc))))
 
 (defn suspend!
+  "Wrapper over `integrant.core/suspend!` that ignores `::keys` and
+  `::config-sources` entries in the config. With `ks` provided, suspends only selected
+  top-level keys."
   ([cfg]
    (suspend! cfg nil))
   ([cfg ks]
@@ -102,6 +195,9 @@
        (ig/suspend! pure-cfg)))))
 
 (defn resume
+  "Wrapper over `integrant.core/resume` that resumes a system using a config while
+  preserving `::keys` and `::config-sources`. Accepts optional `ks` to resume only
+  selected top-level keys."
   ([cfg system]
    (resume cfg system nil))
   ([cfg system ks]
@@ -113,6 +209,9 @@
      (assoc new-sys ::config-sources csrc ::keys ksrc))))
 
 (defn halt!
+  "Wrapper over `integrant.core/halt!` that ignores `::keys` and
+  `::config-sources` entries in the config. With `ks` provided, halts only selected
+  top-level keys."
   ([cfg]
    (halt! cfg nil))
   ([cfg ks]
@@ -122,6 +221,8 @@
        (ig/halt! pure-cfg)))))
 
 (defn ref?
+  "Returns true if `v` is an Integrant reference (`integrant.core/ref?`).
+  Delegates directly to Integrant."
   [v]
   (ig/ref? v))
 
@@ -132,6 +233,19 @@
 (defn prep-var-process   [  v]    (var/resolve v))
 (defn init-var-process   [  v]    (var/deref   v))
 
+(defdoc! expand-var-process
+  "Pre-processes a config value by resolving Vars (symbols/keywords)
+into Var objects. Returns `{k resolved}` so it can be used from
+`integrant.core/expand-key`.")
+
+(defdoc! prep-var-process
+  "Resolves a symbol/keyword into a Var object (without dereferencing it).
+Useful for preparing config values before init.")
+
+(defdoc! init-var-process
+  "Dereferences a resolved Var (or Var-like reference) during init,
+producing the runtime value to be inserted into the system.")
+
 ;;
 ;; configuration loading
 ;;
@@ -141,6 +255,8 @@
 ;; other keys or sets of keys
 
 (defn- validate-ref
+  "Validates that `ref` is a qualified keyword suitable for Integrant references.
+  Returns an `ex-info` instance describing the problem (or nil when valid)."
   [ref]
   (if-not (qualified-keyword? ref)
     (ex-info (str "Invalid reference: " ref ". Must be a qualified keyword.")
@@ -155,6 +271,10 @@
 ;; for the given profile
 
 (defn conf-resource
+  "Loads one or more configuration resources (classpath-based) using Maailma and the
+  project’s custom tag readers.
+
+  Returns a seq of loaded config maps (or nil when nothing could be resolved)."
   ([r]
    (if r (conf/resource r integrant-readers)))
   ([r & more]
@@ -164,10 +284,18 @@
         seq)))
 
 (defn conf-file
+  "Loads a configuration file from the filesystem using Maailma and the project’s
+  custom tag readers.
+
+  Returns a config map (or nil when `f` is nil)."
   [f]
   (if f (conf/file f integrant-readers)))
 
 (defn slurp-resource-or-file
+  "Reads text from `p`.  If `p` resolves as a classpath resource it is slurped
+  from the resource; otherwise `p` is treated as a filesystem path.
+
+  Returns nil for blank/nil input."
   [p]
   (when-some [p (not-empty (str p))]
     (if-let [r (io/resource p)]
@@ -175,14 +303,19 @@
       (slurp p))))
 
 (defn edn-path?
+  "Returns true when `p` looks like an EDN path (string ends with `.edn`)."
   [p]
   (and p (str/ends-with? (str p) ".edn")))
 
 (defn env-path?
+  "Returns true when `p` looks like an ENV path (string ends with `.env`)."
   [p]
   (and p (str/ends-with? (str p) ".env")))
 
 (defn conf-dirs->resource-names
+  "Given one or more resource directories, finds `.edn` and `.env` files under
+  them, sorts them, and returns a seq of resource names (directory-prefixed paths)
+  suitable for loading via `clojure.java.io/resource`."
   ([d]
    (some->> d
             fs/resource-file
@@ -202,8 +335,10 @@
 ;; loading namespaces required by fully-qualified configuration keys
 
 (defn load-with-namespaces
-  "Returns the given config, loading any detected namespaces with
-  `integrant.core/load-namespaces`."
+  "Returns `config` after loading namespaces implied by fully-qualified Integrant
+  keys via `integrant.core/load-namespaces`.
+
+  Intended as a post-step after reading configuration data."
   [config]
   (ig/load-namespaces config)
   config)
@@ -211,25 +346,30 @@
 ;; selecting subsystem(s) from a global configuration map
 
 (defn subsystems
-  "Selects subsystems from the given configuration map `config` by selecting 1st-level
-  branch keys. Returns a map."
+  "Selects subsystem roots from a global Integrant config.
+  With one arg returns `config`; with `keys` returns `(select-keys config keys)`
+  (i.e., only chosen top-level branches)."
   ([config]      config)
   ([config keys] (select-keys config keys)))
 
 ;; getting system configuration from file(s)
 
 (defn read-configs
-  "Reads configuration files in EDN or ENV format. For 2 or more arguments
-  it loads `local-file` from a filesystem (unless it's `nil`) and scans all resource
-  directories specified as other arguments. For each directory it tries to find
-  filenames ending with `.edn` or `.env` and loads them all in order. The local
-  file is being loaded last.
+  "Reads configuration files in EDN or ENV format. Supports three modes:
+  (1) given a map that already contains `::config-sources`, reloads using those sources;
+  (2) given a seq of resource directories, scans and loads `.edn`/`.env` resources from them;
+  (3) given `local-file` plus one or more resource directories, loads resources first and then
+      overlays a local filesystem config (EDN or ENV).
 
-  The function returns a single configuration map merged from all loaded maps (EDN-sourced)
-  with a special key ::config-. The
-  configuration sources are preserved in this map under a key
-  `:amelinium.app/config-sources`, containing the following keys: `:resource-dirs`,
-  `:resource-files` and `:local-file`.
+  For 2 or more arguments it loads `local-file` from a filesystem (unless it's `nil`)
+  and scans all resource directories specified as other arguments. For each directory
+  it tries to find filenames ending with `.edn` or `.env` and loads them all in
+  order. The local file is being loaded last.
+
+  The function returns a single configuration map merged from all loaded
+  maps (EDN-sourced) with a special key ::config-. The configuration sources are
+  preserved in this map under a key `:amelinium.app/config-sources`, containing the
+  following keys: `:resource-dirs`, `:resource-files` and `:local-file`.
 
   When there is only 1 argument given and it is a map then it should be a valid
   config with `:amelinium.app/config-sources` key present. The associated map will be
@@ -237,7 +377,9 @@
 
   When there is only 1 argument given and it is not a map then it should be a
   sequential collection of resource directories to scan and load configuration
-  from. In this case the local configuration file is considered to be `nil`."
+  from. In this case the local configuration file is considered to be `nil`.
+
+  Also derives ENV keys and loads namespaces for fully-qualified Integrant keys."
   ([resource-config-dir-or-map]
    (if-not (map? resource-config-dir-or-map)
      (read-configs nil resource-config-dir-or-map)
