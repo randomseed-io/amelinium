@@ -393,28 +393,18 @@
             ks))))
 
 (defn parse-map
-  "Tries to extract identity from a map `m` by searching for commonly known identity
-  keys.
+  "Tries to parse identity `v` by analyzing it based on its type and/or its structure.
 
-  Optional identity type `identity-type` will be used to constrain the
-  conversion. Its value may also be an acceptable type tag used to group identity
-  types semantically.
+  In case of maps with `:user/id`, `:user/uid`, `:user/email`, `:user/phone` keys it
+  will use corresponding values to parse it.
 
-  If a known key is found but its associated value cannot be converted to `Identity`
-  object, process continues and other keys are tried.
+  In case of an `:identity/type` key it will use its value as the identity type tag
+  and will use it to parse `:identity/value` or `:user/identity` key's value.
 
-  It uses `identity-map-keys` when no identity type is given, or it is set to
-  `:amelinium.identity/any`.
+  In case of a `:user/identity` key and no `:identity/type` key it will try to parse
+  the value as any of supported identities.
 
-  Uses `identity-map-keys-by-type` when an identity type is given to select a group
-  of keys to be tried out. It will also look for a key that matches the given
-  acceptable identity type tag (if passed as `identity-type` instead of a type). If
-  that fails it performs a series of lookups in the map by taking each direct
-  descendant of the given tag associated within
-  `amelinium.proto.identity/type-hierarchy`.
-
-  When a group is not found for the given identity type or acceptable type tag, `nil`
-  is returned."
+  In case of all other map values it will return `nil`."
   ([m]
    (if (seq m)
      (some (fn [[k t]]
@@ -431,8 +421,8 @@
 ;; Creating identities
 
 (defn of
-  "For the given user identity `user-identity` tries to parse the identity and
-  return an `amelinium.Identity` record containing a detected identity type and
+  "For the given user identity `user-identity` tries to parse the identity and return
+  an `amelinium.Identity` record object containing a detected identity type and
   identity value in a form it expresses it best. If the identity type cannot be
   established and it was not given, `nil` is returned.
 
@@ -469,15 +459,14 @@
      (map p/make (cons identity-type (cons user-identity ids))))))
 
 (defn of-value
-  "For the given user identity `user-identity` tries to parse the identity and
-  return an `amelinium.Identity` record containing a detected identity type and
-  identity value in a form it expresses it best. If the identity type cannot be
-  established and it was not given, `nil` is returned.
+  "For the given user identity `user-identity` tries to parse its value and returns it.
 
-  If multiple identities are given it will return a sequence of these identities
-  parsed with parsing functions chosen for detected identity types. If an identity
-  type is cannot be detected and/or is not valid, `nil` value will be inserted into
-  the corresponding location of generated output sequence."
+  If `identity-type` is given and `user-identity` is a correct identity it will return
+  the user identity if it is of the given type or its child.
+
+  If `identity-type` is given and `user-identity` is not a correct identity it will
+  try to parse it. If parsing is successful it will return it only if it is of the
+  given type or its child."
   {:see-also ["of" "of-type" "of-seq"]}
   (^Identity [^Identifiable user-identity]
    (p/make user-identity))
@@ -507,18 +496,11 @@
 
 (defn opt-type
   "For the given user identity `user-identity` and identity type `identity-type` it
-  tries to parse the identity and return an `amelinium.Identity` record containing an
-  identity type and identity value in a form it expresses it best. If the identity
-  type is `nil` or empty then any identity type is accepted.
+  tries to parse it (if possible) and returns `amelinium.Identity` object only if it
+  is of the given type or its child.
 
-  A value of `identity-type` may also be an acceptable type tag (registered with
-  `add-acceptable-type!`) which groups identity types. In such case parsing and
-  detection will be constrained to identity types being its descendants.
-
-  If multiple identities are given it will return a sequence of these identities
-  parsed with parsing functions chosen for the given identity type. If the identity
-  type is not valid or the parsing cannot be applied for an input value, `nil` will
-  be inserted into corresponding location of the output sequence."
+  This function differs from `of-type` in that it will return `nil` if
+  `identity-type` is nil or false."
   {:see-also ["of" "of-value" "of-seq"]}
   (^Identity [identity-type ^Identifiable user-identity]
    (p/make user-identity  (or (some-keyword identity-type) ::any)))
@@ -552,7 +534,12 @@
 
 (defn some-seq
   "Tries to coerce identities to `amelinium.Identity` objects and filters out those who
-  could not be coerced."
+  are not of the acceptable type (given by `acceptable-tag`, can be `:amelinium.identity/any`
+  to accept all types).
+
+  Then it tries to parse each of the identities given and returns a sequence of
+  `amelinium.Identity` objects. Returns `nil` if `acceptable-tag` is `nil` or if
+  no identities are to be parsed or no identities have been parsed successfully."
   ([user-identities]
    (->> (of-seq user-identities) (filter identity) seq))
   ([^Keyword identity-type user-identities]
@@ -811,26 +798,20 @@
 
 (defn to-db
   "For the given user identity `user-identity` tries to express the identity in a
-  database suitable format.
+  database-ready form. It uses a `formatter` function from
+  `amelinium.proto.identity/type-formatters` or passes the value unchanged.
 
-  Uses `to-db*` multimethod to perform `user-identity` transformation on a basis of
-  its identity type.
+  Optional identity type `identity-type` is a type tag which can be used to check if
+  the identity is of this type or its child.
 
-  If the given identity is not a kind of `amelinium.Identity` record it will be
-  converted to it first. If the given value cannot be used as valid identity, `nil`
-  is returned.
+  If formatter is not found, it will return `nil`.
 
-  If the `identity-type` is given, it should be a valid identity type. It instructs
-  the function to treat the given identity as of this type during pre-conversion.
+  Built-ins:
 
-  A value of `identity-type` may also be an acceptable type tag (registered with
-  `add-acceptable-type!`) which groups identity types. In such case parsing and
-  detection will be constrained to identity types being its descendants.
-
-  If the identity is already an `amelinium.Identity` record but its type is
-  different, `nil` will be returned.
-
-  If possible, use `->db` macro instead to get some compile-time optimizations."
+  For identity type `:id` it will return a number.
+  For identity type `:uid` it will return a UUID.
+  For identity type `:email` it will return a lowercase string.
+  For identity type `:phone` it will return a string."
   {:see-also ["->db" "to-db*"]}
   ([^Identifiable user-identity]
    (to-db* (p/make user-identity)))

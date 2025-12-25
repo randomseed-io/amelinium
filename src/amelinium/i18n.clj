@@ -28,20 +28,25 @@
 ;; Accessors
 
 (defn lang
-  "Tries to obtain a language from a request map (`:language/id` key). Falls back to a
-  default language (`:language/default`) if the first one is `nil`. Returns a keyword."
+  "Returns the current language keyword for `req`.
+
+  Looks up `:language/id` first and falls back to `:language/default` when missing.
+  Always returns a keyword (or nil if both keys are absent)."
   ^clojure.lang.Keyword [req]
   (or (get req :language/id)
       (get req :language/default)))
 
 (defn translation-fn
-  "Tries to obtain translation function from a route data in a request map or a `Match`
-  object and if that fails from a request map itself. Falls back to a global variable
-  `amelinium.i18n/translations`.
+  "Returns a Tongue translation function for `req-or-match`.
 
-  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` then the
-  generated translation function will always generate `nil` when a key is missing,
-  ignoring dynamic binding."
+  Lookup order:
+  1) route data `:translations` (via `amelinium.http/get-route-data`),
+  2) `:translations` in the request map (when `req-or-match` is not a Match),
+  3) the global var `amelinium.i18n/translations`.
+
+  When `amelinium.i18n/*handle-missing-keys*` is false/nil, the returned function is
+  wrapped so missing keys yield nil (even if the caller later re-binds
+  `amelinium.i18n/*handle-missing-keys*`)."
   [req-or-match]
   (let [f (or (http/get-route-data req-or-match :translations)
               (if-not (http/match? req-or-match) (get req-or-match :translations))
@@ -58,17 +63,22 @@
 ;; Builders
 
 (defn translator
-  "Tries to obtain translation function from a route data in a request map or a `Match`
-  object and if that fails from a request map itself. Falls back to a global variable
-  `amelinium.i18n/translations`.
+  "Builds a locale-bound translator function for `req-or-match` (request map or Match).
 
-  When `locale` is given it will generate a translation function with predefined
-  translator and locale. If it's not given, it will use language obtained from the
-  context map `req`.
+  The translator is derived via `translation-fn` and then partially applied with a
+  locale keyword:
 
-  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` then the
-  generated translation function will always generate `nil` when a key is missing,
-  ignoring dynamic binding."
+  - when `locale` is provided, it is used;
+  - otherwise the locale is taken from `(lang req-or-match)`.
+
+  May fall back to a default `amelinium.i18n/translations` if translator function
+  cannot be found.
+
+  Returned function signatures mirror Tongue:
+  `([key] ...) ([key x] ...) ([key x y] ...) ([key x y & more] ...)`.
+
+  When `amelinium.i18n/*handle-missing-keys*` is false or nil, missing keys yield
+  nil (see `translation-fn`)."
   ([req-or-match]
    (translator req-or-match nil))
   ([req-or-match locale]
@@ -81,19 +91,14 @@
        ([key x y & more] (apply tr-fn tr-l key x y more))))))
 
 (defn translator-sub
-  "Tries to obtain translation function from a route data in a request map or a `Match`
-  object and if that fails from a request map itself. Falls back to a global variable
-  `amelinium.i18n/translations`. The translation function will accept `key-ns` and
-  `key-name` arguments which will be used to build a keyword with the given namespace
-  and name. This keyword will be used as a translation key.
+  "Builds a locale-bound translator function for `req-or-match` that supports
+  namespaced translation keys built with `(make-kw key-ns key-name)`.
 
-  When `locale` is given it will generate a translation function with predefined
-  translator and locale. If it's not given, it will use language obtained from the
-  context map `req`.
+  Arity options include:
+  - `([key] ...)` for direct keyword keys,
+  - `([key-ns key-name] ...)` and higher arities for building fully-qualified keywords.
 
-  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` then the
-  generated translation function will always generate `nil` when a key is missing,
-  ignoring dynamic binding."
+  Locale resolution and missing-key behavior match `translator` / `translation-fn`."
   ([req-or-match]
    (translator-sub req-or-match nil))
   ([req-or-match locale]
@@ -109,124 +114,75 @@
 ;; Translators
 
 (defn translate-with
-  "Returns a translation string for the given `locale` (language ID) and the keyword
-  `key` using a translation function `tf`. Any optional arguments are passed as they
-  are.
+  "Translates `key` using an explicit Tongue translation function `tf` and `locale`.
 
-  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` (which can
-  be set using `no-default` macro) then the function will return `nil` when a key is
-  missing instead of a warning string.
-
-  If a translation function `tr` was generated (using `translation-fn`, `translator`
-  or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
-  or `nil` then it will always return `nil` when a key is missing, regardless of
-  current value of `*handle-missing-keys*` in the calling context."
+  The `locale` is normalized with `make-kw-simple`. Additional arguments are
+  forwarded to `tf`."
   (^String [tf locale key]            (tf (make-kw-simple locale) key))
   (^String [tf locale key x]          (tf (make-kw-simple locale) key x))
   (^String [tf locale key x y]        (tf (make-kw-simple locale) key x y))
   (^String [tf locale key x y & more] (apply tf (make-kw-simple locale) key x y more)))
 
 (defn translate-sub-with
-  "Returns a translation string for the given `locale` (language ID), the namespace
-  name `ns-name` and the key name `key-name`, using the given translation function
-  `tf`. Useful to translate nested keys which are translated to fully-qualified
-  keywords. Any additional arguments are passed as they are.
+  "Translates a key built from `key-ns` and `key-name` using an explicit Tongue
+  translation function `tf` and `locale`.
 
-  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` (which can
-  be set using `no-default` macro) then the function will return `nil` when a key is
-  missing instead of a warning string.
-
-  If a translation function `tr` was generated (using `translation-fn`, `translator`
-  or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
-  or `nil` then it will always return `nil` when a key is missing, regardless of
-  current value of `*handle-missing-keys*` in the calling context."
+  `locale` is normalized with `make-kw-simple`, and the translation key is built with
+  `(make-kw key-ns key-name)`. Additional arguments are forwarded to `tf`."
   (^String [tf locale key-ns key-name]            (tf (make-kw-simple locale) (make-kw key-ns key-name)))
   (^String [tf locale key-ns key-name x]          (tf (make-kw-simple locale) (make-kw key-ns key-name) x))
   (^String [tf locale key-ns key-name x y]        (tf (make-kw-simple locale) (make-kw key-ns key-name) x y))
   (^String [tf locale key-ns key-name x y & more] (apply tf (make-kw-simple locale) (make-kw key-ns key-name) x y more)))
 
 (defn translate
-  "Returns a translation string for the given `locale` (language ID) and the keyword
-  `key` using a translation function obtained from the given request map (`req`) by
-  calling `translator` function on it. Any optional arguments are passed as they
-  are.
+  "Translates `key` for an explicit `locale` using a translator derived from `req`
+  (request map or Match).
 
-  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` (which can
-  be set using `no-default` macro) then the function will return `nil` when a key is
-  missing instead of a warning string.
-
-  If a translation function `tr` was generated (using `translation-fn`, `translator`
-  or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
-  or `nil` then it will always return `nil` when a key is missing, regardless of
-  current value of `*handle-missing-keys*` in the calling context."
+  Uses `(translator req locale)` and forwards any additional arguments to the
+  underlying Tongue function."
   (^String [req locale key]            ((translator req (make-kw-simple locale)) key))
   (^String [req locale key x]          ((translator req (make-kw-simple locale)) key x))
   (^String [req locale key x y]        ((translator req (make-kw-simple locale)) key x y))
   (^String [req locale key x y & more] (apply (translator req (make-kw-simple locale)) key x y more)))
 
 (defn translate-sub
-  "Returns a translation string for the given `locale` (language ID), the namespace
-  name `ns-name` and the key name `key-name`. Useful to translate nested keys which
-  are translated to fully-qualified keywords. The translation function will be
-  obtained by calling `translator` on `req` (which may be a request map or a `Match`
-  object). Any additional arguments are passed as they are.
+  "Translates a key built from `key-ns` and `key-name` for an explicit `locale` using a
+  translator derived from `req` (request map or Match).
 
-  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` (which can
-  be set using `no-default` macro) then the function will return `nil` when a key is
-  missing instead of a warning string.
-
-  If a translation function `tr` was generated (using `translation-fn`, `translator`
-  or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
-  or `nil` then it will always return `nil` when a key is missing, regardless of
-  current value of `*handle-missing-keys*` in the calling context."
+  Uses `(make-kw key-ns key-name)` to build the translation key and forwards any
+  additional arguments."
   (^String [req locale key-ns key-name]            ((translator req (make-kw-simple locale)) (make-kw key-ns key-name)))
   (^String [req locale key-ns key-name x]          ((translator req (make-kw-simple locale)) (make-kw key-ns key-name) x))
   (^String [req locale key-ns key-name x y]        ((translator req (make-kw-simple locale)) (make-kw key-ns key-name) x y))
   (^String [req locale key-ns key-name x y & more] (apply (translator req (make-kw-simple locale)) (make-kw key-ns key-name) x y more)))
 
 (defn tr
-  "Returns a translation string for the given locale (obtained from a request map)
-  and the keyword `key` using a translation function (obtained from a
-  request map or a `Match` object). Any optional arguments are passed as they are.
+  "Translates `key` using locale inferred from `req` (via `lang`) and a translator
+  derived from `req` (request map or Match).
 
-  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` (which can
-  be set using `no-default` macro) then the function will return `nil` when a key is
-  missing instead of a warning string.
-
-  If a translation function `tr` was generated (using `translation-fn`, `translator`
-  or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
-  or `nil` then it will always return `nil` when a key is missing, regardless of
-  current value of `*handle-missing-keys*` in the calling context."
+  Additional arguments are forwarded to the underlying Tongue function."
   (^String [req key]            ((translator req) key))
   (^String [req key x]          ((translator req) key x))
   (^String [req key x y]        ((translator req) key x y))
   (^String [req key x y & more] (apply (translator req) key x y more)))
 
 (defn tr-sub
-  "Returns a translation string for the given locale (obtained from a request map),
-  the namespace name `key-ns` and the key name `key-name`. Useful to translate nested
-  keys which are translated to fully-qualified keywords. The translation function
-  will be obtained by calling `translator` on `req` (which may be a request map or a
-  `Match` object). Any additional arguments are passed as they are.
+  "Translates a key built from `key-ns` and `key-name` using locale inferred from `req`
+  (via `lang`) and a translator derived from `req` (request map or Match).
 
-  If `*handle-missing-keys*` dynamic variable is set to `false` or `nil` (which can
-  be set using `no-default` macro) then the function will return `nil` when a key is
-  missing instead of a warning string.
-
-  If a translation function `tr` was generated (using `translation-fn`, `translator`
-  or `translator-sub`) with `*handle-missing-keys*` dynamic variable set to `false`
-  or `nil` then it will always return `nil` when a key is missing, regardless of
-  current value of `*handle-missing-keys*` in the calling context."
+  Additional arguments are forwarded to the underlying Tongue function."
   (^String [req key-ns key-name]            ((translator req) (make-kw key-ns key-name)))
   (^String [req key-ns key-name x]          ((translator req) (make-kw key-ns key-name) x))
   (^String [req key-ns key-name x y]        ((translator req) (make-kw key-ns key-name) x y))
   (^String [req key-ns key-name x y & more] (apply (translator req) (make-kw key-ns key-name) x y more)))
 
 (defmacro no-default
-  "Sets `*handle-missing-keys*` dynamic variable to `false`, causing translation
-  functions to return `nil` when translation key is not found instead of a warning
-  string. Also, when used with `translation-fn`, `translator` or `translator-sub`
-  causes generated function to always behave that way."
+  "Executes `body` with `amelinium.i18n/*handle-missing-keys*` bound to false.
+
+  This makes translation return nil for missing keys instead of producing a warning
+  string. When used while creating translators (`translation-fn` / `translator` /
+  `translator-sub`), it also forces the generated function to always behave that
+  way."
   [& body]
   `(binding [*handle-missing-keys* false]
      ~@body))
@@ -234,13 +190,28 @@
 ;; Initialization
 
 (defn missing-key
-  "Returns a warning string for a missing key (defined under a special key
-  `:amelinium/missing-key`) if the dynamic variable `*handle-missing-keys*` is set to
-  a truthy value. Otherwise it returns `nil`."
+  "Returns the missing-key warning string for translation key `k` in `locale`.
+
+  When `amelinium.i18n/*handle-missing-keys*` is truthy, delegates to `f` using the
+  special key `:amelinium/missing-key` and passes `k` as an argument (so the template
+  can include it).  When `*handle-missing-keys*` is false/nil, returns nil."
   [f locale k]
   (if *handle-missing-keys* (f locale :amelinium/missing-key k)))
 
 (defn wrap-translate
+  "Wraps a Tongue translate function `f` to add two behaviors:
+
+  1) Missing keys:
+   - when `amelinium.i18n/*handle-missing-keys*` is truthy, falls back to
+     `(missing-key f locale k)`,
+   - otherwise returns nil.
+
+  2) Key normalization:
+   - accepts keyword keys directly,
+   - for non-keyword keys, tries to coerce via `keyword` before translating.
+
+  Preserves Tongue-like arities:
+  `([locale k] ...) ([locale k a] ...) ([locale k a b] ...) ([locale k a b & more] ...)`."
   [f]
   (fn translate
     (^String [locale k]
@@ -261,6 +232,17 @@
        (if-some [k (keyword k)] (or (apply f locale k a b more) (missing-key f locale k)))))))
 
 (defn prep-pluralizer
+  "Builds a pluralization function for `lang` based on `config` and `translations`.
+
+  Looks up `:tongue/pluralizer` under the language entry, resolves it via
+  `io.randomseed.utils.var/deref-symbol`, and returns a function of one argument `n`
+  that applies the pluralizer to `translations`.
+
+  Supports a special leading map in `translations` (passed to pluralizer as
+  `(pluralizer-fn :parse-args m)`), allowing pluralizers to pre-parse arguments.
+
+  For performance, returns fixed-arity closures for small argument counts and falls
+  back to `apply` for larger counts."
   [config lang translations]
   (if-some [pluralizer-fn (some-> config (get lang) (get :tongue/pluralizer) var/deref-symbol)]
     (let [[a b c d e & more] translations]
@@ -273,7 +255,7 @@
           3 (fn pluralize [n] (pluralizer-fn n a b c))
           4 (fn pluralize [n] (pluralizer-fn n a b c d))
           5 (fn pluralize [n] (pluralizer-fn n a b c d e))
-          (fn pluralize [n] (apply pluralizer-fn n a b c d e more)))))))
+          (fn pluralize   [n] (apply pluralizer-fn n a b c d e more)))))))
 
 (defn- zero-missing-keys
   [config]
@@ -290,16 +272,40 @@
     (var/deref-symbol v)))
 
 (defn prep-translations
+  "Prepares an I18N config map for Tongue.
+
+  Transforms the input `config` by:
+
+  - dereferencing symbolic values via `io.randomseed.utils.var/deref-symbol`,
+
+  - expanding pluralization forms of the shape `[:pluralize ...]`
+    (via `amelinium.i18n/prep-pluralizer`),
+
+  - forcing `:tongue/missing-key` to nil per-language (so missing-key handling is
+    fully controlled by `wrap-translate` / `*handle-missing-keys*`).
+
+  Returns the prepared config map suitable for `tongue.core/build-translate`."
   [config]
   (->> config
        (map/map-values-with-path (partial handle-val config))
        zero-missing-keys))
 
 (defn expand-translations
+  "Integrant `expand-key` handler for `::translations`.
+  Returns `{k prepared-config}` where `prepared-config` is produced by
+  `amelinium.i18n/prep-translations`."
   [k config]
   {k (prep-translations config)})
 
 (defn init-translations
+  "Initializes Tongue translations from `config`.
+
+  Pipeline:
+  1) `amelinium.i18n/prep-translations`
+  2) `tongue.core/build-translate`
+  3) `amelinium.i18n/wrap-translate`
+
+  Returns the final translation function."
   [config]
   (-> config
       prep-translations
