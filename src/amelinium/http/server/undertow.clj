@@ -29,7 +29,8 @@
            (io.undertow.server.handlers.encoding GzipEncodingProvider
                                                  DeflateEncodingProvider)
            (io.undertow.predicate                Predicate
-                                                 Predicates)))
+                                                 Predicates)
+           (ring.adapter.undertow                UndertowWrapper)))
 
 (set! *warn-on-reflection* true)
 
@@ -182,4 +183,4 @@
   (if (and server options)
     (log/msg-with-val
      "HTTP server (Undertow) is stopping on port" (options :port)
-     (if (some? server) (.stop ^Undertow server)))))
+     (if (some? server) (.stop ^UndertowWrapper server)))))
