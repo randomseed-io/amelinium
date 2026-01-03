@@ -68,7 +68,7 @@
            net.java.dev.jna/jna                 {:mvn/version "5.11.0"}       ;; JNA for socket connections
            dev.weavejester/ragtime              {:mvn/version "0.9.1"}        ;; SQL migrations
            com.taoensso/nippy                   {:mvn/version "3.1.1"}        ;; data serialization
-           potemkin/potemkin                    {:mvn/version "0.4.5"}        ;; abstractions with performance in mind
+           potemkin/potemkin                    {:mvn/version "0.4.8"}        ;; abstractions with performance in mind
            crypto-equality/crypto-equality      {:mvn/version "1.0.0"}        ;; avoiding timing attacks when comparing
            com.lambdaworks/scrypt               {:mvn/version "1.4.0"}        ;; password encryption
            buddy/buddy-core                     {:mvn/version "1.9.0"}        ;; encryption and HMAC calculation
