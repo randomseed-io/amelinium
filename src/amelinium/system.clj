@@ -216,7 +216,7 @@ Convenience macro used in configs and code to reference sets of components.")
   ([cfg ks]
    (let [pure-cfg (dissoc cfg ::keys ::config-sources)]
      (if-some [ks (seq ks)]
-       (ig/halt! pure-cfg keys)
+       (ig/halt! pure-cfg ks)
        (ig/halt! pure-cfg)))))
 
 (defn ref?
@@ -257,7 +257,7 @@ producing the runtime value to be inserted into the system.")
   "Validates that `ref` is a qualified keyword suitable for Integrant references.
   Returns an `ex-info` instance describing the problem (or nil when valid)."
   [ref]
-  (if-not (qualified-keyword? ref)
+  (when-not (qualified-keyword? ref)
     (ex-info (str "Invalid reference: " ref ". Must be a qualified keyword.")
              {:reason ::invalid-ref, :ref ref})))
 
@@ -275,7 +275,7 @@ producing the runtime value to be inserted into the system.")
 
   Returns a seq of loaded config maps (or nil when nothing could be resolved)."
   ([r]
-   (if r (conf/resource r integrant-readers)))
+   (when r (conf/resource r integrant-readers)))
   ([r & more]
    (->> (cons r more)
         (map conf-resource)
@@ -288,7 +288,7 @@ producing the runtime value to be inserted into the system.")
 
   Returns a config map (or nil when `f` is nil)."
   [f]
-  (if f (conf/file f integrant-readers)))
+  (when f (conf/file f integrant-readers)))
 
 (defn slurp-resource-or-file
   "Reads text from `p`.  If `p` resolves as a classpath resource it is slurped
@@ -414,7 +414,7 @@ producing the runtime value to be inserted into the system.")
 
 ;; initialization shortcuts
 
-(add-init   ::key         [k v] k)
+(add-init   ::key         [k _] k)
 (add-init   ::function    [k v] (v k))
 (add-init   ::nil         [_ _] nil)
 (add-init   ::var         [_ v] (init-var-process v))
@@ -437,7 +437,7 @@ producing the runtime value to be inserted into the system.")
  (let [tz (utils/valuable tz)
        tz (or (:timezone-id tz) tz)
        tz (if (or (string? tz) (ident? tz)) (utils/some-str tz) tz)]
-   (if tz
+   (when tz
      (let [^TimeZone tz (if (true? tz)
                           (TimeZone/getDefault)
                           (let [^TimeZone tznew (TimeZone/getTimeZone ^String (str tz))]

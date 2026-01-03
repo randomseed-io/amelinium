@@ -118,18 +118,18 @@
 (defn id-email
   ([user-id user-email]
    (some-str-spc user-email
-                 (if user-id (str "(" user-id ")"))))
+                 (when user-id (str "(" user-id ")"))))
   ([user-id user-email ip-addr]
    (some-str-spc user-email
-                 (if user-id (str "(" user-id ")"))
-                 (if ip-addr (str "[" (ip->str ip-addr) "]")))))
+                 (when user-id (str "(" user-id ")"))
+                 (when ip-addr (str "[" (ip->str ip-addr) "]")))))
 
 (defn for-user
   ([user-id user-email]
-   (if (or user-id user-email)
+   (when (or user-id user-email)
      (str "for " (id-email user-id user-email))))
   ([user-id user-email ip-addr]
-   (if (or user-id user-email ip-addr)
+   (when (or user-id user-email ip-addr)
      (if (or user-id user-email)
        (str "for " (id-email user-id user-email ip-addr))
        (str "for [" (ip->str ip-addr) "]")))))
@@ -140,7 +140,7 @@
 
 (defn prep-context-transformer
   [m]
-  (if m (map/map-keys var/deref-symbol m)))
+  (when m (map/map-keys var/deref-symbol m)))
 
 (system/add-expand
  ::unilog [k config]
