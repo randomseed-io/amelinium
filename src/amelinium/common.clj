@@ -1934,7 +1934,11 @@
             include-self?    false}
      :as   opts}]
    (let [include-global?      (if (contains? opts :include-global?) include-global? (not effective?))
-         opts                 (qassoc opts :include-global? include-global? :include-self? include-self?)
+         user-id              (or user-id (get opts :user/id))
+         opts                 (qassoc opts
+                                      :user-id         user-id
+                                      :include-global? include-global?
+                                      :include-self?   include-self?)
          global-marker        (or global-marker (str " (" global-label ")"))
          global-present-label (or global-present-label (str present-label global-marker))
          [l & d]              (roles-matrix req opts)

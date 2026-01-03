@@ -1,37 +1,33 @@
 (ns
 
-    ^{:doc    "Basic identity management for amelinium."
-      :author "Paweł Wilk"
-      :added  "1.0.0"}
+ ^{:doc    "Basic identity management for amelinium."
+   :author "Paweł Wilk"
+   :added  "1.0.0"}
 
-    amelinium.identity
+ amelinium.identity
 
-  (:refer-clojure :exclude [parse-long uuid random-uuid type value])
+  (:refer-clojure :exclude [parse-long random-uuid type])
 
-  (:require [clojure.set                  :as         set]
-            [clojure.string               :as         str]
-            [clj-uuid                     :as        uuid]
-            [lazy-map.core                :as    lazy-map]
-            [amelinium.proto.identity     :as           p]
-            [amelinium.types.identity     :refer     :all]
-            [amelinium                    :refer     :all]
-            [amelinium.logging            :as         log]
-            [phone-number.core            :as       phone]
-            [phone-number.util            :as      phutil]
-            [io.randomseed.utils.db        :as        rdb]
-            [io.randomseed.utils.map      :as         map]
-            [io.randomseed.utils.map      :refer [qassoc]]
-            [io.randomseed.utils          :refer     :all])
+  (:require  [clojure.string               :as                  str]
+             [clj-uuid                     :as                 uuid]
+             [amelinium.proto.identity     :as                    p]
+             [amelinium.types.identity]
+             [phone-number.core            :as                phone]
+             [phone-number.util            :as               phutil]
+             [io.randomseed.utils.db       :as                  rdb]
+             [io.randomseed.utils.map      :as                  map]
+             [io.randomseed.utils          :refer  [safe-parse-long
+                                                    some-str
+                                                    some-keyword
+                                                    not-empty-string?]]
+             [amelinium])
 
   (:import  (java.util                    UUID)
             (clojure.lang                 Symbol
                                           Keyword
-                                          Associative
-                                          PersistentVector
-                                          IPersistentMap)
+                                          Associative)
             (amelinium                    Identity)
             (amelinium.proto.identity     Identifiable)
-            (lazy_map.core                LazyMap)
             (com.google.i18n.phonenumbers Phonenumber$PhoneNumber)))
 
 ;; Standard identity types
@@ -46,40 +42,40 @@
   "Returns `true` if the given string looks like a phone number. If identity type or
   acceptable type `t` is given, then it must be a parent or be equal to `:phone`."
   (^Keyword [^String v]
-   (if (and (= \+ (.charAt v 0))
-            (> (.length v) 4))
+   (when (and (= \+ (.charAt v 0))
+              (> (.length v) 4))
      :phone))
   (^Keyword [^String v ^Keyword t]
-   (if (type? :phone t)
+   (when (type? :phone t)
      (id-phone-string v))))
 
 (defn id-email-string
   "Returns `true` if the given string looks like an e-mail address. If identity type or
   acceptable type `t` is given, then it must be a parent or be equal to `:email`."
   (^Keyword [^String v]
-   (if (and (> (.length v) 2)
-            (pos-int? (str/index-of v \@ 1)))
+   (when (and (> (.length v) 2)
+              (pos-int? (str/index-of v \@ 1)))
      :email))
   (^Keyword [^String v ^Keyword t]
-   (if (type? :email t)
+   (when (type? :email t)
      (id-email-string v))))
 
 (defn id-uid-string
   "Returns `true` if the given string looks like a UID (UUID). If identity type or
   acceptable type `t` is given, then it must be a parent or be equal to `:uid`."
   (^Keyword [^String v]
-   (if (uuid/uuid-string? v) :uid))
+   (when (uuid/uuid-string? v) :uid))
   (^Keyword [^String v ^Keyword t]
-   (if (type? :uid t)
+   (when (type? :uid t)
      (id-uid-string v))))
 
 (defn id-id-string
   "Returns `true` if the given string looks like a user ID. If identity type or
   acceptable type `t` is given, then it must be a parent or be equal to `:id`."
   (^Keyword [^String v]
-   (if (pos-int? (safe-parse-long v)) :id))
+   (when (pos-int? (safe-parse-long v)) :id))
   (^Keyword [^String v ^Keyword t]
-   (if (type? :id t)
+   (when (type? :id t)
      (id-id-string v))))
 
 (p/add-type-string-matcher! id-phone-string
@@ -92,30 +88,30 @@
 (defn preparse-email
   "Parses e-mail by doing basic checks and transforming it to a string."
   ^String [v]
-  (if-some [^String v (some-str v)]
+  (when-some [^String v (some-str v)]
     (let [l (unchecked-int (.length v))]
-      (if (> l 2)
-        (if-some [idx ^long (str/index-of v \@ 1)]
-          (if (and (> (unchecked-dec-int l) idx 0))
+      (when (> l 2)
+        (when-some [idx ^long (str/index-of v \@ 1)]
+          (when (> (unchecked-dec-int l) idx 0)
             (str (subs v 0 idx) (str/lower-case (subs v idx l)))))))))
 
 (defn of-email
   "Parses e-mail by doing basic checks and transforming it to an Identity object."
   ^Identity [v]
-  (if-some [^String v (preparse-email v)]
+  (when-some [^String v (preparse-email v)]
     (Identity. :email v)))
 
 (defn preparse-id
   "Parses user ID by doing basic checks and transforming it to a long number."
   ^Long [v]
-  (if-let [v (safe-parse-long v)]
-    (if (pos-int? v)
+  (when-let [v (safe-parse-long v)]
+    (when (pos-int? v)
       v)))
 
 (defn of-id
   "Parses user ID by doing basic checks and transforming it to an Identity record."
   ^Identity [v]
-  (if-some [^Long v (preparse-id v)]
+  (when-some [^Long v (preparse-id v)]
     (Identity. :id v)))
 
 (defn preparse-phone
@@ -128,20 +124,20 @@
 (defn of-phone
   "Tries to interpret `v` as a phone number and returns an Identity record."
   ^Identity [v]
-  (if-some [v (preparse-phone v)]
+  (when-some [v (preparse-phone v)]
     (Identity. :phone v)))
 
 (defn preparse-uid
   "Tries to create UUID. Returns `nil` if the input cannot be converted to it."
   ^UUID [v]
   (if (uuid? v) v
-      (if (and v (uuid/uuidable? v))
+      (when (and v (uuid/uuidable? v))
         (uuid/as-uuid v))))
 
 (defn of-uid
   "Tries to interpret `v` as a UUID and returns an Identity record."
   ^Identity [v]
-  (if-some [u (preparse-uid v)]
+  (when-some [u (preparse-uid v)]
     (Identity. :uid u)))
 
 ;; Public functions
@@ -168,14 +164,14 @@
   If acceptable parent tag `acceptable-tag` is given, it must be a parent of the
   given identity type tag."
   (^Keyword [id-type]
-   (if-some [t (some-keyword id-type)]
-     (if (isa? p/type-hierarchy t ::valid) t)))
+   (when-some [t (some-keyword id-type)]
+     (when (isa? p/type-hierarchy t ::valid) t)))
   (^Keyword [id-type acceptable-tag]
-   (if-let [t (some-keyword id-type)]
-     (if acceptable-tag
+   (when-let [t (some-keyword id-type)]
+     (when acceptable-tag
        (if (identical? ::any acceptable-tag)
-         (if (isa? p/type-hierarchy t ::valid) t)
-         (if (isa? p/type-hierarchy t acceptable-tag) t))))))
+         (when (isa? p/type-hierarchy t ::valid) t)
+         (when (isa? p/type-hierarchy t acceptable-tag) t))))))
 
 (defn type
   "Returns a keyword describing identity type detected by analyzing the given user
@@ -187,13 +183,13 @@
   Value of the given identity type `identity-type` must match the identity type, and
   not be `nil` nor `false`. If any of these happens, `nil` will be returned."
   (^Keyword [user-identity]
-   (if user-identity (p/type user-identity)))
+   (when user-identity (p/type user-identity)))
   (^Keyword [^Keyword identity-type user-identity]
-   (if user-identity
+   (when user-identity
      (let [t (some-keyword identity-type)]
        (if (identical? ::any t)
          (p/type user-identity)
-         (if t (p/type (p/make user-identity t))))))))
+         (when t (p/type (p/make user-identity t))))))))
 
 (defn type-opt
   "Returns a keyword describing identity type detected by analyzing the given user
@@ -207,9 +203,9 @@
   Value of the given identity type `identity-type` must match the identity type. If
   it does not, `nil` will be returned."
   (^Keyword [user-identity]
-   (if user-identity (p/type user-identity)))
+   (when user-identity (p/type user-identity)))
   (^Keyword [^Keyword identity-type user-identity]
-   (if user-identity
+   (when user-identity
      (let [t (some-keyword identity-type)]
        (if (and t (not (identical? ::any identity-type)))
          (p/type (p/make user-identity t))
@@ -233,15 +229,14 @@
 
   To add acceptable type(s) use `amelinium.proto.identity/add-acceptable-type`."
   (^Keyword [user-identity ^Keyword acceptable-tag]
-   (if (and user-identity acceptable-tag)
-     (if-let [t (p/type user-identity)]
-       (if (and acceptable-tag (isa? p/type-hierarchy t acceptable-tag)) t))))
+   (when (and user-identity acceptable-tag)
+     (when-let [t (p/type user-identity)]
+       (when (and acceptable-tag (isa? p/type-hierarchy t acceptable-tag)) t))))
   (^Keyword [user-identity identity-type ^Keyword acceptable-tag]
-   (if (and user-identity acceptable-tag)
+   (when (and user-identity acceptable-tag)
      (let [t (some-keyword identity-type)]
        (if (and t (not (identical? ::any t)))
-         (if (and acceptable-tag
-                  (isa? p/type-hierarchy t acceptable-tag))
+         (when (and acceptable-tag (isa? p/type-hierarchy t acceptable-tag))
            (p/type (p/make user-identity t)))
          (acceptable-type user-identity acceptable-tag))))))
 
@@ -271,10 +266,10 @@
   be performed to establish the type first. If the type is given, it must be a valid
   type, otherwise `nil` will be returned."
   (^Keyword [user-identity]
-   (if user-identity (p/value user-identity)))
+   (when user-identity (p/value user-identity)))
   (^Keyword [^Keyword identity-type user-identity]
-   (if user-identity
-     (if-some [t (some-keyword identity-type)]
+   (when user-identity
+     (when-some [t (some-keyword identity-type)]
        (p/value user-identity t)))))
 
 ;; Parsing
@@ -299,7 +294,7 @@
   This is internal function. Use `of-type` instead, which will choose the appropriate
   parser via multimethod and cache the results."
   ^Identity [^Keyword acceptable-type ^Identifiable user-identity]
-  (if-some [^Keyword t (p/type user-identity acceptable-type)]
+  (when-some [^Keyword t (p/type user-identity acceptable-type)]
     ((parser t) user-identity)))
 
 (defn parse-single
@@ -310,9 +305,9 @@
   This is internal function. Use `of` or `of-type` instead, which will cache the
   results."
   (^Identity [^Keyword identity-type ^Identifiable user-identity]
-   (if user-identity ((parser identity-type) user-identity)))
+   (when user-identity ((parser identity-type) user-identity)))
   (^Identity [^Identifiable user-identity]
-   (if user-identity ((parser (p/type user-identity)) user-identity))))
+   (when user-identity ((parser (p/type user-identity)) user-identity))))
 
 (def ^{:tag      Identity
        :arglists '(^Identity [^Identifiable user-identity]
@@ -385,10 +380,10 @@
 
 (defn- try-map-keys
   [m identity-type]
-  (if-some [ks (get identity-map-keys-by-type identity-type)]
-    (if (seq m)
+  (when-some [ks (get identity-map-keys-by-type identity-type)]
+    (when (seq m)
       (some (fn [k]
-              (if-let [i (get m k)]
+              (when-let [i (get m k)]
                 (if (and (map? i) (not (record? i))) nil (p/make i identity-type))))
             ks))))
 
@@ -406,13 +401,13 @@
 
   In case of all other map values it will return `nil`."
   ([m]
-   (if (seq m)
+   (when (seq m)
      (some (fn [[k t]]
-             (if-let [i (get m k)]
+             (when-let [i (get m k)]
                (if (and (map? i) (not (record? i))) nil (p/make i t))))
            identity-map-keys)))
   ([^Keyword identity-type m]
-   (if identity-type
+   (when identity-type
      (if (identical? ::any identity-type)
        (parse-map m)
        (or (try-map-keys m identity-type)
@@ -529,7 +524,7 @@
   ([user-identities]
    (map p/make user-identities))
   ([identity-type user-identities]
-   (if-some [identity-type (some-keyword identity-type)]
+   (when-some [identity-type (some-keyword identity-type)]
      (map #(p/make % identity-type) user-identities))))
 
 (defn some-seq
@@ -551,35 +546,35 @@
 
   Identity
 
-  (literal? ^Boolean [v] false)
+  (literal? ^Boolean [_] false)
 
   (type
     (^Keyword [v] (.id-type ^Identity v))
     (^Keyword [v ^Keyword t]
      (let [^Keyword id-type (.id-type ^Identity v)]
-       (if (type? id-type t) id-type))))
+       (when (type? id-type t) id-type))))
 
   (value
     ([v] (.value ^Identity v))
     ([v ^Keyword identity-type]
-     (if (type? (.id-type ^Identity v) identity-type)
+     (when (type? (.id-type ^Identity v) identity-type)
        (.value ^Identity v))))
 
   (make
     (^Identity [v] v)
     (^Identity [v ^Keyword identity-type]
-     (if (type? (.id-type ^Identity v) identity-type) v)))
+     (when (type? (.id-type ^Identity v) identity-type) v)))
 
   String
 
-  (literal? ^Boolean [v] true)
+  (literal? ^Boolean [_] true)
 
   (type
     (^Keyword [v]
-     (if (not-empty-string? v)
+     (when (not-empty-string? v)
        (p/type-string-match v)))
     (^Keyword [v ^Keyword t]
-     (if (not-empty-string? v)
+     (when (not-empty-string? v)
        (p/type-string-match v t))))
 
   (value
@@ -589,13 +584,13 @@
 
   (make
     (^Identity [v]
-     (if (not-empty-string? v) (parse v)))
+     (when (not-empty-string? v) (parse v)))
     (^Identity [v ^Keyword identity-type]
-     (if (not-empty-string? v) (parse identity-type v))))
+     (when (not-empty-string? v) (parse identity-type v))))
 
   Associative
 
-  (literal? ^Boolean [v] false)
+  (literal? ^Boolean [_] false)
 
   (type
     (^Keyword [v]
@@ -616,7 +611,7 @@
 
   Keyword
 
-  (literal? ^Boolean [v] true)
+  (literal? ^Boolean [_] true)
 
   (type
     (^Keyword [v]
@@ -637,7 +632,7 @@
 
   Symbol
 
-  (literal? ^Boolean [v] false)
+  (literal? ^Boolean [_] false)
 
   (type
     (^Keyword [v]
@@ -658,117 +653,117 @@
 
   Number
 
-  (literal? ^Boolean [v] true)
+  (literal? ^Boolean [_] true)
 
   (type
     (^Keyword [v]
-     (if (pos-int? v) :id))
+     (when (pos-int? v) :id))
     (^Keyword [v ^Keyword t]
-     (if (and (pos-int? v) (type? :id t)) :id)))
+     (when (and (pos-int? v) (type? :id t)) :id)))
 
   (value
     (^Long [v]
-     (if (pos-int? v) (long v)))
+     (when (pos-int? v) (long v)))
     (^Long [v ^Keyword identity-type]
-     (if (and (pos-int? v) (type? :id identity-type))
+     (when (and (pos-int? v) (type? :id identity-type))
        (long v))))
 
   (make
     (^Identity [v]
-     (if (pos-int? v)
+     (when (pos-int? v)
        (Identity. :id (long v))))
     (^Identity [v ^Keyword identity-type]
-     (if (and (pos-int? v) (type? :id identity-type))
+     (when (and (pos-int? v) (type? :id identity-type))
        (Identity. :id (long v)))))
 
   Phonenumber$PhoneNumber
 
-  (literal? ^Boolean [v] true)
+  (literal? ^Boolean [_] true)
 
   (type
-    (^Keyword [v] :phone)
-    (^Keyword [v ^Keyword t] (if (type? :phone t) :phone)))
+    (^Keyword [_] :phone)
+    (^Keyword [_ ^Keyword t] (when (type? :phone t) :phone)))
 
   (value
     (^Phonenumber$PhoneNumber [v] v)
     (^Phonenumber$PhoneNumber [v ^Keyword identity-type]
-     (if (type? :phone identity-type) v)))
+     (when (type? :phone identity-type) v)))
 
   (make
     (^Identity [v] (Identity. :phone v))
     (^Identity [v ^Keyword identity-type]
-     (if (type? :phone identity-type)
+     (when (type? :phone identity-type)
        (Identity. :phone v))))
 
   UUID
 
-  (literal? ^Boolean [v] true)
+  (literal? ^Boolean [_] true)
 
   (type
-    (^Keyword [v] :uid)
-    (^Keyword [v ^Keyword t] (if (type? :uid t) :uid)))
+    (^Keyword [_] :uid)
+    (^Keyword [_ ^Keyword t] (when (type? :uid t) :uid)))
 
   (value
     (^UUID [v] v)
     (^UUID [v ^Keyword identity-type]
-     (if (type? :uid identity-type) v)))
+     (when (type? :uid identity-type) v)))
 
   (make
     (^Identity [v] (Identity. :uid v))
     (^Identity [v ^Keyword identity-type]
-     (if (type? :uid identity-type) (Identity. :uid v))))
+     (when (type? :uid identity-type) (Identity. :uid v))))
 
   Character
 
-  (literal? ^Boolean [v] true)
+  (literal? ^Boolean [_] true)
 
   (type
-    ([v] nil)
-    ([v t] nil))
+    ([_] nil)
+    ([_ _] nil))
 
   (value
-    ([v] nil)
-    ([v identity-type] nil))
+    ([_] nil)
+    ([_ _] nil))
 
   (make
-    ([v] nil)
-    ([v identity-type] nil))
+    ([_] nil)
+    ([_ _] nil))
 
   Boolean
 
-  (literal? ^Boolean [v] true)
+  (literal? ^Boolean [_] true)
 
   (type
-    ([v] nil)
-    ([v t] nil))
+    ([_] nil)
+    ([_ _] nil))
 
   (value
-    ([v] nil)
-    ([v identity-type] nil))
+    ([_] nil)
+    ([_ _] nil))
 
   (make
-    ([v] nil)
-    ([v identity-type] nil))
+    ([_] nil)
+    ([_ _] nil))
 
   nil
 
-  (literal? ^Boolean [v] true)
+  (literal? ^Boolean [_] true)
 
   (type
-    ([v] nil)
-    ([v t] nil))
+    ([_] nil)
+    ([_ _] nil))
 
   (value
-    ([v] nil)
-    ([v identity-type] nil))
+    ([_] nil)
+    ([_ _] nil))
 
   (make
-    ([v] nil)
-    ([v identity-type] nil))
+    ([_] nil)
+    ([_ _] nil))
 
   Object
 
-  (literal? ^Boolean [v] false))
+  (literal? ^Boolean [_] false))
 
 ;; DB conversions
 
@@ -793,7 +788,7 @@
    :see-also ["to-db" "->db"]}
   (fn
     (^Keyword [^Identity user-identity] (p/type user-identity))
-    (^Keyword [^Keyword identity-type ^Identity user-identity] identity-type))
+    (^Keyword [^Keyword identity-type ^Identity _user-identity] identity-type))
   :hierarchy #'p/type-hierarchy)
 
 (defn to-db
@@ -855,9 +850,9 @@
   ([user-identity]
    (if (nil? user-identity)
      nil
-     (if-some [r (if (p/literal? user-identity)
+     (if-some [r (when (p/literal? user-identity)
                    (let [r (to-db `~user-identity)]
-                     (if (p/literal? r) r)))]
+                     (when (p/literal? r) r)))]
        r
        `(to-db ~user-identity))))
   ([identity-type user-identity]
@@ -866,15 +861,15 @@
      (let [identity-type (if (or (keyword? identity-type) (string? identity-type))
                            (some-keyword identity-type)
                            identity-type)]
-       (if-some [r (if (and (or (nil? identity-type) (keyword? identity-type))
-                            (p/literal? user-identity))
+       (if-some [r (when (and (or (nil? identity-type) (keyword? identity-type))
+                              (p/literal? user-identity))
                      (let [r (to-db `~identity-type `~user-identity)]
-                       (if (p/literal? r) r)))]
+                       (when (p/literal? r) r)))]
          r
          (or (if (nil? identity-type) (keyword? identity-type)
                  (if (identical? :amelinium.identity/any identity-type)
                    (#'->db &form &env user-identity)
-                   (if-some [f (get (methods to-db*) `~identity-type)]
+                   (when-some [f (get (methods to-db*) `~identity-type)]
                      `(~f (p/make ~user-identity ~identity-type)))))
              `(to-db ~identity-type ~user-identity)))))))
 
@@ -932,7 +927,7 @@
    :see-also ["to-str" "->str"]}
   (fn
     (^Keyword [^Identity user-identity] (p/type user-identity))
-    (^Keyword [^Keyword identity-type ^Identity user-identity] identity-type))
+    (^Keyword [^Keyword identity-type ^Identity _user-identity] identity-type))
   :hierarchy #'p/type-hierarchy)
 
 (defn to-str
@@ -994,9 +989,9 @@
   ([user-identity]
    (if (nil? user-identity)
      nil
-     (if-some [r (if (p/literal? user-identity)
+     (if-some [r (when (p/literal? user-identity)
                    (let [r (to-str `~user-identity)]
-                     (if (p/literal? r) r)))]
+                     (when (p/literal? r) r)))]
        r
        `(to-str ~user-identity))))
   ([identity-type user-identity]
@@ -1005,15 +1000,15 @@
      (let [identity-type (if (or (keyword? identity-type) (string? identity-type))
                            (some-keyword identity-type)
                            identity-type)]
-       (if-some [r (if (and (or (nil? identity-type) (keyword? identity-type))
-                            (p/literal? user-identity))
+       (if-some [r (when (and (or (nil? identity-type) (keyword? identity-type))
+                              (p/literal? user-identity))
                      (let [r (to-str `~identity-type `~user-identity)]
-                       (if (p/literal? r) r)))]
+                       (when (p/literal? r) r)))]
          r
          (or (if (nil? identity-type) (keyword? identity-type)
                  (if (identical? :amelinium.identity/any identity-type)
                    (#'->str &form &env user-identity)
-                   (if-some [f (get (methods to-str*) `~identity-type)]
+                   (when-some [f (get (methods to-str*) `~identity-type)]
                      `(~f (p/make ~user-identity ~identity-type)))))
              `(to-str ~identity-type ~user-identity)))))))
 
