@@ -124,7 +124,7 @@
                                     org.clojure/tools.deps.alpha {:mvn/version "0.9.857"}
                                     org.clojure/spec.alpha       {:mvn/version "0.2.194"}
                                     ns-tracker/ns-tracker        {:mvn/version "0.4.0"}
-                                    jonase/eastwood              {:mvn/version "0.3.13"}}}
+                                    jonase/eastwood              {:mvn/version "1.4.3"}}}
            :docs      {:extra-paths ["aliases/codox"]
                        :extra-deps  {org.clojure/tools.deps.alpha {:mvn/version "0.9.857"}
                                      org.clojure/spec.alpha       {:mvn/version "0.2.194"}
