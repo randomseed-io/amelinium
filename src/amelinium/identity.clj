@@ -763,7 +763,25 @@
 
   Object
 
-  (literal? ^Boolean [_] false))
+  (literal? ^Boolean [_] false)
+
+  (type
+    ([v] (throw (ex-info "Identifiable/type: unsupported value"
+                         {:value v :class (class v)})))
+    ([v t] (throw (ex-info "Identifiable/type: unsupported value"
+                           {:value v :class (class v) :expected t}))))
+
+  (value
+    ([v] (throw (ex-info "Identifiable/value: unsupported value"
+                         {:value v :class (class v)})))
+    ([v t] (throw (ex-info "Identifiable/value: unsupported value"
+                           {:value v :class (class v) :expected t}))))
+
+  (make
+    ([v] (throw (ex-info "Identifiable/make: unsupported value"
+                         {:value v :class (class v)})))
+    ([v t] (throw (ex-info "Identifiable/make: unsupported value"
+                           {:value v :class (class v) :expected t})))))
 
 ;; DB conversions
 
