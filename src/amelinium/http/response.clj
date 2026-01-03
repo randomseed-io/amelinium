@@ -8,7 +8,7 @@
 
   (:require [clojure.set                 :as             set]
             [clojure.string              :as             str]
-            [potemkin.namespaces         :as               p]
+            [potemkin                    :as               p]
             [ring.util.response]
             [ring.util.http-response     :as            resp]
             [ring.util.request           :as             req]

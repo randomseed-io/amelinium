@@ -9,7 +9,7 @@
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require [clojure.string                       :as             str]
-            [potemkin.namespaces                  :as               p]
+            [potemkin                             :as               p]
             [lazy-map.core                        :as        lazy-map]
             [ring.util.response]
             [amelinium.http.response              :as            resp]

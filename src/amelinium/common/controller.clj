@@ -8,7 +8,7 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [potemkin.namespaces                :as            p]
+  (:require [potemkin                           :as            p]
             [reitit.coercion                    :as     coercion]
             [ring.middleware.keyword-params     :as      ring-kw]
             [amelinium.http.response            :as         resp]

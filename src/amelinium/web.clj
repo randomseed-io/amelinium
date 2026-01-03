@@ -11,7 +11,7 @@
   (:require [clojure.string                       :as             str]
             [clojure.core.memoize                 :as             mem]
             [clojure.java.io                      :as              io]
-            [potemkin.namespaces                  :as               p]
+            [potemkin                             :as               p]
             [tick.core                            :as               t]
             [reitit.core                          :as               r]
             [ring.util.response]

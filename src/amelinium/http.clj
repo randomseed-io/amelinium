@@ -8,7 +8,7 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [potemkin.namespaces             :as               p]
+  (:require [potemkin                        :as               p]
             [reitit.core                     :as               r]
             [reitit.ring                     :as            ring]
             [lazy-map.core                   :as        lazy-map]

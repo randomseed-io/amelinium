@@ -11,7 +11,7 @@
   (:require [clojure.set                   :as                    set]
             [clojure.string                :as                    str]
             [next.jdbc.quoted              :as                 quoted]
-            [potemkin.namespaces           :as                      p]
+            [potemkin                      :as                      p]
             [io.randomseed.utils           :refer                :all]
             [io.randomseed.utils.db        :as                     db]
             [io.randomseed.utils.db.types  :as               db-types]

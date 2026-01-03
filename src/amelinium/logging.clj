@@ -6,7 +6,7 @@
 
     amelinium.logging
 
-  (:require [potemkin.namespaces             :as                 p]
+  (:require [potemkin                        :as                 p]
             [amelinium.system                :as            system]
             [buddy.core.hash                 :as              hash]
             [buddy.core.codecs               :as            codecs]

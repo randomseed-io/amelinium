@@ -8,7 +8,7 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [potemkin.namespaces                :as               p]
+  (:require [potemkin                           :as               p]
             [tick.core                          :as               t]
             [clojure.string                     :as             str]
             [amelinium.logging                  :as             log]

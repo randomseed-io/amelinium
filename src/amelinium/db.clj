@@ -20,7 +20,7 @@
             [next.jdbc.prepare             :as                     jp]
             [next.jdbc.protocols           :as                    jpr]
             [ragtime.repl                  :as           ragtime-repl]
-            [potemkin.namespaces           :as                      p]
+            [potemkin                      :as                      p]
             [io.randomseed.utils           :refer                :all]
             [io.randomseed.utils.ip        :as                     ip]
             [io.randomseed.utils.db        :as                     db]
