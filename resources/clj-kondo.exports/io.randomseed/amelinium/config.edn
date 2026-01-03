@@ -1,10 +1,13 @@
 {:hooks
  {:analyze-call
-  {amelinium.system/add-init     hooks.amelinium.system/add-init
-   amelinium.system/add-expand   hooks.amelinium.system/add-expand
-   amelinium.system/add-suspend! hooks.amelinium.system/add-suspend!
-   amelinium.system/add-resume   hooks.amelinium.system/add-resume
-   amelinium.system/add-resolve  hooks.amelinium.system/add-resolve
-   amelinium.system/add-halt!    hooks.amelinium.system/add-halt!
+  {amelinium.system/add-init               hooks.amelinium.system/add-init
+   amelinium.system/add-expand             hooks.amelinium.system/add-expand
+   amelinium.system/add-suspend!           hooks.amelinium.system/add-suspend!
+   amelinium.system/add-resume             hooks.amelinium.system/add-resume
+   amelinium.system/add-resolve            hooks.amelinium.system/add-resolve
+   amelinium.system/add-halt!              hooks.amelinium.system/add-halt!
 
-   cambium.core/deflevel         hooks.cambium.core/deflevel}}}
+   amelinium.common/def-redirect           hooks.amelinium.redirect/def-redirect
+   amelinium.common/def-localized-redirect hooks.amelinium.redirect/def-localized-redirect
+
+   cambium.core/deflevel                   hooks.cambium.core/deflevel}}}
