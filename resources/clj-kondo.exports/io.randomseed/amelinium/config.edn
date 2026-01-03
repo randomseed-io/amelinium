@@ -5,4 +5,6 @@
    amelinium.system/add-suspend! hooks.amelinium.system/add-suspend!
    amelinium.system/add-resume   hooks.amelinium.system/add-resume
    amelinium.system/add-resolve  hooks.amelinium.system/add-resolve
-   amelinium.system/add-halt!    hooks.amelinium.system/add-halt!}}}
+   amelinium.system/add-halt!    hooks.amelinium.system/add-halt!
+
+   cambium.core/deflevel         hooks.cambium.core/deflevel}}}
