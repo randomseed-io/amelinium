@@ -1,50 +1,39 @@
 (ns
 
-    ^{:doc    "Common helpers for amelinium."
-      :author "Paweł Wilk"
-      :added  "1.0.0"}
+ ^{:doc    "Common helpers for amelinium."
+   :author "Paweł Wilk"
+   :added  "1.0.0"}
 
-    amelinium.common
+ amelinium.common
 
-  (:refer-clojure :exclude [parse-long uuid random-uuid])
-
-  (:require [clojure.set                           :as             set]
-            [clojure.string                        :as             str]
-            [clojure.core.memoize                  :as             mem]
-            [tick.core                             :as               t]
-            [reitit.core                           :as               r]
-            [reitit.coercion                       :as        coercion]
+  (:require [clojure.set                           :as                    set]
+            [clojure.string                        :as                    str]
+            [clojure.core.memoize                  :as                    mem]
+            [tick.core                             :as                      t]
+            [reitit.core                           :as                      r]
             [ring.util.response]
-            [ring.util.codec                       :as           codec]
-            [ring.util.request                     :as             req]
-            [clj-uuid                              :as            uuid]
-            [lazy-map.core                         :as        lazy-map]
-            [jsonista.core                         :as               j]
-            [amelinium                             :refer         :all]
-            [amelinium.utils                       :refer         :all]
-            [amelinium.types.response              :refer         :all]
-            [amelinium.types.session               :refer         :all]
-            [amelinium.types.auth                  :refer         :all]
-            [amelinium.proto.http                  :as           phttp]
-            [amelinium.proto.identity              :as             pid]
-            [amelinium.identity                    :as        identity]
-            [amelinium.errors                      :as          errors]
-            [amelinium.auth                        :as            auth]
-            [amelinium.http                        :as            http]
-            [amelinium.http.response               :as            resp]
-            [amelinium.http.middleware.roles       :as           roles]
-            [amelinium.http.middleware.language    :as        language]
-            [amelinium.http.middleware.session     :as         session]
-            [amelinium.common.oplog.auth           :as      oplog-auth]
-            [amelinium.i18n                        :as            i18n]
-            [amelinium.logging                     :as             log]
-            [phone-number.core                     :as           phone]
-            [io.randomseed.utils.time              :as            time]
-            [io.randomseed.utils.vec               :as             vec]
-            [io.randomseed.utils.map               :as             map]
-            [io.randomseed.utils.map               :refer     [qassoc]]
-            [io.randomseed.utils.db                :as              db]
-            [io.randomseed.utils                   :refer         :all])
+            [ring.util.codec                       :as                  codec]
+            [ring.util.request                     :as                    req]
+            [jsonista.core                         :as                      j]
+            [amelinium                             :as              amelinium]
+            [amelinium.proto.http                  :as                  phttp]
+            [amelinium.identity                    :as               identity]
+            [amelinium.errors                      :as                 errors]
+            [amelinium.http                        :as                   http]
+            [amelinium.http.response               :as                   resp]
+            [amelinium.http.middleware.roles       :as                  roles]
+            [amelinium.http.middleware.language    :as               language]
+            [amelinium.http.middleware.session     :as                session]
+            [amelinium.common.oplog.auth           :as             oplog-auth]
+            [amelinium.i18n                        :as                   i18n]
+            [amelinium.utils                       :refer [keyword-from-param
+                                                           try-namespace
+                                                           try-name
+                                                           is-url?]]
+            [io.randomseed.utils                   :as                  utils]
+            [io.randomseed.utils.time              :as                   time]
+            [io.randomseed.utils.map               :as map    :refer [qassoc]]
+            [io.randomseed.utils.db                :as                     db])
 
   (:import (amelinium            Response
                                  Session
@@ -108,7 +97,7 @@
   `Match` object containing configuration associated with the current route data
   under the `:oplog/config` key."
   [req-or-match & message]
-  (if-some [lgr (oplog-logger-populated req-or-match)] (lgr message)))
+  (when-some [lgr (oplog-logger-populated req-or-match)] (lgr message)))
 
 ;; Routing data and settings helpers
 
@@ -123,7 +112,7 @@
   matches."
   (^Boolean []
    false)
-  ([req]
+  ([_req]
    true)
   (^Boolean [req page-id-or-path]
    (if (ident? page-id-or-path)
@@ -143,27 +132,6 @@
        (if (nil? pn)
          (boolean (some #{rn} (filter ident? ar)))
          (boolean (some #(= (if (ident? %) rn pn) %) ar)))))))
-
-(defn lang-param
-  "Returns language parameter ID obtained from language settings. Falls back to `:lang`
-  when nothing was found."
-  [req]
-  (or (language/param req) :lang))
-
-(defn guess-lang-param
-  "For the given src argument, tries to obtain a language ID. If it's a map it looks
-  for `:param` key and for `:language/settings` if that
-  fails. If `:language/settings` is found, it will try to get :param, assuming
-  it's a map too. If the argument is not a map it will simply convert it into a
-  keyword (without a namespace). If all of that fails (e.g. the src is nil) then
-  the :lang keyword is returned."
-  ([] :lang)
-  ([src]
-   (or (if (map? src)
-         (or (get src :param)
-             (some-> (get src :language/settings) :param))
-         (some-keyword-simple src))
-       :lang)))
 
 (defn login-page?
   "Returns true if the current (or given as a match) page is a login page (has
@@ -185,7 +153,7 @@
          login? (boolean (get rd :login-page?))
          auth?  (boolean (get rd :auth-page?))]
      [login? auth?]))
-  ([req ring-match]
+  ([req _ring-match]
    (let [rd     (http/get-route-data req)
          login? (boolean (get rd :login-page?))
          auth?  (boolean (get rd :auth-page?))]
@@ -195,7 +163,7 @@
          login? (boolean (get rd (or login-page-data :login-page?)))
          auth?  (boolean (get rd (or auth-page-data  :auth-page?)))]
      [login? auth?]))
-  ([req ring-match login-page-data auth-page-data]
+  ([req _ring-match login-page-data auth-page-data]
    (let [rd     (http/get-route-data req)
          login? (boolean (get rd (or login-page-data :login-page?)))
          auth?  (boolean (get rd (or auth-page-data  :auth-page?)))]
@@ -225,8 +193,8 @@
   "Generates a list of all possible language variants of a path."
   {:no-doc true}
   ([path lang-id]
-   (if-some [path (some-str path)]
-     (if-some [lang (some-str lang-id)]
+   (when-some [path (utils/some-str path)]
+     (when-some [lang (utils/some-str lang-id)]
        (let [[p s] (split-qparams path)]
          (path-variants-core p lang s)))))
   ([path lang suffix]
@@ -238,8 +206,8 @@
              segs   (str/split path on-slash)
              paths  (map-indexed
                      (if trail?
-                       (fn [i _] (str (str/join "/" (insert-at (unchecked-inc i) segs lang)) "/"))
-                       (fn [i _] (str/join "/" (insert-at (unchecked-inc i) segs lang))))
+                       (fn [i _] (str (str/join "/" (utils/insert-at (unchecked-inc i) segs lang)) "/"))
+                       (fn [i _] (str/join "/" (utils/insert-at (unchecked-inc i) segs lang))))
                      segs)
              paths  (if abs?
                       paths
@@ -282,6 +250,9 @@
   ([_ path router]
    (some->> path (r/match-by-path router) :path-params)))
 
+(declare lang-param)
+(declare guess-lang-param)
+
 (defn path-language
   "Returns a language string if the given path contains a language parameter. Otherwise
   it returns nil."
@@ -300,18 +271,18 @@
   "Splits path into 2 components: path string and location / query params
   string. Returns a sequence."
   [path]
-  (if path (split-qparams path)))
+  (when path (split-qparams path)))
 
 (defn split-query-params
   "Splits path into 3 string components: path, location and query params. Returns a
   vector."
   [path]
-  (if path
+  (when path
     (if-let [[_ p loc q] (re-matches path-splitter path)]
       [p loc q]
       [path nil nil])))
 
-(defn- req-param-path
+(defn req-param-path
   "Checks if the match has a parameter set to the given value. Used to re-check after a
   route was found."
   ([router match-or-path param pvalue]
@@ -322,15 +293,15 @@
            [path
             location
             qparams] (split-query-params path)]
-       (if (some->> path
-                    (r/match-by-path router)
-                    :path-params param #{pvalue})
+       (when (some->> path
+                      (r/match-by-path router)
+                      :path-params param #{pvalue})
          (str path location qparams)))
-     (if match-or-path
+     (when match-or-path
        (let [[path location qparams] (split-query-params match-or-path)
-             qparams                 (if-not (not-empty query-params) qparams)
+             qparams                 (when-not (not-empty query-params) qparams)
              m                       (r/match-by-path router path)]
-         (if (some-> m :path-params param #{pvalue})
+         (when (some-> m :path-params param #{pvalue})
            (some-> (r/match->path m query-params)
                    (str location qparams))))))))
 
@@ -343,7 +314,7 @@
 
   If the path is `nil`, it returns `nil`."
   [uri]
-  (if uri
+  (when uri
     (let [c (unchecked-int (count uri))]
       (if (pos? c)
         (if (= \/ (.charAt ^String uri (unchecked-dec-int c)))
@@ -355,9 +326,10 @@
   "Checks if the given route match can be parameterized with a parameter of the given
   id."
   ^Boolean [match param]
-  (if-some [param (some-keyword-simple param)]
+  (when-some [param (utils/some-keyword-simple param)]
     (or (contains? (get match :required) param)
-        (if-some [t (get match :template)] (some? (some #{(str param)} (re-seq slash-break t)))))
+        (when-some [t (get match :template)]
+          (some? (some #{(str param)} (re-seq slash-break t)))))
     false))
 
 (defn template-path
@@ -365,12 +337,12 @@
   ([match params]
    (template-path match params nil))
   ([match params query-params]
-   (if match
+   (when match
      (template-path (r/match->path match query-params)
                     (get match :template)
                     params nil)))
   ([path template params _]
-   (if-some [template (some-str template)]
+   (when-some [template (utils/some-str template)]
      (->> (map (map/map-keys str params)
                (concat (re-seq slash-break template) (repeat nil))
                (re-seq slash-break (str path)))
@@ -382,30 +354,30 @@
   ([match required-param]
    (path-template-with-param match required-param nil))
   ([match required-param short-circuit]
-   (if-some [required-param (some-keyword-simple required-param)]
-     (if-some [t (get match :template)]
-       (if (or (some? short-circuit)
-               (contains? (get match :required) required-param)
-               (some #{(str required-param)} (re-seq slash-break t)))
+   (when-some [required-param (utils/some-keyword-simple required-param)]
+     (when-some [t (get match :template)]
+       (when (or (some? short-circuit)
+                 (contains? (get match :required) required-param)
+                 (some #{(str required-param)} (re-seq slash-break t)))
          t)))))
 
 (defn parameterized-page-core
   {:no-doc true}
   [param rtr id pvalue params query-params require-param? name-path-fallback?]
-  (let [pvalue (some-str pvalue)
-        param  (some-keyword-simple param)]
+  (let [pvalue (utils/some-str pvalue)
+        param  (utils/some-keyword-simple param)]
     (if (ident? id)
 
       ;; identifier given (route name)
 
-      (if-some [m (r/match-by-name rtr id (qassoc params param pvalue))]
+      (when-some [m (r/match-by-name rtr id (qassoc params param pvalue))]
         (if require-param?
 
           ;; path must be parameterized with our parameter
 
           (or (req-param-path rtr m param pvalue query-params)
-              (if name-path-fallback?
-                (if-some [path (some-str (r/match->path m))]
+              (when name-path-fallback?
+                (when-some [path (utils/some-str (r/match->path m))]
                   (parameterized-page-core param rtr path
                                            pvalue params query-params
                                            true name-path-fallback?))))
@@ -416,9 +388,9 @@
 
       ;; path given
 
-      (if id
+      (when id
         (let [[id location qparams] (split-query-params id)
-              qparams               (if-not (not-empty query-params) qparams)
+              qparams               (when-not (not-empty query-params) qparams)
               m                     (r/match-by-path rtr id)
               cur-pvalue            (get (get m :path-params) param)]
           (if (= cur-pvalue pvalue)
@@ -429,12 +401,12 @@
 
             ;; path is not parameterized or the parameter value is different
 
-            (if-some [template (path-template-with-param m param cur-pvalue)]
+            (if-some [_template (path-template-with-param m param cur-pvalue)]
 
               ;; path is parameterized with our parameter
               ;; we can re-parameterize the path by calling template-path
 
-              (if-some [p (template-path m {param pvalue})]
+              (when-some [p (template-path m {param pvalue})]
                 (if require-param?
                   (some-> (req-param-path  rtr p param pvalue query-params)    (str location qparams))
                   (some-> (r/match-by-path rtr p) (r/match->path query-params) (str location qparams))))
@@ -556,33 +528,33 @@
   (^String [req]
    (r/match->path (get req ::r/match) (get req :query-params)))
   (^String [req id-or-path]
-   (if-some [rtr (get req ::r/router)]
+   (when-some [rtr (get req ::r/router)]
      (if (ident? id-or-path)
        (some-> (r/match-by-name rtr id-or-path) r/match->path)
-       (if-some [path (some-str id-or-path)]
+       (when-some [path (utils/some-str id-or-path)]
          (let [[path location qparams] (split-query-params path)]
            (some-> (r/match-by-path rtr path) r/match->path (str location qparams)))))))
   (^String [req id-or-path param param-value]
-   (if-some [rtr (get req ::r/router)]
+   (when-some [rtr (get req ::r/router)]
      (parameterized-page-mem param rtr id-or-path param-value nil nil false false)))
   (^String [req id-or-path param param-value params-or-require-param?]
-   (if-some [rtr (get req ::r/router)]
+   (when-some [rtr (get req ::r/router)]
      (if (boolean? params-or-require-param?)
        (parameterized-page-mem param rtr id-or-path param-value nil nil params-or-require-param? false)
        (parameterized-page-mem param rtr id-or-path param-value params-or-require-param? nil false false))))
   (^String [req id-or-path param param-value params query-params-or-require-param?]
-   (if-some [rtr (get req ::r/router)]
+   (when-some [rtr (get req ::r/router)]
      (if (boolean? query-params-or-require-param?)
        (parameterized-page-mem param rtr id-or-path param-value params nil query-params-or-require-param? false)
        (parameterized-page-mem param rtr id-or-path param-value params query-params-or-require-param? false false))))
   (^String [req id-or-path param param-value params query-params require-param?]
-   (if-some [rtr (get req ::r/router)]
+   (when-some [rtr (get req ::r/router)]
      (parameterized-page-mem param rtr id-or-path param-value params query-params require-param? false)))
   (^String [req id-or-path param param-value params query-params require-param? name-path-fallback?]
-   (if-some [rtr (get req ::r/router)]
+   (when-some [rtr (get req ::r/router)]
      (parameterized-page-mem param rtr id-or-path param-value params query-params require-param? name-path-fallback?)))
   (^String [_ id-or-path param param-value params query-params require-param? name-path-fallback? router]
-   (if (some? router)
+   (when (some? router)
      (parameterized-page-mem param router id-or-path param-value params query-params require-param? name-path-fallback?))))
 
 (defn localized-page
@@ -670,7 +642,7 @@
                    (or lang (get req :language/str))
                    nil nil false true))
   (^String [req name-or-path lang params-or-lang-required?]
-   (if-some [rtr (get req ::r/router)]
+   (when-some [rtr (get req ::r/router)]
      (if (boolean? params-or-lang-required?)
        (parameterized-page-mem (lang-param req)
                                rtr name-or-path
@@ -684,7 +656,7 @@
                                params-or-lang-required?
                                nil false true))))
   (^String [req name-or-path lang params query-params-or-lang-required?]
-   (if-some [rtr (get req ::r/router)]
+   (when-some [rtr (get req ::r/router)]
      (if (boolean? query-params-or-lang-required?)
        (parameterized-page-mem (lang-param req)
                                rtr name-or-path
@@ -698,14 +670,14 @@
                                params query-params-or-lang-required?
                                false true))))
   (^String [req name-or-path lang params query-params lang-required?]
-   (if-some [rtr (get req ::r/router)]
+   (when-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
                              params query-params
                              lang-required? true)))
   (^String [req name-or-path lang params query-params lang-required? name-path-fallback?]
-   (if-some [rtr (get req ::r/router)]
+   (when-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
@@ -713,7 +685,7 @@
                              lang-required?
                              name-path-fallback?)))
   (^String [req name-or-path lang params query-params lang-required? name-path-fallback? router]
-   (if (some? router)
+   (when (some? router)
      (parameterized-page-mem (lang-param req)
                              router name-or-path
                              (or lang (get req :language/str))
@@ -721,7 +693,7 @@
                              lang-required?
                              name-path-fallback?)))
   (^String [_ name-or-path lang params query-params lang-required? name-path-fallback? router language-settings-or-param]
-   (if (some? router)
+   (when (some? router)
      (parameterized-page-mem (guess-lang-param language-settings-or-param)
                              router name-or-path lang
                              params query-params
@@ -747,19 +719,19 @@
                    (get req :language/str)
                    nil nil true false))
   (^String [req name-or-path lang]
-   (if-some [rtr (get req ::r/router)]
+   (when-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
                              nil nil true false)))
   (^String [req name-or-path lang params]
-   (if-some [rtr (get req ::r/router)]
+   (when-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
                              params nil true false)))
   (^String [req name-or-path lang params query-params]
-   (if-some [rtr (get req ::r/router)]
+   (when-some [rtr (get req ::r/router)]
      (parameterized-page-mem (lang-param req)
                              rtr name-or-path
                              (or lang (get req :language/str))
@@ -779,24 +751,24 @@
   (^String [rtr id params query-params]
    (page-core rtr id params query-params nil))
   (^String [rtr id params query-params fb-lang-settings]
-   (if rtr
+   (when rtr
      (if (ident? id)
        ;; identifier given (route name)
        (let [params (if fb-lang-settings (apply assoc params fb-lang-settings) params)]
          (some-> (r/match-by-name rtr id params)
                  (r/match->path query-params)))
        ;; path given
-       (if id
+       (when id
          (let [[id location qparams] (split-query-params id)
-               qparams               (if-not (not-empty query-params) qparams)]
+               qparams               (when-not (not-empty query-params) qparams)]
            (some-> (r/match-by-path rtr id)
                    (r/match->path query-params)
                    (str location qparams))))))))
 
 (defn lang-from-req
   [req]
-  (if-some [lang-param (lang-param req)]
-    (if-some [lang-str (get req :language/str)]
+  (when-some [lang-param (lang-param req)]
+    (when-some [lang-str (get req :language/str)]
       [lang-param lang-str])))
 
 (defn page
@@ -1026,8 +998,8 @@
   ([req k]
    (route-data-page req k nil))
   ([req k route-data]
-   (if-some [k (some-keyword k)]
-     (if-some [name-or-path (get (or route-data (http/get-route-data req)) k)]
+   (when-some [k (utils/some-keyword k)]
+     (when-some [name-or-path (get (or route-data (http/get-route-data req)) k)]
        (page req name-or-path)))))
 
 (defn route-data-page-in
@@ -1037,8 +1009,8 @@
   ([req ks]
    (route-data-page-in req ks nil))
   ([req ks route-data]
-   (if-some [ks (not-empty (map some-keyword ks))]
-     (if-some [name-or-path (get-in (or route-data (http/get-route-data req)) ks)]
+   (when-some [ks (not-empty (map utils/some-keyword ks))]
+     (when-some [name-or-path (get-in (or route-data (http/get-route-data req)) ks)]
        (page req name-or-path)))))
 
 (defn get-location
@@ -1048,13 +1020,13 @@
   be passed, and they will be passed as arguments during the call to `f`. If there is
   no response location, `nil` is returned."
   ([req]
-   (if-some [l (get req :response/location)]
+   (when-some [l (get req :response/location)]
      (if (is-url? l) l (page req l))))
   ([req f]
-   (if-some [l (get req :response/location)]
+   (when-some [l (get req :response/location)]
      (if (is-url? l) l (f req l))))
   ([req f args]
-   (if-some [l (get req :response/location)]
+   (when-some [l (get req :response/location)]
      (if (is-url? l)
        l
        (case (count args)
@@ -1068,12 +1040,12 @@
 
   LazyMap
 
-  (response-status                    [req] nil)
-  (response-headers   ^IPersistentMap [req] (get req :response/headers))
-  (response-body                      [req] (get req :response/body))
-  (app-status                         [req] (get req :app/status))
-  (response?                 ^Boolean [req] false)
-  (request?                  ^Boolean [req] true)
+  (response-status                    [_req] nil)
+  (response-headers   ^IPersistentMap  [req] (get req :response/headers))
+  (response-body                       [req] (get req :response/body))
+  (app-status                          [req] (get req :app/status))
+  (response?                 ^Boolean [_req] false)
+  (request?                  ^Boolean [_req] true)
 
   (response-location
     ([req] (get-location req))
@@ -1082,7 +1054,7 @@
 
   Associative
 
-  (response-status                    [req] (if (phttp/response? req) (get req :status)))
+  (response-status                    [req] (when (phttp/response? req) (get req :status)))
   (response-headers   ^IPersistentMap [req] (get req :response/headers))
   (response-body                      [req] (get req :response/body))
   (app-status                         [req] (get req :app/status))
@@ -1105,12 +1077,12 @@
 
   String
 
-  (request?         ^Boolean [s] false)
-  (response?        ^Boolean [s] false)
-  (response-status           [s] nil)
-  (response-headers          [s] nil)
-  (response-body             [s] nil)
-  (app-status                [s] nil)
+  (request?         ^Boolean [_] false)
+  (response?        ^Boolean [_] false)
+  (response-status           [_] nil)
+  (response-headers          [_] nil)
+  (response-body             [_] nil)
+  (app-status                [_] nil)
 
   (response-location
     ([s] s)
@@ -1128,9 +1100,9 @@
   ([src]
    (app-status-single src nil))
   ([src err-config]
-   (if-some [st (phttp/app-status src)]
+   (when-some [st (phttp/app-status src)]
      (let [st (if (coll? st) (errors/most-significant (or err-config src) st) st)]
-       (if (keyword? st) st (if st (some-keyword st)))))))
+       (if (keyword? st) st (when st (utils/some-keyword st)))))))
 
 ;; HTMX
 
@@ -1139,7 +1111,7 @@
   `false` or an empty string."
   ^Boolean [req]
   (if-some [hdr (get (get req :headers) "hx-request")]
-    (if-some [hdr (some-str hdr)]
+    (if-some [hdr (utils/some-str hdr)]
       (not= "false" hdr)
       false)
     false))
@@ -1161,7 +1133,7 @@
    (use-hx? req route-data false))
   (^Boolean [req route-data extra-key]
    (if-some [route-data (or route-data (http/get-route-data req))]
-     (if-some [force-hx (or (if extra-key (find route-data extra-key))
+     (if-some [force-hx (or (when extra-key (find route-data extra-key))
                             (find route-data :use-htmx?))]
        (if-some [force-hx? (val force-hx)]
          (boolean force-hx?)
@@ -1174,7 +1146,7 @@
   exist, it returns `nil`. If the header exists but contains an empty string, it
   returns `nil`."
   [req]
-  (some-str (get (get req :headers) "hx-target")))
+  (utils/some-str (get (get req :headers) "hx-target")))
 
 ;; Redirects
 
@@ -1264,7 +1236,7 @@
    (#'def-redirect &form &env name
                    (str "Uses the page function to calculate the destination path on a basis of page
   name (identifier) or a path (a string) and performs a redirect"
-                        (if code (str " with code " code)) " to it using
+                        (when code (str " with code " code)) " to it using
   `" f "`. If the language is given it uses the `localized-page`
   function. If there is no language given but the page identified by its name
   requires a language parameter to be set, it will be obtained from the given request
@@ -1317,7 +1289,7 @@
    (#'def-localized-redirect &form &env name
                              (str "Uses the `localized-page` function to calculate the destination path on a basis of
   page name (identifier) or a path (a string) and performs a redirect"
-                                  (if code (str " with code " code)) " to
+                                  (when code (str " with code " code)) " to
   it using `" f "`. If the language is given it uses the `localized-page` function.
   If there is no language given but the page identified by its name requires
   a language parameter to be set, it will be obtained from the given request map
@@ -1522,7 +1494,7 @@
   other scenarios) after a successful log-in to show the right language version of a
   welcome page. Does not use pre-calculated values from a request map, instead
   triggers configured pickers from a default or given chain. Returns a string."
-  (comp some-str language/pick))
+  (comp utils/some-str language/pick))
 
 (def ^{:tag      Keyword
        :arglists '([req]
@@ -1548,7 +1520,7 @@
   welcome page. Does not use pre-calculated values from a request map, instead
   triggers configured pickers from a default or given chain. When a language cannot
   be found it simply returns `nil` instead of a default language. Returns a string."
-  (comp some-str language/pick-without-fallback))
+  (comp utils/some-str language/pick-without-fallback))
 
 ;; Special redirects
 
@@ -1596,9 +1568,9 @@
   "Returns the time duration between soft lock and the given moment. If the duration is
   zero or negative, it returns nil."
   [user time]
-  (if-some [lock-time (soft-lock-time user)]
+  (when-some [lock-time (soft-lock-time user)]
     (let [d (t/between lock-time time)]
-      (if (time/pos-duration? d) d))))
+      (when (time/pos-duration? d) d))))
 
 (defn lock-wait
   "Returns lock-wait configuration option taken from the authentication configuration
@@ -1633,14 +1605,14 @@
   "Returns the amount of time left before reaching lock-wait. If the amount is negative
   or zero, it returns nil. Does not connect to a database."
   ([lock-passed auth-config-or-lw]
-   (if lock-passed
-     (if-some [lock-wait (lock-wait auth-config-or-lw)]
+   (when lock-passed
+     (when-some [lock-wait (lock-wait auth-config-or-lw)]
        (t/- lock-wait lock-passed))))
   ([user auth-config-or-lw time]
-   (if-some [lock-passed (soft-lock-passed user time)]
-     (if-some [lock-wait (lock-wait auth-config-or-lw)]
+   (when-some [lock-passed (soft-lock-passed user time)]
+     (when-some [lock-wait (lock-wait auth-config-or-lw)]
        (let [d (t/- lock-wait lock-passed)]
-         (if (time/pos-duration? d) d))))))
+         (when (time/pos-duration? d) d))))))
 
 ;; Sessions
 
@@ -1683,7 +1655,7 @@
 (defmacro kv-json-str
   [k v]
   `(if-let [k# ~k]
-     (if-some [k# (some-str k#)]
+     (if-some [k# (utils/some-str k#)]
        (strb "{\"" k# "\":\"" ~v "\"}")) "\"\""))
 
 (defn- inject-json-event-header
@@ -1697,8 +1669,8 @@
        (if (or replace? (not (contains? js ename)))
          (map/qassoc headers hname (j/write-value-as-string (map/qassoc js ename (if k {k v} ""))))
          headers)
-       (map/qassoc headers hname (strb "{" cur ":\"\", \"" ename "\":" (kv-json-str k v) "}")))
-     (map/qassoc headers hname (strb "{\"" ename "\":" (kv-json-str k v) "}")))))
+       (map/qassoc headers hname (utils/strb "{" cur ":\"\", \"" ename "\":" (kv-json-str k v) "}")))
+     (map/qassoc headers hname (utils/strb "{\"" ename "\":" (kv-json-str k v) "}")))))
 
 (defn add-json-event-header
   ([req header-name event-name]
@@ -1706,8 +1678,8 @@
   ([req header-name event-name param-key param-value]
    (add-json-event-header req header-name event-name param-key param-value false))
   ([req header-name event-name param-key param-value replace?]
-   (let [header-name (some-str header-name)
-         event-name  (some-str event-name)
+   (let [header-name (utils/some-str header-name)
+         event-name  (utils/some-str event-name)
          headers     (get req :response/headers)]
      (map/qassoc
       req :response/headers
@@ -1715,8 +1687,8 @@
         (if-some [current (get headers header-name)]
           (inject-json-event-header headers current event-name header-name
                                     param-key param-value replace?)
-          (map/qassoc headers header-name (strb "{\"" event-name "\":" (kv-json-str param-key param-value) "}")))
-        {header-name (strb "{\"" event-name "\":" (kv-json-str param-key param-value) "}")})))))
+          (map/qassoc headers header-name (utils/strb "{\"" event-name "\":" (kv-json-str param-key param-value) "}")))
+        {header-name (utils/strb "{\"" event-name "\":" (kv-json-str param-key param-value) "}")})))))
 
 (defn add-session-hx-header
   "Adds `HX-Trigger` server response header to `:response/headers` map of the given
@@ -1732,7 +1704,7 @@
   trigger name, it will be modified. If it already contains it, it will be left as
   is."
   [req sess]
-  (if-some [sid (if sess (session/any-id sess))]
+  (if-some [sid (when sess (session/any-id sess))]
     (add-json-event-header req "HX-Trigger" "setSession" (session/id-field sess) sid false)
     req))
 
@@ -1749,7 +1721,7 @@
   If the `HX-Trigger` header already exists, it will be modified and any value
   associated with `setSession` key will be modified."
   [req sess]
-  (if-some [sid (if sess (session/any-id sess))]
+  (if-some [sid (when sess (session/any-id sess))]
     (add-json-event-header req "HX-Trigger" "setSession" (session/id-field sess) sid true)
     req))
 
@@ -1760,7 +1732,7 @@
   header is not found."
   [req id-field]
   (let [sid (get (get req :headers) id-field)]
-    (if (session/sid-valid? sid) sid)))
+    (when (session/sid-valid? sid) sid)))
 
 (defn reflect-session-hx-header
   "Tries to obtain session ID from the given `sess` object, and if that fails from the
@@ -1859,15 +1831,15 @@
   [req role]
   (contains?
    (set (vals (get req :roles)))
-   (some-keyword role)))
+   (utils/some-keyword role)))
 
 (defn has-role?
   ([req role]
    (contains? (get req :roles/in-context)
-              (some-keyword role)))
+              (utils/some-keyword role)))
   ([req role context]
    (contains? (roles/filter-in-context context (get req :roles) (get req :roles/config))
-              (some-keyword role))))
+              (utils/some-keyword role))))
 
 (defn role-required!
   [req role]
@@ -1876,7 +1848,7 @@
     (localized-temporary-redirect req :unauthorized)))
 
 (defmacro with-role-only!
-  [req role & body]
+  [_req _role & body]
   `(do (role-required! req role)
        ~@body))
 
@@ -1884,9 +1856,9 @@
   ([req user-id context]
    (let [config (get req :roles/config)
          roles  (roles/get-roles-for-user-id config user-id)]
-     (sort (get roles (some-keyword context)))))
+     (sort (get roles (utils/some-keyword context)))))
   ([req context]
-   (sort (get (get req :roles) (some-keyword context))))
+   (sort (get (get req :roles) (utils/some-keyword context))))
   ([req]
    (sort (get req :roles/in-context))))
 
@@ -1896,17 +1868,17 @@
          roles  (roles/get-roles-for-user-id config user-id)]
      (sort-by first
               (map (comp (partial apply cons)
-                         (juxt-seq first (comp sort second)))
+                         (utils/juxt-seq first (comp sort second)))
                    roles))))
   ([req]
    (sort-by first
             (map (comp (partial apply cons)
-                       (juxt-seq first (comp sort second)))
+                       (utils/juxt-seq first (comp sort second)))
                  (get req :roles)))))
 
 (defn default-contexts-labeler
   [_ ids]
-  (map (juxt-seq some-keyword-simple some-str) ids))
+  (map (utils/juxt-seq utils/some-keyword-simple utils/some-str) ids))
 
 (defn roles-matrix
   ([req]
@@ -1949,7 +1921,7 @@
 
 (defn- calc-roles
   [ctx-labeler roles-labeler missing-label [ctx & roles]]
-  (into [(or (some-str (ctx-labeler ctx)) (str ctx))]
+  (into [(or (utils/some-str (ctx-labeler ctx)) (str ctx))]
         (mapv (comp (fnil identity missing-label) roles-labeler) roles)))
 
 (defn roles-tabler
@@ -1964,18 +1936,18 @@
             global-label     "global"
             context-label    "Context"
             contexts-labeler default-contexts-labeler
-            include-global?  (not effective?)
             include-self?    false}
      :as   opts}]
-   (let [global-marker        (or global-marker (str " (" global-label ")"))
-         global-present-label (or global-present-label (str present-label global-marker))
+   (let [include-global?      (if (contains? opts :include-global?) include-global? (not effective?))
          opts                 (qassoc opts :include-global? include-global? :include-self? include-self?)
+         global-marker        (or global-marker (str " (" global-label ")"))
+         global-present-label (or global-present-label (str present-label global-marker))
          [l & d]              (roles-matrix req opts)
          gctx-line            (first d)
          have-gctx?           (and include-global? (= global-context (first gctx-line)))
          labels               (vec (interleave (range) (cons context-label (map str l))))
          roles-labeler        {true present-label, false missing-label, :! global-present-label}
-         gctx-labeler         (if have-gctx? (qassoc roles-labeler :! present-label))
+         gctx-labeler         (when have-gctx? (qassoc roles-labeler :! present-label))
          ctx-labeler          (contexts-labeler req (map first d))
          data                 (->> (if have-gctx? (next d) d)
                                    (map (partial calc-roles
@@ -2112,11 +2084,11 @@
   given request map `req` is used internally to get the current character
   encoding (with fallback to UTF-8)."
   [req qstr]
-  (if req
-    (if-some [qstr (some-str qstr)]
-      (codec/form-decode qstr (or (req/character-encoding req)
-                                  (get req :character-encoding)
-                                  "UTF-8")))))
+  (when req
+   (when-some [qstr (utils/some-str qstr)]
+     (codec/form-decode qstr (or (req/character-encoding req)
+                                 (get req :character-encoding)
+                                 "UTF-8")))))
 
 (defn url->uri+params
   "Takes a request map `req` and URI (`u`) and tries to decompose it into 2-element
@@ -2125,17 +2097,17 @@
   unmodified and query params slot is set to be `nil`. The request map is used
   internally to get the current character encoding (with fallback to UTF-8)."
   [req u]
-  (try (let [{:keys [uri query-string]} (parse-url u)]
-         [(some-str uri) (parse-query-params req query-string)])
-       (catch Exception _ [(some-str u) nil])))
+  (try (let [{:keys [uri query-string]} (utils/parse-url u)]
+         [(utils/some-str uri) (parse-query-params req query-string)])
+       (catch Exception _ [(utils/some-str u) nil])))
 
 (defn query-string-encode
   ([params]
-   (if params (codec/form-encode params)))
+   (when params (codec/form-encode params)))
   ([req params]
-   (if params (codec/form-encode params (or (req/character-encoding req)
-                                            (get req :character-encoding)
-                                            "UTF-8")))))
+   (when params (codec/form-encode params (or (req/character-encoding req)
+                                              (get req :character-encoding)
+                                              "UTF-8")))))
 
 (defn remove-params
   "Removes the given parameter or parameters from a request map locations:
@@ -2149,11 +2121,11 @@
   location(s) will be skipped."
   ([m params-key parameters-sub-key combined? param]
    (let [strings?     (string? param)
-         param-str    (if strings? param (some-str param))
+         param-str    (if strings? param (utils/some-str param))
          param-kw     (if strings? (keyword param) param)
-         m-parameters (if parameters-sub-key (get m :parameters))
-         m-req-params (if params-key (get m params-key))
-         m-params     (if combined? (get m :params))
+         m-parameters (when parameters-sub-key (get m :parameters))
+         m-req-params (when params-key (get m params-key))
+         m-params     (when combined? (get m :params))
          m            (if (nil? m-parameters) m
                           (if-some [p (get m-parameters parameters-sub-key)]
                             (qassoc m :parameters
@@ -2170,11 +2142,11 @@
   ([m params-key parameters-sub-key combined? param & more]
    (let [params       (cons param more)
          strings?     (string? param)
-         params-str   (if strings? params (map some-str params))
+         params-str   (if strings? params (map utils/some-str params))
          params-kw    (if strings? (map keyword params) params)
-         m-parameters (if parameters-sub-key (get m :parameters))
-         m-req-params (if params-key (get m params-key))
-         m-params     (if combined? (get m :params))
+         m-parameters (when parameters-sub-key (get m :parameters))
+         m-req-params (when params-key (get m params-key))
+         m-params     (when combined? (get m :params))
          m            (if (nil? m-parameters) m
                           (if-some [p (get m-parameters parameters-sub-key)]
                             (qassoc m :parameters
@@ -2259,16 +2231,16 @@
                [params new-ns keys])}
   ([params new-ns keys-or-ns]
    (if (coll? keys-or-ns)
-     (let [new-ns (some-str new-ns)]
+     (let [new-ns (utils/some-str new-ns)]
        (reduce (fn [^clojure.lang.Associative m k]
                  (if (contains? params k)
                    (qassoc m (keyword new-ns (name k)) (get params k))
                    m))
                {} keys-or-ns))
      (if (nil? keys-or-ns)
-       (map/map-keys (comp (partial keyword (some-str new-ns)) name) params)
-       (let [ns     (some-str keys-or-ns)
-             new-ns (some-str new-ns)]
+       (map/map-keys (comp (partial keyword (utils/some-str new-ns)) name) params)
+       (let [ns     (utils/some-str keys-or-ns)
+             new-ns (utils/some-str new-ns)]
          (reduce (fn [^clojure.lang.Associative m ^clojure.lang.MapEntry e]
                    (let [k (.key ^clojure.lang.MapEntry e)]
                      (if (= ns (namespace k))
@@ -2289,7 +2261,7 @@
                    (qassoc m (keyword (name k)) (get params k))
                    m))
                {} keys-or-ns))
-     (let [ns (some-str keys-or-ns)]
+     (let [ns (utils/some-str keys-or-ns)]
        (reduce (fn [^clojure.lang.Associative m ^clojure.lang.MapEntry e]
                  (let [k (.key ^clojure.lang.MapEntry e)]
                    (if (= ns (namespace k))
@@ -2304,7 +2276,7 @@
   [req]
   (get req :parameters))
 
-(defn params
+(defn get-params
   "Synonym of `(get-in req [:parameters params-type])` (in binary variant) and
   `(get req :parameters)` (in unary variant)."
   ([req params-type]
@@ -2312,7 +2284,7 @@
   ([req]
    (get req :parameters)))
 
-(defn form-params
+(defn get-form-params
   "Synonym of `(get-in req [:parameters :form])` (in unary variant) and
   `(get-in req [:parameters :form param])` (in binary variant)."
   ([req]
@@ -2320,7 +2292,7 @@
   ([req param]
    (get (get (get req :parameters) :form) param)))
 
-(defn path-params
+(defn get-path-params
   "Synonym of `(get-in req [:parameters :path])` (in unary variant) and
   `(get-in req [:parameters :path param])` (in binary variant)."
   ([req]
@@ -2328,7 +2300,7 @@
   ([req param]
    (get (get (get req :parameters) :path) param)))
 
-(defn body-params
+(defn get-body-params
   "Synonym of `(get-in req [:parameters :body])` (in unary variant) and
   `(get-in req [:parameters :body param])` (in binary variant)."
   ([req]
@@ -2336,7 +2308,7 @@
   ([req param]
    (get (get (get req :parameters) :body) param)))
 
-(defn identity-param
+(defn get-identity-param
   "For the given map of parameters `m` tries to get existing and non-nil value
   associated with a first existing key in a sequence of `:user/identity`,
   `:user/login`, `:user/email`, `:user/phone`, `:identity`, `:login`, `:username`,
@@ -2347,11 +2319,11 @@
   Optional, custom sequence of parameter names to be looked up can be given as the
   `params` second argument."
   ([m]
-   (if m (->> [:user/identity :user/login :user/email :user/phone
-               :identity :login :username :email :phone]
-              (qsome m) (identity/of-type ::identity/public))))
+   (when m (->> [:user/identity :user/login :user/email :user/phone
+                 :identity :login :username :email :phone]
+                (utils/qsome m) (identity/of-type ::identity/public))))
   ([m params]
-   (if m (->> params (qsome m) (identity/of-type ::identity/public)))))
+   (when m (->> params (utils/qsome m) (identity/of-type ::identity/public)))))
 
 ;; Language helpers
 
@@ -2372,17 +2344,34 @@
    (lang-url nil req path-or-name lang localized? path-params query-params lang-param))
   (^String [router req path-or-name lang localized? path-params query-params lang-param]
    (let [router       (or router (get req ::r/router) (get req :router))
-         lang         (or lang (get req :language/str) (some-str (get req :language/id)) (some-str (get req :lang)))
+         lang         (or lang (get req :language/str) (utils/some-str (get req :language/id)) (utils/some-str (get req :lang)))
          lang-param   (or lang-param (get req :language/settings) :lang)
-         path-or-name (or (valuable path-or-name) (current-page req))
-         path-or-name (if path-or-name (keyword-from-param path-or-name))
+         path-or-name (or (utils/valuable path-or-name) (current-page req))
+         path-or-name (when path-or-name (keyword-from-param path-or-name))
          path-fn      (if localized? localized-path path)
          out-path     (path-fn path-or-name lang path-params query-params router lang-param)]
-     (or out-path (if-not (ident? path-or-name) (some-str path-or-name))))))
+     (or out-path (when-not (ident? path-or-name) (utils/some-str path-or-name))))))
 
 (defn lang-param
+  "Returns language parameter ID obtained from language settings. Falls back to `:lang`
+  when nothing was found."
   [req]
-  (or (get (get req :language/settings) :param) :lang))
+  (or (language/param req) :lang))
+
+(defn guess-lang-param
+  "For the given src argument, tries to obtain a language ID. If it's a map it looks
+  for `:param` key and for `:language/settings` if that
+  fails. If `:language/settings` is found, it will try to get :param, assuming
+  it's a map too. If the argument is not a map it will simply convert it into a
+  keyword (without a namespace). If all of that fails (e.g. the src is nil) then
+  the :lang keyword is returned."
+  ([] :lang)
+  ([src]
+   (or (if (map? src)
+         (or (get src :param)
+             (some-> (get src :language/settings) :param))
+         (utils/some-keyword-simple src))
+       :lang)))
 
 (defn lang-id
   ^Keyword [req]
@@ -2480,7 +2469,7 @@
 
 (defn mobile-agent?
   ^Boolean [req]
-  (if-some [ua (get (get req :headers) "user-agent")]
+  (when-some [ua (get (get req :headers) "user-agent")]
     (some? (re-find #"\b(iPhone|iPad|iPod|Android|Windows Phone|webOS|IEMobile|BlackBerry)\b" ua))))
 
 (defmacro add-header
@@ -2496,7 +2485,7 @@
                             (string?  header-name)
                             (char?    header-name)
                             (number?  header-name))
-                      (some-str header-name)
+                      (utils/some-str header-name)
                       (cons `some-str (cons header-name nil)))]
     `(let [req# ~req
            hdr# (get req# :response/headers)]
@@ -2517,7 +2506,7 @@
                              (string?  header-name)
                              (char?    header-name)
                              (number?  header-name))
-                       (some-str header-name)
+                       (utils/some-str header-name)
                        (cons `some-str (cons header-name nil)))]
      `(let [req# ~req
             hdr# (get req# :response/headers)]
@@ -2533,7 +2522,7 @@
                                     (string?  %1)
                                     (char?    %1)
                                     (number?  %1))
-                              (some-str %1)
+                              (utils/some-str %1)
                               (cons `some-str (cons %1 nil)))
                             (cons %2 nil))
                      names values)
@@ -2620,17 +2609,17 @@
           (nil? id)) nil
      (map? src)      (identity/acceptable-type
                       (or id (identity/value (or identity-type ::identity/any) src))
-                      (or (if identity-type (some-keyword identity-type))
+                      (or (when identity-type (utils/some-keyword identity-type))
                           (get src :id-type)
                           (get src :identity/type)
                           (get src :identity-type)
                           (get src :id_type))
-                      (or (if acceptable-tag (some-keyword acceptable-tag))
+                      (or (when acceptable-tag (utils/some-keyword acceptable-tag))
                           ::identity/standard))
      :else           (identity/acceptable-type
                       (if id id src)
                       identity-type
-                      (or (if acceptable-tag (some-keyword acceptable-tag))
+                      (or (when acceptable-tag (utils/some-keyword acceptable-tag))
                           ::identity/standard)))))
 
 (defn acceptable-identity-type
@@ -2640,10 +2629,10 @@
   ([identity-type]
    (acceptable-identity-type identity-type nil))
   ([identity-type acceptable-tag]
-   (if-some [id-type (some-keyword identity-type)]
-     (if (identity/type? id-type
-                         (or (if acceptable-tag (some-keyword acceptable-tag))
-                             ::identity/standard))
+   (when-some [id-type (utils/some-keyword identity-type)]
+     (when (identity/type? id-type
+                           (or (when acceptable-tag (utils/some-keyword acceptable-tag))
+                               ::identity/standard))
        id-type))))
 
 (defn identity-and-type
@@ -2673,19 +2662,19 @@
   User identity is only tested, never transformed, even if it is not an `Identity`
   object. Identity type is extracted from identity object (given or ad-hoc created)."
   ([user-identity]
-   (if-some [id-type (identity/acceptable-type user-identity nil ::identity/standard)]
+   (when-some [id-type (identity/acceptable-type user-identity nil ::identity/standard)]
      [user-identity id-type]))
   ([user-identity identity-type]
    (identity-and-type user-identity identity-type ::identity/standard))
   ([user-identity identity-type acceptable-tag]
    (if user-identity
-     (if-some [id-type (identity/acceptable-type
-                        user-identity
-                        identity-type
-                        (or (some-keyword acceptable-tag) ::identity/standard))]
+     (when-some [id-type (identity/acceptable-type
+                          user-identity
+                          identity-type
+                          (or (utils/some-keyword acceptable-tag) ::identity/standard))]
        [user-identity id-type])
-     (if identity-type
-       (if-some [id-type (acceptable-identity-type identity-type acceptable-tag)]
+     (when identity-type
+       (when-some [id-type (acceptable-identity-type identity-type acceptable-tag)]
          [nil id-type])))))
 
 ;; Response status

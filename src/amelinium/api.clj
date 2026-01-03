@@ -1,19 +1,16 @@
 (ns
 
-    ^{:doc    "API helpers for amelinium."
-      :author "Paweł Wilk"
-      :added  "1.0.0"}
+ ^{:doc    "API helpers for amelinium."
+   :author "Paweł Wilk"
+   :added  "1.0.0"}
 
-    amelinium.api
+ amelinium.api
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [clojure.string                       :as             str]
-            [potemkin                             :as               p]
-            [lazy-map.core                        :as        lazy-map]
+  (:require [potemkin                             :as               p]
             [ring.util.response]
             [amelinium.http.response              :as            resp]
-            [ring.util.request                    :as             req]
             [amelinium.utils                      :refer         :all]
             [amelinium.common                     :as          common]
             [amelinium.errors                     :as          errors]

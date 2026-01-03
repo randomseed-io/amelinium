@@ -145,7 +145,7 @@
 (system/add-expand
  ::unilog [k config]
  {k (log/preprocess-config
-      (map/update-existing config :context-transformer prep-context-transformer))})
+     (map/update-existing config :context-transformer prep-context-transformer))})
 
 (system/add-init
  ::unilog

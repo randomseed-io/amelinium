@@ -116,7 +116,7 @@
   timeouts to report them to a user."
   [duration]
   (when duration
-    (if-some [millis (t/millis duration)]
+    (when-some [millis (t/millis duration)]
       (if (neg? millis) nil (t/minutes duration)))))
 
 ;; URLs
@@ -127,7 +127,7 @@
   "Returns `true` if the given argument `s` is a non-empty string that begins like an
   URL. Returns `false` otherwise."
   ^Boolean [s]
-  (if (and s (string? s))
+  (when (and s (string? s))
     (let [^String s s]
       (and (not-empty-string? s)
            (not= \/ (.charAt s 0))
