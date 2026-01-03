@@ -1,1 +1,1 @@
-{:config-paths ["resources/clj-kondo.exports/io.randomseed/amelinium"]}
+{:config-paths ["../resources/clj-kondo.exports/io.randomseed/amelinium"]}

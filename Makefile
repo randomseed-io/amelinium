@@ -8,6 +8,10 @@ default:		docs
 lint:
 			bin/lint
 
+clean-kondo:
+			rm -rf .clj-kondo/.cache 2>/dev/null
+			rm -rf .clj-kondo/imports 2>/dev/null
+
 docs:
 			echo "# Introduction" > doc/10_introduction.md
 			tail -n +2 README.md >> doc/10_introduction.md
