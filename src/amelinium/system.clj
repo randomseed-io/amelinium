@@ -11,16 +11,15 @@
   (:require [integrant.core           :as           ig]
             [maailma.core             :as         conf]
             [cambium.core             :as          log]
-            [amelinium                :as    amelinium]
             [amelinium.readers        :as      readers]
             [amelinium.env.file       :as      envfile]
             [tick.core                :as            t]
             [clojure.java.io          :as           io]
             [clojure.string           :as          str]
-            [io.randomseed.utils      :as        utils]
             [io.randomseed.utils.var  :as          var]
             [io.randomseed.utils.fs   :as           fs]
-            [io.randomseed.utils      :refer [defdoc!]])
+            [io.randomseed.utils      :as        utils
+                                      :refer [defdoc!]])
 
   (:import (java.util TimeZone)))
 
