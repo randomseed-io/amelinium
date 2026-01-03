@@ -36,17 +36,12 @@
             [io.randomseed.utils.db                :as                     db])
 
   (:import (amelinium            Response
-                                 Session
-                                 AuthSettings
-                                 AuthConfig)
-           (amelinium.proto.http HTTP)
+                                 Session)
            (clojure.lang         Associative
                                  IPersistentMap
                                  Keyword
-                                 ISeq
                                  IFn)
-           (lazy_map.core        LazyMapEntry
-                                 LazyMap)
+           (lazy_map.core        LazyMap)
            (reitit.core          Match)))
 
 ;; Operations logging

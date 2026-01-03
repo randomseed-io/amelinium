@@ -1,31 +1,26 @@
 (ns
 
-    ^{:doc    "Common HTTP responses for amelinium."
-      :author "Paweł Wilk"
-      :added  "1.0.0"}
+ ^{:doc    "Common HTTP responses for amelinium."
+   :author "Paweł Wilk"
+   :added  "1.0.0"}
 
-    amelinium.http.response
+ amelinium.http.response
 
-  (:require [clojure.set                 :as             set]
-            [clojure.string              :as             str]
-            [potemkin                    :as               p]
+  (:require [amelinium.types.response]
+            [amelinium                   :refer [->Response]]
             [ring.util.response]
-            [ring.util.http-response     :as            resp]
-            [ring.util.request           :as             req]
-            [amelinium.types.response    :refer         :all]
-            [amelinium.proto.http        :as            http]
-            [amelinium                   :refer         :all]
-            [io.randomseed.utils.map     :as             map]
-            [io.randomseed.utils.map     :refer     [qassoc]])
+            [ring.util.http-response     :as     resp]
+            [potemkin                    :as        p]
+            [amelinium.proto.http        :as     http]
+            [io.randomseed.utils.map     :as    map :refer [qassoc]])
 
-  (:import (clojure.lang         IPersistentMap)
-           (amelinium            Response)
-           (amelinium.proto.http HTTP)))
+  (:import (clojure.lang  IPersistentMap)
+           (amelinium     Response)))
 
 ;; Imports
 
 (p/import-vars [ring.util.http-response
-                throw! status header file-response content-type
+                throw! header file-response content-type
                 find-header get-header update-header
                 charset get-charset set-cookie resource-data
                 url-response resource-response])
@@ -36,9 +31,9 @@
 
   Response
 
-  (request?           ^Boolean        [resp] false)
-  (response?          ^Boolean        [resp] true)
-  (app-status                         [resp] nil)
+  (request?           ^Boolean           [_] false)
+  (response?          ^Boolean           [_] true)
+  (app-status                            [_] nil)
   (response-status                    [resp] (.status  ^Response resp))
   (response-headers   ^IPersistentMap [resp] (.headers ^Response resp))
   (response-body                      [resp] (.body    ^Response resp))
