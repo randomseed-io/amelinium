@@ -1656,7 +1656,7 @@
   [k v]
   `(if-let [k# ~k]
      (if-some [k# (utils/some-str k#)]
-       (strb "{\"" k# "\":\"" ~v "\"}")) "\"\""))
+       (utils/strb "{\"" k# "\":\"" ~v "\"}")) "\"\""))
 
 (defn- inject-json-event-header
   ([headers cur ename hname k v]
@@ -2486,7 +2486,7 @@
                             (char?    header-name)
                             (number?  header-name))
                       (utils/some-str header-name)
-                      (cons `some-str (cons header-name nil)))]
+                      (cons `utils/some-str (cons header-name nil)))]
     `(let [req# ~req
            hdr# (get req# :response/headers)]
        (qassoc req# :response/headers
@@ -2507,7 +2507,7 @@
                              (char?    header-name)
                              (number?  header-name))
                        (utils/some-str header-name)
-                       (cons `some-str (cons header-name nil)))]
+                       (cons `utils/some-str (cons header-name nil)))]
      `(let [req# ~req
             hdr# (get req# :response/headers)]
         (qassoc req# :response/headers
@@ -2523,7 +2523,7 @@
                                     (char?    %1)
                                     (number?  %1))
                               (utils/some-str %1)
-                              (cons `some-str (cons %1 nil)))
+                              (cons `utils/some-str (cons %1 nil)))
                             (cons %2 nil))
                      names values)
          pairs  (apply concat pairs)

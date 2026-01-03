@@ -6,7 +6,7 @@
 
  amelinium.api
 
-  (:refer-clojure :exclude [parse-long uuid random-uuid])
+  (:refer-clojure :exclude [random-uuid])
 
   (:require [potemkin                             :as               p]
             [ring.util.response]
@@ -18,10 +18,10 @@
             [amelinium.http.middleware.validators :as      validators]
             [amelinium.http.middleware.session    :as         session]
             [amelinium.types.response             :refer         :all]
-            [amelinium                            :refer         :all]
             [io.randomseed.utils.map              :refer    [qassoc
                                                              qupdate]]
-            [io.randomseed.utils                  :refer         :all])
+            [io.randomseed.utils                  :refer  [random-uuid
+                                                           some-keyword]])
 
   (:import (amelinium     Response)
            (clojure.lang  IFn)
@@ -549,41 +549,41 @@
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (resp/location req page)))
-  (^Response [req data]
+  (^Response [req _data]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (resp/location req page)))
-  (^Response [req data view]
+  (^Response [req _data _view]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (resp/location req page)))
-  (^Response [req data view layout]
+  (^Response [req _data _view _layout]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (resp/location req page)))
-  (^Response [req data view layout lang]
+  (^Response [req _data _view _layout lang]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (resp/location req page lang)))
-  (^Response [req data view layout lang name-or-path]
+  (^Response [req _data _view _layout lang name-or-path]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (page req name-or-path lang))))
-  (^Response [req data view layout lang name-or-path params]
+  (^Response [req _data _view _layout lang name-or-path params]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (page req name-or-path lang params))))
-  (^Response [req data view layout lang name-or-path params query-params]
+  (^Response [req _data _view _layout lang name-or-path params query-params]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (page req name-or-path lang params query-params))))
-  (^Response [req data view layout lang name-or-path params query-params & more]
+  (^Response [req _data _view _layout lang name-or-path params query-params & more]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (if (is-url? name-or-path)
@@ -600,41 +600,41 @@
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (resp/location req localized-page)))
-  (^Response [req data]
+  (^Response [req _data]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (resp/location req localized-page)))
-  (^Response [req data view]
+  (^Response [req _data _view]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (resp/location req localized-page)))
-  (^Response [req data view layout]
+  (^Response [req _data _view _layout]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (resp/location req localized-page)))
-  (^Response [req data view layout lang]
+  (^Response [req _data _view _layout lang]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (resp/location req localized-page lang)))
-  (^Response [req data view layout lang name-or-path]
+  (^Response [req _data _view _layout lang name-or-path]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (localized-page req name-or-path lang))))
-  (^Response [req data view layout lang name-or-path params]
+  (^Response [req _data _view _layout lang name-or-path params]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (localized-page req name-or-path lang params))))
-  (^Response [req data view layout lang name-or-path params query-params]
+  (^Response [req _data _view _layout lang name-or-path params query-params]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (if (is-url? name-or-path)
                    name-or-path
                    (localized-page req name-or-path lang params query-params))))
-  (^Response [req data view layout lang name-or-path params query-params & more]
+  (^Response [req _data _view _layout lang name-or-path params query-params & more]
    (resp/created (render req :ok/created)
                  (or (resp/headers req) {})
                  (if (is-url? name-or-path)
@@ -772,17 +772,17 @@
   (^Response [req sub-status]
    (let [err-config (errors/config req)
          sub-status (errors/most-significant err-config sub-status)]
-     (if-some [resp (errors/render err-config sub-status render-ok req)]
+     (when-some [resp (errors/render err-config sub-status render-ok req)]
        (add-missing-sub-status-to-response req resp sub-status))))
   (^Response [req sub-status default]
    (let [err-config (errors/config req)
          sub-status (errors/most-significant err-config sub-status)]
-     (if-some [resp (errors/render err-config sub-status (or default render-ok) req)]
+     (when-some [resp (errors/render err-config sub-status (or default render-ok) req)]
        (add-missing-sub-status-to-response req resp sub-status))))
   (^Response [req sub-status default & more]
    (let [err-config (errors/config req)
          sub-status (errors/most-significant err-config sub-status)]
-     (if-some [resp (apply errors/render err-config sub-status (or default render-ok) req more)]
+     (when-some [resp (apply errors/render err-config sub-status (or default render-ok) req more)]
        (add-missing-sub-status-to-response req resp sub-status)))))
 
 (defn render-error
@@ -826,17 +826,17 @@
   (^Response [req sub-status]
    (let [err-config (errors/config req)
          sub-status (errors/most-significant err-config sub-status)]
-     (if-some [resp (errors/render err-config sub-status render-internal-server-error req)]
+     (when-some [resp (errors/render err-config sub-status render-internal-server-error req)]
        (add-missing-sub-status-to-response req resp sub-status))))
   (^Response [req sub-status default]
    (let [err-config (errors/config req)
          sub-status (errors/most-significant err-config sub-status)]
-     (if-some [resp (errors/render err-config sub-status (or default render-internal-server-error) req)]
+     (when-some [resp (errors/render err-config sub-status (or default render-internal-server-error) req)]
        (add-missing-sub-status-to-response req resp sub-status))))
   (^Response [req sub-status default & more]
    (let [err-config (errors/config req)
          sub-status (errors/most-significant err-config sub-status)]
-     (if-some [resp (apply errors/render err-config sub-status (or default render-internal-server-error) req more)]
+     (when-some [resp (apply errors/render err-config sub-status (or default render-internal-server-error) req more)]
        (add-missing-sub-status-to-response req resp sub-status)))))
 
 ;; Linking helpers
@@ -857,10 +857,10 @@
          k-blank (seq (get r :blank))
          k-any   (seq (get r :any))
          r       (concat
-                  (if k-some  (map vector k-some  (repeatedly random-uuid)))
-                  (if k-blank (map vector k-blank (repeat "")))
-                  (if k-any   (map vector k-any   (repeatedly #(random-uuid-or-empty rng)))))]
-     (if (seq r)
+                  (when k-some  (map vector k-some  (repeatedly random-uuid)))
+                  (when k-blank (map vector k-blank (repeat "")))
+                  (when k-any   (map vector k-any   (repeatedly #(random-uuid-or-empty rng)))))]
+     (when (seq r)
        (into {} r)))))
 
 ;; Other helpers
