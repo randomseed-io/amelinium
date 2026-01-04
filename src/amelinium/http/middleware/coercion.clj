@@ -1,10 +1,10 @@
 (ns
 
-    ^{:doc    "amelinium service, HTTP parameters coercion."
-      :author "Paweł Wilk"
-      :added  "1.0.0"}
+ ^{:doc    "amelinium service, HTTP parameters coercion."
+   :author "Paweł Wilk"
+   :added  "1.0.0"}
 
-    amelinium.http.middleware.coercion
+ amelinium.http.middleware.coercion
 
   (:refer-clojure :exclude [parse-long uuid random-uuid compile])
 

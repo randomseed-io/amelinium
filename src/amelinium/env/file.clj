@@ -1,17 +1,17 @@
 (ns
 
-    ^{:doc    "Environment files handling for Amelinium."
-      :author "Paweł Wilk"
-      :added  "1.0.0"}
+ ^{:doc    "Environment files handling for Amelinium."
+   :author "Paweł Wilk"
+   :added  "1.0.0"}
 
-    amelinium.env.file
+ amelinium.env.file
 
   (:refer-clojure :exclude [read])
 
   (:require [clojure.string      :as   str]
             [clojure.java.io     :as    io]
             [io.randomseed.utils :as utils]
-            [amelinium       :refer :all]))
+            [amelinium]))
 
 (def ^:dynamic *default-ns* "amelinium.env")
 
