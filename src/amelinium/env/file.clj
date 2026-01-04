@@ -53,13 +53,20 @@
         (map read)
         (apply str))))
 
+(def ^:private ^java.util.regex.Pattern key-pattern
+  (re-pattern "[A-Za-z_][A-Za-z0-9_\\-]*"))
+
+(def ^:private ^java.util.regex.Pattern comment-pattern
+  (re-pattern "^(.*?)(?:\\s+#.*)?$"))
+
 (defn- valid-key?
-  [sk]
-  (boolean (re-matches #"[A-Za-z_][A-Za-z0-9_\-]*" sk)))
+  ^Boolean [sk]
+  (and (string? sk)
+       (.matches (.matcher key-pattern ^String sk))))
 
 (defn- strip-inline-comment
   [s]
-  (let [m (re-find #"^(.*?)(?:\s+#.*)?$" s)]
+  (let [m (re-find comment-pattern s)]
     (if m (second m) s)))
 
 (defn- unescape-double-quoted

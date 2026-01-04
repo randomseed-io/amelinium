@@ -26,19 +26,52 @@
 
 ;; Common functions
 
+(defn- param-type-char?
+  "Allowed chars after the ':' prefix in schema token."
+  ^Boolean [^java.lang.Character c]
+  (let [n (int c)]
+    (or (<= 48 n 57)   ; 0-9
+        (<= 65 n 90)   ; A-Z
+        (<= 97 n 122)  ; a-z
+        (== 45 n)      ; -
+        (== 95 n)      ; _
+        (== 43 n)      ; +
+        (== 63 n)      ; ?
+        (== 33 n))))   ; !
+
 (defn param-type
   "Takes a coercion error expressed as a map `e` and returns a string with parameter
   type if the type can easily be obtained (is a simple name expressed as a string or
   a string representation of keyword). For very complex schemas (which do not consist
   of a keyword or a vector with keyword at their first position) it returns `nil`."
   [e]
-  (if-some [^String s (some-str (get e :schema))]
-    (if-some [^String found (re-find #"^\[?\:?[a-zA-Z0-9\-_\+\?\!]+" s)]
-      (some-str
-       (if (= \: (.charAt found 0))
-         (subs found 1)
-         (if (and (= \[ (.charAt found 0)) (= \: (.charAt found 1)))
-           (subs found 2)))))))
+  (when-some [^String s (some-str (get e :schema))]
+    (let [n (int (.length s))]
+      (when (pos? n)
+        (cond
+          ;; :foo...
+          (== 58 (unchecked-int (.charAt s 0))) ; ':'
+          (let [start (unchecked-int 1)
+                end   (loop [i start]
+                        (if (and (< i n) (param-type-char? (.charAt s i)))
+                          (recur (unchecked-inc-int i))
+                          i))]
+            (when (> end start)
+              (some-str (.substring s start end))))
+
+          ;; [:foo ...]
+          (== 91 (int (.charAt s 0))) ; '['
+          (when (and (> n 1) (== 58 (int (.charAt s 1)))) ; "[:"
+            (let [start 2
+                  end   (loop [i start]
+                          (if (and (< i n) (param-type-char? (.charAt s i)))
+                            (recur (unchecked-inc-int i))
+                            i))]
+              (when (> end start)
+                (some-str (.substring s start end)))))
+
+          :else
+          nil)))))
 
 (defn translate-error
   "Takes a translation function with already applied language ID or a request map,

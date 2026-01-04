@@ -29,38 +29,56 @@
 
 ;; Validator functions
 
-(defn pwd-no-number?
-  [s]
-  (nil? (re-find #"[0-9]" s)))
+(def ^:const ^long HAS-DIGIT  (long 1))
+(def ^:const ^long HAS-LOWER  (long 2))
+(def ^:const ^long HAS-UPPER  (long 4))
+(def ^:const ^long HAS-SYMBOL (long 8))
 
-(defn pwd-no-lower?
-  [s]
-  (nil? (re-find #"[a-z]" s)))
+(defn invalid-password?
+  "Returns true if password is invalid.
+   Rules (Unicode-aware, iterates by code points):
+   - length: 8..62 code points
+   - must contain: digit, lower, upper, symbol (non-letter/digit)
+   - must not be made of the same repeated character"
+  ^Boolean [s]
+  (if-not (string? s)
+    true
+    (let [^String s s
+          n (unchecked-int (.length s))]
+      (loop [i        (unchecked-int 0)
+             cp-count (unchecked-int 0)
+             flags    (long 0)
+             firstcp  (unchecked-int -1)
+             allsame  true]
+        (cond
+          ;; hard fail: too long already
+          (> cp-count 62) true
 
-(defn pwd-no-upper?
-  [s]
-  (nil? (re-find #"[A-Z]" s)))
-
-(defn pwd-no-symbol?
-  [s]
-  (nil? (re-find #"[^A-Za-z0-9]" s)))
-
-(defn pwd-no-different-chars?
-  [s]
-  (if-some [f (first s)] (nil? (some #(not= f %) s)) false))
-
-(defn pwd-no-proper-length?
-  [s]
-  (not (> 62 (count s) 8)))
-
-(def invalid-password?
-  (some-fn (complement string?)
-           pwd-no-proper-length?
-           pwd-no-number?
-           pwd-no-upper?
-           pwd-no-lower?
-           pwd-no-symbol?
-           pwd-no-different-chars?))
+          ;; end of string: evaluate all constraints
+          (>= i n)
+          (or (< cp-count 8)
+              (> cp-count 62)
+              allsame
+              (zero? (bit-and flags HAS-DIGIT))
+              (zero? (bit-and flags HAS-LOWER))
+              (zero? (bit-and flags HAS-UPPER))
+              (zero? (bit-and flags HAS-SYMBOL)))
+          :else
+          (let [cp (unchecked-int (.codePointAt s i))
+                i' (unchecked-add-int i (Character/charCount cp))
+                cpc (unchecked-inc-int cp-count)
+                fcp (if (neg? firstcp) cp firstcp)
+                as? (and allsame (= cp fcp))
+                fl  (cond
+                      (Character/isDigit         cp) (bit-or flags HAS-DIGIT)
+                      (Character/isLowerCase     cp) (bit-or flags HAS-LOWER)
+                      (Character/isUpperCase     cp) (bit-or flags HAS-UPPER)
+                      (Character/isLetterOrDigit cp) flags
+                      :else                          (bit-or flags HAS-SYMBOL))]
+            ;; early exit: >62
+            (if  (> cpc 62)
+              true
+              (recur i' cpc fl fcp as?))))))))
 
 (defn valid-password?
   [p]
@@ -70,25 +88,132 @@
   [p]
   (and (string? p) (utils/not-empty-string? p)))
 
-(defn valid-session-id?
-  [s]
-  (and (string? s)
-       (some? (re-find #"^[a-f0-9]{32}(-[a-f0-9]{32})?$" s))))
+(defn- cp-any?
+  "True if any Unicode code point in s satisfies pred."
+  ^Boolean [^String s pred]
+  (let [n (unchecked-int (.length s))]
+    (loop [i (unchecked-int 0)]
+      (if (>= i n)
+        false
+        (let [cp (unchecked-int (.codePointAt s i))]
+          (if (pred cp)
+            true
+            (recur (unchecked-add-int i (unchecked-int (Character/charCount cp))))))))))
 
-(defn valid-secure-session-id?
-  [s]
-  (and (string? s)
-       (some? (re-find #"^[a-f0-9]{32}-[a-f0-9]{32}$" s))))
+(defn- cp-all-same?
+  "True if s is non-empty and all Unicode code points are the same."
+  ^Boolean [^String s]
+  (let [n (.length s)]
+    (if (zero? n)
+      false
+      (let [f (unchecked-int (.codePointAt s 0))]
+        (loop [i (unchecked-int (Character/charCount f))]
+          (if (>= i n)
+            true
+            (let [cp (unchecked-int (.codePointAt s i))]
+              (and (= cp f)
+                   (recur (+ i (Character/charCount cp)))))))))))
+
+(defn- cp-len ^long [^String s]
+  (.codePointCount s 0 (.length s)))
+
+(defn pwd-no-number?
+  ^Boolean [s]
+  (and (string? s) (not (cp-any? s #(Character/isDigit (int %))))))
+
+(defn pwd-no-lower?
+  ^Boolean [s]
+  (and (string? s) (not (cp-any? s #(Character/isLowerCase (int %))))))
+
+(defn pwd-no-upper?
+  ^Boolean [s]
+  (and (string? s) (not (cp-any? s #(Character/isUpperCase (int %))))))
+
+(defn pwd-no-symbol?
+  ^Boolean [s]
+  (and (string? s) (not (cp-any? s #(not (Character/isLetterOrDigit (int %)))))))
+
+(defn pwd-no-different-chars?
+  ^Boolean [s]
+  (and (string? s) (cp-all-same? s)))
+
+(defn pwd-no-proper-length?
+  ^Boolean [s]
+  (and (string? s) (let [n (unchecked-int (cp-len s))] (not (<= 8 n 62)))))
+
+(defn- lower-hex-char?
+  "True for ASCII lowercase hex: 0-9 or a-f."
+  ^Boolean [^Character c]
+  (let [n (unchecked-int (.charValue c))]
+    (or (<= 48 n 57)
+        (<= 97 n 102))))
+
+(defn- lower-hex-range?
+  "True if s[i..i+len) is all lowercase hex chars."
+  ^Boolean [^String s ^long i ^long len]
+  (let [i (unchecked-int i)
+        end (unchecked-add-int i (unchecked-int len))]
+    (when (<= end (unchecked-int (.length s)))
+      (loop [j i]
+        (if (== j end)
+          true
+          (let [c (.charAt s j)]
+            (and (lower-hex-char? c)
+                 (recur (unchecked-inc j)))))))))
+
+(defn- name-tail-cp-ok?
+  ^Boolean [cp]
+  (let [cp (unchecked-int cp)]
+    (or (Character/isLetter cp)
+        (== cp 0x20)                      ; space
+        (== cp 0x2C)                      ; ,
+        (== cp 0x2E)                      ; .
+        (== cp 0x27)                      ; '
+        (== cp 0x2D)                      ; -
+        )))
 
 (defn valid-string-md5?
-  [s]
+  ^Boolean [s]
   (and (string? s)
-       (some? (re-find #"^[a-f0-9]{32}$" s))))
+       (let [^String s s]
+         (and (== 32 (.length s))
+              (lower-hex-range? s 0 32)))))
+
+(defn valid-secure-session-id?
+  ^Boolean [s]
+  (and (string? s)
+       (let [^String s s]
+         (and (== 65 (.length s))
+              (== 45 (unchecked-int (.charAt s 32)))
+              (lower-hex-range? s 0 32)
+              (lower-hex-range? s 33 32)))))
+
+(defn valid-session-id?
+  ^Boolean [s]
+  (and (string? s)
+       (let [^String s s
+             n (unchecked-int (.length s))]
+         (or (and (== 32 n) (lower-hex-range? s 0 32))
+             (and (== 65 n)
+                  (== 45 (unchecked-int (.charAt s 32)))
+                  (lower-hex-range? s 0 32)
+                  (lower-hex-range? s 33 32))))))
 
 (defn valid-name?
-  [s]
+  ^Boolean [s]
   (and (string? s)
-       (some? (re-find #"^\p{L}[\p{L} ,.'-]*$" s))))
+       (let [^String s s
+             n (.length s)]
+         (and (pos? n)
+              (let [cp0 (unchecked-int (.codePointAt s 0))
+                    i0  (unchecked-int (Character/charCount cp0))]
+                (and (Character/isLetter cp0)
+                     (loop [i i0]
+                       (if (>= i n)
+                         true
+                         (let [cp (.codePointAt s i)]
+                           (and (name-tail-cp-ok? cp)
+                                (recur (unchecked-add-int i (Character/charCount cp)))))))))))))
 
 ;; Generators
 
@@ -527,7 +652,7 @@
 
 (def ip-address-mapped
   (let [str->ipv6 (comp ip/to-v6 ip/string-to-address)
-        ip->str   #(if (ip/is-ipv6? %) (ip/to-str (or (ip/to-v4 %) %)))]
+        ip->str   #(when (ip/is-ipv6? %) (ip/to-str (or (ip/to-v4 %) %)))]
     (m/-simple-schema
      {:type            :ip-address-mapped
       :pred            ip/is-ipv6?
@@ -548,8 +673,8 @@
                         :gen/gen             gen-ipv6-address}})))
 
 (def ip-address
-  (let [ip->str #(if (ip/is-ip? %) (ip/to-str (or (ip/to-v4 %) %)))
-        str->ip #(if (string?   %) (ip/string-to-address %))]
+  (let [ip->str #(when (ip/is-ip? %) (ip/to-str (or (ip/to-v4 %) %)))
+        str->ip #(when (string?   %) (ip/string-to-address %))]
     (m/-simple-schema
      {:type            :ip-address
       :pred            ip/is-ip?
@@ -630,12 +755,12 @@
 
 (defn gen-account-type-schema
   [id auth-settings]
-  (let [id            (utils/some-keyword id)
+  (let [_id           (utils/some-keyword id)
         account-types (some->> auth-settings :types keys (filter some?) (map keyword))
-        account-types (if (seq account-types) (set account-types))
-        enums         (if account-types (mapv name account-types))
-        gen-ac-type   (if account-types (gen-gen-account-type account-types))]
-    (if account-types
+        account-types (when (seq account-types) (set account-types))
+        enums         (when account-types (mapv name account-types))
+        gen-ac-type   (when account-types (gen-gen-account-type account-types))]
+    (when account-types
       (m/-simple-schema
        {:type            :account-type
         :pred            #(and (keyword? %) (contains? account-types %))

@@ -120,14 +120,31 @@
 
 ;; URLs
 
-(def ^:const fast-url-matcher (re-pattern "^[a-zA-Z0-9\\+\\.\\-]+\\:"))
-
 (defn is-url?
   "Returns `true` if the given argument `s` is a non-empty string that begins like an
   URL. Returns `false` otherwise."
   ^Boolean [s]
-  (when (and s (string? s))
-    (let [^String s s]
-      (and (not-empty-string? s)
-           (not= \/ (.charAt s 0))
-           (some? (re-find fast-url-matcher s))))))
+  (when (string? s)
+    (let [^String s s
+          len (.length s)]
+      (when (pos? len)
+        (let [c0 (.charAt s 0)]
+          (when (not= c0 \/)
+            (loop [i 0]
+              (let [c (.charAt s i)
+                    x (int c)]
+                (cond
+                  ;; colon ends scheme-like
+                  (= c \:) true
+
+                  ;; A-Z a-z 0-9 + . -
+                  (or (<= 48 x 57)     ; 0-9
+                      (<= 65 x 90)     ; A-Z
+                      (<= 97 x 122)    ; a-z
+                      (= 43 x)         ; +
+                      (= 46 x)         ; .
+                      (= 45 x))        ; -
+                  (let [i' (inc i)]
+                    (and (< i' len) (recur i')))
+
+                  :else false)))))))))

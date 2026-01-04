@@ -2466,10 +2466,13 @@
 
 ;; Headers
 
+(def ^:private ^java.util.regex.Pattern mobile-ua-pattern
+  (re-pattern "\\b(?:iPhone|iPad|iPod|Android|Windows Phone|webOS|IEMobile|BlackBerry)\\b"))
+
 (defn mobile-agent?
   ^Boolean [req]
-  (when-some [ua (get (get req :headers) "user-agent")]
-    (some? (re-find #"\b(iPhone|iPad|iPod|Android|Windows Phone|webOS|IEMobile|BlackBerry)\b" ua))))
+  (when-some [^String ua (get (get req :headers) "user-agent")]
+    (.find (.matcher mobile-ua-pattern ua))))
 
 (defmacro add-header
   "Adds a header `header` to `:response/headers` map of the `req` using built-in
