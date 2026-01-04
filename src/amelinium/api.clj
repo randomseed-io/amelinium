@@ -8,26 +8,24 @@
 
   (:refer-clojure :exclude [random-uuid])
 
-  (:require [potemkin                             :as               p]
+  (:require [amelinium.types.response]
             [ring.util.response]
             [amelinium.http.response              :as            resp]
-            [amelinium.utils                      :refer         :all]
             [amelinium.common                     :as          common]
             [amelinium.errors                     :as          errors]
             [amelinium.i18n                       :as            i18n]
             [amelinium.http.middleware.validators :as      validators]
+            [potemkin                             :as               p]
             [amelinium.http.middleware.session    :as         session]
-            [amelinium.types.response             :refer         :all]
+            [amelinium.utils                      :refer [random-uuid-or-empty
+                                                          is-url?]]
             [io.randomseed.utils.map              :refer    [qassoc
                                                              qupdate]]
             [io.randomseed.utils                  :refer  [random-uuid
                                                            some-keyword]])
 
-  (:import (amelinium     Response)
-           (clojure.lang  IFn)
-           (reitit.core   Match)
-           (lazy_map.core LazyMapEntry
-                          LazyMap)))
+  (:import (amelinium    Response)
+           (clojure.lang IFn)))
 
 ;; Operations logging
 

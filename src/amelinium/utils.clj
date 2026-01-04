@@ -1,26 +1,25 @@
 (ns
 
-    ^{:doc    "amelinium service, utility functions."
-      :author "Paweł Wilk"
-      :added  "1.0.0"}
+ ^{:doc    "amelinium service, utility functions."
+   :author "Paweł Wilk"
+   :added  "1.0.0"}
 
-    amelinium.utils
+ amelinium.utils
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require [amelinium]
-            [clojure.string            :as          str]
-            [clojure.java.io           :as           io]
-            [tick.core                 :as            t]
-            [io.randomseed.utils       :refer      :all]
-            [io.randomseed.utils.map   :as          map])
+            [clojure.java.io           :as               io]
+            [tick.core                 :as                t]
+            [io.randomseed.utils       :refer [get-rand-int
+                                               random-uuid
+                                               not-empty-string?
+                                               some-str]]
+            [io.randomseed.utils.map   :as              map])
 
   (:import (java.time        Duration)
            (java.time.format DateTimeFormatter)
-           (clojure.lang     Cons
-                             Keyword
-                             PersistentVector
-                             IPersistentMap)))
+           (clojure.lang     Keyword)))
 
 ;; Data structures and control flow expressions
 
@@ -34,9 +33,9 @@
   "Returns the given path if there is a resource it points to. Otherwise it returns
   nil. Multiple arguments are joined using str."
   ([path]
-   (if-some [path (str path)] (and (io/resource path) path)))
+   (when-some [path (str path)] (and (io/resource path) path)))
   ([path & more]
-   (if-some [path (apply str path more)] (and (io/resource path) path))))
+   (when-some [path (apply str path more)] (and (io/resource path) path))))
 
 ;; UUIDs
 
@@ -56,9 +55,9 @@
   with first colon character removed. Returns `nil` for falsy values or empty
   string (including empty strings after trimming the `:`)."
   ^String [s]
-  (if-some [^String s (some-str s)]
+  (when-some [^String s (some-str s)]
     (if (= \: (.charAt s 0))
-      (let [^String s (subs s 1)] (if (not-empty-string? s) s))
+      (let [^String s (subs s 1)] (when (not-empty-string? s) s))
       s)))
 
 (defn keyword-from-param
@@ -69,9 +68,9 @@
   ^Keyword [s]
   (if (keyword? s)
     s
-    (if-some [^String s (some-str s)]
+    (when-some [^String s (some-str s)]
       (if (= \: (.charAt s 0))
-        (let [^String s (subs s 1)] (if (not-empty-string? s) (keyword s)))
+        (let [^String s (subs s 1)] (when (not-empty-string? s) (keyword s)))
         (keyword s)))))
 
 (defn try-namespace

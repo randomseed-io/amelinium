@@ -1,31 +1,24 @@
 (ns
 
-    ^{:doc    "Schemas of amelinium."
-      :author "Paweł Wilk"
-      :added  "1.0.0"}
+ ^{:doc    "Schemas of amelinium."
+   :author "Paweł Wilk"
+   :added  "1.0.0"}
 
-    amelinium.schemas
+ amelinium.schemas
 
   (:require [malli.core                            :as           m]
-            [malli.util                            :as          mu]
-            [malli.error                           :as        merr]
-            [malli.generator                       :as        mgen]
-            [malli.transform                       :as      mtform]
-            [malli.json-schema                     :as json-schema]
             [malli.registry                        :as   mregistry]
             [tick.core                             :as           t]
             [clojure.string                        :as         str]
             [clojure.test.check.generators         :as         gen]
-            [clj-uuid                              :as        uuid]
             [phone-number.core                     :as       phone]
-            [phone-number.util                     :as      phutil]
             [io.randomseed.utils.validators.common :as          vc]
             [io.randomseed.utils.ip                :as          ip]
             [io.randomseed.utils                   :as       utils]
-            [amelinium.locale                      :as      locale]
             [amelinium.identity                    :as    identity])
 
   (:import (java.util UUID)
+           (java.lang Character)
            (java.time Duration)))
 
 ;; Helpers
