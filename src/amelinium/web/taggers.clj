@@ -1,16 +1,14 @@
 (ns
 
-    ^{:doc    "amelinium service, Selmer taggers."
-      :author "Paweł Wilk"
-      :added  "1.0.0"}
+ ^{:doc    "amelinium service, Selmer taggers."
+   :author "Paweł Wilk"
+   :added  "1.0.0"}
 
-    amelinium.web.taggers
+ amelinium.web.taggers
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require [clojure.string                       :as        str]
-            [tick.core                            :as          t]
-            [reitit.core                          :as          r]
             [selmer.parser                        :as     selmer]
             [selmer.util                          :as      sutil]
             [selmer.filter-parser                 :as         fp]
@@ -65,13 +63,60 @@
   `ctx` map. If there is no entry or value is `nil` or `false`, it looks it up
   directly in `ctx`. Returns a value or an empty string."
   [ctx v]
-  (or (if-some [fe (not-empty (get ctx :form/errors))]
-        (if-some [pa (not-empty (get fe :params))]
-          (if-let [param-id (some-str v)]
-            (if-some [param (some-str (get pa param-id))]
-              param))))
-      (if-some [v (get ctx v)] v)
+  (or (when-some [ferrors (not-empty (get ctx :form/errors))]
+        (when-some [params (not-empty (get ferrors :params))]
+          (when-some [param-id (some-str v)]
+            (when-let [param (get params param-id)]
+              (when-some [param (some-str param)]
+                param)))))
+      (when-some [v (get ctx v)] v)
       ""))
+
+(defn- ws?
+  ^Boolean [^java.lang.Character c]
+  (Character/isWhitespace c))
+
+(defn- parse-assignment-token
+  "If v matches: [[ key ]] or [- key -] (with optional whitespace),
+  returns [:ctx key] or [:field key], otherwise nil."
+  [^String v]
+  (let [n (unchecked-int (.length v))]
+    (when (pos? n)
+      ;; trim without allocating
+      (let [l0 (loop [i (unchecked-int 0)]
+                 (if (and (< i n) (ws? (.charAt v i)))
+                   (recur (unchecked-inc-int i))
+                   i))
+            r0 (loop [i n]
+                 (if (and (pos? i) (ws? (.charAt v (dec i))))
+                   (recur (dec i))
+                   i))
+            len (unchecked-subtract-int r0 l0)]
+        (when (>= len 4)
+          (when (and (== 91 (int (.charAt v l0)))                   ; '['
+                     (== 93 (int (.charAt v (dec r0)))))            ; ']'
+            (let [l (int (.charAt v (unchecked-inc-int l0)))        ; 2nd char
+                  r (int (.charAt v (unchecked-subtract-int r0 2))) ; penultimate char
+                  kind (cond (and (== l 91) (== r 93)) :ctx         ; [[ ... ]]
+                             (and (== l 45) (== r 45)) :field       ; [- ... -]
+                             :else nil)]
+              (when kind
+                ;; inner trim (again, no alloc)
+                (let [inner-start (loop [i (unchecked-add-int l0 2)]
+                                    (if (and (< i (unchecked-subtract-int r0 2))
+                                             (ws? (.charAt v i)))
+                                      (recur (unchecked-inc-int i))
+                                      i))
+                      inner-end   (loop [i (unchecked-subtract-int r0 2)]
+                                    (if (and (> i inner-start)
+                                             (ws? (.charAt v (dec i))))
+                                      (recur (dec i))
+                                      i))]
+                  (when (< inner-start inner-end)
+                    ;; must not contain ']'
+                    (let [p (.indexOf v (int \]) inner-start)]
+                      (when (or (neg? p) (>= p inner-end))
+                        [kind (.substring v inner-start inner-end)]))))))))))))
 
 (defn render-assignment-value
   "Interpolates values enclosed within `[[` and `]]` tokens by getting values
@@ -80,24 +125,31 @@
   transferred from propagated error data or, if there was no error, with values
   associated with keys in `ctx` map."
   [ctx v]
-  (if (nil? ctx)
-    v
-    (if (seq v)
-      (let [[_ l kw r] (re-find #"^\s*\[([\[\-])\s*([^\]]+)\s*([\]\-])\]\s*$" v)]
-        (binding [sutil/*escape-variables* true]
-          (html-esc
-           (cond (and kw (= "[" l) (= "]" r)) (some->> (str/trimr kw) keyword-from-param (get ctx))
-                 (and kw (= "-" l r))         (some->> (str/trimr kw) keyword-from-param (get-field-value ctx))
-                 (nil? v)                     ""
-                 :else                        v))))
-      "")))
+  (cond
+    (nil? ctx) v
+    (nil? v)   ""
+    (and (string? v) (zero? (.length ^String v))) ""
+    :else
+    (let [^String v (if (string? v) v (str v))
+          parsed    (parse-assignment-token v)]
+      (binding [sutil/*escape-variables* true]
+        (html-esc
+         (cond
+           (= (first parsed) :ctx)
+           (some->> (second parsed) keyword-from-param (get ctx))
+
+           (= (first parsed) :field)
+           (some->> (second parsed) keyword-from-param (get-field-value ctx))
+
+           :else
+           v))))))
 
 (defn last-char
   "Returns last character of the given string `s` or `nil`."
   [^String s]
-  (if s
+  (when s
     (let [l (unchecked-int (.length s))]
-      (if (pos? l)
+      (when (pos? l)
         (.charAt s (unchecked-dec-int l))))))
 
 (defn- pboolean
@@ -110,7 +162,7 @@
   (if (or (nil? v) (false? v))
     false
     (or (true? v)
-        (if-some [v (if (valuable? v) (some-str v))]
+        (if-some [v (when (valuable? v) (some-str v))]
           (not
            (contains? #{"" " " "\n" "\r" ":"
                         "nil" "null" "false" "no" "not" "none" "off"
