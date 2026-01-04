@@ -1,27 +1,54 @@
 (ns
 
-    ^{:doc    "amelinium service, language middleware."
-      :author "Paweł Wilk"
-      :added  "1.0.0"}
+ ^{:doc    "amelinium service, language middleware."
+   :author "Paweł Wilk"
+   :added  "1.0.0"}
 
-    amelinium.http.middleware.language
+ amelinium.http.middleware.language
 
   (:refer-clojure :exclude [parse-long uuid random-uuid force])
 
-  (:require [reitit.ring             :as            ring]
-            [reitit.core             :as               r]
+  (:require [reitit.core             :as               r]
             [amelinium.logging       :as             log]
             [amelinium.system        :as          system]
             [phone-number.core       :as           phone]
             [io.randomseed.utils.var :as             var]
             [io.randomseed.utils.map :as             map]
-            [io.randomseed.utils.map :refer     [qassoc]]
-            [io.randomseed.utils     :refer         :all]))
+            [io.randomseed.utils     :refer [some-str
+                                             some-keyword
+                                             some-keyword-simple
+                                             when-valuable
+                                             valuable
+                                             valuable?]]))
 
 (def default-lang-param      :lang)
 (def default-fallback-language :en)
 
-(def ^:const re-lang (re-pattern "[A-Za-z_\\-\\:\\.]{2,7}"))
+(defn- lang-tag?
+  "True if s is 2..7 chars and contains only [A-Za-z_\\-:\\.]."
+  ^Boolean [^String s]
+  (let [n (unchecked-int (.length s))]
+    (if (<= 2 n 7)
+      (loop [i (unchecked-int 0)]
+        (if (== i n)
+          true
+          (let [x (int (.charAt s i))]
+            (if (or (<= 65 x 90)   ; A-Z
+                    (<= 97 x 122)  ; a-z
+                    (== 95 x)      ; _
+                    (== 45 x)      ; -
+                    (== 58 x)      ; :
+                    (== 46 x))     ; .
+              (recur (unchecked-inc-int i))
+              false))))
+      false)))
+
+(defn- lang-from
+  ^clojure.lang.Keyword [supported x]
+  (when-some [^String s (some-str x)]
+    (when (lang-tag? s)
+      (when-some [k (some-keyword-simple s)]
+        (get supported k)))))
 
 ;; Configuration getters
 
@@ -75,7 +102,7 @@
      (pick-without-fallback req pickers-or-picker-id :default)
      (pick-without-fallback req (get req :language/pickers) pickers-or-picker-id)))
   ([req pickers picker-id]
-   (if-some [picker (get pickers picker-id)]
+   (when-some [picker (get pickers picker-id)]
      (picker req))))
 
 (defn pick
@@ -110,44 +137,30 @@
          (pick-without-fallback req (get req :language/pickers) pickers-or-picker-id))
        (default-lang-id req)))
   ([req pickers picker-id]
-   (or (if-some [picker (get pickers picker-id)] (picker req))
+   (or (when-some [picker (get pickers picker-id)] (picker req))
        (default-lang-id req))))
 
 ;; Language pickers
 
 (defn from-default
   ([req]         (or (get (config req) :default) default-fallback-language))
-  ([req config]  (or (get config :default) default-fallback-language))
+  ([_ config]    (or (get config :default) default-fallback-language))
   ([_ _ default] (or default default-fallback-language)))
 
 (defn get-in-req
   "Reads a language from the given request map by getting a value specified by a
   sequence of keys, converting the result to a keyword and checking against a set of
   supported languages."
-  ([req supported k]
-   (some->> (get req k)
-            some-str
-            (re-matches re-lang)
-            some-keyword-simple
-            (get supported)))
-  ([req supported k1 k2]
-   (some->> (get (get req k1) k2)
-            some-str
-            (re-matches re-lang)
-            some-keyword-simple
-            (get supported)))
-  ([req supported k1 k2 k3]
-   (some->> (get (get (get req k1) k2) k3)
-            some-str
-            (re-matches re-lang)
-            some-keyword-simple
-            (get supported)))
+  ([req supported k]        (lang-from supported (get req k)))
+  ([req supported k1 k2]    (lang-from supported (get (get req k1) k2)))
+  ([req supported k1 k2 k3] (lang-from supported (get (get (get req k1) k2) k3)))
   ([req supported k1 k2 k3 & kpath]
-   (some->> (get-in req (cons k1 (cons k2 (cons k3 kpath))))
-            some-str
-            (re-matches re-lang)
-            some-keyword-simple
-            (get supported))))
+   (let [v (loop [m  (get (get (get req k1) k2) k3)
+                  ks kpath]
+             (if (seq ks)
+               (recur (get m (first ks)) (next ks))
+               m))]
+     (lang-from supported v))))
 
 (defn from-form-params
   ([req]                   (get-in-req req (supported req) :form-params (param req)))
@@ -167,21 +180,21 @@
 (def default-picker
   {:compile (fn [config]
               (let [default (or (:default config) default-fallback-language)]
-                (fn [req]
+                (fn [_]
                   default)))})
 
 (def req-picker
   {:compile (fn [config]
               (let [lang-param        (param nil config)
                     lang-param        (if (get config :stringify-lang-param?) (some-str lang-param) lang-param)
-                    last-key          (if (some? lang-param) (cons lang-param nil))
+                    last-key          (when (some? lang-param) (cons lang-param nil))
                     supported         (supported nil config)
                     key-path          (get config :key-path)
-                    key-path          (if (valuable? key-path) (if (seqable? key-path) key-path (cons key-path nil)))
+                    key-path          (when (valuable? key-path) (if (seqable? key-path) key-path (cons key-path nil)))
                     path              (seq (concat (seq key-path) last-key))
                     [k1 k2 k3 & rest] path]
                 (case (count path)
-                  0 (fn [req] nil)
+                  0 (fn   [_] nil)
                   1 (fn [req] (get-in-req req supported k1))
                   2 (fn [req] (get-in-req req supported k1 k2))
                   3 (fn [req] (get-in-req req supported k1 k2 k3))
@@ -189,37 +202,37 @@
 
 (def body-picker
   (-> req-picker
-      (qassoc :key-path :body-params)))
+      (map/qassoc :key-path :body-params)))
 
 (def body-phone-picker
   {:compile (fn [config]
               (let [supported (supported nil config)]
                 (fn [req]
-                  (if-some [phone (some-str (get (get req :body-params) :phone))]
-                    (if (phone/has-region? phone)
+                  (when-some [phone (some-str (get (get req :body-params) :phone))]
+                    (when (phone/has-region? phone)
                       (-> (phone/region phone) name some-keyword (get supported)))))))})
 
 (def body-phone-picker-str
   {:compile (fn [config]
               (let [supported (supported nil config)]
                 (fn [req]
-                  (if-some [phone (some-str (get (get req :body-params) "phone"))]
-                    (if (phone/has-region? phone)
+                  (when-some [phone (some-str (get (get req :body-params) "phone"))]
+                    (when (phone/has-region? phone)
                       (-> (phone/region phone) name some-keyword (get supported)))))))})
 
 (def accept-picker
   (-> req-picker
-      (qassoc :key-path :accept
-              :param :language)))
+      (map/qassoc :key-path :accept
+                  :param :language)))
 
 (def query-params-picker
   (-> req-picker
-      (qassoc :key-path :query-params)))
+      (map/qassoc :key-path :query-params)))
 
 (def query-params-picker-str
   (-> req-picker
-      (qassoc :key-path :query-params
-              :stringify-lang-param? true)))
+      (map/qassoc :key-path :query-params
+                  :stringify-lang-param? true)))
 
 (def form-params-picker-str
   {:compile (fn [config]
@@ -239,16 +252,16 @@
   {:compile (fn [config]
               (let [supported (supported nil config)]
                 (fn [req]
-                  (if-some [phone (some-str (get (get req :form-params) "phone"))]
-                    (if (phone/has-region? phone)
+                  (when-some [phone (some-str (get (get req :form-params) "phone"))]
+                    (when (phone/has-region? phone)
                       (-> (phone/region phone) name some-keyword (get supported)))))))})
 
 (def form-param-phone-picker
   {:compile (fn [config]
               (let [supported (supported nil config)]
                 (fn [req]
-                  (if-some [phone (some-str (get (get req :form-params) :phone))]
-                    (if (phone/has-region? phone)
+                  (when-some [phone (some-str (get (get req :form-params) :phone))]
+                    (when (phone/has-region? phone)
                       (-> (phone/region phone) name some-keyword (get supported)))))))})
 
 (def path-picker
@@ -278,9 +291,9 @@
     req
     (let [language-id  (delay (some-keyword-simple language))
           language-str (delay (some-str @language-id))]
-      (qassoc req
-              :language/id  language-id
-              :language/str language-str))))
+      (map/qassoc req
+                  :language/id  language-id
+                  :language/str language-str))))
 
 ;; Language default pickers
 
@@ -323,7 +336,7 @@
   and its result will be converted to a keyword and tested against existence in the
   aforementioned set of supported languages."
   [config p]
-  (if-some [p (var/deref-symbol p)]
+  (when-some [p (var/deref-symbol p)]
     (if (map? p)
       (let [parent     (var/deref-symbol (:derive p))
             p          (if (map? parent) (conj parent (dissoc p :parent)) p)
@@ -331,8 +344,8 @@
             compile-fn (var/deref-symbol (:compile p))
             handler-fn (var/deref-symbol (:handler p))
             picker-fn  (if compile-fn (compile-fn config) #(handler-fn config %))]
-        (if (ifn? picker-fn) picker-fn))
-      (if (ifn? p)
+        (when (ifn? picker-fn) picker-fn))
+      (when (ifn? p)
         (comp (supported nil config) some-keyword p)))))
 
 (defn init-picker-chain
@@ -375,8 +388,8 @@
   (let [default (or (some-keyword-simple (:default config)) default-fallback-language)]
     (-> config
         (assoc  :default   default)
-        (update :supported #(if % (if (system/ref? %) % (map some-keyword-simple (if (coll? %) % (cons % nil))))))
-        (update :supported #(if % (if (system/ref? %) % (disj (conj (set %) default) nil))))
+        (update :supported #(when % (if (system/ref? %) % (map some-keyword-simple (if (coll? %) % (cons % nil))))))
+        (update :supported #(when % (if (system/ref? %) % (disj (conj (set %) default) nil))))
         (update :supported #(if (system/ref? %) % (or (not-empty %) #{default})))
         (update :param     (fnil some-keyword-simple :lang))
         init-pickers)))
@@ -401,23 +414,23 @@
                   (fn [req]
                     (let [lang-id  (delay (picker-fn req))
                           lang-str (delay (some-str @lang-id))]
-                      (handler (qassoc req
-                                       :language/settings config
-                                       :language/pickers  lang-pickers
-                                       :language/default  default-lang-id
-                                       :language/id       lang-id
-                                       :language/str      lang-str))))))}))
+                      (handler (map/qassoc req
+                                           :language/settings config
+                                           :language/pickers  lang-pickers
+                                           :language/default  default-lang-id
+                                           :language/id       lang-id
+                                           :language/str      lang-str))))))}))
 
 (system/add-expand ::default [k config] (expand-language k config))
 (system/add-init   ::default [k config] (wrap-language k (prep-language config)))
-(system/add-halt!  ::default [_ config] nil)
+(system/add-halt!  ::default [_ _] nil)
 
 (system/add-expand ::supported [k config] (expand-supported k config))
 (system/add-init   ::supported [_ config] (prep-supported config))
-(system/add-halt!  ::supported [_ config] nil)
+(system/add-halt!  ::supported [_ _] nil)
 
 (system/add-init  ::pickers   [_ config] config)
-(system/add-halt! ::pickers   [_ config] nil)
+(system/add-halt! ::pickers   [_ _] nil)
 
 (derive ::web ::default)
 (derive ::api ::default)
