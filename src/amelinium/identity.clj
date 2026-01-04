@@ -323,24 +323,24 @@
   Caution: The identity type must be a keyword (it will not be coerced)."
   (rdb/memoize parse-single 4096))
 
-(defn- parse-indexed
-  "(Premature optimization is the root of all evil.)"
-  [[^Keyword t indexed-ids]]
-  (let [[indexes ids] (reduce
-                       (fn [[indexes ids] [i v]] [(cons i indexes) (cons v ids)])
-                       [() ()] indexed-ids)]
-    (map vector indexes (map (parser t) ids))))
+;; (defn- parse-indexed
+;;   "(Premature optimization is the root of all evil.)"
+;;   [[^Keyword t indexed-ids]]
+;;   (let [[indexes ids] (reduce
+;;                        (fn [[indexes ids] [i v]] [(cons i indexes) (cons v ids)])
+;;                        [() ()] indexed-ids)]
+;;     (map vector indexes (map (parser t) ids))))
 
-(defn- parse-multi
-  "(Premature optimization is the root of all evil.)"
-  ([^Keyword identity-type user-identities]
-   (map (parser identity-type) user-identities))
-  ([user-identities]
-   (->> (map-indexed vector user-identities)
-        (group-by #(p/type (nth % 1)))
-        (mapcat parse-indexed)
-        (sort-by #(nth % 0))
-        (map #(nth % 1)))))
+;; (defn- parse-multi
+;;   "(Premature optimization is the root of all evil.)"
+;;   ([^Keyword identity-type user-identities]
+;;    (map (parser identity-type) user-identities))
+;;   ([user-identities]
+;;    (->> (map-indexed vector user-identities)
+;;         (group-by #(p/type (nth % 1)))
+;;         (mapcat parse-indexed)
+;;         (sort-by #(nth % 0))
+;;         (map #(nth % 1)))))
 
 (defmethod parser :email   [_] of-email)
 (defmethod parser :phone   [_] of-phone)
