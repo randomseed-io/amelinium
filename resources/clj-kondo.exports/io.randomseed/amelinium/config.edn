@@ -10,4 +10,6 @@
    amelinium.common/def-redirect           hooks.amelinium.redirect/def-redirect
    amelinium.common/def-localized-redirect hooks.amelinium.redirect/def-localized-redirect
 
+   amelinium.web/def-render                hooks.amelinium.web/def-render
+
    cambium.core/deflevel                   hooks.cambium.core/deflevel}}}
