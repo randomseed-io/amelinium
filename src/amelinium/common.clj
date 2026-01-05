@@ -168,14 +168,12 @@
 
 (def ^:const max-url-len      8192)
 (def ^:const page-cache-len   4096)
-(def ^:const path-splitter    (re-pattern "([^\\?\\#]+)(\\#[^\\?]+)?(\\?.*)?"))
-(def ^:const on-slash         (re-pattern "/"))
 (def ^:const slash-break      (re-pattern "[^/]+|/"))
 
 (defn- split-qparams
   [path]
-  (let [q (.indexOf ^String path "?")
-        h (.indexOf ^String path "#")
+  (let [q (unchecked-int (.indexOf ^String path "?"))
+        h (unchecked-int (.indexOf ^String path "#"))
         i (cond
             (neg? q) h
             (neg? h) q
@@ -184,37 +182,103 @@
         s (when-not (neg? i) (subs path i))]
     [p s]))
 
+(defn split-path-on-slashes
+  "Exact behavior of (clojure.string/split s #\"/\") for non-nil s.
+  - keeps leading and middle empty segments
+  - drops trailing empty segments
+  - if there is no '/', returns [s] (even if s is \"\")
+  - if s contains only '/', returns []"
+  [s]
+  (when-some [^String s (utils/some-str s)]
+    (let [n         (unchecked-int (.length s))
+          first     (unchecked-int (.indexOf s (int \/) 0))]
+      (if (neg? first)
+        [s]
+        (loop [i   (unchecked-int 0)
+               j   first
+               out (transient [])]
+          (if (neg? j)
+            (let [v (persistent! (conj! out (.substring s i n)))
+                ;; drop trailing empties (limit=0 behavior)
+                  k (loop [k (unchecked-dec-int (unchecked-int (count v)))]
+                      (if (and (>= k 0) (= "" (nth v k)))
+                        (recur (unchecked-dec k))
+                        k))]
+              (if (neg? k) [] (subvec v 0 (inc k))))
+            (let [seg (.substring s i j)
+                  i'  (unchecked-inc-int j)
+                  j'  (unchecked-int (.indexOf s (int \/) i'))]
+              (recur i' j' (conj! out seg)))))))))
+
+(defn- template-has-segment?
+  "True if template t contains a non-empty '/'-separated segment equal to needle."
+  ^Boolean [^String t ^String needle]
+  (let [n (unchecked-int (.length t))
+        m (unchecked-int (.length needle))]
+    (loop [i (unchecked-int 0)]
+      (if (>= i n)
+        false
+        (let [j (unchecked-int (.indexOf t (int \/) i))
+              end (if (neg? j) n j)
+              len (unchecked-subtract-int end i)]
+          (cond
+
+            ;; regex [^/]+ ignores empty segments
+            (zero? len)
+            (recur (unchecked-inc-int end)) ; skip '/'
+
+            ;; exact match without allocating substring
+            (and (== len m) (.regionMatches t i needle 0 m))
+            true
+
+            :else
+            (recur (unchecked-inc-int end))))))))
+
+(defn- next-slash-token
+  "Returns [kind start end next-idx] where kind is :slash or :seg.
+   Tokens match regex [^/]+|/ (so no empty segments, but consecutive '/' yield
+   many :slash tokens)."
+  ^clojure.lang.IPersistentVector [^String s ^long i]
+  (let [n (unchecked-int (.length s))]
+    (when (< i n)
+      (if (== (int (.charAt s i)) 47)   ; '/'
+        [:slash i (unchecked-inc-int i) (unchecked-inc-int i)]
+        (let [j (unchecked-int (.indexOf s (int \/) i))
+              end (if (neg? j) n j)]
+          [:seg i end end])))))
+
 (defn path-variants-core
-  "Generates a list of all possible language variants of a path."
+  "Generates a list of all possible language variants of a path. When language and
+  suffix are given the language must be a string."
   {:no-doc true}
   ([path lang-id]
    (when-some [path (utils/some-str path)]
      (when-some [lang (utils/some-str lang-id)]
        (let [[p s] (split-qparams path)]
          (path-variants-core p lang s)))))
-  ([path lang suffix]
-   (let [pathc (count path)]
-     (if (and (= 1 pathc) (= path "/"))
-       (cons (str "/" lang "/") (cons (str "/" lang) nil))
+  ([^String path ^String lang ^String suffix]
+   (let [pathc (unchecked-int (.length path))]
+     (if (and (== 1 pathc) (= path "/"))
+       (cons (utils/strb "/" lang "/") (cons (utils/strb "/" lang) nil))
        (let [abs?   (= \/ (.charAt ^String path (unchecked-int 0)))
              trail? (= \/ (.charAt ^String path (unchecked-dec-int pathc)))
-             segs   (str/split path on-slash)
+             segs   (split-path-on-slashes path)
              paths  (map-indexed
                      (if trail?
-                       (fn [i _] (str (str/join "/" (utils/insert-at (unchecked-inc i) segs lang)) "/"))
+                       (fn [i _] (utils/strb (str/join "/" (utils/insert-at (unchecked-inc i) segs lang)) "/"))
                        (fn [i _] (str/join "/" (utils/insert-at (unchecked-inc i) segs lang))))
                      segs)
              paths  (if abs?
                       paths
                       (->> paths
-                           (cons (str "/" lang "/" path)) lazy-seq
-                           (cons (str lang "/" path))     lazy-seq))
+                           (cons (utils/strb "/" lang "/" path)) lazy-seq
+                           (cons (utils/strb lang "/" path))     lazy-seq))
              paths  (concat paths
                             (lazy-seq
-                             (cons (if trail? (str path lang) (str path "/" lang "/"))
+                             (cons (if trail? (utils/strb path lang) (utils/strb path "/" lang "/"))
                                    nil)))]
          (if suffix
-           (map #(str % suffix) paths)
+           (map #(utils/strb % suffix) paths)
            paths))))))
 
 (def ^{:arglists '([path lang-id]
@@ -268,7 +332,9 @@
   [path]
   (when path (split-qparams path)))
 
-(defn split-query-params
+(def ^:const path-splitter (re-pattern "([^\\?\\#]+)(\\#[^\\?]+)?(\\?.*)?"))
+
+(defn split-query-params-old
   "Splits path into 3 string components: path, location and query params. Returns a
   vector."
   [path]
@@ -276,6 +342,32 @@
     (if-let [[_ p loc q] (re-matches path-splitter path)]
       [p loc q]
       [path nil nil])))
+
+(defn split-query-params
+  "Splits path into 3 string components: path, location and query params.
+   Returns [path location query].
+   `location` includes leading '#', `query` includes leading '?'."
+  [path]
+  (when path
+    (if-let [^String s (utils/some-str path)]
+      (let [n  (unchecked-int (.length s))
+            qi (unchecked-int (.indexOf s (int \?)))
+            hi (unchecked-int (.indexOf s (int \#)))
+            endp (cond
+                   (and (neg? qi) (neg? hi)) n
+                   (neg? qi)                 hi
+                   (neg? hi)                 qi
+                   :else (min qi hi))
+            p (.substring s 0 endp)
+            ;; loc: from # to ? (if ? is after #), or till the end
+            loc (when (and (not= hi -1) (< hi n))
+                  (let [end (if (and (not= qi -1) (> qi hi)) qi n)]
+                    (when (> end hi)
+                      (.substring s hi end))))
+            ;; q: from ? till the end
+            q   (when (not= qi -1) (.substring s qi n))]
+        [(or p "") loc q])
+      ["" nil nil])))
 
 (defn req-param-path
   "Checks if the match has a parameter set to the given value. Used to re-check after a
@@ -291,44 +383,48 @@
        (when (some->> path
                       (r/match-by-path router)
                       :path-params param #{pvalue})
-         (str path location qparams)))
+         (utils/strb path location qparams)))
      (when match-or-path
        (let [[path location qparams] (split-query-params match-or-path)
              qparams                 (when-not (not-empty query-params) qparams)
              m                       (r/match-by-path router path)]
          (when (some-> m :path-params param #{pvalue})
            (some-> (r/match->path m query-params)
-                   (str location qparams))))))))
+                   (utils/strb location qparams))))))))
 
 (defn path-slash-variants
   "Returns a 2-element vector of a path containing its two variants: with and without a
   trailing slash. The original path is always placed first.
 
-  If the path is empty, vector of an empty string and a slash is returned. If the
+  If the path is empty, vector of an empty string and a slash iw returned. If the
   path is a slash, vector of a slash and an empty string is returned.
 
-  If the path is `nil`, it returns `nil`."
+  If the path is `nil` or `false`, it returns `nil`."
   [uri]
   (when uri
-    (let [c (unchecked-int (count uri))]
-      (if (pos? c)
-        (if (= \/ (.charAt ^String uri (unchecked-dec-int c)))
-          [uri (subs uri 0 (dec c))]
-          [uri (str uri "/")])
-        ["" "/"]))))
+    (if-some [^String uri (utils/some-str uri)]
+      (let [c (unchecked-int (.length uri))]
+        (if (pos? c)
+          (let [c' (unchecked-dec-int c)]
+            (if (= \/ (.charAt ^String uri c'))
+              [uri (subs uri 0 c')]
+              [uri (utils/strb uri "/")]))
+          ["" "/"]))
+      ["" "/"])))
 
 (defn has-param?
   "Checks if the given route match can be parameterized with a parameter of the given
   id."
   ^Boolean [match param]
-  (when-some [param (utils/some-keyword-simple param)]
-    (or (contains? (get match :required) param)
-        (when-some [t (get match :template)]
-          (some? (some #{(str param)} (re-seq slash-break t)))))
-    false))
+  (boolean
+   (when-some [param (utils/some-keyword-simple param)]
+     (or (contains? (get match :required) param)
+         (when-some [^String t (get match :template)]
+           (template-has-segment? t (str param)))))))
 
 (defn template-path
-  "Replaces parameters in the given path using a template."
+  "Replaces parameters in the given path using a template.
+   Same behavior as the regex-based version, but avoids re-seq allocations."
   ([match params]
    (template-path match params nil))
   ([match params query-params]
@@ -337,11 +433,49 @@
                     (get match :template)
                     params nil)))
   ([path template params _]
-   (when-some [template (utils/some-str template)]
-     (->> (map (map/map-keys str params)
-               (concat (re-seq slash-break template) (repeat nil))
-               (re-seq slash-break (str path)))
-          (apply str)))))
+   (when-some [^String t (utils/some-str template)]
+     (let [^String p (str path)         ; (str nil) => ""
+           pm        (map/map-keys str params)
+           sb        (StringBuilder.)]
+       (loop [ti (unchecked-int 0)
+              pi (unchecked-int 0)]
+         (if-some [[pk ps pe pn] (next-slash-token p (int pi))]
+           (let [[tk ts te tn] (or (next-slash-token t (int ti)) [:none 0 0 ti])]
+             (cond
+               ;; template token exhausted -> behave like (concat template-tokens (repeat nil)):
+               (= tk :none)
+               (do
+                 (if (= pk :slash)
+                   (.append sb \/)
+                   (.append sb p ps pe))
+                 (recur ti pn))
+
+               ;; both have slash token
+               (and (= tk :slash) (= pk :slash))
+               (do (.append sb \/) (recur tn pn))
+
+               ;; segment in template: try replacement
+               (= tk :seg)
+               (let [k (.substring t ts te)
+                     v (get pm k ::none)]
+                 (if (identical? v ::none)
+                   ;; default: take token from path
+                   (if (= pk :slash)
+                     (.append sb \/)
+                     (.append sb p ps pe))
+                   ;; replacement: mimic (apply str ...) by stringifying
+                   (.append sb (str v)))
+                 (recur tn pn))
+
+               ;; template has slash but path has seg (mismatch) -> keep old behavior:
+               ;; map lookup misses -> default path token
+               :else
+               (do
+                 (if (= pk :slash)
+                   (.append sb \/)
+                   (.append sb p ps pe))
+                 (recur tn pn))))
+           (str sb)))))))
 
 (defn path-template-with-param
   "Returns a path template for the given match if the route supports the given
@@ -350,10 +484,10 @@
    (path-template-with-param match required-param nil))
   ([match required-param short-circuit]
    (when-some [required-param (utils/some-keyword-simple required-param)]
-     (when-some [t (get match :template)]
+     (when-some [^String t (get match :template)]
        (when (or (some? short-circuit)
                  (contains? (get match :required) required-param)
-                 (some #{(str required-param)} (re-seq slash-break t)))
+                 (template-has-segment? t (str required-param)))
          t)))))
 
 (defn parameterized-page-core
@@ -392,7 +526,7 @@
 
             ;; path is parameterized and the parameter value is the same
 
-            (some-> (r/match->path m query-params) (str location qparams))
+            (some-> (r/match->path m query-params) (utils/strb location qparams))
 
             ;; path is not parameterized or the parameter value is different
 
@@ -403,8 +537,11 @@
 
               (when-some [p (template-path m {param pvalue})]
                 (if require-param?
-                  (some-> (req-param-path  rtr p param pvalue query-params)    (str location qparams))
-                  (some-> (r/match-by-path rtr p) (r/match->path query-params) (str location qparams))))
+                  (some-> (req-param-path rtr p param pvalue query-params)
+                          (utils/strb location qparams))
+                  (some-> (r/match-by-path rtr p)
+                          (r/match->path query-params)
+                          (utils/strb location qparams))))
 
               ;; path is not parameterized with our parameter
 
@@ -414,7 +551,7 @@
 
                 (some-> (some #(req-param-path rtr % param pvalue query-params)
                               (path-variants id pvalue))
-                        (str location qparams))
+                        (utils/strb location qparams))
 
                 ;; parameter is not required and path is not parameterized with it
 
@@ -424,13 +561,13 @@
 
                   (some-> (some #(some-> (r/match-by-path rtr %) (r/match->path query-params))
                                 (path-variants id pvalue))
-                          (str location qparams))
+                          (utils/strb location qparams))
 
                   ;; no parameter injection, return the path
 
                   (some-> (some #(some-> (r/match-by-path rtr %) (r/match->path query-params))
                                 (path-slash-variants id))
-                          (str location qparams)))))))))))
+                          (utils/strb location qparams)))))))))))
 
 (def ^{:private  true
        :tag      String
@@ -528,7 +665,7 @@
        (some-> (r/match-by-name rtr id-or-path) r/match->path)
        (when-some [path (utils/some-str id-or-path)]
          (let [[path location qparams] (split-query-params path)]
-           (some-> (r/match-by-path rtr path) r/match->path (str location qparams)))))))
+           (some-> (r/match-by-path rtr path) r/match->path (utils/strb location qparams)))))))
   (^String [req id-or-path param param-value]
    (when-some [rtr (get req ::r/router)]
      (parameterized-page-mem param rtr id-or-path param-value nil nil false false)))
@@ -758,7 +895,7 @@
                qparams               (when-not (not-empty query-params) qparams)]
            (some-> (r/match-by-path rtr id)
                    (r/match->path query-params)
-                   (str location qparams))))))))
+                   (utils/strb location qparams))))))))
 
 (defn lang-from-req
   [req]
@@ -1520,12 +1657,13 @@
 ;; Special redirects
 
 (defn add-slash
-  "Adds trailing slash to a path unless it already exists."
+  "Adds trailing slash to a path unless it already exists. The given uri must be a
+  string or nil."
   ^String [^String uri]
   (if uri
-    (let [c (unchecked-int (count uri))]
+    (let [c (unchecked-int (.length uri))]
       (if (pos? c)
-        (if (= \/ (.charAt ^String uri (unchecked-dec-int c))) uri (str uri "/"))
+        (if (= \/ (.charAt ^String uri (unchecked-dec-int c))) uri (utils/strb uri "/"))
         "/"))
     "/"))
 
@@ -1939,8 +2077,8 @@
                                       :user-id         user-id
                                       :include-global? include-global?
                                       :include-self?   include-self?)
-         global-marker        (or global-marker (str " (" global-label ")"))
-         global-present-label (or global-present-label (str present-label global-marker))
+         global-marker        (or global-marker (utils/strb " (" global-label ")"))
+         global-present-label (or global-present-label (utils/strb present-label global-marker))
          [l & d]              (roles-matrix req opts)
          gctx-line            (first d)
          have-gctx?           (and include-global? (= global-context (first gctx-line)))
@@ -2384,7 +2522,7 @@
 (defn lang-str
   ^String [req]
   (or (get req :language/str)
-      (str (get req :language/default))))
+      (utils/some-str (get req :language/default))))
 
 (defn lang-str-or-nil
   ^String [req]
