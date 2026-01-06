@@ -19,6 +19,7 @@
             [amelinium.common                   :as          common]
             [amelinium.common.controller        :as           super]
             [amelinium.web                      :as             web]
+            [amelinium.web.htmx                 :as            htmx]
             [amelinium.auth                     :as            auth]
             [amelinium.http                     :as            http]
             [amelinium.identity                 :as        identity]
@@ -183,7 +184,7 @@
 (defn- auth-prolonged-ok
   [req route-data lang]
   (if (common/use-hx? req route-data :auth/use-htmx?)
-    (web/hx-go-to-with-status req route-data :auth/prolonged-ok :login/prolonged)
+    (htmx/go-to-with-status req route-data :auth/prolonged-ok :login/prolonged)
     (auth-ok req route-data lang)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -276,7 +277,7 @@
    (let [route-data  (http/get-route-data req)
          session-key (or session-key (get route-data :session-key))
          sess        (session/of req session-key)
-         req         (common/empty-session-id-header req sess)]
+         req         (session/empty-session-id-header req sess)]
      (session/delete! sess)
      (if-some [dst (get route-data :destination)]
        (web/go-to req dst)

@@ -24,6 +24,7 @@
             [amelinium.auth                     :as         auth]
             [amelinium.http                     :as         http]
             [amelinium.http.middleware.session  :as      session]
+            [ameliniun.web.htmx                 :as         htmx]
             [amelinium.types.session            :refer      :all]
             [puget.printer                      :refer  [cprint]])
 
@@ -173,7 +174,7 @@
   data (given as `route-data`)."
   [req route-data sess]
   (and sess (session/soft-expired? sess)
-       (common/use-hx? req route-data :error/use-htmx?)))
+       (htmx/use? req route-data :error/use-htmx?)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions
@@ -317,7 +318,7 @@
                                    :user/id           user-id
                                    :user/account-type ac-type)
                                   (session/inject sess)
-                                  (common/replace-session-id-header sess)
+                                  (session/replace-session-id-header sess)
                                   (common/roles-refresh)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

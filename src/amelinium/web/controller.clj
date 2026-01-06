@@ -20,6 +20,7 @@
             [amelinium.common.controller        :as           super]
             [amelinium.i18n                     :as            i18n]
             [amelinium.web                      :as             web]
+            [amelinium.web.htmx                 :as            htmx]
             [amelinium.auth                     :as            auth]
             [amelinium.http                     :as            http]
             [amelinium.http.response            :as            resp]
@@ -79,7 +80,7 @@
   ([req gmap ^Session smap]
    (if-not gmap
      req
-     (if (or (common/session-variable-get-failed? gmap)
+     (if (or (session/get-variable-failed? gmap)
              (not (get gmap :uri)))
        (qassoc req
                :goto-injected? true
@@ -220,7 +221,7 @@
              ^Session sess (session/allow-soft-expired sess)
              session-field (or (session/id-field sess) "session-id")]
          (if use-htmx?
-           (web/hx-go-to-with-status req route-data :auth/prolongate :login/prolongate)
+           (htmx/go-to-with-status req route-data :auth/prolongate :login/prolongate)
            (let [req-to-save (common/remove-form-params req session-field)]
              (session/put-var! sess
                                :goto {:ts           (t/now)

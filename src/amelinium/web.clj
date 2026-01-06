@@ -9,41 +9,38 @@
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require [clojure.string                       :as             str]
-            [clojure.core.memoize                 :as             mem]
             [clojure.java.io                      :as              io]
             [potemkin                             :as               p]
-            [tick.core                            :as               t]
-            [reitit.core                          :as               r]
             [ring.util.response]
             [amelinium.http.response              :as            resp]
             [ring.util.request                    :as             req]
             [selmer.parser                        :as          selmer]
             [amelinium.db                         :as              db]
+            [amelinium.web.htmx                   :as            htmx]
             [amelinium.i18n                       :as            i18n]
             [amelinium.types.response             :refer         :all]
             [amelinium.utils                      :refer         :all]
             [amelinium.common                     :as          common]
             [amelinium.errors                     :as          errors]
             [amelinium.http                       :as            http]
-            [amelinium.http.middleware.language   :as        language]
             [amelinium.http.middleware.session    :as         session]
             [amelinium.http.middleware.coercion   :as        coercion]
-            [amelinium.http.middleware.validators :as      validators]
             [amelinium.logging                    :as             log]
             [amelinium                            :refer         :all]
-            [io.randomseed.utils.map              :as             map]
-            [io.randomseed.utils.map              :refer     [qassoc]]
-            [io.randomseed.utils                  :refer         :all]
+            [io.randomseed.utils.map              :as map :refer [qassoc]]
+            [io.randomseed.utils                  :refer          [parse-url
+                                                                   or-some
+                                                                   some-str
+                                                                   some-keyword
+                                                                   valuable?]]
             [hiccup.core                          :refer         :all]
             [hiccup.table                         :as           table]
             [lazy-map.core                        :as        lazy-map])
 
   (:import (amelinium     Response)
            (clojure.lang  IFn)
-           (reitit.core   Match)
            (java.io       File)
-           (lazy_map.core LazyMapEntry
-                          LazyMap)))
+           (lazy_map.core LazyMapEntry)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Request map keys exposed in views
@@ -95,11 +92,6 @@
                 pick-language pick-language-without-fallback
                 pick-language-str pick-language-str-without-fallback])
 
-;; HTMX
-
-(p/import-vars [amelinium.common
-                hx-request? use-hx? hx-target])
-
 ;; Special redirects
 
 (p/import-vars [amelinium.common
@@ -138,11 +130,11 @@
   "Generates roles table as HTML string."
   ([req]
    (let [{:keys [data labels]} (roles-tabler req nil)]
-     (if (and data labels)
+     (when (and data labels)
        (html (table/to-table1d data labels)))))
   ([req opts]
    (let [{:keys [data labels]} (roles-tabler req opts)]
-     (if (and data labels)
+     (when (and data labels)
        (html (table/to-table1d data labels))))))
 
 ;; HTML response
@@ -207,7 +199,7 @@
      (let [req-data (get req :app/data)]
        (if (false? req-data)
          req
-         (let [req-data (if req-data (map/to-lazy req-data))
+         (let [req-data (when req-data (map/to-lazy req-data))
                data     (if req-data (map/merge-lazy req-data data) (map/to-lazy data))
                keyz     (or keyz (concat common-keys (get req :app/data-required)))]
            (if (and data (pos? (count data)))
@@ -298,37 +290,6 @@
                       (qassoc apd# ~@pairs)
                       (lazy-map/->LazyMap {~@pairs ~@[]})))))))))
 
-;; Targets
-
-(defn get-target
-  "Gets a target element ID set for the current route using `:app/target` route
-  data. If it cannot be extracted, returns `nil`."
-  [req]
-  (if-let [target (http/req-or-route-param req :app/target)]
-    (some-str target)))
-
-(defn set-target-header
-  "Sets the `HX-Retarget` header to a string value of the given `target` in response
-  headers (under the `:response/headers` key) of the given `req` map. If the target
-  is not given, its value is obtained from `:app/target` of the `req` or the route
-  data within a request map. Returns updated `req`.
-
-  By default it will not replace existing `HX-Retarget` header, unless the `replace?`
-  argument is set to `true`."
-  ([req]
-   (if-some [target (get-target req)]
-     (set-target-header req target false)
-     req))
-  ([req target]
-   (set-target-header req target false))
-  ([req target replace?]
-   (if-some [target (some-str target)]
-     (if-some [headers (resp/headers req)]
-       (if (or replace? (not (contains? headers "HX-Retarget")))
-         (qassoc req :headers (qassoc headers "HX-Retarget" target))
-         req)
-       (qassoc req :headers {"HX-Retarget" target}))
-     req)))
 
 ;; Layouts and views
 
@@ -423,21 +384,21 @@
   (let [core        (some-str core)
         pre         (or (some-str pre) "views")
         auto-dir    (or dir (.getName ^File (io/as-file core)))
-        auto-dir-sl (if auto-dir (str auto-dir "/"))
-        prep-sl     (if pre      (str pre  "/"))
-        dir-sl      (if dir      (str dir  "/"))
-        lang-sl     (if lang     (str lang "/"))
+        auto-dir-sl (when auto-dir (str auto-dir "/"))
+        prep-sl     (when pre      (str pre  "/"))
+        dir-sl      (when dir      (str dir  "/"))
+        lang-sl     (when lang     (str lang "/"))
         pths        (lazy-cat [[prep-sl lang-sl dir-sl core dot-html]]
                               [[prep-sl lang-sl dir-sl core sl-default-html]]
                               [[prep-sl dir-sl core dot-html]]
                               [[prep-sl lang-sl auto-dir-sl default-html]]
-                              (if auto-dir [[prep-sl lang-sl auto-dir dot-html]])
-                              (if auto-dir [[prep-sl auto-dir-sl default-html]])
-                              (if auto-dir [[prep-sl auto-dir dot-html]])
+                              (when auto-dir [[prep-sl lang-sl auto-dir dot-html]])
+                              (when auto-dir [[prep-sl auto-dir-sl default-html]])
+                              (when auto-dir [[prep-sl auto-dir dot-html]])
                               [[prep-sl lang-sl default-html]]
                               [[prep-sl default-html]])]
     (or (first (keep #(apply some-resource %) pths))
-        (do (if (nil? uri) (log/wrn "[-]: Empty URI while resolving" pre))
+        (do (when (nil? uri) (log/wrn "[-]: Empty URI while resolving" pre))
             (log/wrn (str "[" uri "]: Cannot find") pre)
             (doseq [path pths] (log/wrn (apply str "[" uri "]: Tried [resources]/" path)))))))
 
@@ -536,16 +497,16 @@
   `other-status` is given, it will be used as fallback in the same way as the first,
   when it will return `nil`."
   ([req route-data k status]
-   (if status
-     (if-some [db (or (get req k) (get route-data k))]
+   (when status
+     (when-some [db (or (get req k) (get route-data k))]
        (get db status))))
   ([req route-data k status other-status]
    (if status
-     (if-some [db (or (get req k) (get route-data k))]
+     (when-some [db (or (get req k) (get route-data k))]
        (or-some (get db status)
-                (if other-status (get db other-status))))
-     (if other-status
-       (if-some [db (or (get req k) (get route-data k))]
+                (when other-status (get db other-status))))
+     (when other-status
+       (when-some [db (or (get req k) (get route-data k))]
          (get db other-status))))))
 
 (defn status-lv
@@ -592,7 +553,7 @@
          [layout view]
          (let [app-status (get req :app/status)]
            (log/web-dbg req "Getting layout/view for"
-                        (if app-status (str "application status " (some-str app-status) " and"))
+                        (when app-status (str "application status " (some-str app-status) " and"))
                         "HTTP response status" status)
            [(if no-layout
               (or-some (get-for-status req route-data :status/layouts app-status status)
@@ -658,7 +619,7 @@
    (render req status data view layout nil))
   ([req http-status data view layout lang]
    (let [uri         (get req :uri)
-         lang        (if lang (some-str lang))
+         lang        (when lang (some-str lang))
          lang        (if (false? lang) nil (common/pick-language-str req))
          route-data  (http/get-route-data req)
          [layt view] (status-lv req http-status layout view route-data)
@@ -670,10 +631,10 @@
                  data (prep-app-data req data)
                  data (map/assoc-missing data
                                          :uri                uri
-                                         :url                (delay (req/request-url req))
+                                         :url                (delay (req/request-url        req))
                                          :character-encoding (delay (req/character-encoding req))
-                                         :path               (delay (common/page req))
-                                         :htmx-request?      (delay (common/hx-request? req))
+                                         :path               (delay (common/page            req))
+                                         :htmx-request?      (delay (htmx/request?          req))
                                          :lang               dlng)
                  data (update-status data req http-status dlng)
                  html (if view (selmer/render-file view data) "")
@@ -734,9 +695,9 @@
   (^Response [resp-fn status req data view layout lang]
    (if (resp/response? req)
      req
-     (let [req (set-target-header req)]
-       (-> (render req status data view layout lang)
-           (resp-fn (or (resp/headers req) {})))))))
+     (-> (htmx/set-target-header req)
+         (render status data view layout lang)
+         (resp-fn (or (resp/headers req) {}))))))
 
 (defn render-response-force
   "Web response renderer. Uses the `render` function to render a response body
@@ -787,9 +748,9 @@
   ([resp-fn status req data view layout]
    (render-response-force resp-fn status req data view layout nil))
   ([resp-fn status req data view layout lang]
-   (let [req (set-target-header req)]
-     (-> (render req status data view layout lang)
-         (resp-fn (or (resp/headers req) {}))))))
+   (-> (htmx/set-target-header req)
+       (render status data view layout lang)
+       (resp-fn (or (resp/headers req) {})))))
 
 ;; Rendering functions generation
 
@@ -810,21 +771,21 @@
        (#'def-render &form &env name doc f status)
        (#'def-render
         &form &env name
-        (str "Renders a " (if status (name status " "))
+        (str "Renders a " (when status (name status " "))
              "response with a possible body generated with views, layouts and data \n  "
              "obtained from a request map (`:app/layout`, `:app/view`, `:app/data` keys).\n  "
              "Uses `" f-or-doc "` to set the response code."
-             (if status
+             (when status
                (str " Additionaly, associates `:status` key\n  "
-                    "with `" (str status) "` in `:app/data` "
+                    "with `" status "` in `:app/data` "
                     "by passing it as an argument to `render-response`\n  "
                     "(which will also set the `:status/title` "
                     "and `:status/description` if possible).")))
         f status))))
   ([name doc f status]
    `(let [^IFn f# ~f
-          c# ~status
-          c# (if c# (keyword c#))]
+          c#      ~status
+          c#      (if c# (keyword c#))]
       (defn ~name ~doc
         (^Response []
          (render-response f# c# nil nil nil nil nil))
@@ -1230,126 +1191,7 @@
       (log/web-dbg req "Rendering response with application status" app-status)
       (apply errors/render err-config app-status (or default render-ok) req data view layout lang more)))))
 
-;; HTMX
-
-(defn hx-inject
-  "Injects HTML fragment by issuing HTMX response with `HX-Retarget` header set to
-  `target` (if given and its value is not `false` and not `nil`), `:app/layout` key
-  of the `req` set to `false` and `:app/view` key of the `req` set to `view` (if
-  given and not `nil`). Returns updated request map `req`."
-  ([req]
-   (log/web-dbg req "Setting :app/layout to false")
-   (qassoc req :app/layout false))
-  ([req target]
-   (let [req (qassoc req :app/layout false)]
-     (log/web-dbg req "Setting :app/layout to false")
-     (if target
-       (if-some [t (some-str target)]
-         (do (log/web-dbg req "Setting HX-Retarget header to" target)
-             (add-header req :HX-Retarget t))
-         req)
-       req)))
-  ([req target view]
-   (let [req (qassoc req :app/layout false :app/view view)]
-     (log/web-dbg req "Setting :app/layout to false and :app/view to" view)
-     (if target
-       (if-some [t (some-str target)]
-         (do (log/web-dbg req "Setting HX-Retarget header to" target)
-             (add-header req :HX-Retarget t))
-         req)
-       req))))
-
-(defn hx-transform-redirect
-  "Adds the `HX-Redirect` response header set to a value of existing `Location` header
-  and removes the last one from the response map `resp`."
-  ^Response [^Response resp]
-  (if (instance? Response resp)
-    (->Response (.status resp)
-                (let [headers (.headers resp)]
-                  (-> (qassoc headers "HX-Redirect" (get headers "Location"))
-                      (dissoc "Location")))
-                (.body resp))))
-
-(defn hx-transform-redirect-200
-  "Adds the `HX-Redirect` response header set to a value of existing `Location` header
-  and removes the last one from the response map `resp`. Additionally, forces HTTP
-  status of the response to be 200."
-  ^Response [^Response resp]
-  (if (instance? Response resp)
-    (->Response 200
-                (let [headers (.headers resp)]
-                  (-> (qassoc headers "HX-Redirect" (get headers "Location"))
-                      (dissoc "Location")))
-                (.body resp))))
-
-(defn hx-localized-redirect
-  "HTMX redirect wrapper. Uses `HX-Redirect` header to trigger redirect and resets the
-  status code to 200. The `f` should be a function which takes a request map and
-  returns a response; should take at least one single argument which should be a
-  URL. The URL will be parameterized with a language. Works almost the same way as
-  the `redirect` but it will generate a localized path using a language obtained from
-  a request (under `:language/str` key) and if there will be no
-  language-parameterized variant of the path, it will fail. Use this function to make
-  sure that localized path will be produced, or `nil`."
-  {:arglists '(^Response [^IFn f]
-               ^Response [^IFn f req]
-               ^Response [^IFn f url]
-               ^Response [^IFn f req url]
-               ^Response [^IFn f req name-or-path]
-               ^Response [^IFn f req name-or-path path-params]
-               ^Response [^IFn f req name-or-path path-params query-params]
-               ^Response [^IFn f req name-or-path lang]
-               ^Response [^IFn f req name-or-path lang path-params]
-               ^Response [^IFn f req name-or-path lang path-params query-params]
-               ^Response [^IFn f req name-or-path lang path-params query-params & more])}
-  (^Response [^IFn f]
-   (hx-transform-redirect (common/localized-redirect f)) )
-  (^Response [^IFn f req-or-url]
-   (hx-transform-redirect (common/localized-redirect f req-or-url)))
-  (^Response [^IFn f req name-or-path]
-   (hx-transform-redirect (common/localized-redirect f req name-or-path)))
-  (^Response [^IFn f req name-or-path lang]
-   (hx-transform-redirect (common/localized-redirect f req name-or-path lang)))
-  (^Response [^IFn f req name-or-path lang params]
-   (hx-transform-redirect (common/localized-redirect f req name-or-path lang params)))
-  (^Response [^IFn f req name-or-path lang params query-params]
-   (hx-transform-redirect (common/localized-redirect f req name-or-path lang params query-params)))
-  (^Response [^IFn f req name-or-path lang params query-params & more]
-   (hx-transform-redirect (apply common/localized-redirect f req name-or-path lang params query-params more))))
-
-(defn hx-redirect
-  "Generic HTMX redirect wrapper. Uses `HX-Redirect` header to trigger redirect and
-  resets the status code to 200. The `f` should be a function which takes a request
-  map and returns a response; should take at least one single argument which should
-  be a URL. The URL will be parameterized with a language if required. If the
-  language is given it uses the `localized-page` function. If there is no language
-  given but the page identified by its name requires a language parameter to be set,
-  it will be obtained from the given request map (under the key `:language/str`)."
-  {:arglists '(^Response [^IFn f]
-               ^Response [^IFn f req]
-               ^Response [^IFn f url]
-               ^Response [^IFn f req url]
-               ^Response [^IFn f req name-or-path]
-               ^Response [^IFn f req name-or-path path-params]
-               ^Response [^IFn f req name-or-path path-params query-params]
-               ^Response [^IFn f req name-or-path lang]
-               ^Response [^IFn f req name-or-path lang path-params]
-               ^Response [^IFn f req name-or-path lang path-params query-params]
-               ^Response [^IFn f req name-or-path lang path-params query-params & more])}
-  (^Response [^IFn f]
-   (hx-transform-redirect (common/redirect f)))
-  (^Response [^IFn f req-or-url]
-   (hx-transform-redirect (common/redirect f req-or-url)))
-  (^Response [^IFn f req name-or-path]
-   (hx-transform-redirect (common/redirect f req name-or-path)))
-  (^Response [^IFn f req name-or-path lang]
-   (hx-transform-redirect (common/redirect f req name-or-path lang)))
-  (^Response [^IFn f req name-or-path lang params]
-   (hx-transform-redirect (common/redirect f req name-or-path lang params)))
-  (^Response [^IFn f req name-or-path lang params query-params]
-   (hx-transform-redirect (common/redirect f req name-or-path lang params query-params)))
-  (^Response [^IFn f req name-or-path lang params query-params & more]
-   (hx-transform-redirect (apply common/redirect f req name-or-path lang params query-params more))))
+;; Redirect wrappers
 
 (defn http-go-to
   "Uses the `localized-page` function to calculate the destination path on a basis of
@@ -1435,75 +1277,17 @@
   (^Response [req name-or-path lang params query-params & more]
    (apply common/localized-redirect resp/temporary-redirect req name-or-path lang params query-params more)))
 
-(defn hx-go-to
-  "Same as `http-go-to` but uses `hx-transform-redirect` internally to generate HTMX
-  redirect."
-  {:arglists '(^Response []
-               ^Response [req]
-               ^Response [url]
-               ^Response [req url]
-               ^Response [req name-or-path]
-               ^Response [req name-or-path path-params]
-               ^Response [req name-or-path path-params query-params]
-               ^Response [req name-or-path lang]
-               ^Response [req name-or-path lang path-params]
-               ^Response [req name-or-path lang path-params query-params]
-               ^Response [req name-or-path lang path-params query-params & more])}
-  (^Response []
-   (hx-transform-redirect (common/localized-redirect resp/see-other)))
-  (^Response [req-or-url]
-   (hx-transform-redirect (common/localized-redirect resp/see-other req-or-url)))
-  (^Response [req name-or-path]
-   (hx-transform-redirect (common/localized-redirect resp/see-other req name-or-path)))
-  (^Response [req name-or-path lang]
-   (hx-transform-redirect (common/localized-redirect resp/see-other req name-or-path lang)))
-  (^Response [req name-or-path lang params]
-   (hx-transform-redirect (common/localized-redirect resp/see-other req name-or-path lang params)))
-  (^Response [req name-or-path lang params query-params]
-   (hx-transform-redirect (common/localized-redirect resp/see-other req name-or-path lang params query-params)))
-  (^Response [req name-or-path lang params query-params & more]
-   (hx-transform-redirect (apply common/localized-redirect resp/see-other req name-or-path lang params query-params more))))
-
-(defn hx-move-to
-  "Same as `http-move-to` but uses `hx-transform-redirect` internally to generate HTMX
-  redirect."
-  {:arglists '(^Response []
-               ^Response [req]
-               ^Response [url]
-               ^Response [req url]
-               ^Response [req name-or-path]
-               ^Response [req name-or-path path-params]
-               ^Response [req name-or-path path-params query-params]
-               ^Response [req name-or-path lang]
-               ^Response [req name-or-path lang path-params]
-               ^Response [req name-or-path lang path-params query-params]
-               ^Response [req name-or-path lang path-params query-params & more])}
-  (^Response []
-   (hx-transform-redirect (common/localized-redirect resp/temporary-redirect)))
-  (^Response [req-or-url]
-   (hx-transform-redirect (common/localized-redirect resp/temporary-redirect req-or-url)))
-  (^Response [req name-or-path]
-   (hx-transform-redirect (common/localized-redirect resp/temporary-redirect req name-or-path)))
-  (^Response [req name-or-path lang]
-   (hx-transform-redirect (common/localized-redirect resp/temporary-redirect req name-or-path lang)))
-  (^Response [req name-or-path lang params]
-   (hx-transform-redirect (common/localized-redirect resp/temporary-redirect req name-or-path lang params)))
-  (^Response [req name-or-path lang params query-params]
-   (hx-transform-redirect (common/localized-redirect resp/temporary-redirect req name-or-path lang params query-params)))
-  (^Response [req name-or-path lang params query-params & more]
-   (hx-transform-redirect (apply common/localized-redirect resp/temporary-redirect req name-or-path lang params query-params more))))
-
 (defn- go-to-fn
   ^IFn [req]
-  (if (use-hx? req nil false) hx-go-to http-go-to))
+  (if (htmx/use? req nil false) htmx/go-to http-go-to))
 
 (defn- move-to-fn
   ^IFn [req]
-  (if (use-hx? req nil false) hx-move-to http-move-to))
+  (if (htmx/use? req nil false) htmx/move-to http-move-to))
 
 (defn go-to
-  "When HTMX is detected with `use-hx?` calls `hx-go-to`, otherwise calls
-  `http-go-to`."
+  "When HTMX is detected with `amelinium.web.htmx/use?` calls
+  `amelinium.web.htmx/go-to`, otherwise calls `http-go-to`."
   {:arglists '(^Response [req]
                ^Response [req url]
                ^Response [req name-or-path]
@@ -1527,8 +1311,8 @@
    (apply (go-to-fn req) req name-or-path lang params query-params more)))
 
 (defn move-to
-  "When HTMX is detected with `use-hx?` calls `hx-move-to`, otherwise calls
-  `http-move-to`."
+  "When HTMX is detected with `amelinium.web.htmx/use?` calls
+  `amelinium.web.htmx/move-to`, otherwise calls `http-move-to`."
   {:arglists '(^Response [req]
                ^Response [req url]
                ^Response [req name-or-path]
@@ -1568,50 +1352,23 @@
                  (or (get-in route-data [:error/destinations app-status] default-page)
                      (get route-data :error/destination))))))
 
-(defn hx-go-to-with-status
-  "Uses `hx-inject` to set a target (`HX-Retarget` header) on a basis of the given
-  application status `app-status` by looking it up in `:status/targets` of a route
-  data map with a fallback to `:error/target`.
-
-  Additionally, sets a fallback view to the given `default-view` (if set) and a flag
-  `:response/set-status!` in `req` to ensure that application status is processed
-  even if an HTTP response status will be `:ok/found` during rendering.
-
-  Returns `req` with added `:app/status` set to the value of `app-status`,
-  updated `:response/headers` and `:response/set-status!` flag."
-  (^Response [req]
-   (hx-go-to-with-status req nil :error/internal nil))
-  (^Response [req app-status]
-   (hx-go-to-with-status req nil app-status nil))
-  (^Response [req app-status default-view]
-   (hx-go-to-with-status req nil app-status default-view))
-  (^Response [req route-data app-status default-view]
-   (let [req        (qassoc req :app/status app-status :response/set-status! true)
-         route-data (or route-data (http/get-route-data req))
-         target     (or (get-in route-data [:status/targets app-status])
-                        (get route-data :error/target))]
-     (log/web-dbg req "Injecting HTML fragment with app status" app-status
-                  (if target (str "(target: " (some-str target) ")")))
-     (if default-view
-       (hx-inject req target default-view)
-       (hx-inject req target)))))
-
 (defn go-to-with-status
-  "Uses `hx-go-to-with-status` when HTMX is in use (uses `common/use-hx?`),
-  `http-go-to-with-status` otherwise. Takes additional `hx-status-flag` as a key to
-  be checked in route data whether it is associated with a HTMX-enforcement flag."
+  "Uses `amelinium.web.htmx/go-to-with-status` when HTMX is in use (uses
+  `amelinium.web.htmx/use?`), `http-go-to-with-status` otherwise. Takes additional
+  `hx-status-flag` as a key to be checked in route data whether it is associated with
+  a HTMX-enforcement flag."
   (^Response [req]
    (go-to-with-status req nil :error nil false))
   (^Response [req app-status]
    (go-to-with-status req nil app-status nil false))
   (^Response [req app-status default-page]
    (go-to-with-status req nil app-status default-page false))
-  (^Response [req route-data app-status default-page]
+  (^Response [req _route-data app-status default-page]
    (go-to-with-status req nil app-status default-page false))
   (^Response [req route-data app-status default-page hx-status-flag]
    (let [route-data (or route-data (http/get-route-data req))
-         go-to-fn   (if (use-hx? req route-data hx-status-flag)
-                      hx-go-to-with-status
+         go-to-fn   (if (htmx/use? req route-data hx-status-flag)
+                      htmx/go-to-with-status
                       http-go-to-with-status)]
      (go-to-fn req
                (or (get-in route-data [:error/destinations app-status] default-page)
@@ -1624,17 +1381,20 @@
   header on a basis of the given `app-status`. If `app-status` is sequential and contains
   multiple statuses, it will be replaced by the most accurate one.
 
-  Returns proper HTMX response (when `common/use-hx?` returns `true` because the request
-  indicated it is HTMX, or `:error/use-htmx?` route data key is set, or generic
-  `:use-htmx?` route data key is set), or a HTTP redirect response (if HTMX is not in
-  use or disabled), as a result of error encountered.
+  Returns proper HTMX response when:
+  - `common/use-hx?` returns `true` because the request indicated it is HTMX,
+  - or `:error/use-htmx?` route data key is set,
+  - or generic `:use-htmx?` route data key is set.
+
+  Returns a generic HTTP redirect response (if HTMX is not in use or is disabled),
+  as a result of error encountered.
 
   Additionally, sets an HTTP response header named `header-name` (if set) with error
   status detected (mainly to be used by reverse proxies). If header name is `false`,
   no header is set. If header name is not set or is set to `nil`, the name `Error` is
   used. Returns updated `req`.
 
-  For HTMX uses `hx-go-to-with-status`, for regular web uses
+  For HTMX uses `amelinium.web.htmx/go-to-with-status`, for regular web uses
   `http-go-to-with-status`."
   (^Response [req]
    (handle-error req nil :auth/error nil nil))
@@ -1646,7 +1406,7 @@
    (handle-error req route-data app-status default-view nil))
   (^Response [req route-data app-status default-view header-name]
    (let [route-data    (or route-data (http/get-route-data req))
-         app-st-single (if-not (keyword? app-status)
+         app-st-single (when-not (keyword? app-status)
                          (errors/most-significant (get route-data :errors/config) app-status))
          reduced?      (and app-st-single (not (identical? app-status app-st-single)))
          app-status    (if reduced? app-st-single app-status)
@@ -1659,8 +1419,8 @@
            req            (if (and str-app-status header-name)
                             (add-header req header-name str-app-status)
                             req)]
-       (if (use-hx? req route-data :error/use-htmx?)
-         (hx-go-to-with-status   req route-data app-status default-view)
+       (if (htmx/use? req route-data :error/use-htmx?)
+         (htmx/go-to-with-status req route-data app-status default-view)
          (http-go-to-with-status req route-data app-status default-view))))))
 
 (defn response!
@@ -1696,7 +1456,7 @@
                     (or route-data (http/get-route-data req))
                     status
                     fallback-view
-                    (if error-header error-header))
+                    (when error-header error-header))
       req))))
 
 ;; Form errors
@@ -1758,8 +1518,8 @@
     (let [route-data             (or route-data (http/get-route-data req))
           forced-orig-page       (get route-data :form-errors/page)
           orig-page              (or forced-orig-page (:page (get req :goto)))
-          referer                (if (nil? orig-page) (some-str (get (get req :headers) "referer")))
-          [orig-uri orig-params] (if referer (common/url->uri+params req referer))
+          referer                (when (nil? orig-page) (some-str (get (get req :headers) "referer")))
+          [orig-uri orig-params] (when referer (common/url->uri+params req referer))
           handling-previous?     (contains? (get req :query-params) "form-errors")]
 
       (if (and (or (valuable? orig-page) (valuable? orig-uri) referer)
@@ -1768,14 +1528,14 @@
         ;; redirect to a form-submission page allowing user to correct errors
         ;; transfer form errors using query params or form params (if a session is present)
 
-        (let [orig-uri     (if orig-uri (some-str orig-uri))
-              orig-params  (if orig-uri orig-params)
+        (let [orig-uri     (when orig-uri (some-str orig-uri))
+              orig-params  (when orig-uri orig-params)
               dest         (or orig-page orig-uri)
               dest-uri     (if (keyword? dest) (common/page req dest) dest)
               dest-uri     (some-str dest-uri)
               skey         (or session-key (get route-data :session-key))
               smap         (session/not-empty-of req skey)
-              stored?      (if (and smap (session/valid? smap))
+              stored?      (when (and smap (session/valid? smap))
                              (session/put-var!
                               smap :form-errors
                               {:dest   dest-uri
@@ -1801,7 +1561,7 @@
                                             :params (force values)}))
             render-bad-params)))))
 
-(defn hx-handle-bad-request-form-params
+(defn htmx-handle-bad-request-form-params
   "Called by other functions to render form with feedback about submitted parameter
   errors (induced manually or caused by coercion exception). On fronted, uses HTMX
   and JavaScript Fetch API calls to load HTML.
@@ -1826,13 +1586,13 @@
   Sets `HX-Retarget` response header to a value set in route data option
   `:form-errors/target` and returns a response."
   ([req route-data errors]
-   (hx-handle-bad-request-form-params req route-data errors nil nil nil))
+   (htmx-handle-bad-request-form-params req route-data errors nil nil nil))
   ([req route-data errors values]
-   (hx-handle-bad-request-form-params req route-data errors values nil nil))
+   (htmx-handle-bad-request-form-params req route-data errors values nil nil))
   ([req route-data errors values explanations]
-   (hx-handle-bad-request-form-params req route-data errors values explanations nil))
+   (htmx-handle-bad-request-form-params req route-data errors values explanations nil))
   ([req route-data errors values explanations title _]
-   (hx-handle-bad-request-form-params req route-data errors values explanations title))
+   (htmx-handle-bad-request-form-params req route-data errors values explanations title))
   ([req route-data errors values explanations title]
    (if-not (valuable? errors)
      req ;; generic error page?
@@ -1840,10 +1600,10 @@
            orig-page          (get route-data :form-errors/page)
            orig-page          (or orig-page (:page (get req :goto)))
            title              (or title (get route-data :form-errors/title))
-           referer            (if (nil? orig-page) (some-str (get (get req :headers) "referer")))
-           orig-uri           (if referer (some-str (:uri (parse-url referer))))
+           referer            (when (nil? orig-page) (some-str (get (get req :headers) "referer")))
+           orig-uri           (when referer (some-str (:uri (parse-url referer))))
            src-page           (or orig-page (http/route-name req orig-uri))
-           src-route-data     (if src-page (http/route-data req src-page))
+           src-route-data     (when src-page (http/route-data req src-page))
            new-view           (get route-data :form-errors/view)
            new-view           (if (nil? new-view) (get src-route-data :app/view) new-view)
            new-view           (if (nil? new-view) (get src-route-data :name) new-view)
@@ -1851,10 +1611,10 @@
            new-layout         (if (nil? new-layout) (get src-route-data :app/layout) new-layout)
            handling-previous? (contains? (get req :query-params) "form-errors")
            hx-targets         (get route-data :form-errors/retargets)
-           hx-src-target      (if hx-targets (hx-target req))
-           hx-target          (if hx-src-target (get hx-targets hx-src-target))
+           hx-src-target      (when hx-targets (htmx/get-target-header req))
+           hx-target          (when hx-src-target (get hx-targets hx-src-target))
            hx-target          (some-str (or hx-target (get route-data :form-errors/target)))
-           req                (if hx-target (add-header req :HX-Retarget hx-target) req)
+           req                (if hx-target (common/add-header req :HX-Retarget hx-target) req)
            req                (if title (assoc-app-data req :title title) req)
            req                (if (nil? new-view)   req (qassoc req :app/view   new-view))
            req                (if (nil? new-layout) req (qassoc req :app/layout new-layout))]
@@ -1867,11 +1627,11 @@
            (render-bad-params nil new-view new-layout))))))
 
 (defn handle-bad-request-form-params
-  "Dispatch function which calls `hx-handle-bad-request-form-params` when HTMX is in
-  use or `http-handle-bad-request-form-params` in other cases. HTMX mode will be in
-  place when a client request contains `HX-Request` header set to a non-falsy and not
-  empty value, or it was enforced by using route data key `:form-errors/use-htmx?`
-  set to a truthy value."
+  "Dispatch function which calls `amelinium.web.htmx/handle-bad-request-form-params`
+  when HTMX is in use or `http-handle-bad-request-form-params` in other cases. HTMX
+  mode will be in place when a client request contains `HX-Request` header set to a
+  non-falsy and not empty value, or when it was enforced by using route data key
+  `:form-errors/use-htmx?` set to a truthy value."
   ([req]
    (handle-bad-request-form-params req nil nil nil nil nil))
   ([req errors]
@@ -1884,18 +1644,18 @@
    (handle-bad-request-form-params req errors values explanations title nil))
   ([req errors values explanations title session-key]
    (let [route-data (http/get-route-data req)]
-     (if (use-hx? req route-data :form-errors/use-htmx?)
-       (hx-handle-bad-request-form-params   req route-data errors values explanations title)
+     (if (htmx/use? req route-data :form-errors/use-htmx?)
+       (htmx-handle-bad-request-form-params req route-data errors values explanations title)
        (http-handle-bad-request-form-params req route-data errors values explanations title session-key)))))
 
 (defn- param-current-vals
   [req]
-  (if-let [form-params (get req :form-params)]
+  (when-let [form-params (get req :form-params)]
     (let [good-params (->> (common/get-form-params req)
                            (map/remove-empty-values)
                            (map/map-keys some-str))]
       (->> form-params
-           (map/map-vals-by-k #(if (contains? good-params %) (some-str (get form-params %))))
+           (map/map-vals-by-k #(when (contains? good-params %) (some-str (get form-params %))))
            (map/remove-empty-values)))))
 
 (defn- param-errors-stringify
@@ -1927,7 +1687,7 @@
   `:form-errors/layout` and/or `:form-errors/view` options are set. Layout can be set
   to `false` to allow injection of HTML fragments. If form errors page is not
   specified one is obtained from the `Referer` request header. See
-  `hx-handle-bad-request-form-params` for more info.
+  `amelinium.web.htmx/handle-bad-request-form-params` for more info.
 
   If simple HTTP mode is in place the `http-handle-bad-request-form-params` is used,
   and the following will happen:
