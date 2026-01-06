@@ -27,6 +27,16 @@
   "An empty lazy map."
   (map/lazy))
 
+(defn map-to-lazy
+  "Ensures that the given argument `m` is a lazy map. If it is not a map, it is
+  returned as is. If it is `nil`, empty lazy map is returned."
+  [m]
+  (if (map? m)
+    (map/to-lazy m)
+    (if (nil? m)
+      empty-lazy-map
+      m)))
+
 ;; File system operations
 
 (defn some-resource
