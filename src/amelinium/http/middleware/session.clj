@@ -447,11 +447,11 @@
   valid. Optional `session-key` may be given to express a key in associative
   structure (defaults to `:session`). Returns `nil` if session is not valid."
   (^Session [^Sessionable  src]
-   (if-let [^Session s (p/session src)]
-     (if (.valid? s) s)))
+   (when-let [^Session s (p/session src)]
+     (when (.valid? s) s)))
   (^Session [^Sessionable src ^Keyword session-key]
-   (if-let [^Session s (p/session src session-key)]
-     (if (.valid? s) s))))
+   (when-let [^Session s (p/session src session-key)]
+     (when (.valid? s) s))))
 
 (defn control?
   "Returns `true` if the given value is an instance of a class which fully satisfies
@@ -484,9 +484,9 @@
   be converted to a session. Optional `session-key` can be given when passing a
   request map."
   (^String [^Sessionable src]
-   (if-some [^Session s (p/session src)] (.id s)))
+   (when-some [^Session s (p/session src)] (.id s)))
   (^String [^Sessionable src ^Keyword session-key]
-   (if-some [^Session s (p/session src session-key)] (.id s))))
+   (when-some [^Session s (p/session src session-key)] (.id s))))
 
 (defn err-id
   "Returns an error session ID from the given source and optional session key. Works
@@ -495,9 +495,9 @@
   be converted to a session. Optional `session-key` can be given when passing a
   request map."
   (^String [^Sessionable src]
-   (if-some [^Session s (p/session src)] (.err-id s)))
+   (when-some [^Session s (p/session src)] (.err-id s)))
   (^String [^Sessionable src ^Keyword session-key]
-   (if-some [^Session s (p/session src session-key)] (.err-id s))))
+   (when-some [^Session s (p/session src session-key)] (.err-id s))))
 
 (defn any-id
   "Returns a session ID from the given source and optional session key. May return a
@@ -506,9 +506,9 @@
   be converted to a session. Optional `session-key` can be given when passing a
   request map."
   (^String [^Sessionable src]
-   (if-some [^Session s (p/session src)] (or (.id s) (.err-id s))))
+   (when-some [^Session s (p/session src)] (or (.id s) (.err-id s))))
   (^String [^Sessionable src ^Keyword session-key]
-   (if-some [^Session s (p/session src session-key)] (or  (.id s) (.err-id s)))))
+   (when-some [^Session s (p/session src session-key)] (or  (.id s) (.err-id s)))))
 
 (defn db-token
   "Returns the `:db-token` (security token in a database-suitable form) property of a
@@ -516,9 +516,9 @@
   satisfies the `Sessionable` protocol and can be converted to a session. Optional
   `session-key` can be given when passing a request map."
   (^String [^Sessionable src]
-   (if-some [^Session s (p/session src)] (.db-token s)))
+   (when-some [^Session s (p/session src)] (.db-token s)))
   (^String [^Sessionable src ^Keyword session-key]
-   (if-some [^Session s (p/session src session-key)] (.db-token s))))
+   (when-some [^Session s (p/session src session-key)] (.db-token s))))
 
 (defn user-id
   "Returns the `:user-id` (user ID) property of a session. The `src` can be a session
@@ -526,9 +526,9 @@
   be converted to a session. Optional `session-key` can be given when passing a
   request map."
   (^Long [^Sessionable src]
-   (if-some [^Session s (p/session src)] (.user-id s)))
+   (when-some [^Session s (p/session src)] (.user-id s)))
   (^Long [^Sessionable src ^Keyword session-key]
-   (if-some [^Session s (p/session src session-key)] (.user-id s))))
+   (when-some [^Session s (p/session src session-key)] (.user-id s))))
 
 (defn user-email
   "Returns the `:user-email` (user e-mail) property of a session. The `src` can be a
@@ -536,9 +536,9 @@
   and can be converted to a session. Optional `session-key` can be given when passing
   a request map."
   (^String [^Sessionable src]
-   (if-some [^Session s (p/session src)] (.user-email s)))
+   (when-some [^Session s (p/session src)] (.user-email s)))
   (^String [^Sessionable src ^Keyword session-key]
-   (if-some [^Session s (p/session src session-key)] (.user-email s))))
+   (when-some [^Session s (p/session src session-key)] (.user-email s))))
 
 (defn created
   "Returns the `:created` (creation time) property of a session. The `src` can be a
@@ -546,9 +546,9 @@
   and can be converted to a session. Optional `session-key` can be given when passing
   a request map."
   (^Instant [^Sessionable src]
-   (if-some [^Session s (p/session src)] (.created s)))
+   (when-some [^Session s (p/session src)] (.created s)))
   (^Instant [^Sessionable src ^Keyword session-key]
-   (if-some [^Session s (p/session src session-key)] (.created s))))
+   (when-some [^Session s (p/session src session-key)] (.created s))))
 
 (defn active
   "Returns the `:active` (last active time) property of a session. The `src` can be a
@@ -556,9 +556,9 @@
   and can be converted to a session. Optional `session-key` can be given when passing
   a request map."
   (^Instant [^Sessionable src]
-   (if-some [^Session s (p/session src)] (.active s)))
+   (when-some [^Session s (p/session src)] (.active s)))
   (^Instant [^Sessionable src ^Keyword session-key]
-   (if-some [^Session s (p/session src session-key)] (.active s))))
+   (when-some [^Session s (p/session src session-key)] (.active s))))
 
 (defn ip
   "Returns the `:ip` (IP address) property of a session. The `src` can be a session
@@ -566,9 +566,9 @@
   be converted to a session. Optional `session-key` can be given when passing a
   request map."
   (^IPAddress [^Sessionable src]
-   (if-some [^Session s (p/session src)] (.ip s)))
+   (when-some [^Session s (p/session src)] (.ip s)))
   (^IPAddress [^Sessionable src ^Keyword session-key]
-   (if-some [^Session s (p/session src session-key)] (.ip s))))
+   (when-some [^Session s (p/session src session-key)] (.ip s))))
 
 (defn session-key
   "Returns the `:session-key` (session key) property of a session. The `src` can be a
@@ -576,9 +576,9 @@
   and can be converted to a session. Optional `session-key` can be given when passing
   a request map."
   ([^Sessionable src]
-   (if-some [^Session s (p/session src)] (or (.session-key s) :session)))
+   (when-some [^Session s (p/session src)] (or (.session-key s) :session)))
   ([^Sessionable src ^Keyword session-key]
-   (if-some [^Session s (p/session src session-key)] (or (.session-key s) :session))))
+   (when-some [^Session s (p/session src session-key)] (or (.session-key s) :session))))
 
 (defn id-field
   "Returns the `:id-field` (field ID) property of a session. The `src` can be a session
@@ -586,9 +586,9 @@
   be converted to a session. Optional `session-key` can be given when passing a
   request map."
   ([^Sessionable src]
-   (if-some [^Session s (p/session src)] (.id-field s)))
+   (when-some [^Session s (p/session src)] (.id-field s)))
   ([^Sessionable src ^Keyword session-key]
-   (if-some [^Session s (p/session src session-key)] (.id-field s))))
+   (when-some [^Session s (p/session src session-key)] (.id-field s))))
 
 (defn prolonged?
   "Returns `true` if the given session has just been prolonged. The `src` can be a
@@ -598,14 +598,14 @@
   (^Boolean [^Sessionable src]
    (if-some [^Session s (p/session src)] (.prolonged? s) false))
   (^Boolean [^Sessionable src ^Keyword session-key]
-   (if-some [^Session s (p/session src session-key)] (.prolonged? s)) false))
+   (if-some [^Session s (p/session src session-key)] (.prolonged? s) false)))
 
 (defn mem-ctime
   "Retrieves an entry creation time (in milliseconds) associated with the given `key`
   in a TTL map of a current handler cache. If the entry does not exist, `nil` is
   returned."
   [^SessionControl ctrl key]
-  (if-some [^PluggableMemoization m (p/mem-cache ctrl)]
+  (when-some [^PluggableMemoization m (p/mem-cache ctrl)]
     (nth (get (.ttl ^TTLCacheQ (.cache m)) key) 1 nil)))
 
 (defn mem-etime
@@ -614,9 +614,9 @@
   cache. It is calculated by adding cache's TTL to entry's creation time. If the
   entry does not exist, `nil` is returned."
   [^SessionControl ctrl key]
-  (if-some [^PluggableMemoization m (p/mem-cache ctrl)]
+  (when-some [^PluggableMemoization m (p/mem-cache ctrl)]
     (let [^TTLCacheQ c (.cache m)]
-      (if-some [ctime (nth (get (.ttl c) key) 1 nil)]
+      (when-some [ctime (nth (get (.ttl c) key) 1 nil)]
         (+ ctime (.ttl-ms c))))))
 
 (defn mem-cache-expired?
@@ -1831,6 +1831,98 @@
                           :error (SessionError. :error :session/db-problem
                                                 (str "Session cannot be saved"
                                                      (for-user user-id user-email ip)))))))))))))
+
+;; Helpers
+
+(defn config+session
+  "Gets a session map and a session config map from the given request map. Returns a
+  two-element vector."
+  ([req]
+   (config+session req :session))
+  ([req session-key]
+   (if-some [^Session s (of req session-key)]
+     [(or (config s) (config req session-key)) s]
+     [nil nil])))
+
+(defn get-session-id-header
+  "For the given request map `req` it tries to get a request header identified by a
+  name `id-field`, and then checks if it is valid session identifier. Returns a
+  session identifier or `nil` if the obtained value is not valid session ID or the
+  header is not found."
+  [req id-field]
+  (let [sid (get (get req :headers) id-field)]
+    (when (sid-valid? sid) sid)))
+
+(defn add-session-id-header
+  "Adds session ID header to a map under the `response-headers-key` (defaults to
+  `:response/headers`) key of the given `req` map. Name of the header is obtained
+  from session ID field (by calling `id-field`) and its value is set to session
+  ID (obtained by calling `any-id`). If the header already exists it is not added."
+  ([req sess]
+   (add-session-id-header req sess false :response/headers))
+  ([req sess replace?]
+   (add-session-id-header req sess replace? :response/headers))
+  ([req sess replace? response-headers-key]
+   (if sess
+     (if-some [id-field (id-field sess)]
+       (if-some [sid (any-id sess)]
+         (let [response-headers-key (or response-headers-key :response-headers)
+               headers              (get req response-headers-key)]
+           (if (pos? (count headers))
+             (if (or replace? (not (contains? headers id-field)))
+               (qassoc req response-headers-key (qassoc headers id-field sid))
+               req)
+             (qassoc req response-headers-key {id-field sid})))
+         req)
+       req)
+     req)))
+
+(defn replace-session-id-header
+  "Adds session ID header to the `:response/headers` map of the given `req` map. Name
+  of the header is obtained from session ID field (by calling `id-field`) and its value
+  is set to session ID (obtained by calling `any-id`). If the header already exists
+  it is replaced."
+  [req sess]
+  (add-session-id-header req sess true))
+
+(defn reflect-session-id-header
+  "Adds session ID header to a map under the `response-headers-key` (defaults to
+  `:response/headers`) key of the given `req` map. Name of the header is obtained
+  from session ID field (by calling `id-field`) and its value is set to session
+  ID (obtained by calling `any-id`, and if that fails by getting the value of client
+  request header with the same name using `get-session-id-header`).  If the header
+  already exists it is not added."
+  ([req sess]
+   (reflect-session-id-header req sess :response/headers))
+  ([req sess response-headers-key]
+   (if sess
+     (if-some [id-field (id-field sess)]
+       (if-some [sid (or (any-id sess) (get-session-id-header req id-field))]
+         (let [response-headers-key (or response-headers-key :response/headers)
+               headers              (get req response-headers-key)]
+           (if (pos? (count headers))
+             (if (contains? headers id-field)
+               req
+               (qassoc req response-headers-key (qassoc headers id-field sid)))
+             (qassoc req response-headers-key {id-field sid})))
+         req)
+       req)
+     req)))
+
+(defn empty-session-id-header
+  "Adds session ID header to a map under the `response-headers-key` (defaults to
+  `:response/headers`) key of the given `req` map. Name of the header is obtained
+  from session ID field (by calling `id-field`). If the header already exists it is
+  replaced. The content is set to a string consisting of a single minus character."
+  ([req sess]
+   (empty-session-id-header req sess :response/headers))
+  ([req sess response-headers-key]
+   (if-some [id-field (id-field sess)]
+     (let [headers (get req response-headers-key)]
+       (if (pos? (count headers))
+         (qassoc req response-headers-key (qassoc headers id-field "-"))
+         (qassoc req response-headers-key {id-field "-"})))
+     req)))
 
 ;; Initialization
 

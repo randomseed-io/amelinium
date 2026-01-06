@@ -1,10 +1,10 @@
 (ns
 
- ^{:doc    "Common helpers for amelinium."
-   :author "Paweł Wilk"
-   :added  "1.0.0"}
+    ^{:doc    "Common helpers for amelinium."
+      :author "Paweł Wilk"
+      :added  "1.0.0"}
 
- amelinium.common
+    amelinium.common
 
   (:require [clojure.set                           :as                    set]
             [clojure.string                        :as                    str]
@@ -14,7 +14,6 @@
             [ring.util.response]
             [ring.util.codec                       :as                  codec]
             [ring.util.request                     :as                    req]
-            [jsonista.core                         :as                      j]
             [amelinium                             :as              amelinium]
             [amelinium.proto.http                  :as                  phttp]
             [amelinium.identity                    :as               identity]
@@ -23,7 +22,6 @@
             [amelinium.http.response               :as                   resp]
             [amelinium.http.middleware.roles       :as                  roles]
             [amelinium.http.middleware.language    :as               language]
-            [amelinium.http.middleware.session     :as                session]
             [amelinium.common.oplog.auth           :as             oplog-auth]
             [amelinium.i18n                        :as                   i18n]
             [amelinium.utils                       :refer [keyword-from-param
@@ -35,8 +33,7 @@
             [io.randomseed.utils.map               :as map    :refer [qassoc]]
             [io.randomseed.utils.db                :as                     db])
 
-  (:import (amelinium            Response
-                                 Session)
+  (:import (amelinium            Response)
            (clojure.lang         Associative
                                  IPersistentMap
                                  Keyword
@@ -1236,50 +1233,6 @@
      (let [st (if (coll? st) (errors/most-significant (or err-config src) st) st)]
        (if (keyword? st) st (when st (utils/some-keyword st)))))))
 
-;; HTMX
-
-(defn hx-request?
-  "Returns `true` if the client request has `HX-Request` header set to any value but
-  `false` or an empty string."
-  ^Boolean [req]
-  (if-some [hdr (get (get req :headers) "hx-request")]
-    (if-some [hdr (utils/some-str hdr)]
-      (not= "false" hdr)
-      false)
-    false))
-
-(defn use-hx?
-  "Returns `true` if response should be HTMX-compatible, `false` if it should not. Uses
-  optional `route-data` or gets it from the `req` to look for (optional) `extra-key`
-  first, and if it is not given or has falsy value then gets a value associated with
-  the `:use-htmx?` key.
-
-  * If the obtained value is `false`, it will return `false`.
-  * If the obtained value is `true` or any non-`nil` value, it will return `true`.
-  * If the obtained value is `nil`, or there is no route data nor any of the mentioned
-    keys can be found in route data, it will try to auto-detect HTMX using `hx-request?`
-    function which analyzes the `HX-Request` request header."
-  (^Boolean [req]
-   (hx-request? req))
-  (^Boolean [req route-data]
-   (use-hx? req route-data false))
-  (^Boolean [req route-data extra-key]
-   (if-some [route-data (or route-data (http/get-route-data req))]
-     (if-some [force-hx (or (when extra-key (find route-data extra-key))
-                            (find route-data :use-htmx?))]
-       (if-some [force-hx? (val force-hx)]
-         (boolean force-hx?)
-         (hx-request? req))
-       (hx-request? req))
-     (hx-request? req))))
-
-(defn hx-target
-  "Returns a string from `HX-Target` header set by a client. If the header does not
-  exist, it returns `nil`. If the header exists but contains an empty string, it
-  returns `nil`."
-  [req]
-  (utils/some-str (get (get req :headers) "hx-target")))
-
 ;; Redirects
 
 (defn redirect
@@ -1746,213 +1699,6 @@
      (when-some [lock-wait (lock-wait auth-config-or-lw)]
        (let [d (t/- lock-wait lock-passed)]
          (when (time/pos-duration? d) d))))))
-
-;; Sessions
-
-(defn session
-  "Gets a session map from the given request map."
-  ([req]
-   (session/of req))
-  ([req session-key]
-   (session/of req session-key)))
-
-(defn session-config
-  "Gets a session config map from the given request map."
-  ([req]
-   (session/config req))
-  ([req session-key]
-   (session/config req session-key)))
-
-(defn config+session
-  "Gets a session map and a session config map from the given request map. Returns a
-  two-element vector."
-  ([req]
-   (config+session req :session))
-  ([req session-key]
-   (if-some [^Session s (session/of req session-key)]
-     [(or (session/config s) (session/config req session-key)) s]
-     [nil nil])))
-
-(defn session-inject
-  "Adds session data to a request map. Session key is obtained from the `config` field
-  of `smap` or (if given) from a `session-key` argument."
-  ([req smap]
-   (session/inject req smap))
-  ([req smap session-key]
-   (session/inject req smap session-key)))
-
-(defn session-variable-get-failed?
-  [v]
-  (session/get-variable-failed? v))
-
-(defmacro kv-json-str
-  [k v]
-  `(if-let [k# ~k]
-     (if-some [k# (utils/some-str k#)]
-       (utils/strb "{\"" k# "\":\"" ~v "\"}")) "\"\""))
-
-(defn- inject-json-event-header
-  ([headers cur ename hname k v]
-   (inject-json-event-header headers cur ename hname k v false))
-  ([headers cur ename hname k v replace?]
-   (if-some [js (and (string? cur)
-                     (not-empty cur)
-                     (j/read-value cur j/default-object-mapper))]
-     (if (map? js)
-       (if (or replace? (not (contains? js ename)))
-         (map/qassoc headers hname (j/write-value-as-string (map/qassoc js ename (if k {k v} ""))))
-         headers)
-       (map/qassoc headers hname (utils/strb "{" cur ":\"\", \"" ename "\":" (kv-json-str k v) "}")))
-     (map/qassoc headers hname (utils/strb "{\"" ename "\":" (kv-json-str k v) "}")))))
-
-(defn add-json-event-header
-  ([req header-name event-name]
-   (add-json-event-header req header-name event-name nil nil false))
-  ([req header-name event-name param-key param-value]
-   (add-json-event-header req header-name event-name param-key param-value false))
-  ([req header-name event-name param-key param-value replace?]
-   (let [header-name (utils/some-str header-name)
-         event-name  (utils/some-str event-name)
-         headers     (get req :response/headers)]
-     (map/qassoc
-      req :response/headers
-      (if (pos? (count headers))
-        (if-some [current (get headers header-name)]
-          (inject-json-event-header headers current event-name header-name
-                                    param-key param-value replace?)
-          (map/qassoc headers header-name (utils/strb "{\"" event-name "\":" (kv-json-str param-key param-value) "}")))
-        {header-name (utils/strb "{\"" event-name "\":" (kv-json-str param-key param-value) "}")})))))
-
-(defn add-session-hx-header
-  "Adds `HX-Trigger` server response header to `:response/headers` map of the given
-  `req` map by putting a JSON in the following form:
-
-  `{\"setSession\":{\"session-id\": \"SID\"}}`
-
-  where the `session-id` string is obtained from session's ID field (using
-  `amelinium.http.middleware.session/id-field`) and `SID` is replaced with session
-  ID (obtained with `amelinium.http.middleware.session/any-id`).
-
-  If the `HX-Trigger` header already exists but it does not contain `setSession`
-  trigger name, it will be modified. If it already contains it, it will be left as
-  is."
-  [req sess]
-  (if-some [sid (when sess (session/any-id sess))]
-    (add-json-event-header req "HX-Trigger" "setSession" (session/id-field sess) sid false)
-    req))
-
-(defn replace-session-hx-header
-  "Adds `HX-Trigger` server response header to `:response/headers` map of the given
-  `req` map by putting a JSON in the following form:
-
-  `{\"setSession\":{\"session-id\": \"SID\"}}`
-
-  where the `session-id` string is obtained from session's ID field (using
-  `amelinium.http.middleware.session/id-field`) and `SID` is replaced with session
-  ID (obtained with `amelinium.http.middleware.session/any-id`).
-
-  If the `HX-Trigger` header already exists, it will be modified and any value
-  associated with `setSession` key will be modified."
-  [req sess]
-  (if-some [sid (when sess (session/any-id sess))]
-    (add-json-event-header req "HX-Trigger" "setSession" (session/id-field sess) sid true)
-    req))
-
-(defn get-session-id-header
-  "For the given request map `req` it tries to get a request header identified by a
-  name `id-field`, and then checks if it is valid session identifier. Returns a
-  session identifier or `nil` if the obtained value is not valid session ID or the
-  header is not found."
-  [req id-field]
-  (let [sid (get (get req :headers) id-field)]
-    (when (session/sid-valid? sid) sid)))
-
-(defn reflect-session-hx-header
-  "Tries to obtain session ID from the given `sess` object, and if that fails from the
-  request header with name same as session ID field (obtained by calling
-  `amelinium.http.middleware.session/id-field` on `sess`) from the `req` map. Then it
-  uses `add-json-event-handler` to set `HX-Trigger` response header in a similar way
-  the `add-session-hx-header` does."
-  [req sess]
-  (if sess
-    (if-some [id-field (session/id-field sess)]
-      (if-some [sid (or (session/any-id sess) (get-session-id-header req id-field))]
-        (add-json-event-header req
-                               "HX-Trigger"
-                               "setSession"
-                               id-field
-                               sid
-                               false)
-        req)
-      req)
-    req))
-
-(defn add-session-id-header
-  "Adds session ID header to the `:response/headers` map of the given `req` map. Name
-  of the header is obtained from session ID field (by calling
-  `amelinium.http.middleware.session/id-field`) and its value is set to session
-  ID (obtained by calling `amelinium.http.middleware.session/any-id`). If the header
-  already exists it is not added."
-  ([req sess]
-   (add-session-id-header req sess false))
-  ([req sess replace?]
-   (if sess
-     (if-some [id-field (session/id-field sess)]
-       (if-some [sid (session/any-id sess)]
-         (let [headers (get req :response/headers)]
-           (if (pos? (count headers))
-             (if (or replace? (not (contains? headers id-field)))
-               (qassoc req :response/headers (qassoc headers id-field sid))
-               req)
-             (qassoc req :response/headers {id-field sid})))
-         req)
-       req)
-     req)))
-
-(defn replace-session-id-header
-  "Adds session ID header to the `:response/headers` map of the given `req` map. Name
-  of the header is obtained from session ID field (by calling
-  `amelinium.http.middleware.session/id-field`) and its value is set to session
-  ID (obtained by calling `amelinium.http.middleware.session/any-id`). If the header
-  already exists it is replaced."
-  [req sess]
-  (add-session-id-header req sess true))
-
-(defn reflect-session-id-header
-  "Adds session ID header to the `:response/headers` map of the given `req` map. Name
-  of the header is obtained from session ID field (by calling
-  `amelinium.http.middleware.session/id-field`) and its value is set to session
-  ID (obtained by calling `amelinium.http.middleware.session/any-id`, and if that
-  fails by getting the value of client request header with the same name using
-  `get-session-id-header`). If the header already exists it is not added."
-  [req sess]
-  (if sess
-    (if-some [id-field (session/id-field sess)]
-      (if-some [sid (or (session/any-id sess) (get-session-id-header req id-field))]
-        (let [headers (get req :response/headers)]
-          (if (pos? (count headers))
-            (if (contains? headers id-field)
-              req
-              (qassoc req :response/headers (qassoc headers id-field sid)))
-            (qassoc req :response/headers {id-field sid})))
-        req)
-      req)
-    req))
-
-(defn empty-session-id-header
-  "Adds session ID header with an empty string to the `:response/headers` map of the
-  given `req` map. Name of the header is obtained from session ID field (by calling
-  `amelinium.http.middleware.session/id-field`). If the header already exists it is
-  replaced."
-  ([req sess]
-   (empty-session-id-header req sess :response/headers))
-  ([req sess headers-key]
-   (if-some [id-field (session/id-field sess)]
-     (let [headers (get req headers-key)]
-       (if (pos? (count headers))
-         (qassoc req headers-key (qassoc headers id-field "-"))
-         (qassoc req headers-key {id-field "-"})))
-     req)))
 
 ;; Context and roles
 
