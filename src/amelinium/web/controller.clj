@@ -167,8 +167,8 @@
 
        ;; Unauthorized (RBAC)
 
-       (not (or (get req :user/authorized?) sess-err))
-       (if (get req :user/authenticated?)
+       (not (or (force (get req :user/authorized?)) sess-err))
+       (if (force (get req :user/authenticated?))
          (web/render-error req :auth/access-denied  :login/access-denied)
          (web/render-error req :auth/login-required :login/login-required))
 

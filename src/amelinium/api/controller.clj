@@ -74,7 +74,7 @@
 
        ;; Authorization failed.
 
-       (not (or session-error authorized?))
+       (not (or session-error (force authorized?)))
        (-> req (cleanup-req @auth-state) (api/render-error :auth/access-denied))
 
        ;; There is no session. Short-circuit.
@@ -140,7 +140,7 @@
 
        ;; Authorization failed but session error was not handled for some strange reason.
 
-       (not authorized?)
+       (not (force authorized?))
        (-> req (cleanup-req @auth-state) (api/render-error :auth/access-denied))
 
        :----pass
