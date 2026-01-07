@@ -8,63 +8,32 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [clojure.string                       :as             str]
-            [clojure.java.io                      :as              io]
+  (:require [clojure.java.io                      :as              io]
             [potemkin                             :as               p]
             [ring.util.response]
+            [amelinium]
+            [amelinium.types.response]
             [amelinium.http.response              :as            resp]
             [ring.util.request                    :as             req]
             [selmer.parser                        :as          selmer]
             [amelinium.db                         :as              db]
-            [amelinium.web.htmx                   :as            htmx]
             [amelinium.i18n                       :as            i18n]
-            [amelinium.types.response             :refer         :all]
-            [amelinium.utils                      :refer         :all]
             [amelinium.common                     :as          common]
             [amelinium.errors                     :as          errors]
             [amelinium.http                       :as            http]
-            [amelinium.http.middleware.session    :as         session]
-            [amelinium.http.middleware.coercion   :as        coercion]
             [amelinium.logging                    :as             log]
-            [amelinium                            :refer         :all]
-            [io.randomseed.utils.map              :as map :refer [qassoc]]
-            [io.randomseed.utils                  :refer          [parse-url
-                                                                   or-some
-                                                                   some-str
-                                                                   some-keyword
-                                                                   valuable?]]
-            [hiccup.core                          :refer         :all]
-            [hiccup.table                         :as           table]
-            [lazy-map.core                        :as        lazy-map])
+            [amelinium.web.html                   :as            html]
+            [amelinium.web.htmx                   :as            htmx]
+            [amelinium.web.app-data               :as        app-data]
+            [io.randomseed.utils.map              :as             map]
+            [io.randomseed.utils                  :refer    [or-some
+                                                             some-str
+                                                             some-keyword
+                                                             valuable?]])
 
   (:import (amelinium     Response)
            (clojure.lang  IFn)
-           (java.io       File)
-           (lazy_map.core LazyMapEntry)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Request map keys exposed in views
-
-(def ^:const page-keys       [:title :subtitle])
-(def ^:const param-keys      [:query-params :form-params :path-params :form/errors :coercion/errors])
-(def ^:const validators-keys [:validators/config :validators/params-valid?])
-(def ^:const session-keys    [:session])
-(def ^:const remote-ip-keys  [:remote-ip :remote-ip/str :remote-ip/by-proxy? :remote-ip/proxy])
-(def ^:const language-keys   [:language/id :language/str :language/default :accept])
-(def ^:const i18n-keys       [:i18n/translator :i18n/translator-sub :i18n/translator-nd :i18n/translator-sub-nd])
-(def ^:const roles-keys      [:roles :roles/in-context :roles/context :user/authorized? :user/authenticated? :user/known?])
-
-(def ^:const common-auth-keys (vec (concat session-keys remote-ip-keys roles-keys)))
-
-;; Request map keys to be always copied to the template system data map
-;; Later on we put them under :app/data-required for being used by the injecting function
-
-(def ^:const common-keys (vec (concat common-auth-keys
-                                      validators-keys
-                                      language-keys
-                                      i18n-keys
-                                      param-keys
-                                      page-keys)))
+           (java.io       File)))
 
 ;; Routing data and settings helpers
 
@@ -104,25 +73,6 @@
                 hard-lock-time hard-locked?
                 soft-lock-time soft-lock-passed soft-locked? soft-lock-remains])
 
-;; Context and roles
-
-(p/import-vars [amelinium.common
-                has-any-role? has-role?
-                role-required! with-role-only!
-                roles-for-context roles-for-contexts default-contexts-labeler
-                roles-matrix roles-tabler])
-
-;; Lazy map handling
-
-(defn map-to-lazy
-  "Ensures that the given argument `m` is a lazy map. If it is not a map, it is
-  returned as is. If it is `nil`, empty lazy map is returned."
-  [m]
-  (if (map? m)
-    (map/to-lazy m)
-    (if (nil? m)
-      empty-lazy-map
-      m)))
 
 ;; HTML generators and transformers
 
@@ -146,150 +96,6 @@
   (if (and (seq? body) (> (count body) 1))
     `(let [req# ~req] (if (instance? Response req#) req# (do ~@body)))
     `(let [req# ~req] (if (instance? Response req#) req# ~@body))))
-
-;; Handling :app/data
-
-(defn get-missing-app-data-from-req
-  "Associates missing data identified with keys listed in `keyz` with values taken from
-  the request map if the key exists. The resulting map is converted to a lazy map if
-  it's not."
-  [data req keyz]
-  (let [req (map/to-lazy req)]
-    (reduce (fn [ret k]
-              (if-let [entry (and (not (contains? ret k)) (find req k))]
-                (qassoc ret k (.val_ ^LazyMapEntry entry))
-                ret))
-            (map/to-lazy (or data empty-lazy-map))
-            (seq keyz))))
-
-(defn no-app-data
-  "Disables processing of the `:app/data` key for the given request `req` by
-  associating it with the `false` value."
-  [req]
-  (qassoc req :app/data false))
-
-(defn no-app-data?
-  "Returns `true` when the value associated with `:app/data` in `req` is `false`."
-  [req]
-  (false? (get req :app/data)))
-
-(defn app-data
-  "Gets the value of `:app/data` for the current request. If it does not exist or it is
-  `nil`, returns an empty lazy map. Otherwise it returns the unmodified value. If it
-  is a map but not a lazy map, converts it to a lazy map."
-  [req]
-  (if-some [m (get req :app/data)]
-    (map-to-lazy m)
-    empty-lazy-map))
-
-(defn prep-app-data
-  "Prepares data for the rendering functions by copying the given values associated
-  with the given keys from `req` to a lazy map under `:app/data` key of the
-  `req`. The list of keys to copy must be as a sequential collection, explicitly
-  given as `keyz`, or reside under `:app/data-required` of the `req`. If there
-  already is `:app/data` in the request map then it will be used as the initial value
-  of the created data map. Data for existing keys will not be copied."
-  ([req]
-   (prep-app-data req nil nil))
-  ([req data]
-   (prep-app-data req data nil))
-  ([req data keyz]
-   (if (false? data)
-     req
-     (let [req-data (get req :app/data)]
-       (if (false? req-data)
-         req
-         (let [req-data (when req-data (map/to-lazy req-data))
-               data     (if req-data (map/merge-lazy req-data data) (map/to-lazy data))
-               keyz     (or keyz (concat common-keys (get req :app/data-required)))]
-           (if (and data (pos? (count data)))
-             (get-missing-app-data-from-req data req keyz)
-             (map/select-keys-lazy req keyz))))))))
-
-(defmacro add-app-data
-  "Adds a lazy map to a request map `req` under its key `:app/data` using
-  `qassoc`. Overwrites previous value. The body is a result of evaluating expressions
-  passed as additional arguments (`body`). Returns updated `req`. Assumes that `req`
-  is always a map. Ensures that the resulting map is lazy. Ensures that the result is
-  not `nil` (if it is, empty lazy map is returned).
-
-  Associating `:app/data` with `false` will prevent it from further processing."
-  [req & body]
-  (if (and (seq? body) (> (count body) 1))
-    `(qassoc ~req :app/data (map-to-lazy (do ~@body)))
-    `(qassoc ~req :app/data (map-to-lazy ~@body))))
-
-(defn update-app-data
-  "Updates the `:app/data` in a request map `req` with a result of calling the function
-  `f` on the previous value and optional arguments. Uses
-  `io.randomseed.utils.map/qassoc`. Returns updated `req` with a lazy map under
-  `:add/data` key. Ensures that the result of calling `f` is a lazy map and if it is
-  not, tries to convert it to a lazy map (if it is `nil`). When the current value of
-  `:app/data` is `false` it will short-circuit and skip updating."
-  ([req]
-   (add-app-data req))
-  ([req f]
-   (let [ad (app-data req)]
-     (if (false? ad) req (qassoc req :app/data (map-to-lazy (f ad))))))
-  ([req f a]
-   (let [ad (app-data req)]
-     (if (false? ad) req (qassoc req :app/data (map-to-lazy (f ad a))))))
-  ([req f a b]
-   (let [ad (app-data req)]
-     (if (false? ad) req (qassoc req :app/data (map-to-lazy (f ad a b))))))
-  ([req f a b c]
-   (let [ad (app-data req)]
-     (if (false? ad) req (qassoc req :app/data (map-to-lazy (f ad a b c))))))
-  ([req f a b c d]
-   (let [ad (app-data req)]
-     (if (false? ad) req (qassoc req :app/data (map-to-lazy (f ad a b c d))))))
-  ([req f a b c d & more]
-   (let [ad (app-data req)]
-     (if (false? ad) req (qassoc req :app/data (map-to-lazy (apply f ad a b c d more)))))))
-
-(defmacro assoc-app-data
-  "Adds keys with associated values to `:app/data` map of the `req` using `qassoc`. If
-  any key argument is a literal keyword, a character, or a literal string, it will be
-  converted to a keyword literal and placed as `qassoc` argument. Otherwise it will
-  be left as is and wrapped into a call to `io.randomseed.utils/some-keyword` to
-  ensure the result is a keyword run-time. Missing last value, if any, will be padded
-  with `nil`. If there is no body or the body is empty, it will initialize it with a
-  map expression, otherwise it will use `assoc`. Assumes that `req` is always a
-  map. If the current value of `:app/data` is `false`, it will skip the processing."
-  ([req k v]
-   (let [k (if (or (keyword? k) (string? k) (char? k))
-             (some-keyword k)
-             (cons `some-keyword (cons k nil)))]
-     `(let [req# ~req
-            apd# (app-data req#)]
-        (if (false? apd#) req# (qassoc req# :app/data (qassoc apd# ~k ~v))))))
-  ([req k v & more]
-   (let [pairs  (cons k (cons v more))
-         names  (take-nth 2 pairs)
-         values (concat (take-nth 2 (rest pairs)) '(nil))
-         pairs  (map #(cons (if (or (keyword?  %1)
-                                    (string?   %1)
-                                    (char?     %1))
-                              (some-keyword %1)
-                              (cons `some-keyword (cons %1 nil)))
-                            (cons %2 nil))
-                     names values)
-         pairs  (apply concat pairs)
-         names  (take-nth 2 pairs)
-         dups?  (not= (count names) (count (distinct names)))]
-     (if dups?
-       `(let [req# ~req
-              apd# (app-data req#)]
-          (if (false? apd#) req# (qassoc req# :app/data (qassoc apd# ~@pairs))))
-       `(let [req# ~req
-              apd# (app-data req#)]
-          (if (false? apd#)
-            req#
-            (qassoc req# :app/data
-                    (if (pos? (count apd#))
-                      (qassoc apd# ~@pairs)
-                      (lazy-map/->LazyMap {~@pairs ~@[]})))))))))
-
 
 ;; Layouts and views
 
@@ -628,7 +434,7 @@
      (if (or layt view)
        (do (log/web-dbg req "Rendering (layout:" layt "view:" (str view ")"))
            (let [dlng (or lang (get req :language/str))
-                 data (prep-app-data req data)
+                 data (app-data/prep req data)
                  data (map/assoc-missing data
                                          :uri                uri
                                          :url                (delay (req/request-url        req))
@@ -636,9 +442,9 @@
                                          :path               (delay (common/page            req))
                                          :htmx-request?      (delay (htmx/request?          req))
                                          :lang               dlng)
-                 data (update-status data req http-status dlng)
+                 data (app-data/update-status data req http-status dlng)
                  html (if view (selmer/render-file view data) "")
-                 rndr (qassoc data :body [:safe html])
+                 rndr (map/qassoc data :body [:safe html])
                  resp (if layt (selmer/render-file layt rndr) html)]
              resp))
        (do (log/web-err req "Rendering empty document since no layout nor view was set")
@@ -1056,49 +862,49 @@
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+          req        (app-data/update-status req app-status nil :app-status :app-status/title :app-status/description)]
       (errors/render err-config app-status render-internal-server-error req))))
   (^Response [req app-status default]
    (response
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+          req        (app-data/update-status req app-status nil :app-status :app-status/title :app-status/description)]
       (errors/render err-config app-status (or default render-internal-server-error) req))))
   (^Response [req app-status default data]
    (response
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+          data       (app-data/update-status data req app-status nil :app-status :app-status/title :app-status/description)]
       (errors/render err-config app-status (or default render-internal-server-error) req data))))
   (^Response [req app-status default data view]
    (response
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+          data       (app-data/update-status data req app-status nil :app-status :app-status/title :app-status/description)]
       (errors/render err-config app-status (or default render-internal-server-error) req data view))))
   (^Response [req app-status default data view layout]
    (response
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+          data       (app-data/update-status data req app-status nil :app-status :app-status/title :app-status/description)]
       (errors/render err-config app-status (or default render-internal-server-error) req data view layout))))
   (^Response [req app-status default data view layout lang]
    (response
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+          data       (app-data/update-status data req app-status lang :app-status :app-status/title :app-status/description)]
       (errors/render err-config app-status (or default render-internal-server-error) req data view layout lang))))
   (^Response [req app-status default data view layout lang & more]
    (response
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+          data       (app-data/update-status data req app-status lang :app-status :app-status/title :app-status/description)]
       (apply errors/render err-config app-status (or default render-internal-server-error) req data view layout lang more)))))
 
 (defn render-status
@@ -1139,7 +945,7 @@
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+          req        (app-data/update-status req app-status nil :app-status :app-status/title :app-status/description)]
       (log/web-dbg req "Rendering response with application status" app-status)
       (errors/render err-config app-status render-ok req))))
   (^Response [req app-status default]
@@ -1147,7 +953,7 @@
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          req        (update-status req app-status nil :app-status :app-status/title :app-status/description)]
+          req        (app-data/update-status req app-status nil :app-status :app-status/title :app-status/description)]
       (log/web-dbg req "Rendering response with application status" app-status)
       (errors/render err-config app-status (or default render-ok) req))))
   (^Response [req app-status default data]
@@ -1155,7 +961,7 @@
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+          data       (app-data/update-status data req app-status nil :app-status :app-status/title :app-status/description)]
       (log/web-dbg req "Rendering response with application status" app-status)
       (errors/render err-config app-status (or default render-ok) req data))))
   (^Response [req app-status default data view]
@@ -1163,7 +969,7 @@
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+          data       (app-data/update-status data req app-status nil :app-status :app-status/title :app-status/description)]
       (log/web-dbg req "Rendering response with application status" app-status)
       (errors/render err-config app-status (or default render-ok) req data view))))
   (^Response [req app-status default data view layout]
@@ -1171,7 +977,7 @@
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          data       (update-status data req app-status nil :app-status :app-status/title :app-status/description)]
+          data       (app-data/update-status data req app-status nil :app-status :app-status/title :app-status/description)]
       (log/web-dbg req "Rendering response with application status" app-status)
       (errors/render err-config app-status (or default render-ok) req data view layout))))
   (^Response [req app-status default data view layout lang]
@@ -1179,7 +985,7 @@
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+          data       (app-data/update-status data req app-status lang :app-status :app-status/title :app-status/description)]
       (log/web-dbg req "Rendering response with application status" app-status)
       (errors/render err-config app-status (or default render-ok) req data view layout lang))))
   (^Response [req app-status default data view layout lang & more]
@@ -1187,107 +993,23 @@
     req
     (let [err-config (errors/config req)
           app-status (errors/most-significant err-config app-status)
-          data       (update-status data req app-status lang :app-status :app-status/title :app-status/description)]
+          data       (app-data/update-status data req app-status lang :app-status :app-status/title :app-status/description)]
       (log/web-dbg req "Rendering response with application status" app-status)
       (apply errors/render err-config app-status (or default render-ok) req data view layout lang more)))))
 
 ;; Redirect wrappers
 
-(defn http-go-to
-  "Uses the `localized-page` function to calculate the destination path on a basis of
-  page name (identifier) or a path (a string) and performs a redirect with code 303 to
-  it using `resp/see-other`. If the language is given it uses the `localized-page` function.
-  If there is no language given but the page identified by its name requires
-  a language parameter to be set, it will be obtained from the given request map
-  (under the key `:language/str`).
-
-  The difference between this function and its regular counterpart (if defined) is in
-  binary variants of them (when a request map and a name or a path are given as
-  arguments). The regular function will fail to generate a redirect if there is
-  no language parameter and the given path does not point to an existing
-  page. On the contrary, this function will generate a localized path using a
-  language obtained from a request (under `:language/str` key) and if there will be no
-  language-parameterized variant of the path, it will fail. Use this function to make
-  sure that a localized path will be produced, or `nil`."
-  {:arglists '(^Response []
-               ^Response [req]
-               ^Response [url]
-               ^Response [req url]
-               ^Response [req name-or-path]
-               ^Response [req name-or-path path-params]
-               ^Response [req name-or-path path-params query-params]
-               ^Response [req name-or-path lang]
-               ^Response [req name-or-path lang path-params]
-               ^Response [req name-or-path lang path-params query-params]
-               ^Response [req name-or-path lang path-params query-params & more])}
-  (^Response []
-   (common/localized-redirect resp/see-other))
-  (^Response [req-or-url]
-   (common/localized-redirect resp/see-other req-or-url))
-  (^Response [req name-or-path]
-   (common/localized-redirect resp/see-other req name-or-path))
-  (^Response [req name-or-path lang]
-   (common/localized-redirect resp/see-other req name-or-path lang))
-  (^Response [req name-or-path lang params]
-   (common/localized-redirect resp/see-other req name-or-path lang params))
-  (^Response [req name-or-path lang params query-params]
-   (common/localized-redirect resp/see-other req name-or-path lang params query-params))
-  (^Response [req name-or-path lang params query-params & more]
-   (apply common/localized-redirect resp/see-other req name-or-path lang params query-params more)))
-
-(defn http-move-to
-  "Uses the `localized-page` function to calculate the destination path on a basis of
-  page name (identifier) or a path (a string) and performs a redirect with code 307
-  to it using `resp/temporary-redirect`. If the language is given it uses the
-  `localized-page` function.  If there is no language given but the page identified
-  by its name requires a language parameter to be set, it will be obtained from the
-  given request map (under the key `:language/str`).
-
-  The difference between this function and its regular counterpart (if defined) is in
-  binary variants of them (when a request map and a name or a path are given as
-  arguments). The regular function will fail to generate a redirect if there is
-  no language parameter and the given path does not point to an existing
-  page. On the contrary, this function will generate a localized path using a
-  language obtained from a request (under `:language/str` key) and if there will be no
-  language-parameterized variant of the path, it will fail. Use this function to make
-  sure that a localized path will be produced, or `nil`."
-  {:arglists '(^Response []
-               ^Response [req]
-               ^Response [url]
-               ^Response [req url]
-               ^Response [req name-or-path]
-               ^Response [req name-or-path path-params]
-               ^Response [req name-or-path path-params query-params]
-               ^Response [req name-or-path lang]
-               ^Response [req name-or-path lang path-params]
-               ^Response [req name-or-path lang path-params query-params]
-               ^Response [req name-or-path lang path-params query-params & more])}
-  (^Response []
-   (common/localized-redirect resp/temporary-redirect))
-  (^Response [req-or-url]
-   (common/localized-redirect resp/temporary-redirect req-or-url))
-  (^Response [req name-or-path]
-   (common/localized-redirect resp/temporary-redirect req name-or-path))
-  (^Response [req name-or-path lang]
-   (common/localized-redirect resp/temporary-redirect req name-or-path lang))
-  (^Response [req name-or-path lang params]
-   (common/localized-redirect resp/temporary-redirect req name-or-path lang params))
-  (^Response [req name-or-path lang params query-params]
-   (common/localized-redirect resp/temporary-redirect req name-or-path lang params query-params))
-  (^Response [req name-or-path lang params query-params & more]
-   (apply common/localized-redirect resp/temporary-redirect req name-or-path lang params query-params more)))
-
 (defn- go-to-fn
   ^IFn [req]
-  (if (htmx/use? req nil false) htmx/go-to http-go-to))
+  (if (htmx/use? req nil false) htmx/go-to html/go-to))
 
 (defn- move-to-fn
   ^IFn [req]
-  (if (htmx/use? req nil false) htmx/move-to http-move-to))
+  (if (htmx/use? req nil false) htmx/move-to html/move-to))
 
 (defn go-to
   "When HTMX is detected with `amelinium.web.htmx/use?` calls
-  `amelinium.web.htmx/go-to`, otherwise calls `http-go-to`."
+  `amelinium.web.htmx/go-to`, otherwise calls `amelinium.web.html/go-to`."
   {:arglists '(^Response [req]
                ^Response [req url]
                ^Response [req name-or-path]
@@ -1734,7 +1456,7 @@
   ([req errors session-key]
    (let [translate-sub (i18n/no-default (common/translator-sub req))]
      (if-not (valuable? errors)
-       (assoc-app-data req
+       (app-data/assoc req
                        :title (delay (translate-sub :parameters/error))
                        :form/errors nil
                        :coercion/errors nil)

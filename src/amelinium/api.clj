@@ -62,14 +62,6 @@
                 hard-lock-time hard-locked?
                 soft-lock-time soft-lock-passed soft-locked? soft-lock-remains])
 
-;; Context and roles
-
-(p/import-vars [amelinium.common
-                has-any-role? has-role?
-                role-required! with-role-only!
-                roles-for-context roles-for-contexts default-contexts-labeler
-                roles-matrix roles-tabler])
-
 ;; Language helpers
 
 (p/import-vars [amelinium.common

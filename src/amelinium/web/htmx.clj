@@ -17,6 +17,7 @@
             [amelinium.http                       :as            http]
             [amelinium.http.middleware.session    :as         session]
             [amelinium.logging                    :as             log]
+            [amelinium.web.app-data               :as        app-data]
             [io.randomseed.utils.map              :as map  :refer [qassoc]]
             [io.randomseed.utils                  :as           utils])
 
@@ -473,6 +474,7 @@
            req                (if (nil? new-layout) req (qassoc req :app/layout new-layout))]
        (-> req
            (assoc-app-data :coercion/errors       explanations
+           (app-data/assoc :coercion/errors       explanations
                            :form/previous-errors? handling-previous?
                            :form/errors           (delay {:dest   (:uri req)
                                                           :errors (force errors)
