@@ -440,7 +440,7 @@
   pre-filling in forms."
   [req form-keep session-key]
   (let [qp (get req :query-params)]
-    (when-let [bad-params (when qp (get qp "form-errors"))]
+    (if-let [bad-params (when qp (get qp "form-errors"))]
       (let [_            (log/web-dbg req "Handling form errors. Keeping:" (str/join "," form-keep))
             svar         (some-> (session/valid-of req session-key)
                                  (session/fetch-var! :form-errors))
