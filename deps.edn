@@ -25,6 +25,7 @@
            clojure-interop/javax.security       {:mvn/version "1.0.5"}        ;; inter-op for javax.security
            fipp/fipp                            {:mvn/version "0.6.29"}       ;; pretty printing
            mvxcvi/puget                         {:mvn/version "1.3.4"}        ;; pretty printing
+           zprint/zprint                        {:mvn/version "1.3.0"}
            io.randomseed/smangler               {:mvn/version "1.0.4"}        ;; fast string trimming
            io.randomseed/bankster               {:mvn/version "1.2.16"}       ;; currency and money
            io.randomseed/phone-number           {:mvn/version "8.13.6-3"}     ;; phone number validation
@@ -89,6 +90,7 @@
                                      fipp/fipp                     {:mvn/version "0.6.29"}
                                      cljfmt/cljfmt                 {:mvn/version "0.6.4"}
                                      ns-tracker/ns-tracker         {:mvn/version "0.4.0"}
+                                     zprint/zprint                 {:mvn/version "1.3.0"}
                                      mvxcvi/puget                  {:mvn/version "1.3.4"}}
                        :extra-paths ["dev/src" "test"]
                        :jvm-opts    ["-Xmx1024m","-Dclojure.spec.compile-asserts=true","--enable-native-access=ALL-UNNAMED"]}
@@ -98,6 +100,7 @@
                                      fipp/fipp             {:mvn/version "0.6.29"}
                                      cljfmt/cljfmt         {:mvn/version "0.6.4"}
                                      ns-tracker/ns-tracker {:mvn/version "0.4.0"}
+                                     zprint/zprint         {:mvn/version "1.3.0"}
                                      mvxcvi/puget          {:mvn/version "1.3.4"}}
                        :jvm-opts    ["-Xmx1024m"]}
            :test      {:extra-paths ["test"]
@@ -142,6 +145,7 @@
                                      nrepl/nrepl               {:mvn/version "0.8.3"}
                                      kaocha-nrepl/kaocha-nrepl {:mvn/version "1.0.3"}
                                      mvxcvi/puget              {:mvn/version "1.3.4"}
+                                     zprint/zprint             {:mvn/version "1.3.0"}
                                      org.clojure/tools.nrepl   {:mvn/version "0.2.13"}}}
            :cider-clj {:extra-paths ["aliases/nrepl"]
                        :extra-deps  {cider/cider-nrepl         {:mvn/version "0.25.9"}
@@ -149,22 +153,24 @@
                                      nrepl/nrepl               {:mvn/version "0.8.3"}
                                      kaocha-nrepl/kaocha-nrepl {:mvn/version "1.0.3"}
                                      mvxcvi/puget              {:mvn/version "1.3.4"}
+                                     zprint/zprint             {:mvn/version "1.3.0"}
                                      org.clojure/tools.nrepl   {:mvn/version "0.2.13"}}
                        :main-opts   ["-m" "nrepl.cmdline" "--middleware" "[cider.nrepl/cider-middleware]"]}
            :dev-rebel {:extra-paths ["aliases/rebel"]
                        :extra-deps  {com.bhauman/rebel-readline      {:mvn/version "0.1.5"}
                                      com.bhauman/rebel-readline-cljs {:mvn/version "0.1.5"}
                                      io.aviso/pretty                 {:mvn/version "1.4.4"}
+                                     zprint/zprint                   {:mvn/version "1.3.0"}
                                      mvxcvi/puget                    {:mvn/version "1.3.4"}}
                        :main-opts   ["-m" "amelinium.rebel.main"]}
            :pack      {:extra-deps {pack/pack.alpha {:git/url "https://github.com/juxt/pack.alpha.git"
                                                      :sha     "2769a6224bfb938e777906ea311b3daf7d2220f5"}}}
-           :new       {:deps {org.babashka/cli {:mvn/version "0.8.67"}
-                              io.github.seancorfield/deps-new {:git/tag "v0.10.3"
-                                                               :git/sha "2c012c4"}}
+           :new       {:deps       {org.babashka/cli                {:mvn/version "0.8.67"}
+                                    io.github.seancorfield/deps-new {:git/tag "v0.10.3"
+                                                                     :git/sha "2c012c4"}}
                        :ns-default org.corfield.new
-                       :exec-args {}
-                       :main-opts ["-m" "babashka.cli.exec"]}}
+                       :exec-args  {}
+                       :main-opts  ["-m" "babashka.cli.exec"]}}
  :codox   {:name        "Amelinium"
            :description "Opinionated Clojure Web Engine"
            :license     "GNU LGPL"
