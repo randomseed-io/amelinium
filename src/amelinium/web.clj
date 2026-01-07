@@ -588,7 +588,7 @@
        (#'def-render &form &env name doc f status)
        (#'def-render
         &form &env name
-        (str "Renders a " (when status (name status " "))
+        (str "Renders a " (when status (str (name status) " "))
              "response with a possible body generated with views, layouts and data \n  "
              "obtained from a request map (`:app/layout`, `:app/view`, `:app/data` keys).\n  "
              "Uses `" f-or-doc "` to set the response code."
