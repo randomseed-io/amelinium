@@ -1034,7 +1034,7 @@
 
 (defn move-to
   "When HTMX is detected with `amelinium.web.htmx/use?` calls
-  `amelinium.web.htmx/move-to`, otherwise calls `http-move-to`."
+  `amelinium.web.htmx/move-to`, otherwise calls `amelinium.web.html/move-to`."
   {:arglists '(^Response [req]
                ^Response [req url]
                ^Response [req name-or-path]
@@ -1057,28 +1057,11 @@
   (^Response [req name-or-path lang params query-params & more]
    (apply (move-to-fn req) req name-or-path lang params query-params more)))
 
-(defn http-go-to-with-status
-  "Uses `http-go-to` to make a redirect on a basis of the given application status
-  `app-status` by looking it up in `:error/destinations` of a route data map with
-  fallback to a value associated with the `:error/destination` key or to a value of
-  the `default-page` argument (if set)."
-  (^Response [req]
-   (http-go-to-with-status req nil :error nil))
-  (^Response [req app-status]
-   (http-go-to-with-status req nil app-status nil))
-  (^Response [req app-status default-page]
-   (http-go-to-with-status req nil app-status default-page))
-  (^Response [req route-data app-status default-page]
-   (let [route-data (or route-data (http/get-route-data req))]
-     (http-go-to req
-                 (or (get-in route-data [:error/destinations app-status] default-page)
-                     (get route-data :error/destination))))))
-
 (defn go-to-with-status
   "Uses `amelinium.web.htmx/go-to-with-status` when HTMX is in use (uses
-  `amelinium.web.htmx/use?`), `http-go-to-with-status` otherwise. Takes additional
-  `hx-status-flag` as a key to be checked in route data whether it is associated with
-  a HTMX-enforcement flag."
+  `amelinium.web.htmx/use?`), `amelinium.web.html/go-to-with-status` otherwise.
+  Takes additional `hx-status-flag` as a key to be checked in route data whether it
+  is associated with a HTMX-enforcement flag."
   (^Response [req]
    (go-to-with-status req nil :error nil false))
   (^Response [req app-status]
@@ -1091,7 +1074,7 @@
    (let [route-data (or route-data (http/get-route-data req))
          go-to-fn   (if (htmx/use? req route-data hx-status-flag)
                       htmx/go-to-with-status
-                      http-go-to-with-status)]
+                      html/go-to-with-status)]
      (go-to-fn req
                (or (get-in route-data [:error/destinations app-status] default-page)
                    (get route-data :error/destination))))))
@@ -1104,7 +1087,7 @@
   multiple statuses, it will be replaced by the most accurate one.
 
   Returns proper HTMX response when:
-  - `common/use-hx?` returns `true` because the request indicated it is HTMX,
+  - `amelinium.web.htmx/use?` returns `true` because the request indicated it is HTMX,
   - or `:error/use-htmx?` route data key is set,
   - or generic `:use-htmx?` route data key is set.
 
@@ -1117,7 +1100,7 @@
   used. Returns updated `req`.
 
   For HTMX uses `amelinium.web.htmx/go-to-with-status`, for regular web uses
-  `http-go-to-with-status`."
+  `amelinium.web.html/go-to-with-status`."
   (^Response [req]
    (handle-error req nil :auth/error nil nil))
   (^Response [req app-status]
@@ -1143,7 +1126,7 @@
                             req)]
        (if (htmx/use? req route-data :error/use-htmx?)
          (htmx/go-to-with-status req route-data app-status default-view)
-         (http-go-to-with-status req route-data app-status default-view))))))
+         (html/go-to-with-status req route-data app-status default-view))))))
 
 (defn response!
   "Returns a response on a basis of `app-status` (or `:app/status` key of the
@@ -1183,177 +1166,12 @@
 
 ;; Form errors
 
-(defn http-handle-bad-request-form-params
-  "Called by other functions to generate a redirect or to display a page with
-  a form to be corrected because of a parameter error (induced manually or
-  caused by coercion exception).
-
-  Takes a request map `req`, a map of erroneous parameter identifiers to parameter
-  types `errors`, a map of current parameter values `values`, a map of error
-  explanations (`explanations`), page title (`title`), and optional session key
-  `session-key` used when getting a session object from the `req`.
-
-  The following arguments can be Delay objects and `clojure.core/force` will be
-  applied to them before use: `errors`, `values`, `explanations`, `title`.
-
-  Parameter type in `errors` map can be `nil`, meaning it is of unknown type.
-
-  If there is a session then the `errors` map is stored in a session variable
-  `:form-errors` under the `:errors` key (additionally, there is a `:dest` key
-  identifying a path of the current page).
-
-  If there is no valid session or a session variable cannot be stored, the result is
-  serialized as a query string parameter `form-errors` with erroneous fields
-  separated by commas.
-
-  If type name is available for a parameter then a string in a form of
-  `parameter:type` is generated.
-
-  If type name is not available, a simple parameter name is generated. So the example
-  value (before encoding) may look like `email,secret:password` (`email` being a
-  parameter without type information, `secret` being a parameter with type named
-  `password`).
-
-  Next, the originating URI is obtained from the `Referer` header and a temporary
-  redirect (with HTTP code 307) is generated with this path and a query string
-  containing `form-errors` parameter. The value of the parameter is empty if form
-  errors were saved in a session variable.
-
-  The destination of the redirect can be overriden by the `:form-errors/page`
-  configuration option associated with HTTP route data.
-
-  If the destination URI cannot be established, or if a coercion error happened
-  during handling some previous coercion error (so the current page is where the
-  browser had been redirected to), then instead of generating a redirect, a regular
-  page is rendered with HTTP code of 422. The `:app/data` key of a request map is
-  updated with:
-
-  - `:title` set to `title`,
-  - `:form/errors` set to a map containing:
-    - `:errors` mapped to `errors`,
-    - `:params` mapped to `values`,
-    - `:dest` mapped to destination URI;
-  - `:coercion/errors` set to `explanations` map."
-  [req route-data errors values explanations title session-key]
-  (if-not (valuable? errors)
-    req
-    (let [route-data             (or route-data (http/get-route-data req))
-          forced-orig-page       (get route-data :form-errors/page)
-          orig-page              (or forced-orig-page (:page (get req :goto)))
-          referer                (when (nil? orig-page) (some-str (get (get req :headers) "referer")))
-          [orig-uri orig-params] (when referer (common/url->uri+params req referer))
-          handling-previous?     (contains? (get req :query-params) "form-errors")]
-
-      (if (and (or (valuable? orig-page) (valuable? orig-uri) referer)
-               (not handling-previous?))
-
-        ;; redirect to a form-submission page allowing user to correct errors
-        ;; transfer form errors using query params or form params (if a session is present)
-
-        (let [orig-uri     (when orig-uri (some-str orig-uri))
-              orig-params  (when orig-uri orig-params)
-              dest         (or orig-page orig-uri)
-              dest-uri     (if (keyword? dest) (common/page req dest) dest)
-              dest-uri     (some-str dest-uri)
-              skey         (or session-key (get route-data :session-key))
-              smap         (session/not-empty-of req skey)
-              stored?      (when (and smap (session/valid? smap))
-                             (session/put-var!
-                              smap :form-errors
-                              {:dest   dest-uri
-                               :errors (force errors)
-                               :params (force values)}))
-              joint-params (qassoc orig-params "form-errors" (if stored? "" (coercion/join-errors (force errors))))]
-          (if dest-uri
-            (common/temporary-redirect req dest-uri nil joint-params)
-            (resp/temporary-redirect (str referer
-                                          (if (str/includes? referer "?") "&" "?")
-                                          (common/query-string-encode req joint-params)))))
-
-        ;; render a separate page describing invalid parameters
-        ;; instead of current page
-
-        (-> (assoc-app-data
-             req
-             :title                 title
-             :coercion/errors       explanations
-             :form/previous-errors? handling-previous?
-             :form/errors           (delay {:dest   (:uri req)
-                                            :errors (force errors)
-                                            :params (force values)}))
-            render-bad-params)))))
-
-(defn htmx-handle-bad-request-form-params
-  "Called by other functions to render form with feedback about submitted parameter
-  errors (induced manually or caused by coercion exception). On fronted, uses HTMX
-  and JavaScript Fetch API calls to load HTML.
-
-  Takes a request map `req`, a map of erroneous parameter identifiers to parameter
-  types `errors`, a map of current parameter values `values`, a map of error
-  explanations (`explanations`), and a page title (`title`).
-
-  The following arguments can be Delay objects and `clojure.core/force` will be
-  applied to them before use: `errors`, `values`, `explanations`, `title`.
-
-  Parameter type in `errors` map can be `nil`, meaning it is of unknown type.
-
-  The layout and view are obtained from the `:form-errors/page` configuration option
-  associated with HTTP route data or the destination page established by checking
-  `Referer` header, unless `:form-errors/layout` and/or `:form-errors/view` options
-  are set. Layout can be set to `false` to allow injection of HTML fragments.
-
-  If form errors page is not specified one is obtained from the `Referer` request
-  header.
-
-  Sets `HX-Retarget` response header to a value set in route data option
-  `:form-errors/target` and returns a response."
-  ([req route-data errors]
-   (htmx-handle-bad-request-form-params req route-data errors nil nil nil))
-  ([req route-data errors values]
-   (htmx-handle-bad-request-form-params req route-data errors values nil nil))
-  ([req route-data errors values explanations]
-   (htmx-handle-bad-request-form-params req route-data errors values explanations nil))
-  ([req route-data errors values explanations title _]
-   (htmx-handle-bad-request-form-params req route-data errors values explanations title))
-  ([req route-data errors values explanations title]
-   (if-not (valuable? errors)
-     req ;; generic error page?
-     (let [route-data         (or route-data (http/get-route-data req))
-           orig-page          (get route-data :form-errors/page)
-           orig-page          (or orig-page (:page (get req :goto)))
-           title              (or title (get route-data :form-errors/title))
-           referer            (when (nil? orig-page) (some-str (get (get req :headers) "referer")))
-           orig-uri           (when referer (some-str (:uri (parse-url referer))))
-           src-page           (or orig-page (http/route-name req orig-uri))
-           src-route-data     (when src-page (http/route-data req src-page))
-           new-view           (get route-data :form-errors/view)
-           new-view           (if (nil? new-view) (get src-route-data :app/view) new-view)
-           new-view           (if (nil? new-view) (get src-route-data :name) new-view)
-           new-layout         (get route-data :form-errors/layout)
-           new-layout         (if (nil? new-layout) (get src-route-data :app/layout) new-layout)
-           handling-previous? (contains? (get req :query-params) "form-errors")
-           hx-targets         (get route-data :form-errors/retargets)
-           hx-src-target      (when hx-targets (htmx/get-target-header req))
-           hx-target          (when hx-src-target (get hx-targets hx-src-target))
-           hx-target          (some-str (or hx-target (get route-data :form-errors/target)))
-           req                (if hx-target (common/add-header req :HX-Retarget hx-target) req)
-           req                (if title (assoc-app-data req :title title) req)
-           req                (if (nil? new-view)   req (qassoc req :app/view   new-view))
-           req                (if (nil? new-layout) req (qassoc req :app/layout new-layout))]
-       (-> req
-           (assoc-app-data :coercion/errors       explanations
-                           :form/previous-errors? handling-previous?
-                           :form/errors           (delay {:dest   (:uri req)
-                                                          :errors (force errors)
-                                                          :params (force values)}))
-           (render-bad-params nil new-view new-layout))))))
-
 (defn handle-bad-request-form-params
   "Dispatch function which calls `amelinium.web.htmx/handle-bad-request-form-params`
-  when HTMX is in use or `http-handle-bad-request-form-params` in other cases. HTMX
-  mode will be in place when a client request contains `HX-Request` header set to a
-  non-falsy and not empty value, or when it was enforced by using route data key
-  `:form-errors/use-htmx?` set to a truthy value."
+  when HTMX is in use or `amelinium.web.html/handle-bad-request-form-params` in other
+  cases. HTMX mode will be in place when a client request contains `HX-Request`
+  header set to a non-falsy and not empty value, or when it was enforced by using
+  route data key `:form-errors/use-htmx?` set to a truthy value."
   ([req]
    (handle-bad-request-form-params req nil nil nil nil nil))
   ([req errors]
@@ -1367,8 +1185,8 @@
   ([req errors values explanations title session-key]
    (let [route-data (http/get-route-data req)]
      (if (htmx/use? req route-data :form-errors/use-htmx?)
-       (htmx-handle-bad-request-form-params req route-data errors values explanations title)
-       (http-handle-bad-request-form-params req route-data errors values explanations title session-key)))))
+       (htmx/handle-bad-request-form-params req route-data errors values explanations title)
+       (html/handle-bad-request-form-params req route-data errors values explanations title session-key)))))
 
 (defn- param-current-vals
   [req]
@@ -1411,8 +1229,9 @@
   specified one is obtained from the `Referer` request header. See
   `amelinium.web.htmx/handle-bad-request-form-params` for more info.
 
-  If simple HTTP mode is in place the `http-handle-bad-request-form-params` is used,
-  and the following will happen:
+  If simple HTTP mode is in place the
+  `amelinium.web.html/handle-bad-request-form-params` is used, and the following will
+  happen:
 
   If there is a session then the `errors` map is stored in a session variable
   `:form-errors` under the `:errors` key (additionally, there is a `:dest` key
