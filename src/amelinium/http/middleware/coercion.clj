@@ -1,28 +1,32 @@
 (ns
 
- ^{:doc    "amelinium service, HTTP parameters coercion."
-   :author "Paweł Wilk"
-   :added  "1.0.0"}
+    ^{:doc    "amelinium service, HTTP parameters coercion."
+      :author "Paweł Wilk"
+      :added  "1.0.0"}
 
- amelinium.http.middleware.coercion
+    amelinium.http.middleware.coercion
 
   (:refer-clojure :exclude [parse-long uuid random-uuid compile])
 
-  (:require [clojure.string                    :as             str]
-            [amelinium.system                  :as          system]
-            [amelinium.logging                 :as             log]
-            [amelinium.i18n                    :as            i18n]
-            [amelinium.schemas                 :as         schemas]
-            [amelinium.common                  :as          common]
-            [amelinium.http.middleware.session :as         session]
-            [reitit.coercion                   :as        coercion]
-            [reitit.ring.coercion              :as             rrc]
-            [malli.core                        :as               m]
-            [malli.registry                    :as       mregistry]
-            [io.randomseed.utils.var           :as             var]
-            [io.randomseed.utils.map           :as             map]
-            [io.randomseed.utils.map           :refer     [qassoc]]
-            [io.randomseed.utils               :refer         :all]))
+  (:require [clojure.string                    :as                          str]
+            [amelinium.system                  :as                       system]
+            [amelinium.logging                 :as                          log]
+            [amelinium.schemas                 :as                      schemas]
+            [amelinium.common                  :as                       common]
+            [amelinium.http.middleware.session :as                      session]
+            [reitit.coercion                   :as                     coercion]
+            [reitit.ring.coercion              :as                          rrc]
+            [malli.core                        :as                            m]
+            [malli.registry                    :as                    mregistry]
+            [io.randomseed.utils.var           :as                          var]
+            [io.randomseed.utils.map           :refer      [qassoc
+                                                            map-values
+                                                            map-vals-by-kv
+                                                            remove-empty-values]]
+            [io.randomseed.utils               :refer      [some-str
+                                                            some-keyword
+                                                            not-empty-string?
+                                                            juxt-seq]]))
 
 ;; Common functions
 
@@ -97,51 +101,51 @@
   ([translate-sub param-id param-type _ _]
    (let [param-type? (some? param-type)
          param-id?   (some? param-id)
-         param-str   (if param-id? (some-str param-id))
-         mixed-id    (if (and param-type? param-id?) (str param-id "." param-type))
+         param-str   (when param-id? (some-str param-id))
+         mixed-id    (when (and param-type? param-id?) (str param-id "." param-type))
          mixed-id?   (some? mixed-id)
          param-name  (translate-sub :parameter param-str param-type)
          param-name? (some? param-name)
          param-name  (if param-name? param-name param-str)
-         type-name   (if param-type? (translate-sub :parameter-type param-type param-str))
+         type-name   (when param-type? (translate-sub :parameter-type param-type param-str))
          type-name?  (some? type-name)
          output      {:parameter/name param-name :parameter-type/name type-name}]
      (-> output
          (qassoc :error/summary
-                 (or (if param-id?   (translate-sub :parameter-error param-str
-                                                    param-name
-                                                    param-str
-                                                    param-type))
-                     (if param-name? (translate-sub :error/parameter-name nil
-                                                    param-name
-                                                    param-str
-                                                    param-type))
-                     (if param-type? (translate-sub :type-error param-type
-                                                    param-name
-                                                    param-str
-                                                    param-type))
-                     (if type-name?  (translate-sub :error/type-name nil
-                                                    type-name
-                                                    param-str
-                                                    param-type))
-                     (if param-id?   (translate-sub :error/parameter nil
-                                                    param-str
-                                                    param-type))
-                     (if param-type? (translate-sub :error/parameter-of-type
-                                                    nil param-type))))
+                 (or (when param-id?   (translate-sub :parameter-error param-str
+                                                      param-name
+                                                      param-str
+                                                      param-type))
+                     (when param-name? (translate-sub :error/parameter-name nil
+                                                      param-name
+                                                      param-str
+                                                      param-type))
+                     (when param-type? (translate-sub :type-error param-type
+                                                      param-name
+                                                      param-str
+                                                      param-type))
+                     (when type-name?  (translate-sub :error/type-name nil
+                                                      type-name
+                                                      param-str
+                                                      param-type))
+                     (when param-id?   (translate-sub :error/parameter nil
+                                                      param-str
+                                                      param-type))
+                     (when param-type? (translate-sub :error/parameter-of-type
+                                                      nil param-type))))
          (qassoc :error/description
-                 (or (if mixed-id?   (translate-sub :parameter-should mixed-id
-                                                    param-name
-                                                    param-str
-                                                    param-type))
-                     (if param-id?   (translate-sub :parameter-should param-str
-                                                    param-name
-                                                    param-str
-                                                    param-type))
-                     (if param-type? (translate-sub :type-should param-type
-                                                    param-name
-                                                    param-str
-                                                    param-type))))))))
+                 (or (when mixed-id?   (translate-sub :parameter-should mixed-id
+                                                      param-name
+                                                      param-str
+                                                      param-type))
+                     (when param-id?   (translate-sub :parameter-should param-str
+                                                      param-name
+                                                      param-str
+                                                      param-type))
+                     (when param-type? (translate-sub :type-should param-type
+                                                      param-name
+                                                      param-str
+                                                      param-type))))))))
 
 (defn recode-errors-simple
   "Uses exception data to recode coercion errors in a form of a map. To be used mainly
@@ -152,22 +156,22 @@
         src (get dat :in)
         err (get dat :errors)
         vls (get dat :value)
-        err (if (coll? err) err (if (some? err) (cons err nil)))
-        src (if (coll? src) src (if (some? src) (cons src nil)))
+        err (if (coll? err) err (when (some? err) (cons err nil)))
+        src (if (coll? src) src (when (some? src) (cons src nil)))
         src (if (identical? (first src) :request) (rest src) src)
         src (or (first src) :unknown)]
-    (if err
+    (when err
       (->> err
            (map
             (fn [e]
-              (if (map? e)
-                (if-some [param-path (get e :path)]
-                  (if-some [param-id (and (coll? param-path) (some-keyword (first param-path)))]
+              (when (map? e)
+                (when-some [param-path (get e :path)]
+                  (when-some [param-id (and (coll? param-path) (some-keyword (first param-path)))]
                     {:parameter/id    param-id
                      :parameter/src   src
                      :parameter/path  param-path
                      :parameter/type  (param-type e)
-                     :parameter/value (if vls (get vls param-id))})))))
+                     :parameter/value (when vls (get vls param-id))})))))
            (filter identity)))))
 
 (defn explain-errors-simple
@@ -176,7 +180,7 @@
   function `translate-sub`. Enriches the output map with `:parameter/name`,
   `:error/summary` and `:error/description` entries. To be used in API responses."
   [data translate-sub]
-  (if-some [r (recode-errors-simple data)]
+  (when-some [r (recode-errors-simple data)]
     (map #(into % (translate-error translate-sub %)) r)))
 
 (defn list-errors-simple-seqs
@@ -189,7 +193,7 @@
   [data]
   (let [dat (coercion/encode-error data)
         err (get dat :errors)
-        err (if (coll? err) err (if (some? err) (cons err nil)))]
+        err (if (coll? err) err (when (some? err) (cons err nil)))]
     (->> err (filter identity) (map (juxt-seq (comp some-str first :path) param-type :value)))))
 
 (defn list-errors-simple
@@ -218,20 +222,20 @@
   values are parameter types (as defined in a schema used to validate and coerce them).
   Used to pass form errors to another page which should expose them to a visitor."
   [data]
-  (if-some [r (list-errors-simple data)]
+  (when-some [r (list-errors-simple data)]
     (reduce (partial apply qassoc) {} (map butlast r))))
 
 (defn join-param-names
   "Used to produce a string containing parameter names from a map or a sequence."
   [params]
-  (if params
+  (when params
     (cond
-      (map?     params) (if (pos? (count params))
+      (map?     params) (when (pos? (count params))
                           (some->> (keys params)
                                    (map some-str)
                                    (filter identity) seq
                                    (str/join ",")))
-      (string?  params) (if (not-empty-string? params) params)
+      (string?  params) (when (not-empty-string? params) params)
       (seqable? params) (some->> (seq params)
                                  (map some-str)
                                  (filter identity) seq
@@ -252,10 +256,10 @@
   [errors]
   (if (and (string? errors) (not-empty-string? errors))
     errors
-    (if-some [errors (seq errors)]
+    (when-some [errors (seq errors)]
       (->> errors
            (map (fn [[param-id param-type _]]
-                  (if-some [param-id (and param-id (some-str (str/trim (some-str param-id))))]
+                  (when-some [param-id (and param-id (some-str (str/trim (some-str param-id))))]
                     (if-some [param-type (and param-type (some-str (str/trim (some-str param-type))))]
                       (str param-id ":" param-type)
                       param-id))))
@@ -275,10 +279,10 @@
   [errors]
   (if (and (string? errors) (pos? (count errors)))
     errors
-    (if-some [errors (seq errors)]
+    (when-some [errors (seq errors)]
       (->> errors
            (map (fn [[param-id param-type param-value]]
-                  (if-some [param-id (and param-id (some-str (str/trim (some-str param-id))))]
+                  (when-some [param-id (and param-id (some-str (str/trim (some-str param-id))))]
                     (let [param-type (and param-type (some-str (str/trim (some-str param-type))))]
                       (str param-id ":" param-type ":" param-value)))))
            (filter identity)
@@ -294,35 +298,35 @@
   ([param-id param-type param-value]
    (if-not param-type
      (if param-value
-       (if param-id (split-error param-id nil))
-       (if param-id (split-error param-id)))
+       (when param-id (split-error param-id nil))
+       (when param-id (split-error param-id)))
      (let [id (some-str param-id)
            ty (some-str param-type)
            va (some-str param-value)
-           id (if id (str/trim id))
-           ty (if ty (str/trim ty))]
-       (if (or (and id (pos? (count id)))
-               (and ty (pos? (count ty))))
+           id (when id (str/trim id))
+           ty (when ty (str/trim ty))]
+       (when (or (and id (pos? (count id)))
+                 (and ty (pos? (count ty))))
          [id ty va]))))
   ([param-id param-type]
    (if-not param-type
-     (if param-id (split-error param-id))
+     (when param-id (split-error param-id))
      (let [id (some-str param-id)
            ty (some-str param-type)
-           id (if id (str/trim id))
-           ty (if ty (str/trim ty))]
-       (if (or (and id (pos? (count id)))
-               (and ty (pos? (count ty))))
+           id (when id (str/trim id))
+           ty (when ty (str/trim ty))]
+       (when (or (and id (pos? (count id)))
+                 (and ty (pos? (count ty))))
          [id ty nil]))))
   ([param-id]
    (if (and (sequential? param-id) (seq param-id))
      (apply split-error (take 3 param-id))
-     (if-some [param-id (some-> param-id some-str str/trim some-str)]
+     (when-some [param-id (some-> param-id some-str str/trim some-str)]
        (let [[f s v] (str/split param-id #":" 3)
-             f       (if f (some-str (str/trim f)))
-             s       (if s (some-str (str/trim s)))
-             v       (if v (some-str v))]
-         (if (or f s) [f s v]))))))
+             f       (when f (some-str (str/trim f)))
+             s       (when s (some-str (str/trim s)))
+             v       (when v (some-str v))]
+         (when (or f s) [f s v]))))))
 
 (defn valid-param-name?
   "Returns `true` if the given parameter name or parameter type name matches a pattern
@@ -356,14 +360,14 @@
   [errors]
   (cond
     (map?        errors) (pos? (count errors))
-    (string?     errors) (if (not-empty-string? errors)
+    (string?     errors) (when (not-empty-string? errors)
                            (some->> (str/split errors #",+" 108) seq
                                     (map #(take 2 (split-error %)))
                                     (filter valid-error-pair?) seq
                                     (mapcat seq)
                                     (apply qassoc {})
                                     (not-empty)))
-    (sequential? errors) (if (seq errors)
+    (sequential? errors) (when (seq errors)
                            (some->> errors
                                     (map #(take 2 %))
                                     (filter valid-error-pair?) seq
@@ -384,7 +388,7 @@
   "Takes a parameter names separated by commas, removes duplicates and empty strings,
   and returns a sequence of strings."
   [s]
-  (if (and (string? s) (not-empty-string? s))
+  (when (and (string? s) (not-empty-string? s))
     (some->> (str/split s #",+" 108) seq
              (filter valid-param-name?)
              distinct seq)))
@@ -394,9 +398,9 @@
   as a sequence of strings). Returns a map where keys are parameter names and values
   are parameter values."
   [req ids]
-  (if (seq ids)
+  (when (seq ids)
     (let [form-params (get req :form-params)]
-      (if (and form-params (pos? (count form-params)))
+      (when (and form-params (pos? (count form-params)))
         (reduce #(qassoc %1 %2 (get form-params %2)) {} ids)))))
 
 (defn remove-params
@@ -405,13 +409,13 @@
   [req to-remove to-keep]
   (let [params (get req :params)]
     (if (seq params)
-      (let [remove-str  (delay (map some-str to-remove))
-            form-params (delay (if to-keep
-                                 (let [r (select-keys (get req :form-params) to-keep)]
-                                   (if to-remove (apply dissoc r to-remove) r))))
-            params      (delay (if to-keep
-                                 (let [r (select-keys params to-keep)]
-                                   (if to-remove (apply dissoc r to-remove) r))))]
+      (let [to-remove-str (delay (map some-str to-remove))
+            form-params   (delay (when to-keep
+                                   (let [r (select-keys (get req :form-params) to-keep)]
+                                     (when to-remove-str (apply dissoc r to-remove-str) r))))
+            params        (delay (when to-keep
+                                   (let [r (select-keys params to-keep)]
+                                     (if to-remove-str (apply dissoc r to-remove-str) r))))]
         (qassoc req
                 :body-params {}
                 :form-params form-params
@@ -436,13 +440,13 @@
   pre-filling in forms."
   [req form-keep session-key]
   (let [qp (get req :query-params)]
-    (if-let [bad-params (if qp (get qp "form-errors"))]
+    (when-let [bad-params (when qp (get qp "form-errors"))]
       (let [_            (log/web-dbg req "Handling form errors. Keeping:" (str/join "," form-keep))
             svar         (some-> (session/valid-of req session-key)
                                  (session/fetch-var! :form-errors))
-            expected-uri (if svar (get svar :dest))
-            svar-errors  (if svar (get svar :errors))
-            svar-params  (if svar (get svar :params))]
+            expected-uri (when svar (get svar :dest))
+            svar-errors  (when svar (get svar :errors))
+            svar-params  (when svar (get svar :params))]
         (if (and (or (and (map? svar-errors) (pos? (count svar-errors)))
                      (and (map? svar-params) (pos? (count svar-params))))
                  (or (not expected-uri) (= expected-uri (get req :uri))))
@@ -470,14 +474,14 @@
 ;; Default exception handler
 
 (defn default-exception-handler
-  [req e responder raiser]
+  [_req e responder raiser]
   (rrc/handle-coercion-exception e responder raiser))
 
 ;; Initializers
 
 (defn- prep-form-keep
   [v]
-  (if v
+  (when v
     (if (and (seqable? v) (seq v))
       (some->> (if (map? v) (keys v) v)
                (map some-str)
@@ -488,15 +492,15 @@
 (defn- process-schema-entry
   [id {:keys [compile options] :as sch}]
   (if (and compile (some? id))
-    (if-some [compile (if (symbol? compile) (var/deref compile))]
+    (when-some [compile (when (symbol? compile) (var/deref compile))]
       (compile id options))
     sch))
 
 (defn init-registry
   [config]
   (let [local-schemas (->> config
-                           (map/map-vals-by-kv process-schema-entry)
-                           map/remove-empty-values)]
+                           (map-vals-by-kv process-schema-entry)
+                           remove-empty-values)]
     (mregistry/fast-registry
      (merge (m/default-schemas) schemas/schemas local-schemas))))
 
@@ -511,7 +515,7 @@
                          raiser            #(throw %)}}]
   {:name    k
    :compile (fn [{:keys [session-key form-errors? form-keep coercion parameters responses]} _]
-              (if (and enabled? coercion (or parameters responses))
+              (when (and enabled? coercion (or parameters responses))
                 (let [exception-handler (var/deref-symbol exception-handler)
                       responder         (var/deref-symbol responder)
                       raiser            (var/deref-symbol raiser)
@@ -543,19 +547,19 @@
                              (exception-handler e respond raise))))))))))})
 
 (defn init-coercer
-  [k {:keys [init initializer config enabled?] :or {enabled? true}}]
-  (if enabled?
-    (if-some [coercer (var/deref-symbol (or init initializer))]
-      (coercer (map/map-values var/deref-symbol config)))))
+  [_k {:keys [init initializer config enabled?] :or {enabled? true}}]
+  (when enabled?
+    (when-some [coercer (var/deref-symbol (or init initializer))]
+      (coercer (map-values var/deref-symbol config)))))
 
-(system/add-init  ::coercer [k config] (var/make k (init-coercer k config)))
-(system/add-halt! ::coercer [k config] (var/make k nil))
+(system/add-init  ::coercer    [k config] (var/make k (init-coercer k config)))
+(system/add-halt! ::coercer    [k      _] (var/make k nil))
 
 (system/add-init  ::exceptions [k config] (var/make k (init-exceptions-handler k config)))
-(system/add-halt! ::exceptions [k config] (var/make k nil))
+(system/add-halt! ::exceptions [k      _] (var/make k nil))
 
-(system/add-init  ::registry [k config] (var/make k (init-registry config)))
-(system/add-halt! ::registry [k config] (var/make k nil))
+(system/add-init  ::registry   [k config] (var/make k (init-registry config)))
+(system/add-halt! ::registry   [k      _] (var/make k nil))
 
 (derive ::coercer-all ::coercer)
 (derive ::coercer-web ::coercer)

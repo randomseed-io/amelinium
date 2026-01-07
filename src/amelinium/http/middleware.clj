@@ -25,7 +25,7 @@
     (when web-handler
       (log/msg "Installing rendering web handler:"  web-handler-sym)
       {:name    (or (keyword k) ::renderer)
-       :compile (fn [data opts]
+       :compile (fn [_data _opts]
                   (fn [handler]
                     (fn [req]
                       (if (resp/response? req)
@@ -43,7 +43,7 @@
     (when preparer
       (log/msg "Installing generic request preparer:"  preparer-sym)
       {:name    (or  (keyword k) ::preparer)
-       :compile (fn [data opts]
+       :compile (fn [_data _opts]
                   (fn [handler]
                     (fn [req]
                       (let [resp (preparer req)]
@@ -61,13 +61,13 @@
 
 (system/add-expand ::chain    [k config] (expand-chain k config))
 (system/add-init   ::chain    [k config] (var/make k (prep-chain config)))
-(system/add-halt!  ::chain    [k config] (var/make k nil))
+(system/add-halt!  ::chain    [k     _] (var/make k nil))
 
 (system/add-init   ::renderer [k config] (init-renderer k config))
-(system/add-halt!  ::renderer [_ config] nil)
+(system/add-halt!  ::renderer [_      _] nil)
 
 (system/add-init   ::preparer [k config] (init-preparer k config))
-(system/add-halt!  ::preparer [_ config] nil)
+(system/add-halt!  ::preparer [_      _] nil)
 
 (derive ::default       ::chain)
 (derive ::default-chain ::chain)

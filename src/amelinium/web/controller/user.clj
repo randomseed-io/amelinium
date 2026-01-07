@@ -20,6 +20,7 @@
             [amelinium.common.controller        :as           super]
             [amelinium.web                      :as             web]
             [amelinium.web.htmx                 :as            htmx]
+            [amelinium.web.app-data             :as        app-data]
             [amelinium.auth                     :as            auth]
             [amelinium.http                     :as            http]
             [amelinium.identity                 :as        identity]
@@ -95,19 +96,19 @@
       errors?       (web/render-error  req errors)
       confirmed?    (web/render-status req :verify/confirmed)
       max-attempts? (-> req
-                        (web/assoc-app-data :verify/retry-in           retry-in
-                                            :verify/in-mins            retry-in-mins
-                                            :verify/retry-unit         :minutes
-                                            :verify/retry-dur          retry-dur
-                                            :verify/mins-left          mins-left
-                                            :verify/max-attempts?      max-attempts?
-                                            :verify/expired?           expired?
-                                            :verify/attempts-left      attempts-left
-                                            :verify/attempts-left-word attempts-left-w
-                                            :sub-status/description    retry-in-mins)
+                        (app-data/assoc :verify/retry-in           retry-in
+                                        :verify/in-mins            retry-in-mins
+                                        :verify/retry-unit         :minutes
+                                        :verify/retry-dur          retry-dur
+                                        :verify/mins-left          mins-left
+                                        :verify/max-attempts?      max-attempts?
+                                        :verify/expired?           expired?
+                                        :verify/attempts-left      attempts-left
+                                        :verify/attempts-left-word attempts-left-w
+                                        :sub-status/description    retry-in-mins)
                         (web/add-header :Retry-After (retry-after expires))
                         (web/add-status :verify/max-attempts))
-      :send!        (let [{:keys [token code
+      :else         (let [{:keys [token code
                                   exists?]} result
                           lang-str          (some-str lang)
                           remote-ip         (get req :remote-ip/str)
@@ -155,7 +156,7 @@
                         (log/web-wrn req "Unknown identity type:" id-type))
                       (-> req
                           (web/add-status :verify/sent)
-                          (web/assoc-app-data
+                          (app-data/assoc
                            :user/identity             id-str
                            :user/phone                (if phone? id-str)
                            :user/email                (if email? id-str)
@@ -183,7 +184,7 @@
 
 (defn- auth-prolonged-ok
   [req route-data lang]
-  (if (common/use-hx? req route-data :auth/use-htmx?)
+  (if (htmx/use? req route-data :auth/use-htmx?)
     (htmx/go-to-with-status req route-data :auth/prolonged-ok :login/prolonged)
     (auth-ok req route-data lang)))
 
@@ -258,7 +259,7 @@
                                req
                                ;; Redirect to a proper language version of this very page.
                                (web/move-to req (or (get @route-data :name) (get req :uri)) @lang))
-       :invalid-session!     (web/move-to req (or (get @route-data :auth/login) :auth/login) @lang)))))
+       :else!                (web/move-to req (or (get @route-data :auth/login) :auth/login) @lang)))))
 
 (defn login!
   "Prepares response data to be displayed on a login page."
@@ -267,7 +268,7 @@
    (let [^Session sess (session/of req session-key)
          rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))
          user-login    (delay (some-str (common/get-form-params req :user/login)))]
-     (web/assoc-app-data req :lock-remains rem-mins :user/login user-login))))
+     (app-data/assoc req :lock-remains rem-mins :user/login user-login))))
 
 (defn logout!
   "Logs user out."
@@ -298,7 +299,7 @@
              rem-mins      (delay (super/lock-remaining-mins req (auth/db req) sess t/now))]
          (-> req
              (qassoc sess-key (qassoc sess :prolonged? true))
-             (web/assoc-app-data :lock-remains rem-mins)))
+             (app-data/assoc :lock-remains rem-mins)))
 
        (and sess (session/hard-expired? sess))
        (web/move-to req (get-in route-data [:auth-error/destinations :auth/session-expired] :login/session-expired))
@@ -332,7 +333,7 @@
                  retry-in       (delay (retry-in-mins retry-dur))
                  id-type        (delay (common/guess-identity-type r id nil nil))
                  start-over?    (or expired? false)
-                 req            (web/assoc-app-data
+                 req            (app-data/assoc
                                  req
                                  :url/start-over            (if start-over? start-over-url)
                                  :user/id-type              id-type
@@ -440,7 +441,7 @@
          params     (common/get-form-params req)
          id         (common/get-identity-param params)
          id-type    (identity/type id)
-         req        (web/assoc-app-data req :user/identity id :identity/type id-type)]
+         req        (app-data/assoc req :user/identity id :identity/type id-type)]
      (if id-type
 
        ;; initiate change
@@ -571,7 +572,7 @@
   (let [params  (common/get-form-params req)
         id      (common/get-identity-param params)
         id-type (identity/type id)
-        req     (web/assoc-app-data req :user/identity id :identity/type id-type)]
+        req     (app-data/assoc req :user/identity id :identity/type id-type)]
     (if id-type
 
       ;; initiate recovery
@@ -670,7 +671,7 @@
                                                      req
                                                      {"login" user-email
                                                       "token" token}))))]
-            (web/assoc-app-data
+            (app-data/assoc
              req
              :user/login              user-email
              :user/email              user-email
@@ -712,14 +713,14 @@
                                 (get form-params :username)))]
     (if (not= password password-2)
       (-> req
-          (web/assoc-app-data :user/login         login
+          (app-data/assoc :user/login         login
                               :confirmation/token token
                               :confirmation/code  code)
           (web/form-params-error! {:user/repeated-password :repeated-password}))
       (let [db    (auth/db req)
             cfrm  (confirmation/establish db id code token one-minute "recovery")
             login (delay (or (some->> cfrm :user/id (user/email db :id)) @login))
-            req   (web/assoc-app-data req
+            req   (app-data/assoc req
                                       :user/login         login
                                       :confirmation/token token
                                       :confirmation/code  code)]

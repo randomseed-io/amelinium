@@ -70,7 +70,7 @@
 ;; Response rendering
 
 (p/import-vars [amelinium.common
-                add-header add-headers add-status remove-status])
+                add-status remove-status add-header add-headers])
 
 (defn render
   "Returns response body on a basis of a value associated with the `:response/body`

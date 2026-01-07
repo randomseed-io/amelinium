@@ -8,10 +8,8 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [potemkin                           :as            p]
-            [reitit.coercion                    :as     coercion]
+  (:require [reitit.coercion                    :as     coercion]
             [ring.middleware.keyword-params     :as      ring-kw]
-            [amelinium.http.response            :as         resp]
             [tick.core                          :as            t]
             [amelinium.logging                  :as          log]
             [amelinium.identity                 :as     identity]
@@ -20,12 +18,16 @@
             [amelinium.common                   :as       common]
             [io.randomseed.utils.time           :as         time]
             [io.randomseed.utils.map            :refer  [qassoc]]
-            [io.randomseed.utils                :refer      :all]
+            [io.randomseed.utils                :refer  [strb
+                                                         some-str
+                                                         some-keyword]]
             [amelinium.auth                     :as         auth]
             [amelinium.http                     :as         http]
             [amelinium.http.middleware.session  :as      session]
-            [ameliniun.web.htmx                 :as         htmx]
-            [amelinium.types.session            :refer      :all]
+            [amelinium.http.middleware.roles    :as        roles]
+            [amelinium.web.htmx                 :as         htmx]
+            [amelinium.types.session]
+            [amelinium]
             [puget.printer                      :refer  [cprint]])
 
   (:import (amelinium Session)))
@@ -51,7 +53,7 @@
 (defn check-password
   "Check password using authentication configuration."
   [user password auth-config]
-  (if (and user password)
+  (when (and user password)
     (auth/check-password-json password
                               (get user :shared)
                               (get user :intrinsic)
@@ -61,9 +63,9 @@
   "Returns true if an account associated with the session is hard-locked.
   Uses cached property."
   (^Boolean [req session]
-   (if-some [db (auth/db req)]
+   (when-some [db (auth/db req)]
      (account-locked? req session db)))
-  (^Boolean [req session db]
+  (^Boolean [_req session db]
    (some? (some->> session :user/id (user/prop-get-locked db)))))
 
 (defn lock-remaining-mins
@@ -73,12 +75,12 @@
   ([req auth-db smap time-fn]
    (lock-remaining-mins req auth-db smap time-fn :user/login))
   ([req auth-db smap time-fn id-field]
-   (if auth-db
+   (when auth-db
      (let [user (and smap (user/props-of :session auth-db smap))
            user (or user (user/props-of :email auth-db (get-in req [:parameters :form id-field])))]
-       (if (some? user)
-         (if-some [auth-config (auth/config req (get user :account-type))]
-           (if-some [mins (time/minutes (common/soft-lock-remains user auth-config (time-fn)))]
+       (when (some? user)
+         (when-some [auth-config (auth/config req (get user :account-type))]
+           (when-some [mins (time/minutes (common/soft-lock-remains user auth-config (time-fn)))]
              (if (zero? mins) 1 mins))))))))
 
 (defn prolongation?
@@ -120,7 +122,7 @@
   (or (and (session/hard-expired? sess)
            (not (common/on-page?
                  req
-                 (or (get-in route-data [:auth-error/destinations :auth/session-expired] :login/session-expired)))))
+                 (get-in route-data [:auth-error/destinations :auth/session-expired] :login/session-expired))))
       false))
 
 (defn get-goto-uri
@@ -129,9 +131,9 @@
   authenticated to be redirected into a page where session expiration has been
   encountered a moment ago."
   [req ^Session sess]
-  (if (and (session/soft-expired? sess)
-           (contains? (get req :form-params) "am/goto"))
-    (if-some [g (session/get-var sess :goto)]
+  (when (and (session/soft-expired? sess)
+             (contains? (get req :form-params) "am/goto"))
+    (when-some [g (session/get-var sess :goto)]
       (if (session/get-variable-failed? g)
         false
         (:uri g)))))
@@ -144,7 +146,7 @@
 (defn get-goto-for-valid
   "Gets go-to map from session variable if the session is valid (and not expired)."
   [^Session smap]
-  (if (and smap (session/valid? smap))
+  (when (and smap (session/valid? smap))
     (get-goto smap)))
 
 (defn hx-prolong?
@@ -182,24 +184,24 @@
 (defn verify-request-id-update
   "Default confirmation request ID field updater for asynchronous identity
   confirmation."
-  [db id-type id code token response]
-  (if-some [headers (:headers response)]
-    (if-some [req-id (if (map? headers)
-                       (or (get headers "twilio-request-id")
-                           (get headers "x-message-id")))]
+  [db _id-type id code token response]
+  (when-some [headers (:headers response)]
+    (when-some [req-id (when (map? headers)
+                         (or (get headers "twilio-request-id")
+                             (get headers "x-message-id")))]
       (confirmation/update-request-id db id code token req-id))))
 
 (defn verify-process-error
   "Default error processor for asynchronous e-mail or SMS sending."
-  [db id-type id code token exception]
+  [_db _id-type _id _code _token exception]
   (cprint exception))
 
 (defn invalidate-user-sessions!
   "Invalidates user sessions if `id-type` is an e-mail."
   ([req route-data id-type id user-id]
    (invalidate-user-sessions! req route-data id-type id user-id nil))
-  ([req route-data id-type id user-id session-key]
-   (if (or (identical? :email id-type) (identical? :user/email id-type))
+  ([req route-data id-type _id user-id session-key]
+   (when (or (identical? :email id-type) (identical? :user/email id-type))
      (let [route-data  (or route-data (http/get-route-data req))
            session-key (or session-key (get route-data :session-key))]
        (session/delete-all! req session-key user-id)))))
@@ -235,7 +237,7 @@
          user          (user/get-login-data auth-db user-email)
          user-id       (get user :id)
          ac-type       (get user :account-type)
-         pwd-suites    (select-keys user [:intrinsic :shared])
+         _pwd-suites   (select-keys user [:intrinsic :shared])
          auth-config   (delay (auth/config auth-settings ac-type))
          email-str     (identity/->str :email user-email)
          for-user      (log/for-user user-id email-str ipplain)
@@ -277,49 +279,49 @@
                                   :user/id user-id :user/account-type ac-type
                                   :user/authenticated? true))
 
-       :authenticate! (do (log/msg "Login successful" for-user)
-                          (oplog true :info "Login OK" for-mail)
-                          (user/update-login-ok auth-db user-id ipaddr)
-                          (let [^Session sess (or sess
-                                                  (session/of req (or session-key
-                                                                      (get route-data :session-key))))
-                                hx?           (and (common/use-hx? req route-data :error/use-htmx?))
-                                hx-pl?        (and hx? sess (session/soft-expired? sess))
-                                goto-uri      (if-not hx-pl? (get-goto-uri req sess))
-                                goto?         (boolean goto-uri)
-                                prolonged?    (or hx-pl? goto?)
-                                ^Session sess (if prolonged?
-                                                (session/prolong sess ipaddr)
-                                                (session/create  sess user-id email-str ipaddr))]
+       :else (do (log/msg "Login successful" for-user)
+                 (oplog true :info "Login OK" for-mail)
+                 (user/update-login-ok auth-db user-id ipaddr)
+                 (let [^Session sess (or sess
+                                         (session/of req (or session-key
+                                                             (get route-data :session-key))))
+                       hx?           (htmx/use? req route-data :error/use-htmx?)
+                       hx-pl?        (and hx? sess (session/soft-expired? sess))
+                       goto-uri      (when-not hx-pl? (get-goto-uri req sess))
+                       goto?         (boolean goto-uri)
+                       prolonged?    (or hx-pl? goto?)
+                       ^Session sess (if prolonged?
+                                       (session/prolong sess ipaddr)
+                                       (session/create  sess user-id email-str ipaddr))]
 
-                            (if-not (session/valid? sess)
+                   (if-not (session/valid? sess)
 
-                              (let [e (session/error sess)
-                                    c (:cause    e)
-                                    s (:severity e)]
-                                (when c
-                                  (log/log (or s :warn) c)
-                                  (oplog-fn :level s :user-id user-id :op :session :ok? false :msg c))
-                                (qassoc req
-                                        :auth/ok?            false
-                                        :app/status          :auth/session-error
-                                        :user/authenticated? false
-                                        :user/authorized?    false
-                                        :user/id             user-id
-                                        :user/account-type   ac-type))
+                     (let [e (session/error sess)
+                           c (:cause    e)
+                           s (:severity e)]
+                       (when c
+                         (log/log (or s :warn) c)
+                         (oplog-fn :level s :user-id user-id :op :session :ok? false :msg c))
+                       (qassoc req
+                               :auth/ok?            false
+                               :app/status          :auth/session-error
+                               :user/authenticated? false
+                               :user/authorized?    false
+                               :user/id             user-id
+                               :user/account-type   ac-type))
 
-                              (-> req
-                                  (qassoc
-                                   :auth/ok?          true
-                                   :app/status        (if prolonged? :auth/prolonged-ok :auth/ok)
-                                   :auth/goto         goto-uri
-                                   :auth/htmx?        hx?
-                                   :auth/use-htmx?    hx?
-                                   :user/id           user-id
-                                   :user/account-type ac-type)
-                                  (session/inject sess)
-                                  (session/replace-session-id-header sess)
-                                  (common/roles-refresh)))))))))
+                     (-> req
+                         (qassoc
+                          :auth/ok?          true
+                          :app/status        (if prolonged? :auth/prolonged-ok :auth/ok)
+                          :auth/goto         goto-uri
+                          :auth/htmx?        hx?
+                          :auth/use-htmx?    hx?
+                          :user/id           user-id
+                          :user/account-type ac-type)
+                         (session/inject sess)
+                         (session/replace-session-id-header sess)
+                         (roles/refresh)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special actions (controller handlers)
@@ -343,7 +345,7 @@
    (authenticate! req user-email user-password nil))
   ([req user-email user-password session-key]
    (let [route-data             (delay (http/get-route-data req))
-         ^String  user-password (if user-email (some-str user-password))
+         ^String  user-password (when user-email (some-str user-password))
          ^Session sess          (session/of req (or session-key (get @route-data :session-key)))]
 
      (if user-password
@@ -411,7 +413,7 @@
   "Generates bad parameter exception which should trigger coercion error.
   The value of `param-type` must be a valid schema."
   [req param value param-type]
-  (if-some [param (some-keyword param)]
+  (when-some [param (some-keyword param)]
     (let [param-type (some-keyword param-type)]
       (throw
        (ex-info

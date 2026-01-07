@@ -26,7 +26,8 @@
             [amelinium.web.htmx                   :as               htmx]
             [amelinium.web.app-data               :as           app-data]
             [io.randomseed.utils.map              :as                map]
-            [amelinium.utils                      :refer [some-resource]]
+            [amelinium.utils                      :refer [is-url?
+                                                          some-resource]]
             [io.randomseed.utils                  :refer [or-some
                                                           some-str
                                                           some-keyword
@@ -821,16 +822,16 @@
    (let [sub-ns        (name sub-key)
          sub-title-key (keyword sub-ns "title")
          sub-desc-key  (keyword sub-ns "description")]
-     (update-status req sub-status nil sub-key sub-title-key sub-desc-key)))
+     (app-data/update-status req sub-status nil sub-key sub-title-key sub-desc-key)))
   ([data req sub-status sub-key]
    (let [sub-ns        (name sub-key)
          sub-title-key (keyword sub-ns "title")
          sub-desc-key  (keyword sub-ns "description")]
-     (update-status data req sub-status nil sub-key sub-title-key sub-desc-key)))
+     (app-data/update-status data req sub-status nil sub-key sub-title-key sub-desc-key)))
   ([data req sub-status lang sub-key title-key description-key]
-   (update-status data req sub-status lang sub-key title-key description-key))
+   (app-data/update-status data req sub-status lang sub-key title-key description-key))
   ([req sub-status lang sub-key title-key description-key]
-   (update-status req sub-status lang sub-key title-key description-key)))
+   (app-data/update-status req sub-status lang sub-key title-key description-key)))
 
 (defn render-error
   "Renders error response on a basis of `app-status` or `app-statuses`, and optional

@@ -197,7 +197,7 @@
                                         :verify/retry-dur       @retry-dur
                                         :verify/attempts-left   attempts-left
                                         :sub-status/description (tr :try-in-mins @retry-in)))
-      :send!        (let [{:keys [token code
+      :else         (let [{:keys [token code
                                   exists?]} result
                           id-str            (identity/->str id-type id)
                           lang-str          (some-str lang)

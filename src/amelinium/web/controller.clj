@@ -9,9 +9,8 @@
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require [tick.core                          :as               t]
-            [clojure.string                     :as             str]
-            [amelinium.types.session            :refer         :all]
-            [amelinium.types.response           :refer         :all]
+            [amelinium.types.session]
+            [amelinium.types.response]
             [amelinium]
             [amelinium.logging                  :as             log]
             [amelinium.model.user               :as            user]
@@ -20,6 +19,7 @@
             [amelinium.common.controller        :as           super]
             [amelinium.i18n                     :as            i18n]
             [amelinium.web                      :as             web]
+            [amelinium.web.html                 :as            html]
             [amelinium.web.htmx                 :as            htmx]
             [amelinium.auth                     :as            auth]
             [amelinium.http                     :as            http]
@@ -217,7 +217,7 @@
 
        (super/prolongation? sess @auth-state @login-data?)
        (let [req           (cleanup-req req @auth-state)
-             use-htmx?     (common/use-hx? req route-data :prolongate/use-htmx?)
+             use-htmx?     (htmx/use? req route-data :prolongate/use-htmx?)
              ^Session sess (session/allow-soft-expired sess)
              session-field (or (session/id-field sess) "session-id")]
          (if use-htmx?
@@ -232,9 +232,9 @@
                                       :form-params  (get req-to-save :form-params)
                                       :query-params (get req-to-save :query-params)
                                       :params       (get req-to-save :params)})
-             (web/http-go-to-with-status req route-data :auth/prolongate :login/prolongate))))
+             (html/go-to-with-status req route-data :auth/prolongate :login/prolongate))))
 
-       :----pass
+       :else
 
        (let [valid-session? (session/valid? sess)
              auth?          (nth @auth-state 1 false)
