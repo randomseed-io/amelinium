@@ -73,20 +73,6 @@
                 hard-lock-time hard-locked?
                 soft-lock-time soft-lock-passed soft-locked? soft-lock-remains])
 
-
-;; HTML generators and transformers
-
-(defn roles-table
-  "Generates roles table as HTML string."
-  ([req]
-   (let [{:keys [data labels]} (roles-tabler req nil)]
-     (when (and data labels)
-       (html (table/to-table1d data labels)))))
-  ([req opts]
-   (let [{:keys [data labels]} (roles-tabler req opts)]
-     (when (and data labels)
-       (html (table/to-table1d data labels))))))
-
 ;; HTML response
 
 (defmacro response
