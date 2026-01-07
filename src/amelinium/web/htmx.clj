@@ -472,14 +472,13 @@
            hx-target          (when hx-src-target (get hx-targets hx-src-target))
            hx-target          (some-str (or hx-target (get route-data :form-errors/target)))
            req                (if hx-target (common/add-header req :HX-Retarget hx-target) req)
-           req                (if title (assoc-app-data req :title title) req)
-           req                (if (nil? new-view)   req (qassoc req :app/view   new-view))
-           req                (if (nil? new-layout) req (qassoc req :app/layout new-layout))]
+           req                (if title (app-data/assoc req :title title) req)
+           req                (if (nil? new-view)   req (qassoc req :error/view   new-view))
+           req                (if (nil? new-layout) req (qassoc req :error/layout new-layout))]
        (-> req
-           (assoc-app-data :coercion/errors       explanations
+           (qassoc :response/set-status! true)
            (app-data/assoc :coercion/errors       explanations
                            :form/previous-errors? handling-previous?
                            :form/errors           (delay {:dest   (:uri req)
                                                           :errors (force errors)
-                                                          :params (force values)}))
-           (render-bad-params nil new-view new-layout))))))
+                                                          :params (force values)})))))))

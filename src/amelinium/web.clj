@@ -250,79 +250,63 @@
 (p/import-vars [amelinium.common
                 add-header add-headers add-status remove-status])
 
-(defn- update-status
-  "Updates `:app/data` map of the `req` by setting its status key `status-key` to
-  `status`, `title-key` to translated `status` and `description-key` to translated
-  message obtained for a translation key made with namespace of `status` and name of
-  `status` with `.full` attached. If `status` is untranslatable (is not an ident nor
-  a string), it will just associate `status-key` with the given `status`.
-
-  Any existing entries of `:app/data` having the same keys as given (`status-key`,
-  `title-key` and `description-key`) will remain unmodified."
-  ([req status lang status-key title-key description-key]
-   (if status
-     (->> (update-status (get req :app/data empty-lazy-map) req status lang status-key title-key description-key)
-          (qassoc req :app/data))
-     req))
-  ([data req status lang status-key title-key description-key]
-   (if status
-     (if (common/untranslatable? status)
-       (map/assoc-missing (or data empty-lazy-map) status-key status)
-       (let [translate-sub (delay (i18n/no-default (common/translator-sub req lang)))]
-         (map/assoc-missing
-          (or data empty-lazy-map)
-          status-key      status
-          title-key       (delay (@translate-sub status))
-          description-key (delay (@translate-sub
-                                  (try-namespace status)
-                                  (str (try-name status) ".full"))))))
-     data))
-  ([data req status lang]
-   (update-status data req status lang :status :status/title :status/description))
-  ([req status lang]
-   (update-status req status lang :status :status/title :status/description)))
-
 (defn get-for-status
-  "If the given `status` is not `nil` and not `false`, it looks for `k` in `req`,
-  and if that returns `nil` tries to look for `k` in `route-data`, and then, if its
-  not `nil` gets a value associated with the given `status` in this map. If
-  `other-status` is given, it will be used as fallback in the same way as the first,
-  when it will return `nil`."
-  ([req route-data k status]
-   (when status
-     (when-some [db (or (get req k) (get route-data k))]
-       (get db status))))
-  ([req route-data k status other-status]
-   (if status
-     (when-some [db (or (get req k) (get route-data k))]
-       (or-some (get db status)
-                (when other-status (get db other-status))))
-     (when other-status
-       (when-some [db (or (get req k) (get route-data k))]
-         (get db other-status))))))
+  "If the given `status` is not `nil` and not `false`, it looks for `k` in `db` to
+  obtain a map in which `status` is looked up.  If `other-status` is given, it will
+  be used as fallback when first lookup within a map will return nil or `status` was
+  falsy."
+  ([db k status]
+   (when status (get (get db k) status)))
+  ([db k status other-status]
+   (when-some [db (get db k)]
+     (if status
+       (or-some (get db status) (when other-status (get db other-status)))
+       (when other-status (get db other-status))))))
 
-(defn status-lv
-  "Sets a different layout and/or view when the given HTTP status (`status`) is not
-  `:ok/found` nor `:ok` nor `nil` and the `:response/set-status!` entry of the `req`
-  does not have a truthy value.
+(defn status-ok?
+  "Returns `true` when the given `status` is either `:ok/found`, nil, `:ok` or
+  `:info/early-hints`. False otherwise."
+  [status]
+  (if (identical? status :ok/found)
+    true
+    (or (nil?       status)
+        (identical? status :ok)
+        (identical? status :info/early-hints))))
+
+(defn status-error?
+  "Returns `true` when the given `status` is neither `:ok/found` nor nil nor `:ok` nor
+  `:info/early-hints`. False otherwise."
+  [status]
+  (not (status-ok? status))
+
+(defn- status-lv
+  "Sets a different layout and/or view when the given HTTP status (`status`) does not
+  equal to `:ok/found` nor `:ok` nor `:info/early-hints` nor `nil`, or when the
+  `:response/set-status!` entry of the `req` has a truthy value.
 
   If `layout` is given and it is not `nil`, it will not be changed but returned as
   is. If `view` is given and it is not `nil`, it will not be changed but returned as
   is.
 
-  To establish a layout it will check for `:status/layouts` key in `req` and then in
-  `route-data` to obtain a mapping of statuses to layouts. It will then look for an
-  application status (taken from `:app/status` of the given `req`) and if that
-  will return `nil` it will look for an HTTP status `status` in the same map. If that
-  will fail, it will try `:error/layout` key of the `req` and the `:error/layout` key
-  of the `route-data`. Finally, it will return a string `\"error\"`.
+  To establish a layout the following lookups are made:
 
-  To establish a view it will check for `:status/views` key in `req` and then in
-  `route-data` to obtain a mapping of statuses to views. It will then look for an
-  application status (taken from `:app/status` of the given `req`) and if that
-  will return `nil` it will look for an HTTP status `status` in the same map. If that
-  will fail, it will try `:error/layout` key of the `req` and then `:error/layout`
-  key of the `route-data`. Finally, it will return a string `\"error\"`.
+  - `:error/layout` is looked up within of `req`,
+  - `:app/status` of `req` is looked up within `:status/layouts` of `req`,
+  - `status` is looked up within `:status/layouts` of `req`,
+  - `:app/status` of `req` is looked up within `:status/layouts` of `route-data`,
+  - `status` is looked up within `:status/layouts` of `route-data`,
+  - `:error/layout` is looked up within of `route-data`,
+  - falls back to \"error\".
+
+  To establish a view the following lookups are made:
+
+  - `:error/view` is looked up within of `req`,
+  - `:app/status` of `req` is looked up within `:status/views` of `req`,
+  - `status` is looked up within `:status/views` of `req`,
+  - `:app/status` of `req` is looked up within `:status/views` of `route-data`,
+  - `status` is looked up within `:status/views` of `route-data`,
+  - `:error/view` is looked up within of `route-data`,
+  - falls back to \"error\".
 
   Returns a 2-element vector in a form of `[layout view]`."
   ([req]
@@ -334,28 +318,25 @@
   ([req status layout view]
    (status-lv req status layout view (http/get-route-data req)))
   ([req status layout view route-data]
-   (if (and (or (identical? :ok/found status)
-                (nil? status)
-                (identical? :ok status))
-            (not (get req :response/set-status!)))
-     [layout view]
-     (let [no-layout (nil? layout)
-           no-view   (nil? view)]
-       (if (not (or no-layout no-view))
-         [layout view]
+   (when (or (status-error? status) (get req :response/set-status!))
+     (let [no-layout? (nil? layout)
+           no-view?   (nil? view)]
+       (when (or no-layout? no-view?)
          (let [app-status (get req :app/status)]
            (log/web-dbg req "Getting layout/view for"
                         (when app-status (str "application status " (some-str app-status) " and"))
                         "HTTP response status" status)
-           [(if no-layout
-              (or-some (get-for-status req route-data :status/layouts app-status status)
-                       (get req :error/layout)
+           [(if no-layout?
+              (or-some (get req :error/layout)
+                       (get-for-status req :status/layouts app-status status)
+                       (get-for-status route-data :status/layouts app-status status)
                        (get route-data :error/layout)
                        "error")
               layout)
-            (if no-view
-              (or-some (get-for-status req route-data :status/views app-status status)
-                       (get req :error/view)
+            (if no-view?
+              (or-some (get req :error/view)
+                       (get-for-status req :status/views app-status status)
+                       (get-for-status route-data :status/views app-status status)
                        (get route-data :error/view)
                        "error")
               view)]))))))
@@ -374,49 +355,63 @@
   to `:app/data` map (unless it already contains one), using configuration maps
   associated with the `:errors/config` key of a route data.
 
-  In case of a regular response page (when the namespace of a `status` keyword is
-  \"ok\" or \"info\") the following sources are checked to find a layout path:
+  In case of a regular response, when the given HTTP status (`http-status`) equals to
+  `:ok/found` or `:ok` or `:info/early-hints` or `nil`, and when the
+  `:response/set-status!` entry of the `req` has a falsy value a layout is
+  established in a following way  (nil causes next lookup to be tried):
+
   - the given `layout`,
   - value of `:app/layout` (in a route data or a request map).
 
-  In case of a regular response page (when the namespace of a `status` keyword is
-  \"ok\" or \"info\") the following sources are checked to find a view path:
+  In the same case a view is established:
+
   - the given `view`,
   - value of `:app/view` (in a route data or a request map).
 
-  In case of an error response page (when the namespace of a `status` keyword is not
-  \"ok\" nor \"info\") the following sources are checked to find a layout path:
-  - the given `layout`,
-  - value of `status` looked up in a map under `:status/layouts` (in a route data or a request map),
-  - value of `:app/error-layout` (in a route data or a request map),
-  - \"error\".
+  In case of an error response page, when the given HTTP status (`http-status`) does
+  not equal to `:ok/found` nor `:ok` nor `:info/early-hints` nor `nil`, or when the
+  `:response/set-status!` entry of the `req` has a truthy value a layout is
+  established in a following way (nil causes next lookup to be tried):
 
-  In case of an error response page (when the namespace of a status keyword is not
-  \"ok\" nor \"info\") the following sources are checked to find a view path:
+  - the given `layout`,
+  - `:error/layout` is looked up within of `req`,
+  - `:app/status` of `req` is looked up within `:status/layouts` of `req`,
+  - `status` is looked up within `:status/layouts` of `req`,
+  - `:app/status` of `req` is looked up within `:status/layouts` of `route-data`,
+  - `status` is looked up within `:status/layouts` of `route-data`,
+  - `:error/layout` is looked up within of `route-data`,
+  - plain string \"error\".
+
+  In the same case a view is established:
+
   - the given `view`,
-  - value of `status` looked up in a map under `:status/views` (in a  route data or a request map),
-  - value of `:app/error-view` (in a route data or a request map),
-  - \"error\"."
+  - `:error/view` is looked up within of `req`,
+  - `:app/status` of `req` is looked up within `:status/views` of `req`,
+  - `status` is looked up within `:status/views` of `req`,
+  - `:app/status` of `req` is looked up within `:status/views` of `route-data`,
+  - `status` is looked up within `:status/views` of `route-data`,
+  - `:error/view` is looked up within of `route-data`,
+  - plain string \"error\"."
   ([]
    (render nil :ok/found nil nil nil nil))
   ([req]
    (render req :ok/found nil nil nil nil))
-  ([req status]
-   (render req status nil nil nil nil))
-  ([req status data]
-   (render req status data nil nil nil))
-  ([req status data view]
-   (render req status data view nil nil))
-  ([req status data view layout]
-   (render req status data view layout nil))
+  ([req http-status]
+   (render req http-status nil nil nil nil))
+  ([req http-status data]
+   (render req http-status data nil nil nil))
+  ([req http-status data view]
+   (render req http-status data view nil nil))
+  ([req http-status data view layout]
+   (render req http-status data view layout nil))
   ([req http-status data view layout lang]
-   (let [uri         (get req :uri)
-         lang        (when lang (some-str lang))
-         lang        (if (false? lang) nil (common/pick-language-str req))
-         route-data  (http/get-route-data req)
-         [layt view] (status-lv req http-status layout view route-data)
-         layt        (resolve-layout req lang layt route-data)
-         view        (resolve-view   req lang view route-data)]
+   (let [uri        (get req :uri)
+         lang       (when lang (some-str lang))
+         lang       (if (false? lang) nil (common/pick-language-str req))
+         route-data (http/get-route-data req)
+         l-v        (status-lv req http-status layout view route-data)
+         layt       (resolve-layout req lang (if l-v (nth l-v 0) layout) route-data)
+         view       (resolve-view   req lang (if l-v (nth l-v 1)   view) route-data)]
      (if (or layt view)
        (do (log/web-dbg req "Rendering (layout:" layt "view:" (str view ")"))
            (let [dlng (or lang (get req :language/str))
@@ -447,29 +442,43 @@
   to `:app/data` map (unless it already contains one), using configuration maps
   associated with the `:errors/config` key of a route data.
 
-  In case of a regular response page (when the namespace of a `status` keyword is
-  \"ok\" or \"info\") the following sources are checked to find a layout path:
+   In case of a regular response, when the given HTTP status (`http-status`) equals to
+  `:ok/found` or `:ok` or `:info/early-hints` or `nil`, and when the
+  `:response/set-status!` entry of the `req` has a falsy value a layout is
+  established in a following way  (nil causes next lookup to be tried):
+
   - the given `layout`,
   - value of `:app/layout` (in a route data or a request map).
 
-  In case of a regular response page (when the namespace of a `status` keyword is
-  \"ok\" or \"info\") the following sources are checked to find a view path:
+  In the same case a view is established:
+
   - the given `view`,
   - value of `:app/view` (in a route data or a request map).
 
-  In case of an error response page (when the namespace of a `status` keyword is not
-  \"ok\" nor \"info\") the following sources are checked to find a layout path:
-  - the given `layout`,
-  - value of `status` looked up in a map under `:status/layouts` (in a route data or a request map),
-  - value of `:app/error-layout` (in a route data or a request map),
-  - \"error\".
+  In case of an error response page, when the given HTTP status (`http-status`) does
+  not equal to `:ok/found` nor `:ok` nor `:info/early-hints` nor `nil`, or when the
+  `:response/set-status!` entry of the `req` has a truthy value a layout is
+  established in a following way (nil causes next lookup to be tried):
 
-  In case of an error response page (when the namespace of a status keyword is not
-  \"ok\" nor \"info\") the following sources are checked to find a view path:
+  - the given `layout`,
+  - `:error/layout` is looked up within of `req`,
+  - `:app/status` of `req` is looked up within `:status/layouts` of `req`,
+  - `status` is looked up within `:status/layouts` of `req`,
+  - `:app/status` of `req` is looked up within `:status/layouts` of `route-data`,
+  - `status` is looked up within `:status/layouts` of `route-data`,
+  - `:error/layout` is looked up within of `route-data`,
+  - plain string \"error\".
+
+  In the same case a view is established:
+
   - the given `view`,
-  - value of `status` looked up in a map under `:status/views` (in a  route data or a request map),
-  - value of `:app/error-view` (in a route data or a request map),
-  - \"error\"."
+  - `:error/view` is looked up within of `req`,
+  - `:app/status` of `req` is looked up within `:status/views` of `req`,
+  - `status` is looked up within `:status/views` of `req`,
+  - `:app/status` of `req` is looked up within `:status/views` of `route-data`,
+  - `status` is looked up within `:status/views` of `route-data`,
+  - `:error/view` is looked up within of `route-data`,
+  - plain string \"error\"."
   (^Response []
    (render-response resp/ok :ok/found nil nil nil nil nil))
   (^Response [resp-fn]
@@ -502,29 +511,43 @@
   to `:app/data` map (unless it already contains one), using configuration maps
   associated with the `:errors/config` key of a route data.
 
-  In case of a regular response page (when the namespace of a `status` keyword is
-  \"ok\" or \"info\") the following sources are checked to find a layout path:
+   In case of a regular response, when the given HTTP status (`http-status`) equals to
+  `:ok/found` or `:ok` or `:info/early-hints` or `nil`, and when the
+  `:response/set-status!` entry of the `req` has a falsy value a layout is
+  established in a following way  (nil causes next lookup to be tried):
+
   - the given `layout`,
   - value of `:app/layout` (in a route data or a request map).
 
-  In case of a regular response page (when the namespace of a `status` keyword is
-  \"ok\" or \"info\") the following sources are checked to find a view path:
+  In the same case a view is established:
+
   - the given `view`,
   - value of `:app/view` (in a route data or a request map).
 
-  In case of an error response page (when the namespace of a `status` keyword is not
-  \"ok\" nor \"info\") the following sources are checked to find a layout path:
-  - the given `layout`,
-  - value of `status` looked up in a map under `:status/layouts` (in a route data or a request map),
-  - value of `:app/error-layout` (in a route data or a request map),
-  - \"error\".
+  In case of an error response page, when the given HTTP status (`http-status`) does
+  not equal to `:ok/found` nor `:ok` nor `:info/early-hints` nor `nil`, or when the
+  `:response/set-status!` entry of the `req` has a truthy value a layout is
+  established in a following way (nil causes next lookup to be tried):
 
-  In case of an error response page (when the namespace of a status keyword is not
-  \"ok\" nor \"info\") the following sources are checked to find a view path:
+  - the given `layout`,
+  - `:error/layout` is looked up within of `req`,
+  - `:app/status` of `req` is looked up within `:status/layouts` of `req`,
+  - `status` is looked up within `:status/layouts` of `req`,
+  - `:app/status` of `req` is looked up within `:status/layouts` of `route-data`,
+  - `status` is looked up within `:status/layouts` of `route-data`,
+  - `:error/layout` is looked up within of `route-data`,
+  - plain string \"error\".
+
+  In the same case a view is established:
+
   - the given `view`,
-  - value of `status` looked up in a map under `:status/views` (in a  route data or a request map),
-  - value of `:app/error-view` (in a route data or a request map),
-  - \"error\"."
+  - `:error/view` is looked up within of `req`,
+  - `:app/status` of `req` is looked up within `:status/views` of `req`,
+  - `status` is looked up within `:status/views` of `req`,
+  - `:app/status` of `req` is looked up within `:status/views` of `route-data`,
+  - `status` is looked up within `:status/views` of `route-data`,
+  - `:error/view` is looked up within of `route-data`,
+  - plain string \"error\"."
   ([]
    (render-response-force resp/ok :ok/found nil nil nil nil nil))
   ([resp-fn]
@@ -1265,12 +1288,12 @@
                        :title (delay (translate-sub :parameters/error))
                        :form/errors nil
                        :coercion/errors nil)
-       (handle-bad-request-form-params req
-                                       (delay (param-errors-stringify errors))
-                                       (delay (param-current-vals req))
-                                       nil
-                                       (delay (translate-sub :parameters/error))
-                                       session-key)))))
+       (render-bad-params
+        (handle-bad-request-form-params (delay (param-errors-stringify errors))
+                                        (delay (param-current-vals req))
+                                        nil
+                                        (delay (translate-sub :parameters/error))
+                                        session-key))))))
 
 ;; Linking helpers
 
