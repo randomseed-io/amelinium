@@ -49,7 +49,9 @@
   "Filters roles map by the given context, merging-in global roles when needed. Returns
   a set of roles matching the context or `nil`."
   ([req]
-   (filter-in-context (get req :roles/context) (get req :roles) (get req :roles/config)))
+   (filter-in-context (force (get req :roles/context))
+                      (force (get req :roles))
+                      (get req :roles/config)))
   ([context roles config]
    (when (valuable? roles)
      (let [context        (some-keyword context)
@@ -101,7 +103,7 @@
   rules but none matched."
   ([req]
    (user-authorized? req
-                     (get req :roles/in-context)
+                     (force (get req :roles/in-context))
                      (get req :roles/config req)))
   ([req in-context]
    (user-authorized? req in-context
@@ -395,16 +397,16 @@
 
 (defn has-any-role?
   [req role]
-  (contains?
-   (set (vals (get req :roles)))
-   (some-keyword role)))
+  (let [r (some-keyword role)
+        m (force (get req :roles))]
+    (boolean (some #(contains? % r) (vals m)))))
 
 (defn has-role?
   ([req role]
-   (contains? (get req :roles/in-context)
+   (contains? (force (get req :roles/in-context))
               (some-keyword role)))
   ([req role context]
-   (contains? (filter-in-context context (get req :roles) (get req :roles/config))
+   (contains? (filter-in-context context (force (get req :roles)) (get req :roles/config))
               (some-keyword role))))
 
 (defn role-required!
@@ -413,12 +415,16 @@
   ([req role redirect-fn status]
    (if (has-role? req role)
      req
-     (redirect-fn req status :unauthorized))))
+     (redirect-fn req status))))
 
 (defmacro with-role-only!
-  [_req _role & body]
-  `(do (role-required! req role)
-       ~@body))
+  [req role redirect-fn & body]
+  `(let [req#         ~req
+         role#        ~role
+         redirect-fn# ~redirect-fn]
+     (if (has-role? req# role#)
+       (do ~@body)
+       (redirect-fn# req# :unauthorized))))
 
 (defn roles-for-context
   ([req user-id context]
@@ -428,7 +434,7 @@
   ([req context]
    (sort (get (get req :roles) (some-keyword context))))
   ([req]
-   (sort (get req :roles/in-context))))
+   (sort (force (get req :roles/in-context)))))
 
 (defn roles-for-contexts
   ([req user-id]
@@ -442,7 +448,7 @@
    (sort-by first
             (map (comp (partial apply cons)
                        (juxt-seq first (comp sort second)))
-                 (get req :roles)))))
+                 (force (get req :roles))))))
 
 (defn matrix
   ([req]
@@ -461,7 +467,7 @@
          dynamic-roles  (set (filter identity (cons self-role (map config dynamic-roles))))
          translate-role (if translation-fn #(or (translation-fn %) (get known % %))  #(get known % %))
          sorter         (comp str/lower-case translate-role)
-         all-roles-m    (if user-id (get-roles-for-user-id config user-id) (get req :roles))
+         all-roles-m    (if user-id (get-roles-for-user-id config user-id) (force (get req :roles)))
          roles-m        (dissoc all-roles-m gctx)
          groles         (get all-roles-m gctx #{})
          dyn-roles      (set/select groles dynamic-roles)
