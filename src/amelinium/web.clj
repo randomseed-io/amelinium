@@ -1101,7 +1101,7 @@
                          (errors/most-significant (get route-data :errors/config) app-status))
          reduced?      (and app-st-single (not (identical? app-status app-st-single)))
          app-status    (if reduced? app-st-single app-status)
-         req           (if reduced? (qassoc req :app/status app-status) req)]
+         req           (if reduced? (map/qassoc req :app/status app-status) req)]
      (log/web-dbg req "Handling status:" app-status)
      (let [header-name    (cond (nil? header-name)   "Error"
                                 (false? header-name) nil
@@ -1187,7 +1187,7 @@
 (defn- param-errors-stringify
   [errors]
   (if errors
-    (reduce-kv #(qassoc %1 (some-str %2) (some-str %3)) errors errors)))
+    (reduce-kv #(map/qassoc %1 (some-str %2) (some-str %3)) errors errors)))
 
 (defn- param-errors-stringify-vals
   [errors]

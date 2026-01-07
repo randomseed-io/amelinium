@@ -19,7 +19,10 @@
             [amelinium.logging                    :as             log]
             [amelinium.web.app-data               :as        app-data]
             [io.randomseed.utils.map              :as map  :refer [qassoc]]
-            [io.randomseed.utils                  :as           utils])
+            [io.randomseed.utils                  :refer   [strb
+                                                            some-str
+                                                            parse-url
+                                                            valuable?]])
 
   (:import (amelinium    Response)
            (clojure.lang IFn)))
@@ -31,7 +34,7 @@
   a \"false\" or an empty string."
   ^Boolean [req]
   (if-some [hdr (get (get req :headers) "hx-request")]
-    (if-some [hdr (utils/some-str hdr)]
+    (if-some [hdr (some-str hdr)]
       (not= "false" hdr)
       false)
     false))
@@ -77,14 +80,14 @@
   exist, it returns `nil`. If the header exists but contains an empty string, it
   returns `nil`."
   [req]
-  (utils/some-str (get (get req :headers) "hx-target")))
+  (some-str (get (get req :headers) "hx-target")))
 
 (defn get-target
   "Gets a target element ID set for the current route using `:app/target` route
   data. If it cannot be extracted, returns `nil`."
   [req]
   (when-let [target (http/req-or-route-param req :app/target)]
-    (utils/some-str target)))
+    (some-str target)))
 
 (defn set-target-header
   "Sets the `HX-Retarget` header to a string value of the given `target` in response
@@ -101,7 +104,7 @@
   ([req target]
    (set-target-header req target false))
   ([req target replace?]
-   (if-some [target (utils/some-str target)]
+   (if-some [target (some-str target)]
      (if-some [headers (resp/headers req)]
        (if (or replace? (not (contains? headers "HX-Retarget")))
          (qassoc req :headers (qassoc headers "HX-Retarget" target))
@@ -114,8 +117,8 @@
 (defmacro kv-json-str
   [k v]
   `(if-let [k# ~k]
-     (if-some [k# (utils/some-str k#)]
-       (utils/strb "{\"" k# "\":\"" ~v "\"}")) "\"\""))
+     (if-some [k# (some-str k#)]
+       (strb "{\"" k# "\":\"" ~v "\"}")) "\"\""))
 
 (defn- inject-json-event-header
   ([headers cur ename hname k v]
@@ -128,8 +131,8 @@
        (if (or replace? (not (contains? js ename)))
          (map/qassoc headers hname (j/write-value-as-string (map/qassoc js ename (if k {k v} ""))))
          headers)
-       (map/qassoc headers hname (utils/strb "{" cur ":\"\", \"" ename "\":" (kv-json-str k v) "}")))
-     (map/qassoc headers hname (utils/strb "{\"" ename "\":" (kv-json-str k v) "}")))))
+       (map/qassoc headers hname (strb "{" cur ":\"\", \"" ename "\":" (kv-json-str k v) "}")))
+     (map/qassoc headers hname (strb "{\"" ename "\":" (kv-json-str k v) "}")))))
 
 (defn add-json-event-header
   ([req header-name event-name]
@@ -137,8 +140,8 @@
   ([req header-name event-name param-key param-value]
    (add-json-event-header req header-name event-name param-key param-value false))
   ([req header-name event-name param-key param-value replace?]
-   (let [header-name (utils/some-str header-name)
-         event-name  (utils/some-str event-name)
+   (let [header-name (some-str header-name)
+         event-name  (some-str event-name)
          headers     (get req :response/headers)]
      (map/qassoc
       req :response/headers
@@ -146,8 +149,8 @@
         (if-some [current (get headers header-name)]
           (inject-json-event-header headers current event-name header-name
                                     param-key param-value replace?)
-          (map/qassoc headers header-name (utils/strb "{\"" event-name "\":" (kv-json-str param-key param-value) "}")))
-        {header-name (utils/strb "{\"" event-name "\":" (kv-json-str param-key param-value) "}")})))))
+          (map/qassoc headers header-name (strb "{\"" event-name "\":" (kv-json-str param-key param-value) "}")))
+        {header-name (strb "{\"" event-name "\":" (kv-json-str param-key param-value) "}")})))))
 
 (defn add-session-hx-header
   "Adds `HX-Trigger` server response header to `:response/headers` map of the given
@@ -218,7 +221,7 @@
    (let [req (qassoc req :app/layout false)]
      (log/web-dbg req "Setting :app/layout to false")
      (if target
-       (if-some [t (utils/some-str target)]
+       (if-some [t (some-str target)]
          (do (log/web-dbg req "Setting HX-Retarget header to" target)
              (common/add-header req :HX-Retarget t))
          req)
@@ -227,7 +230,7 @@
    (let [req (qassoc req :app/layout false :app/view view)]
      (log/web-dbg req "Setting :app/layout to false and :app/view to" view)
      (if target
-       (if-some [t (utils/some-str target)]
+       (if-some [t (some-str target)]
          (do (log/web-dbg req "Setting HX-Retarget header to" target)
              (common/add-header req :HX-Retarget t))
          req)
@@ -408,7 +411,7 @@
          target     (or (get-in route-data [:status/targets app-status])
                         (get route-data :error/target))]
      (log/web-dbg req "Injecting HTML fragment with app status" app-status
-                  (when target (str "(target: " (utils/some-str target) ")")))
+                  (when target (str "(target: " (some-str target) ")")))
      (if default-view
        (inject req target default-view)
        (inject req target)))))
@@ -448,14 +451,14 @@
   ([req route-data errors values explanations title _]
    (handle-bad-request-form-params req route-data errors values explanations title))
   ([req route-data errors values explanations title]
-   (if-not (utils/valuable? errors)
+   (if-not (valuable? errors)
      req ;; generic error page?
      (let [route-data         (or route-data (http/get-route-data req))
            orig-page          (get route-data :form-errors/page)
            orig-page          (or orig-page (:page (get req :goto)))
            title              (or title (get route-data :form-errors/title))
-           referer            (when (nil? orig-page) (utils/some-str (get (get req :headers) "referer")))
-           orig-uri           (when referer (utils/some-str (:uri (utils/parse-url referer))))
+           referer            (when (nil? orig-page) (some-str (get (get req :headers) "referer")))
+           orig-uri           (when referer (some-str (:uri (parse-url referer))))
            src-page           (or orig-page (http/route-name req orig-uri))
            src-route-data     (when src-page (http/route-data req src-page))
            new-view           (get route-data :form-errors/view)
@@ -467,7 +470,7 @@
            hx-targets         (get route-data :form-errors/retargets)
            hx-src-target      (when hx-targets (get-target-header req))
            hx-target          (when hx-src-target (get hx-targets hx-src-target))
-           hx-target          (utils/some-str (or hx-target (get route-data :form-errors/target)))
+           hx-target          (some-str (or hx-target (get route-data :form-errors/target)))
            req                (if hx-target (common/add-header req :HX-Retarget hx-target) req)
            req                (if title (assoc-app-data req :title title) req)
            req                (if (nil? new-view)   req (qassoc req :app/view   new-view))
