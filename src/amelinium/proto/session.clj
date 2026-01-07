@@ -10,7 +10,6 @@
 
   (:require [amelinium] [amelinium.types.session])
   (:import  (amelinium            Session
-                                  SessionError
                                   SessionConfig)
             (clojure.core.memoize PluggableMemoization)
             (java.time            Instant)))
@@ -23,13 +22,13 @@
   implementations should be stored in all created `Session` records, in their
   `:control` fields."
 
-  (^{:tag Boolean}
+  (^{:tag Session}
    empty
    [c] [c s-k]
    "Returns an empty session with the `:control` field populated.")
 
   (^{:tag Boolean}
-   control?
+   control-source?
    [c] [c s-k]
    "Returns `true` if the given object is an instance of a class implementing
   `SessionControl` protocol (directly or indirectly).")
