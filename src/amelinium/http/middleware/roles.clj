@@ -8,27 +8,28 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [clojure.set                       :as        set]
-            [clojure.string                    :as        str]
-            [tick.core                         :as          t]
-            [buddy.core.hash                   :as       hash]
-            [buddy.core.codecs                 :as     codecs]
-            [taoensso.nippy                    :as      nippy]
-            [next.jdbc.sql                     :as        sql]
-            [next.jdbc                         :as       jdbc]
-            [reitit.ring                       :as       ring]
-            [amelinium.http.response           :as       resp]
-            [amelinium.db                      :as         db]
-            [amelinium.logging                 :as        log]
-            [amelinium.system                  :as     system]
-            [amelinium.http.middleware.session :as    session]
-            [amelinium.types.session           :refer    :all]
-            [amelinium                         :refer    :all]
-            [io.randomseed.utils               :refer    :all]
-            [io.randomseed.utils.time          :as       time]
-            [io.randomseed.utils.var           :as        var]
-            [io.randomseed.utils.map           :as        map]
-            [io.randomseed.utils.ip            :as         ip])
+  (:require [amelinium]
+            [amelinium.types.session]
+            [clojure.string                    :as                 str]
+            [clojure.set                       :as                 set]
+            [next.jdbc.sql                     :as                 sql]
+            [reitit.ring                       :as                ring]
+            [amelinium.http.response           :as                resp]
+            [amelinium.db                      :as                  db]
+            [amelinium.logging                 :as                 log]
+            [amelinium.system                  :as              system]
+            [amelinium.http.middleware.session :as             session]
+            [io.randomseed.utils               :refer [juxt-seq
+                                                       some-str
+                                                       some-keyword
+                                                       some-keyword-simple
+                                                       safe-parse-long
+                                                       valuable
+                                                       valuable?
+                                                       contains-some?]]
+            [io.randomseed.utils.time          :as                time]
+            [io.randomseed.utils.var           :as                 var]
+            [io.randomseed.utils.map           :as                 map])
 
   (:import (amelinium Session)))
 
@@ -50,11 +51,11 @@
   ([req]
    (filter-in-context (get req :roles/context) (get req :roles) (get req :roles/config)))
   ([context roles config]
-   (if (valuable? roles)
+   (when (valuable? roles)
      (let [context        (some-keyword context)
            global-context (get config :global-context)
-           context-roles  (if context (get roles context))
-           global-roles   (if global-context (get roles global-context))]
+           context-roles  (when context (get roles context))
+           global-roles   (when global-context (get roles global-context))]
        (set/union context-roles global-roles)))))
 
 (defn user-authenticated?
@@ -110,7 +111,7 @@
                      (get config :authorize-default? true)))
   ([req in-context data auth-default?]
    (if-some [data (or data (not-empty (get (ring/get-match req) :data)))]
-     (if-not (some-> (get data :roles/forbidden) (contains-some? in-context))
+     (when-not (some-> (get data :roles/forbidden) (contains-some? in-context))
        (if-some [roles-any (not-empty (get data :roles/any))]
          (or  (contains-some? roles-any in-context)
               (some-> (get data :roles/all) (set/subset? in-context)) false)
@@ -118,7 +119,7 @@
            (set/subset? roles-all in-context)
            auth-default?)))
      auth-default?))
-  ([req in-context auth-default? roles-forbidden roles-any roles-all]
+  ([_req in-context auth-default? roles-forbidden roles-any roles-all]
    (if-not (some-> roles-forbidden (contains-some? in-context))
      (if roles-any
        (or (contains-some? roles-any in-context)
@@ -145,10 +146,10 @@
 (defn query-roles
   "Gets roles for the given user ID from a database. Returns a map of roles as a
   sequence of maps."
-  ([user-id config db]
+  ([user-id _config db]
    (query-roles db user-id))
   ([db user-id]
-   (if (and db user-id)
+   (when (and db user-id)
      (sql/find-by-keys db :roles {:user-id user-id} db/opts-simple-map))))
 
 (defn parse-roles
@@ -160,11 +161,11 @@
                 (get config :global-context)
                 (get config :context-column)
                 (get config :keep-unknown?)))
-  ([roles user-id config known-roles global-context context-column keep-unknown?]
+  ([roles _user-id _config known-roles _global-context context-column keep-unknown?]
    (let [remove-unknown (if (or keep-unknown? (empty? known-roles))
                           identity
                           (partial filter (comp (partial contains? known-roles) :role)))]
-     (if (seq roles)
+     (when (seq roles)
        (->> roles
             (filter identity)
             (map #(update % :role keyword))
@@ -229,10 +230,10 @@
    (get-roles-for-user-id config user-id handler-fn
                           (get config :global-context)
                           (get config :anonymous-role)))
-  ([config user-id handler-fn global-context anonymous-role]
+  ([_config user-id handler-fn global-context anonymous-role]
    (if (valuable? user-id)
      (handler-fn user-id)
-     (if anonymous-role {global-context #{anonymous-role}}))))
+     (when anonymous-role {global-context #{anonymous-role}}))))
 
 (defn get-roles-from-session
   "Uses the given session map `session` to obtain current user's ID and then calls
@@ -260,7 +261,7 @@
          roles   (get-roles-for-user-id config user-id handler-fn global-context anonymous-role)]
      (if (or (not user-id) (session/valid? session))
        roles
-       (if known-user-role {global-context #{known-user-role}})))))
+       (when known-user-role {global-context #{known-user-role}})))))
 
 (defn get-req-context
   "Gets context from a request using a key path."
@@ -268,7 +269,7 @@
    (get-req-context req (get req :roles/config)))
   ([req config]
    (get-req-context req config (get config :req-context-path)))
-  ([req config req-context-path]
+  ([req _config req-context-path]
    (some-keyword (get-in req req-context-path))))
 
 (defn get-req-self
@@ -286,11 +287,11 @@
                  (get config :self-role)
                  (get config :req-self-path)
                  (get config :req-self-check-path)))
-  ([req config self-role self-path self-check-path]
-   (if self-path
-     (if-some [req-self-value (get-in req self-path)]
+  ([req _config self-role self-path self-check-path]
+   (when self-path
+     (when-some [req-self-value (get-in req self-path)]
        (if self-check-path
-         (if (= req-self-value (get-in req self-check-path)) self-role)
+         (when (= req-self-value (get-in req self-check-path)) self-role)
          self-role)))))
 
 (defn force-context
@@ -327,7 +328,7 @@
   injection using enclosed configuration and a default, memoized processor."
   ([req]
    (inject-roles req (get req :roles/config)))
-  ([req {:keys [config processor
+  ([req {:keys [processor
                 req-context-fn req-self-role-fn
                 anonymous-role known-user-role self-role
                 global-context authorize-default? session-key]
@@ -343,9 +344,9 @@
    (let [data        (not-empty (get (ring/get-match req) :data))
          [roles-forbidden
           roles-any
-          roles-all] (if data [(not-empty (get data :roles/forbidden))
-                               (not-empty (get data :roles/any))
-                               (not-empty (get data :roles/all))])]
+          roles-all] (when data [(not-empty (get data :roles/forbidden))
+                                 (not-empty (get data :roles/any))
+                                 (not-empty (get data :roles/all))])]
      (inject-roles req config processor rcfn srfn
                    anonymous-role known-user-role self-role
                    global-context authorize-default? session-key
@@ -357,7 +358,7 @@
    (let [^Session session (session/of req session-key)
          known?           (delay (user-known? session))
          authenticated?   (delay (user-authenticated? session))
-         roles            (delay (let [sr (if (and self-role @authenticated?) (srfn req))]
+         roles            (delay (let [sr (when (and self-role @authenticated?) (srfn req))]
                                    (cond-> (get-roles-from-session config session
                                                                    processor
                                                                    global-context
@@ -389,6 +390,98 @@
       (hdl req)
       req)
     req))
+
+;; Helpers
+
+(defn has-any-role?
+  [req role]
+  (contains?
+   (set (vals (get req :roles)))
+   (some-keyword role)))
+
+(defn has-role?
+  ([req role]
+   (contains? (get req :roles/in-context)
+              (some-keyword role)))
+  ([req role context]
+   (contains? (filter-in-context context (get req :roles) (get req :roles/config))
+              (some-keyword role))))
+
+(defn role-required!
+  ([req role redirect-fn]
+   (role-required! req role redirect-fn :unauthorized))
+  ([req role redirect-fn status]
+   (if (has-role? req role)
+     req
+     (redirect-fn req status :unauthorized))))
+
+(defmacro with-role-only!
+  [_req _role & body]
+  `(do (role-required! req role)
+       ~@body))
+
+(defn roles-for-context
+  ([req user-id context]
+   (let [config (get req :roles/config)
+         roles  (get-roles-for-user-id config user-id)]
+     (sort (get roles (some-keyword context)))))
+  ([req context]
+   (sort (get (get req :roles) (some-keyword context))))
+  ([req]
+   (sort (get req :roles/in-context))))
+
+(defn roles-for-contexts
+  ([req user-id]
+   (let [config (get req :roles/config)
+         roles  (get-roles-for-user-id config user-id)]
+     (sort-by first
+              (map (comp (partial apply cons)
+                         (juxt-seq first (comp sort second)))
+                   roles))))
+  ([req]
+   (sort-by first
+            (map (comp (partial apply cons)
+                       (juxt-seq first (comp sort second)))
+                 (get req :roles)))))
+
+(defn roles-matrix
+  ([req]
+   (roles-matrix req nil))
+  ([req opts]
+   (let [user-id        (or (get opts :user-id) (get opts :user/id))
+         effective?     (get opts :effective?      false)
+         inc-g?         (get opts :include-global? false)
+         inc-s?         (get opts :include-self?   false)
+         config         (get req :roles/config)
+         gctx           (get config :global-context :!)
+         known          (get config :roles)
+         translation-fn (or (get opts :translation-fn) (get config :translation-fn))
+         self-role      (get config :self-role)
+         dynamic-roles  [:anonymous-role :logged-in-role :known-user-role]
+         dynamic-roles  (set (filter identity (cons self-role (map config dynamic-roles))))
+         translate-role (if translation-fn #(or (translation-fn %) (get known % %))  #(get known % %))
+         sorter         (comp str/lower-case translate-role)
+         all-roles-m    (if user-id (get-roles-for-user-id config user-id) (get req :roles))
+         roles-m        (dissoc all-roles-m gctx)
+         groles         (get all-roles-m gctx #{})
+         dyn-roles      (set/select groles dynamic-roles)
+         reg-roles      (vals (map/qupdate all-roles-m gctx #(apply disj % dyn-roles)))
+         reg-roles      (dedupe (sort-by sorter (apply concat reg-roles)))
+         dyn-roles      (if (or inc-s? (not self-role)) dyn-roles (disj dyn-roles self-role))
+         all-roles      (concat reg-roles (sort-by sorter dyn-roles))
+         all-contexts   (keys roles-m)
+         all-contexts   (if (and inc-g? gctx) (cons gctx all-contexts) all-contexts)
+         header         (map translate-role all-roles)]
+     (seq
+      (cons header
+            (for [context-id all-contexts]
+              (let [croles (get all-roles-m context-id #{})]
+                (cons context-id
+                      (map
+                       (if effective?
+                         #(or (contains? croles %) (and (contains? groles %) :!))
+                         (partial contains? croles))
+                       all-roles)))))))))
 
 ;; Initialization
 
@@ -431,19 +524,19 @@
 
 (defn- setup-req-path
   [v]
-  (if v
+  (when v
     (if (coll? v)
       (mapv some-keyword v)
       [(some-keyword v)])))
 
 (defn- setup-req-fn
   [v]
-  (if v
+  (when v
     (if (fn? v) v (var/deref-symbol v))))
 
 (defn- setup-session-key
   [config]
-  (if-some [sk (get config :session-key)]
+  (if (some? (get config :session-key))
     config
     (assoc config :session-key
            (or (get (get (or (get config :session/config) (get config :session)) :config) :session-key)
@@ -508,7 +601,7 @@
            self-role logged-in-role anonymous-role known-user-role roles
            authorize-default? keep-unknown?]
     :as   config}]
-  (if-some [processor (var/deref-symbol (:handler config))]
+  (when-some [processor (var/deref-symbol (:handler config))]
     (let [handler-name     (:handler config)
           dbname           (db/db-name db)
           config           (-> config (dissoc :handler) (update :db db/ds) prep-config setup-session-key)
@@ -535,8 +628,8 @@
       (log/msg "Installing role-based access control handler:" handler-name)
       (log/msg "Using database" dbname "for permissions")
       {:name    ::roles
-       :compile (fn [{:keys [no-roles?] :as data} opts]
-                  (if (and (not no-roles?) db)
+       :compile (fn [{:keys [no-roles?] :as data} _opts]
+                  (when (and (not no-roles?) db)
                     (let [roles-forbidden (not-empty (get data :roles/forbidden))
                           roles-any       (not-empty (get data :roles/any))
                           roles-all       (not-empty (get data :roles/all))]
@@ -551,7 +644,7 @@
 
 (system/add-expand ::default [k config] (expand-config k config))
 (system/add-init   ::default [_ config] (wrap-roles config))
-(system/add-halt!  ::default [_ config] nil)
+(system/add-halt!  ::default [_      _] nil)
 
 (derive ::web ::default)
 (derive ::api ::default)
