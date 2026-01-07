@@ -1,21 +1,21 @@
 (ns
 
- ^{:doc    "Basic identity management for amelinium."
-   :author "Paweł Wilk"
-   :added  "1.0.0"}
+    ^{:doc    "Basic identity management for amelinium."
+      :author "Paweł Wilk"
+      :added  "1.0.0"}
 
- amelinium.identity
+    amelinium.identity
 
   (:refer-clojure :exclude [parse-long random-uuid type])
 
-  (:require  [clojure.string               :as                  str]
-             [clj-uuid                     :as                 uuid]
-             [amelinium.proto.identity     :as                    p]
+  (:require  [clojure.string               :as                     str]
+             [clj-uuid                     :as                    uuid]
+             [amelinium.proto.identity     :as                       p]
              [amelinium.types.identity]
-             [phone-number.core            :as                phone]
-             [phone-number.util            :as               phutil]
-             [io.randomseed.utils.db       :as                  rdb]
-             [io.randomseed.utils.map      :as                  map]
+             [phone-number.core            :as                   phone]
+             [phone-number.util            :as                  phutil]
+             [io.randomseed.utils.db       :as                     rdb]
+             [io.randomseed.utils.map      :as                     map]
              [io.randomseed.utils          :refer  [safe-parse-long
                                                     some-str
                                                     some-keyword

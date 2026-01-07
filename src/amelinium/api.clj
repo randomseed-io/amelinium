@@ -1,28 +1,28 @@
 (ns
 
- ^{:doc    "API helpers for amelinium."
-   :author "Paweł Wilk"
-   :added  "1.0.0"}
+    ^{:doc    "API helpers for amelinium."
+      :author "Paweł Wilk"
+      :added  "1.0.0"}
 
- amelinium.api
+    amelinium.api
 
   (:refer-clojure :exclude [random-uuid])
 
   (:require [amelinium.types.response]
             [ring.util.response]
-            [amelinium.http.response              :as            resp]
-            [amelinium.common                     :as          common]
-            [amelinium.errors                     :as          errors]
-            [amelinium.i18n                       :as            i18n]
-            [amelinium.http.middleware.validators :as      validators]
-            [potemkin                             :as               p]
-            [amelinium.http.middleware.session    :as         session]
+            [amelinium.http.response              :as                     resp]
+            [amelinium.common                     :as                   common]
+            [amelinium.errors                     :as                   errors]
+            [amelinium.i18n                       :as                     i18n]
+            [amelinium.http.middleware.validators :as               validators]
+            [potemkin                             :as                        p]
+            [amelinium.http.middleware.session    :as                  session]
             [amelinium.utils                      :refer [random-uuid-or-empty
                                                           is-url?]]
             [io.randomseed.utils.map              :refer    [qassoc
                                                              qupdate]]
-            [io.randomseed.utils                  :refer  [random-uuid
-                                                           some-keyword]])
+            [io.randomseed.utils                  :refer [random-uuid
+                                                          some-keyword]])
 
   (:import (amelinium    Response)
            (clojure.lang IFn)))

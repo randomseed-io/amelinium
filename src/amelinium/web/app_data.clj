@@ -9,15 +9,15 @@
   (:refer-clojure :exclude [parse-long uuid random-uuid]
                   :rename  {get get-core update update-core assoc assoc-core})
 
-  (:require [amelinium.i18n                       :as                     i18n]
+  (:require [amelinium.i18n                       :as                       i18n]
+            [amelinium.common                     :as                     common]
+            [io.randomseed.utils.map              :as map :refer        [qassoc]]
+            [io.randomseed.utils                  :refer          [some-keyword]]
+            [lazy-map.core                        :as                   lazy-map]
             [amelinium.utils                      :refer         [try-name
                                                                   try-namespace
                                                                   empty-lazy-map
-                                                                  map-to-lazy]]
-            [amelinium.common                     :as                   common]
-            [io.randomseed.utils.map              :as map :refer      [qassoc]]
-            [io.randomseed.utils                  :refer        [some-keyword]]
-            [lazy-map.core                        :as                 lazy-map])
+                                                                  map-to-lazy]])
 
   (:import (lazy_map.core LazyMapEntry)))
 
@@ -165,7 +165,7 @@
              (some-keyword k)
              (cons `some-keyword (cons k nil)))]
      `(let [req# ~req
-            apd# (app-data req#)]
+            apd# (get req#)]
         (if (false? apd#) req# (qassoc req# :app/data (qassoc apd# ~k ~v))))))
   ([req k v & more]
    (let [pairs  (cons k (cons v more))
@@ -183,10 +183,10 @@
          dups?  (not= (count names) (count (distinct names)))]
      (if dups?
        `(let [req# ~req
-              apd# (app-data req#)]
+              apd# (get req#)]
           (if (false? apd#) req# (qassoc req# :app/data (qassoc apd# ~@pairs))))
        `(let [req# ~req
-              apd# (app-data req#)]
+              apd# (get req#)]
           (if (false? apd#)
             req#
             (qassoc req# :app/data

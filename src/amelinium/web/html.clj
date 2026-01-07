@@ -8,26 +8,25 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [clojure.string                       :as                 str]
+  (:require [clojure.string                       :as                      str]
             [ring.util.response]
-            [amelinium.http.response              :as                resp]
-            [amelinium.types.response             :refer             :all]
-            [amelinium.utils                      :refer             :all]
-            [amelinium.common                     :as              common]
-            [amelinium.http                       :as                http]
-            [amelinium.http.middleware.roles      :as               roles]
-            [amelinium.http.middleware.session    :as             session]
-            [amelinium.http.middleware.coercion   :as            coercion]
-            [amelinium.web.app-data               :as            app-data]
-            [amelinium                            :refer             :all]
-            [io.randomseed.utils.map              :as map :refer [qassoc]]
-            [io.randomseed.utils                  :refer      [strb
-                                                               some-str
-                                                               juxt-seq
-                                                               some-keyword-simple
-                                                               valuable?]]
-            [hiccup.core                          :refer         :all]
-            [hiccup.table                         :as           table])
+            [amelinium.types.response]
+            [amelinium.http.response              :as                     resp]
+            [amelinium]
+            [amelinium.common                     :as                   common]
+            [amelinium.http                       :as                     http]
+            [amelinium.http.middleware.roles      :as                    roles]
+            [amelinium.http.middleware.session    :as                  session]
+            [amelinium.http.middleware.coercion   :as                 coercion]
+            [amelinium.web.app-data               :as                 app-data]
+            [io.randomseed.utils.map              :refer              [qassoc]]
+            [io.randomseed.utils                  :refer [strb
+                                                          some-str
+                                                          juxt-seq
+                                                          some-keyword-simple
+                                                          valuable?]]
+            [hiccup2.core                         :refer                [html]]
+            [hiccup.table                         :as                    table])
 
   (:import (amelinium     Response)))
 

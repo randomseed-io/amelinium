@@ -8,28 +8,29 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [clojure.java.io                      :as              io]
-            [potemkin                             :as               p]
+  (:require [clojure.java.io                      :as                 io]
+            [potemkin                             :as                  p]
             [ring.util.response]
             [amelinium]
             [amelinium.types.response]
-            [amelinium.http.response              :as            resp]
-            [ring.util.request                    :as             req]
-            [selmer.parser                        :as          selmer]
-            [amelinium.db                         :as              db]
-            [amelinium.i18n                       :as            i18n]
-            [amelinium.common                     :as          common]
-            [amelinium.errors                     :as          errors]
-            [amelinium.http                       :as            http]
-            [amelinium.logging                    :as             log]
-            [amelinium.web.html                   :as            html]
-            [amelinium.web.htmx                   :as            htmx]
-            [amelinium.web.app-data               :as        app-data]
-            [io.randomseed.utils.map              :as             map]
-            [io.randomseed.utils                  :refer    [or-some
-                                                             some-str
-                                                             some-keyword
-                                                             valuable?]])
+            [amelinium.http.response              :as               resp]
+            [ring.util.request                    :as                req]
+            [selmer.parser                        :as             selmer]
+            [amelinium.db                         :as                 db]
+            [amelinium.i18n                       :as               i18n]
+            [amelinium.common                     :as             common]
+            [amelinium.errors                     :as             errors]
+            [amelinium.http                       :as               http]
+            [amelinium.logging                    :as                log]
+            [amelinium.web.html                   :as               html]
+            [amelinium.web.htmx                   :as               htmx]
+            [amelinium.web.app-data               :as           app-data]
+            [io.randomseed.utils.map              :as                map]
+            [amelinium.utils                      :refer [some-resource]]
+            [io.randomseed.utils                  :refer [or-some
+                                                          some-str
+                                                          some-keyword
+                                                          valuable?]])
 
   (:import (amelinium     Response)
            (clojure.lang  IFn)
@@ -277,7 +278,7 @@
   "Returns `true` when the given `status` is neither `:ok/found` nor nil nor `:ok` nor
   `:info/early-hints`. False otherwise."
   [status]
-  (not (status-ok? status))
+  (not (status-ok? status)))
 
 (defn- status-lv
   "Sets a different layout and/or view when the given HTTP status (`status`) does not
