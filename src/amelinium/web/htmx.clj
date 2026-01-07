@@ -107,9 +107,9 @@
    (if-some [target (some-str target)]
      (if-some [headers (resp/headers req)]
        (if (or replace? (not (contains? headers "HX-Retarget")))
-         (qassoc req :headers (qassoc headers "HX-Retarget" target))
+         (qassoc req :response/headers (qassoc headers "HX-Retarget" target))
          req)
-       (qassoc req :headers {"HX-Retarget" target}))
+       (qassoc req :response/headers {"HX-Retarget" target}))
      req)))
 
 ;; Session
