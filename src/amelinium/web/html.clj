@@ -15,12 +15,14 @@
             [amelinium.utils                      :refer             :all]
             [amelinium.common                     :as              common]
             [amelinium.http                       :as                http]
+            [amelinium.http.middleware.roles      :as               roles]
             [amelinium.http.middleware.session    :as             session]
             [amelinium.http.middleware.coercion   :as            coercion]
             [amelinium.web.app-data               :as            app-data]
             [amelinium                            :refer             :all]
             [io.randomseed.utils.map              :as map :refer [qassoc]]
-            [io.randomseed.utils                  :refer      [some-str
+            [io.randomseed.utils                  :refer      [strb
+                                                               some-str
                                                                juxt-seq
                                                                some-keyword-simple
                                                                valuable?]]
@@ -60,9 +62,9 @@
                                       :user-id         user-id
                                       :include-global? include-global?
                                       :include-self?   include-self?)
-         global-marker        (or global-marker (utils/strb " (" global-label ")"))
-         global-present-label (or global-present-label (utils/strb present-label global-marker))
-         [l & d]              (roles-matrix req opts)
+         global-marker        (or global-marker (strb " (" global-label ")"))
+         global-present-label (or global-present-label (strb present-label global-marker))
+         [l & d]              (roles/matrix req opts)
          gctx-line            (first d)
          have-gctx?           (and include-global? (= global-context (first gctx-line)))
          labels               (vec (interleave (range) (cons context-label (map str l))))

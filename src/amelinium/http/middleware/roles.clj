@@ -444,9 +444,9 @@
                        (juxt-seq first (comp sort second)))
                  (get req :roles)))))
 
-(defn roles-matrix
+(defn matrix
   ([req]
-   (roles-matrix req nil))
+   (matrix req nil))
   ([req opts]
    (let [user-id        (or (get opts :user-id) (get opts :user/id))
          effective?     (get opts :effective?      false)
