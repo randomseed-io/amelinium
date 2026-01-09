@@ -262,26 +262,27 @@
                            :user.public-identity   :parameter/public-identity
                            }
 
-   :in-mins       [:pluralize {:none       "zero sekund"
-                               :zero       "kilka sekund"
-                               :one        "minutę"
-                               :genitive   "{1} minut"
-                               :nominative "{1} minuty"}]
-   :mins-left     [:pluralize {:none       "Przekroczono czas oczekiwania"
-                               :zero       "Pozostała niecała minuta"
-                               :one        "Pozostała minuta"
-                               :genitive   "Pozostało {1} minut"
-                               :nominative "Pozostały {1} minuty"}]
-   :try-in-mins   [:pluralize {:none       "Spróbuj jeszcze raz."
-                               :zero       "Spróbuj za kilka sekund."
-                               :one        "Spróbuj za minutę."
-                               :genitive   "Spróbuj za {1} minut."
-                               :nominative "Spróbuj za {1} minuty."}]
-   :attempts-left [:pluralize {:none       "zero prób"
-                               :zero       "zero prób"
-                               :one        "jedna próba"
-                               :genitive   "{1} prób"
-                               :nominative "{1} próby"}]
+   :in-mins       [:pluralize {:none         "zero sekund"
+                               :zero         "kilka sekund"
+                               :one          "minutę"
+                               :p/genitive   "{1} minut"
+                               :p/nominative "{1} minuty"}]
+   :mins-left     [:pluralize {:none         "Przekroczono czas oczekiwania"
+                               :zero         "Pozostała niecała minuta"
+                               :one          "Pozostała minuta"
+                               :p/genitive   "Pozostało {1} minut"
+                               :p/nominative "Pozostały {1} minuty"}]
+   :try-in-mins   [:pluralize {:none         "Spróbuj jeszcze raz."
+                               :zero         "Spróbuj za kilka sekund."
+                               :one          "Spróbuj za minutę."
+                               :p/genitive   "Spróbuj za {1} minut."
+                               :p/nominative "Spróbuj za {1} minuty."}]
+   :attempts-left [:pluralize {:none         "zero prób"
+                               :zero         "zero prób"
+                               :one          "jedna próba"
+                               :genitive     "{1} prób"
+                               :p/genitive   "{1} prób"
+                               :p/nominative "{1} próby"}]
 
 
    :tongue/pluralizer amelinium.i18n.pluralizers/pl}}}

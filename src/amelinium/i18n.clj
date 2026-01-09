@@ -8,17 +8,12 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [clojure.string          :as                 str]
-            [tongue.core             :as              tongue]
-            [io.randomseed.utils     :refer             :all]
+  (:require [tongue.core             :as              tongue]
             [io.randomseed.utils.var :as                 var]
             [io.randomseed.utils.map :as                 map]
-            [amelinium.app           :as                 app]
             [amelinium.system        :as              system]
-            [amelinium.logging       :as                 log]
             [amelinium.http          :as                http]
-            [amelinium.db.sql        :refer [idname make-kw
-                                             idname-simple
+            [amelinium.db.sql        :refer [make-kw
                                              make-kw-simple]]))
 
 (defonce ^:redef translations nil)
@@ -49,7 +44,7 @@
   `amelinium.i18n/*handle-missing-keys*`)."
   [req-or-match]
   (let [f (or (http/get-route-data req-or-match :translations)
-              (if-not (http/match? req-or-match) (get req-or-match :translations))
+              (when-not (http/match? req-or-match) (get req-or-match :translations))
               translations)]
     (if *handle-missing-keys*
       f
@@ -196,7 +191,7 @@
   special key `:amelinium/missing-key` and passes `k` as an argument (so the template
   can include it).  When `*handle-missing-keys*` is false/nil, returns nil."
   [f locale k]
-  (if *handle-missing-keys* (f locale :amelinium/missing-key k)))
+  (when *handle-missing-keys* (f locale :amelinium/missing-key k)))
 
 (defn wrap-translate
   "Wraps a Tongue translate function `f` to add two behaviors:
@@ -217,19 +212,19 @@
     (^String [locale k]
      (if (keyword? k)
        (or (f locale k) (missing-key f locale k))
-       (if-some [k (keyword k)] (or (f locale k) (missing-key f locale k)))))
+       (when-some [k (keyword k)] (or (f locale k) (missing-key f locale k)))))
     (^String [locale k a]
      (if (keyword? k)
        (or (f locale k a) (missing-key f locale k))
-       (if-some [k (keyword k)] (or (f locale k a) (missing-key f locale k)))))
+       (when-some [k (keyword k)] (or (f locale k a) (missing-key f locale k)))))
     (^String [locale k a b]
      (if (keyword? k)
        (or (f locale k a b) (missing-key f locale k))
-       (if-some [k (keyword k)] (or (f locale k a b) (missing-key f locale k)))))
+       (when-some [k (keyword k)] (or (f locale k a b) (missing-key f locale k)))))
     (^String [locale k a b & more]
      (if (keyword? k)
        (or (apply f locale k a b more) (missing-key f locale k))
-       (if-some [k (keyword k)] (or (apply f locale k a b more) (missing-key f locale k)))))))
+       (when-some [k (keyword k)] (or (apply f locale k a b more) (missing-key f locale k)))))))
 
 (defn prep-pluralizer
   "Builds a pluralization function for `lang` based on `config` and `translations`.
@@ -238,24 +233,20 @@
   `io.randomseed.utils.var/deref-symbol`, and returns a function of one argument `n`
   that applies the pluralizer to `translations`.
 
-  Supports a special leading map in `translations` (passed to pluralizer as
-  `(pluralizer-fn :parse-args m)`), allowing pluralizers to pre-parse arguments.
+  Supports a special leading map or vector in `translations` (passed to pluralizer as
+  `(pluralizer-fn :amelinium.i18n/parse m)`), allowing pluralizers to pre-parse
+  arguments and produce translation functions.
 
-  For performance, returns fixed-arity closures for small argument counts and falls
-  back to `apply` for larger counts."
+  For performance, in rare cases, returns fixed-arity closures for small argument
+  counts and falls back to `apply` for larger counts."
   [config lang translations]
-  (if-some [pluralizer-fn (some-> config (get lang) (get :tongue/pluralizer) var/deref-symbol)]
-    (let [[a b c d e & more] translations]
-      (if (map? a)
-        (prep-pluralizer config lang (pluralizer-fn :parse-args a))
-        (case (count translations)
-          0 (fn pluralize [n] (pluralizer-fn n))
-          1 (fn pluralize [n] (pluralizer-fn n a))
-          2 (fn pluralize [n] (pluralizer-fn n a b))
-          3 (fn pluralize [n] (pluralizer-fn n a b c))
-          4 (fn pluralize [n] (pluralizer-fn n a b c d))
-          5 (fn pluralize [n] (pluralizer-fn n a b c d e))
-          (fn pluralize   [n] (apply pluralizer-fn n a b c d e more)))))))
+  (when-some [pluralizer-fn (some-> config (get lang) (get :tongue/pluralizer) var/deref-symbol)]
+    (let [[a & _] translations]
+      (cond
+        (fn? a)                                      a
+        (and (vector? a) (nil? (next translations))) (pluralizer-fn ::parse a)
+        (map? a)                                     (pluralizer-fn ::parse a)
+        :else                                        (pluralizer-fn ::parse (vec translations))))))
 
 (defn- zero-missing-keys
   [config]
@@ -314,4 +305,4 @@
 
 (system/add-expand ::translations [k config] (expand-translations k config))
 (system/add-init   ::translations [k config] (var/make k (init-translations config)))
-(system/add-halt!  ::translations [k config] (var/make k nil))
+(system/add-halt!  ::translations [k      _] (var/make k nil))
