@@ -398,10 +398,10 @@
   [e respond raise]
   (let [data  (ex-data e)
         ctype (get data :type)]
-    (if-let [status (case ctype
-                      ::coercion/request-coercion  422
-                      ::coercion/response-coercion 500
-                      nil)]
+    (if-some [status (condp identical? ctype
+                       ::coercion/request-coercion  422
+                       ::coercion/response-coercion 500
+                       nil)]
       (if respond
         (respond {:status status :body (coercion/encode-error data)})
         {:status status :body (coercion/encode-error data)})

@@ -134,7 +134,7 @@
                                              :verifyCode       (str code)
                                              :verifyLink       verify-link
                                              :recoveryLink     recovery-link}]
-                      (case id-type
+                      (condp identical? id-type
                         :email (if-some [template (get opts (if exists?
                                                               :tpl/email-exists
                                                               :tpl/email-verify))]
@@ -211,7 +211,7 @@
          status     (get req :app/status)]
      (if (resp/response? req)
        req
-       (case status
+       (condp identical? status
          :auth/ok            (if auth-only? req (auth-ok req route-data lang))
          :auth/prolonged-ok  (if auth-only? req (auth-prolonged-ok req route-data lang))
          :auth/locked        (web/handle-error req route-data status :login/account-locked      :Authentication-Error)
@@ -533,7 +533,7 @@
   ([req]
    (pwd-status req (http/get-route-data req)))
   ([req route-data]
-   (case (get req :app/status)
+   (condp identical? (get req :app/status)
      :pwd/created      req
      :pwd/updated      req
      :pwd/bad-password (common/move-to req (get-in route-data [:error/destinations :auth/bad-password] :login/bad-password))

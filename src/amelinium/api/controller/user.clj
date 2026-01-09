@@ -232,7 +232,7 @@
                                              :verifyCode       (str code)
                                              :verifyLink       verify-link
                                              :recoveryLink     recovery-link}]
-                      (case id-type
+                      (condp identical? id-type
                         :email (if-some [template (get opts (if exists?
                                                               :tpl/email-exists
                                                               :tpl/email-verify))]

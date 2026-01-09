@@ -1156,7 +1156,7 @@
    (when-some [l (get req :response/location)]
      (if (is-url? l)
        l
-       (case (count args)
+       (case (unchecked-int (count args))
          1 (f req (first args))
          2 (f req (first args) (second args))
          3 (f req (first args) (second args) (second (rest args)))

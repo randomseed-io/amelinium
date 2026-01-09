@@ -395,7 +395,7 @@
                       (handler
                        (qassoc req result-key true))))
                   (if explain?
-                    (let [explain-fn (case required-mode
+                    (let [explain-fn (condp identical? required-mode
                                        :all v/explain-all-required
                                        :one v/explain-required
                                        (if (int? required-mode)
@@ -415,7 +415,7 @@
                                        config-key config
                                        result-key (nil? (first reasons))
                                        explain-key reasons)))))))
-                    (let [check-fn (case required-mode
+                    (let [check-fn (condp identical? required-mode
                                      :all v/has-all-required?
                                      :one v/has-required?
                                      (if (int? required-mode)

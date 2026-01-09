@@ -193,7 +193,7 @@
                     key-path          (when (valuable? key-path) (if (seqable? key-path) key-path (cons key-path nil)))
                     path              (seq (concat (seq key-path) last-key))
                     [k1 k2 k3 & rest] path]
-                (case (count path)
+                (case (unchecked-int (count path))
                   0 (fn   [_] nil)
                   1 (fn [req] (get-in-req req supported k1))
                   2 (fn [req] (get-in-req req supported k1 k2))

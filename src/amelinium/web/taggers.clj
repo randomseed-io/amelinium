@@ -43,11 +43,11 @@
       (if (>= idx slen)
         (.toString sb)
         (let [c (char (.charAt s idx))]
-          (case c
-            \< (.append sb "%3C")
-            \> (.append sb "%3E")
-            \" (.append sb "%22")
-            \' (.append sb "%27")
+          (case (int c)
+            60 (.append sb "%3C")
+            62 (.append sb "%3E")
+            34 (.append sb "%22")
+            39 (.append sb "%27")
             (.append sb c))
           (recur (inc idx))))))
   s)

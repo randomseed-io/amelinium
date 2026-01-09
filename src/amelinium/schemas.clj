@@ -459,7 +459,7 @@
         identity->str #(identity/->str   ::identity/standard %)]
     (m/-simple-schema
      {:type            :identity
-      :pred            #(case (identity/type %)
+      :pred            #(condp identical? (identity/type %)
                           :uid   (uuid?                   (identity/value %))
                           :phone (vc/valid-regular-phone? (identity/value %))
                           :email (vc/valid-email?         (identity/value %))
@@ -488,7 +488,7 @@
         identity->str #(identity/->str   ::identity/public %)]
     (m/-simple-schema
      {:type            :public-identity
-      :pred            #(case (identity/type %)
+      :pred            #(condp identical? (identity/type %)
                           :phone (vc/valid-regular-phone? (identity/value %))
                           :email (vc/valid-email?         (identity/value %))
                           false)

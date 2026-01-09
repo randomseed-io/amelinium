@@ -382,7 +382,8 @@
          req   (get data :request)
          ctype (get data :type)
          data  (dissoc data :request :response)]
-     (case ctype
+
+     (condp identical? ctype
 
        :reitit.coercion/request-coercion
        (let [translate-sub (i18n/no-default (common/translator-sub req))]

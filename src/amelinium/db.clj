@@ -9,7 +9,6 @@
   (:refer-clojure :exclude [memoize parse-long uuid random-uuid -> <-])
 
   (:require [clojure.set                   :as                    set]
-            [clojure.string                :as                    str]
             [clojure.core                  :as                      c]
             [clojure.core.cache            :as                  cache]
             [clojure.core.memoize          :as                    mem]
@@ -438,7 +437,7 @@
   "Extracts column and table specs as a vector from the given control keyword and
   predefined hints for table and column spec."
   [ctrl table-spec column-spec]
-  (if (keyword? ctrl)
+  (when (keyword? ctrl)
     (let [[c t] (sql/column-table ctrl)]
       (if c
         (if t [c t] (if table-spec [c table-spec] [table-spec c]))
@@ -1370,7 +1369,7 @@
   ([k config ds-getter ds-closer ds-suspender]
    (init-db k config ds-getter ds-closer ds-suspender nil))
   ([k config ds-getter ds-closer ds-suspender ds-resumer]
-   (if config
+   (when config
      (let [db-props (c/-> :properties config (dissoc :logger :migrations-dir) prep-db)
            db-name  (db-name db-props config k)
            db-key   (db-key-name k db-props config)
@@ -1418,9 +1417,9 @@
   "Logs database migration event described by database identifier `db-k-name`, data
   source `ds`, operation (`:up` or `:down`) and migration identifier `id`."
   [db-k-name ds op id]
-  (case op
-    :up   (log/msg "Applying DB migration"     id "on" (db-key-name db-k-name ds))
-    :down (log/msg "Rolling back DB migration" id "on" (db-key-name db-k-name ds))
+  (condp identical? op
+    :up   (log/msg "Applying DB migration"      id "on" (db-key-name db-k-name ds))
+    :down (log/msg "Rolling back DB migration"  id "on" (db-key-name db-k-name ds))
     (log/err "Unknown database operation" id "on" (db-key-name db-k-name ds))))
 
 (defn migrator-config
@@ -1491,7 +1490,7 @@
 
 (defn- email-to-db    ^String [v] (identity/->db :email v))
 (defn- phone-to-db    ^String [v] (identity/->db :phone v))
-(defn- long-or-nil    ^Long   [n] (if n (long n)))
+(defn- long-or-nil    ^Long   [n] (when n (long n)))
 (defn- identity-to-db         [v] (identity/->db v))
 
 (defcoercions ::any

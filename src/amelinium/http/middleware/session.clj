@@ -1246,7 +1246,7 @@
   "Returns a function which takes a request map and returns a session ID."
   [path]
   (let [[a b c d & _more] path]
-    (case (count path)
+    (case (unchecked-int (count path))
       0 (fn ^String [req] (when-some [p (get req :params)] (some-str (or (get p :session-id) (get p "session-id")))))
       1 (fn ^String [req] (some-str (get req a)))
       2 (fn ^String [req] (some-str (get (get req a) b)))
