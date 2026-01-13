@@ -258,15 +258,15 @@
  ;; HTTP default router
 
  :amelinium.http.router/web [#ref :amelinium.http.router/web-routes
-                             {:data {:compile       reitit.coercion/compile-request-coercers
-                                     :middleware    #ref :amelinium.http.middleware/web
-                                     :translations  #ref :amelinium.i18n/translations
+                             {:data {:compile      reitit.coercion/compile-request-coercers
+                                     :middleware   #ref :amelinium.http.middleware/web
+                                     :translations #ref :amelinium.i18n/translations
                                      ;;:errors/config #ref :amelinium.errors/settings
-                                     :auth/setup    #ref :amelinium.auth/setup
-                                     :oplog/config  #ref :amelinium.common.oplog.auth/log
-                                     :coercion      #ref :amelinium.http.middleware.coercion/coercer
+                                     :auth/setup   #ref :amelinium.auth/setup
+                                     :oplog/config #ref :amelinium.common.oplog.auth/log
+                                     :coercion     #ref :amelinium.http.middleware.coercion/coercer
                                      ;;:exception  reitit.dev.pretty/exception
-                                     :appinit       #ref :amelinium.app/init}}]
+                                     :appinit      #ref :amelinium.app/init}}]
 
  ;; HTTP default handler
 
