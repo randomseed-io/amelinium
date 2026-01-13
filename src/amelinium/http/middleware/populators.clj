@@ -11,24 +11,24 @@
   (:require [amelinium.system        :as          system]
             [amelinium.logging       :as             log]
             [io.randomseed.utils.var :as             var]
-            [io.randomseed.utils.map :as             map]
             [io.randomseed.utils.map :refer     [qassoc]]
-            [io.randomseed.utils     :refer         :all]))
+            [io.randomseed.utils     :refer     [some-symbol
+                                                 some-keyword]]))
 
 (defn- derefn
   [v]
-  (if-some [f (var/deref v)]
-    (if (fn? f) f)))
+  (when-some [f (var/deref v)]
+    (when (fn? f) f)))
 
 (defn- derefe
   [v]
-  (if-some [f (var/deref v)]
-    (if (or (map? f) (sequential? f)) f)))
+  (when-some [f (var/deref v)]
+    (when (or (map? f) (sequential? f)) f)))
 
 (defn- derefm
   [v]
-  (if-some [f (var/deref v)]
-    (if (map? f) f)))
+  (when-some [f (var/deref v)]
+    (when (map? f) f)))
 
 (defn compile-populator
   "Prepares a single populator."
@@ -50,12 +50,12 @@
                                cf    :compile
                                args  :args
                                cargs :compile-args} entry]
-                          (if-some [id (some-keyword id)]
-                            (if (or (contains? to-enable id) (not (contains? to-disable id)))
+                          (when-some [id (some-keyword id)]
+                            (when (or (contains? to-enable id) (not (contains? to-disable id)))
                               (let [f  (derefn f)
-                                    cf (if (not f) (derefn cf))
+                                    cf (when (not f) (derefn cf))
                                     f  (or f (if cf (cf data id cargs) (derefn (symbol id))))]
-                                (if (fn? f)
+                                (when (fn? f)
                                   [id (fn populator [req] (f req id args))])))))))
 
 (defn compile

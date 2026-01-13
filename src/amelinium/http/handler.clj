@@ -8,19 +8,20 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
-  (:require [reitit.ring               :as      ring]
-            [io.randomseed.utils       :refer   :all]
-            [io.randomseed.utils.var   :as       var]
-            [amelinium.system          :as    system]
-            [clojurewerkz.balagan.core :as         b]))
+  (:require [reitit.ring               :as             ring]
+            [io.randomseed.utils       :refer [some-keyword
+                                               some-str]]
+            [io.randomseed.utils.var   :as              var]
+            [amelinium.system          :as           system]
+            [clojurewerkz.balagan.core :as                b]))
 
 (defonce ^:redef default nil)
 
 (defn new-handler
   [{:keys [router resource-pathname not-found redirect-slash]}]
-  (let [not-found         (if not-found (var/deref-symbol not-found) {:status 404 :body "Not found"})
-        not-found         (if not-found (if (fn? not-found) not-found (constantly not-found)))
-        redirect-slash    (if redirect-slash (if (true? redirect-slash) :both (some-keyword redirect-slash)))
+  (let [not-found         (when not-found (var/deref-symbol not-found) {:status 404 :body "Not found"})
+        not-found         (when not-found (if (fn? not-found) not-found (constantly not-found)))
+        redirect-slash    (when redirect-slash (if (true? redirect-slash) :both (some-keyword redirect-slash)))
         resource-pathname (if (true? resource-pathname) "/" resource-pathname)
         resource-pathname (some-str resource-pathname)
         extra-handlers    nil
@@ -48,7 +49,7 @@
 
 (system/add-expand ::default [k config] {k config})
 (system/add-init   ::default [k config] (var/make k (new-handler config)))
-(system/add-halt!  ::default [k config] (var/make k nil))
+(system/add-halt!  ::default [k      _] (var/make k nil))
 
 (derive ::web ::default)
 (derive ::api ::default)

@@ -7,7 +7,6 @@
     amelinium.http.server
 
   (:require [amelinium.system               :as   system]
-            [amelinium.logging              :as      log]
             [amelinium.http.server.jetty    :as    jetty]
             [amelinium.http.server.undertow :as undertow]))
 

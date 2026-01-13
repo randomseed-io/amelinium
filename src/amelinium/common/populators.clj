@@ -51,9 +51,9 @@
   "Injects user's preferred language into a request map."
   [req _ _]
   (delay
-    (if-some [db (auth/db req)]
-      (if-some [smap (session/of req)]
-        (if-some [user-id (session/user-id smap)]
+    (when-some [db (auth/db req)]
+      (when-some [smap (session/of req)]
+        (when-some [user-id (session/user-id smap)]
           (let [supported (get (get req :language/settings) :supported)]
             (contains? supported (user/setting db user-id :language))))))))
 

@@ -12,9 +12,7 @@
             [amelinium.http.response   :as      resp]
             [amelinium.logging         :as       log]
             [amelinium.system          :as    system]
-            [io.randomseed.utils       :refer   :all]
-            [io.randomseed.utils.var   :as       var]
-            [io.randomseed.utils.map   :as       map]))
+            [io.randomseed.utils.var   :as       var]))
 
 (defn init-renderer
   "Generic middleware which renders results by calling configured web handler

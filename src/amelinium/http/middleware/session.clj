@@ -8,8 +8,7 @@
 
   (:refer-clojure :exclude [parse-long uuid random-uuid empty empty?])
 
-  (:require [amelinium.types.session]
-            [io.randomseed.utils.db.types]
+  (:require [io.randomseed.utils.db.types]
             [clojure.set                  :as                       set]
             [clojure.string               :as                       str]
             [clojure.core.memoize         :as                       mem]
@@ -39,8 +38,9 @@
                                                    safe-parse-long
                                                    not-empty-string?
                                                    to-snake-simple-str]]
-            [amelinium                     :refer [map->Session
-                                                   map->SessionConfig]])
+            [amelinium.types.session]
+            [amelinium                    :refer [map->Session
+                                                  map->SessionConfig]])
 
   (:import (clojure.lang             Keyword
                                      Associative

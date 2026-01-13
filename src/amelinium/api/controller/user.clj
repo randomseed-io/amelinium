@@ -6,40 +6,38 @@
 
     amelinium.api.controller.user
 
-  (:refer-clojure :exclude [parse-long uuid random-uuid])
-
-  (:require [tick.core                          :as               t]
-            [clojure.string                     :as             str]
-            [amelinium.logging                  :as             log]
-            [amelinium.identity                 :as        identity]
-            [amelinium.utils                    :refer         :all]
-            [amelinium.common                   :as          common]
-            [amelinium.common.controller        :as           super]
-            [amelinium.i18n                     :as            i18n]
-            [amelinium.api                      :as             api]
-            [amelinium.auth                     :as            auth]
-            [amelinium.http                     :as            http]
-            [amelinium.http.response            :as            resp]
-            [amelinium.http.middleware.session  :as         session]
-            [amelinium.http.middleware.language :as        language]
-            [amelinium.http.client.twilio       :as          twilio]
-            [amelinium.model.confirmation       :as    confirmation]
-            [amelinium.model.user               :as            user]
-            [amelinium.types.auth               :refer         :all]
-            [amelinium.types.session            :refer         :all]
-            [amelinium                          :refer         :all]
-            [io.randomseed.utils.map            :as             map]
-            [io.randomseed.utils.map            :refer     [qassoc]]
-            [io.randomseed.utils                :refer         :all]
-            [puget.printer                      :refer     [cprint]])
+  (:require [tick.core                           :as                      t]
+            [clojure.string                      :as                    str]
+            [amelinium.logging                   :as                    log]
+            [amelinium.identity                  :as               identity]
+            [amelinium.common                    :as                 common]
+            [amelinium.common.controller         :as                  super]
+            [amelinium.i18n                      :as                   i18n]
+            [amelinium.api                       :as                    api]
+            [amelinium.auth                      :as                   auth]
+            [amelinium.messaging                 :as                    msg]
+            [amelinium.http                      :as                   http]
+            [amelinium.http.response             :as                   resp]
+            [amelinium.http.middleware.session   :as                session]
+            [amelinium.http.middleware.language  :as               language]
+            [amelinium.model.confirmation        :as           confirmation]
+            [amelinium.model.user                :as                   user]
+            [amelinium]
+            [amelinium.types.auth]
+            [amelinium.types.session]
+            [amelinium.utils                     :refer [timeout?
+                                                         simple-duration
+                                                         retry-in-mins
+                                                         rfc1123-date-time]]
+            [io.randomseed.utils.map             :as                    map]
+            [io.randomseed.utils                 :refer          [some-str]]
+            [zprint.core                         :refer           [czprint]])
 
   (:import (amelinium Session
                       AuthSettings
                       AuthConfig
                       AuthConfirmation
-                      UserData
-                      Suites
-                      SuitesJSON)))
+                      UserData)))
 
 (def one-minute   (t/new-duration 1 :minutes))
 (def five-minutes (t/new-duration 5 :minutes))
@@ -77,7 +75,7 @@
    (auth-with-password! req user-email password sess route-data lang auth-only-mode nil))
   ([req user-email password ^Session sess route-data lang auth-only-mode session-key]
    (let [sk  (or session-key (session/session-key sess) (get route-data :session-key))
-         req (super/auth-user-with-password! req user-email password sess route-data auth-only-mode session-key)]
+         req (super/auth-user-with-password! req user-email password sess route-data auth-only-mode sk)]
      (if (resp/response? req)
        req
        (let [lang   (or lang (common/pick-language req))
@@ -114,16 +112,16 @@
     req
     (let [form-params    (common/get-form-params req)
           user-email     (or (get form-params :user/login) (get form-params :login))
-          password       (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))
+          password       (when user-email (some-str (or (get form-params :user/password) (get form-params :password))))
           route-data     (delay (http/get-route-data req))
           session-key    (or session-key (get @route-data :session-key))
           sess           (session/of req session-key)
           lang           (delay (common/pick-language req :user))
           valid-session? (delay (session/valid? sess))]
       (cond
-        password          (auth-with-password! req user-email password sess @route-data @lang false session-key)
-        @valid-session?   req
-        :invalid-session! (api/move-to req (or (get @route-data :auth/info) :auth/info) @lang))))))
+        password        (auth-with-password! req user-email password sess @route-data @lang false session-key)
+        @valid-session? req
+        :else           (api/move-to req (or (get @route-data :auth/info) :auth/info) @lang))))))
 
 (defn authenticate-only!
   "Logs user in when user e-mail and password are given.
@@ -144,7 +142,7 @@
    req
    (let [form-params (common/get-form-params req)
          user-email  (or (get form-params :user/login) (get form-params :login))
-         password    (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))]
+         password    (when user-email (some-str (or (get form-params :user/password) (get form-params :password))))]
      (super/auth-user-with-password! req user-email password nil nil true nil))))
 
 (defn info!
@@ -154,22 +152,24 @@
    (let [auth-db       (auth/db req)
          ^Session sess (session/of req session-key)
          prolonged?    (some? (and (session/expired? sess) (get req :goto-uri)))
-         remaining     (super/lock-remaining-mins req auth-db (if prolonged? sess) t/now)
-         body          (qassoc (get req :response/body) :lock-remains remaining)]
-     (qassoc req
-             :response/body body
-             session-key    (delay
-                              (if @prolonged?
-                                (qassoc sess :id (or (session/id sess) (session/err-id sess)) :prolonged? true)
-                                (qassoc sess :prolonged? false)))))))
+         remaining     (super/lock-remaining-mins req auth-db (when prolonged? sess) t/now)
+         body          (map/qassoc (get req :response/body) :lock-remains remaining)]
+     (map/qassoc
+      req
+      :response/body body
+      session-key    (delay
+                       (if prolonged?
+                         (map/qassoc sess :id (or (session/id sess) (session/err-id sess)) :prolonged? true)
+                         (map/qassoc sess :prolonged? false)))))))
 
 ;; Identity confirmation
 
 (defn verify!
   "Performs the identity verification by sending an e-mail or SMS with a URL to
   complete confirmation."
-  [req {:keys [no-data result reason db id id-type lang translator route-data]
-        :as   opts}]
+  [req {:keys      [no-data result reason db id id-type lang translator]
+        route-data :route/data
+        :as        opts}]
   (let [lang              (or lang       (common/pick-language req :registration) (common/lang-id req))
         tr                (or translator (i18n/no-default (common/translator req lang)))
         {:keys [confirmed?
@@ -179,8 +179,8 @@
         id-type           (common/guess-identity-type result id id-type)
         errors?           (some? (seq errors))
         attempts?         (and (not errors?) (int? attempts))
-        attempts-left     (if attempts? (if (neg? attempts) 0 attempts))
-        max-attempts?     (if attempts? (zero? attempts-left))
+        attempts-left     (when attempts? (if (neg? attempts) 0 attempts))
+        max-attempts?     (when attempts? (zero? attempts-left))
         bad-result?       (not (or errors? attempts?))
         retry-dur         (delay (simple-duration expires))
         expired?          (delay (timeout? @retry-dur))
@@ -197,41 +197,41 @@
                                         :verify/retry-dur       @retry-dur
                                         :verify/attempts-left   attempts-left
                                         :sub-status/description (tr :try-in-mins @retry-in)))
-      :else         (let [{:keys [token code
-                                  exists?]} result
-                          id-str            (identity/->str id-type id)
-                          lang-str          (some-str lang)
-                          remote-ip         (get req :remote-ip/str)
-                          rdata             (or route-data (http/get-route-data req))
-                          existing-uid      (if exists? (some-str (get result :existing-user/uid)))
-                          existing-user-id  (if exists? (get result :existing-user/id))
-                          user-login        (delay (if (identical? :email id-type)
-                                                     id-str
-                                                     (if existing-user-id (user/email db :id existing-user-id))))
-                          lang-qs           (common/query-string-encode req {"lang" lang-str})
-                          url-type          (common/id-type->url-type id-type reason)
-                          verify-link       (str (get rdata url-type) token "/?" lang-qs)
-                          recovery-link     (if existing-uid (str (get rdata :url/recover) existing-uid "/?" lang-qs))
                           req-updater       (get opts :async/responder super/verify-request-id-update)
                           exc-handler       (get opts :async/raiser super/verify-process-error)
                           req-updater       #(req-updater db id-type id-str code token %)
                           exc-handler       #(exc-handler db id-type id-str code token %)
-                          add-retry-fields  (fn [req]
-                                              (api/assoc-body
-                                               req
-                                               :user/identity        id-str
-                                               :identity/type        id-type
-                                               :verify/expired?      @expired?
-                                               :verify/retry-in      @retry-in
-                                               :verify/retry-unit    :minutes
-                                               :verify/retry-dur     @retry-dur
-                                               :verify/attempts-left attempts-left))
-                          template-params   {:serviceName      (tr :verify/app-name)
-                                             :expiresInMinutes (tr :in-mins @retry-in)
-                                             :remoteAddress    remote-ip
-                                             :verifyCode       (str code)
-                                             :verifyLink       verify-link
-                                             :recoveryLink     recovery-link}]
+      :else         (let [token            (get result :token)
+                          code             (get result :code)
+                          exists?          (get result :exists)
+                          id-str           (identity/->str id-type id)
+                          lang-str         (some-str lang)
+                          remote-ip        (get req :remote-ip/str)
+                          rdata            (or route-data (http/get-route-data req))
+                          existing-uid     (when exists? (some-str (get result :existing-user/uid)))
+                          existing-user-id (when exists? (get result :existing-user/id))
+                          user-login       (delay (if (identical? :email id-type)
+                                                    id-str
+                                                    (when existing-user-id (user/email db :id existing-user-id))))
+                          lang-qs          (common/query-string-encode req {"lang" lang-str})
+                          url-type         (common/id-type->url-type id-type reason)
+                          verify-link      (str (get rdata url-type) token "/?" lang-qs)
+                          recovery-link    (when existing-uid (str (get rdata :url/recover) existing-uid "/?" lang-qs))
+                          add-retry-fields #(api/assoc-body
+                                             %
+                                             :user/identity        id-str
+                                             :identity/type        id-type
+                                             :verify/expired?      @expired?
+                                             :verify/retry-in      @retry-in
+                                             :verify/retry-unit    :minutes
+                                             :verify/retry-dur     @retry-dur
+                                             :verify/attempts-left attempts-left)
+                          template-params  {:serviceName      (tr :verify/app-name)
+                                            :expiresInMinutes (tr :in-mins @retry-in)
+                                            :remoteAddress    remote-ip
+                                            :verifyCode       (str code)
+                                            :verifyLink       verify-link
+                                            :recoveryLink     recovery-link}]
                       (condp identical? id-type
                         :email (if-some [template (get opts (if exists?
                                                               :tpl/email-exists
@@ -269,7 +269,7 @@
          email           (.email udata)]
      (if (and phone email)
        (api/render-error req :verify/multiple-ids)
-       (let [db          (if udata (.db udata))
+       (let [db          (when udata (.db udata))
              reason      (or (some-str reason) "creation")
              [id id-type
               no-data f] (if phone
@@ -297,10 +297,10 @@
    (let [params                      (common/get-form-params req)
          ^AuthSettings auth-settings (auth/settings req)
          ^UserData     udata         (user/make-user-data auth-settings params)
-         db                          (if udata (.db udata))
+         db                          (when udata (.db udata))
          result                      (confirmation/create-for-registration db udata)]
      (verify! req {:db               db
-                   :id               (if udata (.email udata))
+                   :id               (when udata (.email udata))
                    :id-type          :email
                    :result           result
                    :tpl/email-exists :registration/exists
@@ -324,7 +324,7 @@
                                                            :user/middle-name])
                           (map/update-existing :user/middle-name some-str))
           change?     (pos-int? (count to-change))
-          result      (if change? (user/props-set auth-db user-id to-change))
+          result      (when change? (user/props-set auth-db user-id to-change))
           bad-result? (not (or change? (pos-int? (:next.jdbc/update-count result))))]
       (if bad-result?
         (api/render-error req :profile/update-error)
@@ -364,11 +364,11 @@
         (let [route-data    (http/get-route-data req)
               smap          (session/of req (or session-key (get route-data :session-key)))
               user-email    (identity/of-email (session/user-email smap))
-              password      (if user-email (some-str (or (get form-params :user/password) (get form-params :password))))
+              password      (when user-email (some-str (or (get form-params :user/password) (get form-params :password))))
               form-params   (dissoc form-params :password :user/password)
               auth-result   (super/auth-user-with-password! req user-email password smap route-data true nil)
               auth-bad?     (not= :auth/ok (:app/status auth-result))
-              auth-settings (if-not auth-bad? (auth/settings req))
+              auth-settings (when-not auth-bad? (auth/settings req))
               auth-db       (auth/db auth-settings)
               auth-failed?  (or auth-bad? (not auth-db))]
           (if auth-failed?
@@ -386,10 +386,10 @@
                 (api/render-status req :identity/not-updated)
                 (let [lang                        (common/lang-id req)
                       ^AuthConfig auth-config     (auth/config auth-settings (get props :account-type))
-                      ^AuthConfirmation auth-cfrm (if auth-config (.confirmation auth-config))
-                      auth-db                     (if auth-config (.db auth-config) auth-db)
-                      attempts                    (if auth-cfrm   (.max-attempts auth-cfrm))
-                      exp                         (if auth-cfrm   (.expires      auth-cfrm))
+                      ^AuthConfirmation auth-cfrm (when auth-config (.confirmation auth-config))
+                      auth-db                     (when auth-config (.db auth-config) auth-db)
+                      attempts                    (when auth-cfrm   (.max-attempts auth-cfrm))
+                      exp                         (when auth-cfrm   (.expires      auth-cfrm))
                       result                      (confirmation/create-for-change auth-db id user-id exp attempts id-type)]
                   (verify! req {:id               id
                                 :db               auth-db
@@ -420,12 +420,12 @@
         (if (> (count to-change) 1)
           (api/render-error req :verify/multiple-ids)
           (let [db           (auth/db req)
-                id           (if id (val id))
-                id-type      (if id (identity/type id))
+                id           (when id (val id))
+                id-type      (when id (identity/type id))
                 confirmation (confirmation/establish db id code token one-minute "change")
                 confirmed?   (get confirmation :confirmed?)
                 id-type      (common/guess-identity-type confirmation id id-type)
-                updated      (if confirmed? (user/update-identity id-type db token code id))
+                updated      (when confirmed? (user/update-identity id-type db token code id))
                 updated?     (:updated? updated)
                 bad-result?  (or (nil? confirmation) (and confirmed? (nil? updated)))]
             (cond
@@ -433,14 +433,14 @@
               updated?         (let [user-id    (get updated :id)
                                      id         (get updated :identity)
                                      route-data (http/get-route-data req)]
-                                 (if session-invalidator (session-invalidator req route-data id-type id user-id))
+                                 (when session-invalidator (session-invalidator req route-data id-type id user-id))
                                  (confirmation/delete db id "change")
                                  (-> req
                                      (api/add-body {:user/uid (get updated :uid) id-type id})
                                      (api/render-status :identity/created)))
               (not confirmed?) (api/render-error req (:errors confirmation))
               (not updated?)   (api/render-error req (:errors updated))
-              :error!          (api/render-error req (or (not-empty (:errors confirmation))
+              :else            (api/render-error req (or (not-empty (:errors confirmation))
                                                          (not-empty (:errors updated))))))))))))
 
 ;; User creation
@@ -461,8 +461,8 @@
        (api/render-error req :parameters/error)
        (let [confirmation (confirmation/establish db login code token one-minute "creation")
              confirmed?   (get confirmation :confirmed?)
-             creation     (if confirmed? (user/create db login token code))
-             created?     (if creation (get creation :created?))
+             creation     (when confirmed? (user/create db login token code))
+             created?     (when creation (get creation :created?))
              bad-result?  (or (nil? confirmation) (and confirmed? (nil? creation)))]
          (cond
            bad-result?      (api/render-error req :verify/bad-result)
@@ -474,7 +474,7 @@
                                   (api/add-status :user/created)))
            (not confirmed?) (api/render-error req (:errors confirmation))
            (not created?)   (api/render-error req (:errors creation))
-           :error!          (api/render-error req (or (not-empty (:errors confirmation))
+           :else            (api/render-error req (or (not-empty (:errors confirmation))
                                                       (not-empty (:errors creation))))))))))
 
 ;; Password setting
@@ -503,7 +503,7 @@
                           (session/user-id session)
                           (user/id-of :email (auth/db req) user-email))
               req     (super/set-password! req user-id new-password)]
-          (if (and session-invalidator (identical? :pwd/created (get req :app/status)))
+          (when (and session-invalidator (identical? :pwd/created (get req :app/status)))
             (session-invalidator req nil :user/email email-str user-id))
           req)
         req)))))
@@ -528,13 +528,13 @@
         (let [db           (auth/db req)
               confirmation (confirmation/establish db id code token one-minute "recovery")
               id-type      (common/guess-identity-type confirmation id id-type)
-              confirmed?   (boolean (if confirmation (get confirmation :confirmed?)))
-              user-id      (if confirmation (get confirmation :user/id))
+              confirmed?   (boolean (when confirmation (get confirmation :confirmed?)))
+              user-id      (when confirmation (get confirmation :user/id))
               req          (if confirmed? (super/set-password! req user-id new-password) req)
-              updated?     (if confirmed? (identical? (get req :app/status) :pwd/created))]
+              updated?     (when confirmed? (identical? (get req :app/status) :pwd/created))]
           (cond
             (nil? confirmation) (api/render-error req :verify/bad-result)
-            updated?            (do (if session-invalidator
+            updated?            (do (when session-invalidator
                                       (session-invalidator req nil
                                                            :user/email
                                                            (user/email db :id user-id)
@@ -543,7 +543,7 @@
                                     req)
             (not confirmed?)    (api/render-error req (:errors confirmation))
             (not updated?)      req
-            :error!             (api/render-error req (not-empty (:errors confirmation))))))))))
+            :else               (api/render-error req (not-empty (:errors confirmation))))))))))
 
 (defn recovery-create!
   [req]
@@ -567,10 +567,10 @@
              user-id                     (get props :id)
              ^AuthConfig auth-config     (auth/config auth-settings (get props :account-type))
              ^AuthConfig auth-config     (or auth-config (auth/config auth-settings))
-             ^AuthConfirmation auth-cfrm (if auth-config (.confirmation auth-config))
-             auth-db                     (if auth-config (.db auth-config) auth-db)
-             attempts                    (if auth-cfrm   (.max-attempts auth-cfrm))
-             exp                         (if auth-cfrm   (.expires      auth-cfrm))
+             ^AuthConfirmation auth-cfrm (when auth-config (.confirmation auth-config))
+             auth-db                     (if auth-config   (.db auth-config) auth-db)
+             attempts                    (when auth-cfrm   (.max-attempts auth-cfrm))
+             exp                         (when auth-cfrm   (.expires      auth-cfrm))
              result                      (confirmation/create-for-recovery auth-db id user-id exp attempts id-type)]
          (verify! req {:id               id
                        :db               auth-db
@@ -590,6 +590,6 @@
    (password-create! req session-key super/invalidate-user-sessions!))
   ([req session-key session-invalidator]
    (let [form-params (common/get-form-params req)]
-     (if (qsome form-params [:confirmation/token :confirmation/code :token :code])
+     (if (map/qsome form-params [:confirmation/token :confirmation/code :token :code])
        (password-recover! req session-invalidator)
        (password-change!  req session-key session-invalidator)))))
