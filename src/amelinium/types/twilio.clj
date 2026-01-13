@@ -10,9 +10,8 @@
 
 (in-ns 'amelinium)
 
-(import [java.time   Instant Duration]
-        [javax.sql   DataSource]
-        [inet.ipaddr IPAddress])
+(import [amelinium.proto.twilio TwilioControl]
+        [clojure.lang           IPersistentMap IPersistentSet Keyword])
 
 (defrecord TwilioConfig
     [^String                        url
@@ -37,3 +36,17 @@
      ^clojure.lang.IPersistentMap   localized-templates
      ^Boolean                       prepared?
      ^Boolean                       enabled?])
+
+(defrecord TwilioEmailMessaging
+    [^TwilioControl  control
+     ^IPersistentSet capabilities
+     ^IPersistentMap provider
+     ^IPersistentMap response-stub
+     ^Keyword        channel-type])
+
+(defrecord TwilioSMSMessaging
+    [^TwilioControl  control
+     ^IPersistentSet capabilities
+     ^IPersistentMap provider
+     ^IPersistentMap response-stub
+     ^Keyword        channel-type])

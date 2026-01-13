@@ -1,38 +1,40 @@
 (ns
 
-    ^{:doc    "amelinium service, Twilio client."
+    ^{:doc    "Amelinium service, Twilio client."
       :author "Paweł Wilk"
       :added  "1.0.0"}
 
-    amelinium.http.client.twilio
+    amelinium.http.client.messaging.twilio
 
-  (:refer-clojure :exclude [parse-long uuid random-uuid])
+  (:refer-clojure :exclude [uuid random-uuid])
 
-  (:require [clojure.set                  :as             set]
-            [clojure.string               :as             str]
-            [tick.core                    :as               t]
-            [hato.client                  :as              hc]
-            [phone-number.core            :as           phone]
-            [amelinium.db                 :as              db]
-            [amelinium.logging            :as             log]
-            [amelinium.system             :as          system]
-            [amelinium.proto.twilio       :as               p]
-            [amelinium.types.twilio       :refer         :all]
-            [amelinium                    :refer         :all]
-            [io.randomseed.utils          :refer         :all]
-            [io.randomseed.utils.time     :as            time]
-            [io.randomseed.utils.var      :as             var]
-            [io.randomseed.utils.map      :as             map]
-            [io.randomseed.utils.map      :refer     [qassoc]]
-            [potpuri.core                 :refer [deep-merge]])
+  (:require [clojure.string                  :as                        str]
+            [hato.client                     :as                         hc]
+            [phone-number.core               :as                      phone]
+            [amelinium.logging               :as                        log]
+            [amelinium.system                :as                     system]
+            [amelinium.http.client.messaging :as                     client]
+            [amelinium.proto.messaging       :as                        msg]
+            [amelinium.proto.twilio          :as                          p]
+            [io.randomseed.utils.time        :as                       time]
+            [io.randomseed.utils.var         :as                        var]
+            [io.randomseed.utils.map         :as                        map]
+            [potpuri.core                    :refer            [deep-merge]]
+            [amelinium.types.twilio          :refer [map->TwilioConfig
+                                                     map->TwilioEmailMessaging
+                                                     map->TwilioSMSMessaging]]
+            [io.randomseed.utils             :refer [valuable?
+                                                     some-str
+                                                     some-keyword
+                                                     some-keyword-simple
+                                                     ]])
 
-  (:import (clojure.lang            Keyword
-                                    PersistentVector
-                                    IPersistentMap
-                                    IFn
-                                    Fn)
-           (amelinium.proto.twilio  TwilioControl)
-           (amelinium               TwilioConfig)))
+  (:import (clojure.lang              IPersistentMap IPersistentSet)
+           (amelinium                 TwilioConfig)
+           (amelinium.proto.messaging Messaging)
+           (amelinium.proto.twilio    TwilioControl
+                                      TwilioEmailMessaging
+                                      TwilioSMSMessaging)))
 
 (defonce ^:redef sms    (constantly nil))
 (defonce ^:redef email  (constantly nil))
@@ -41,7 +43,10 @@
 ;; Constants
 
 (def ^:const config-tag (re-pattern ":([a-zA-Z][a-zA-Z0-9_\\-]+)"))
-(def ^:const json-types #{:json :JSON :application/json "application/json" "json" "JSON"})
+(def ^:const json-types #{:application/json
+                          "application/json"
+                          "json" "JSON"
+                          :json  :JSON})
 
 ;; Helpers
 
@@ -62,15 +67,22 @@
                                               template-group
                                               lang
                                               fallback-template)]
-       (qassoc params :template_id template-id)
+       (map/qassoc params :template_id template-id)
        params)
      params)))
 
 ;; E-mail sending
 
+(defn- prep-to
+  [to]
+  (cond (nil?  to) nil
+        (map?  to) [to]
+        (coll? to) (vec to)
+        :else      [{:email (str to)}]))
+
 (defn sendmail-l10n-template
   ([^TwilioControl ctrl lang to template-group]
-   (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+   (when-some [to (prep-to to)]
      (p/request ctrl (localize-sendmail-params
                       ctrl
                       lang
@@ -78,7 +90,7 @@
                       template-group
                       nil))))
   ([^TwilioControl ctrl lang to template-group fallback-template-id-or-template-data]
-   (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+   (when-some [to (prep-to to)]
      (if (map? fallback-template-id-or-template-data)
        (p/request ctrl (localize-sendmail-params
                         ctrl
@@ -95,7 +107,7 @@
                         template-group
                         fallback-template-id-or-template-data)))))
   ([^TwilioControl ctrl lang to template-group fallback-template-id template-data]
-   (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+   (when-some [to (prep-to to)]
      (p/request ctrl (localize-sendmail-params
                       ctrl
                       lang
@@ -106,12 +118,12 @@
                       fallback-template-id)))))
 
 (defn sendmail-l10n-template-async
-  {:arglists '([respond raise lang to template-group]
-               [respond raise lang to template-group fallback-template-id]
-               [respond raise lang to template-group template-data]
-               [respond raise lang to template-group fallback-template-id template-data])}
+  {:arglists '([^TwilioControl ctrl respond raise lang to template-group]
+               [^TwilioControl ctrl respond raise lang to template-group fallback-template-id]
+               [^TwilioControl ctrl respond raise lang to template-group template-data]
+               [^TwilioControl ctrl respond raise lang to template-group fallback-template-id template-data])}
   ([^TwilioControl ctrl respond raise lang to template-group]
-   (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+   (when-some [to (prep-to to)]
      (p/request ctrl {:async? true} (localize-sendmail-params
                                      ctrl
                                      lang
@@ -120,7 +132,7 @@
                                      nil)
                 respond raise)))
   ([^TwilioControl ctrl respond raise lang to template-group fallback-template-id-or-template-data]
-   (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+   (when-some [to (prep-to to)]
      (if (map? fallback-template-id-or-template-data)
        (p/request ctrl {:async? true} (localize-sendmail-params
                                        ctrl
@@ -139,7 +151,7 @@
                                        fallback-template-id-or-template-data)
                   respond raise))))
   ([^TwilioControl ctrl respond raise lang to template-group fallback-template-id template-data]
-   (if-some [to (if (map? to) [to] (if (coll? to) (vec to) [{:email (str to)}]))]
+   (when-some [to (prep-to to)]
      (p/request ctrl {:async true} (localize-sendmail-params
                                     ctrl
                                     lang
@@ -155,9 +167,12 @@
                [^TwilioControl ctrl to template-group fallback-template]
                [^TwilioControl ctrl to template-group template-data]
                [^TwilioControl ctrl to template-group fallback-template template-data])}
-  ([^TwilioControl ctrl to tpl-gr]                 (sendmail-l10n-template ctrl nil to tpl-gr))
-  ([^TwilioControl ctrl to tpl-gr fb-tpl-or-tdata] (sendmail-l10n-template ctrl nil to tpl-gr fb-tpl-or-tdata))
-  ([^TwilioControl ctrl to tpl-gr fb-tpl tdata]    (sendmail-l10n-template ctrl nil to tpl-gr fb-tpl tdata)))
+  ([^TwilioControl ctrl to tpl-gr]
+   (sendmail-l10n-template ctrl nil to tpl-gr))
+  ([^TwilioControl ctrl to tpl-gr fb-tpl-or-tdata]
+   (sendmail-l10n-template ctrl nil to tpl-gr fb-tpl-or-tdata))
+  ([^TwilioControl ctrl to tpl-gr fb-tpl tdata]
+   (sendmail-l10n-template ctrl nil to tpl-gr fb-tpl tdata)))
 
 ;; SMS sending
 
@@ -176,6 +191,69 @@
   (p/request ctrl {:async? true}
              {:Body (str body) :To (some-phone to)}
              respond raise))
+
+;; Messaging protocol implementation
+
+(defn- on-ok-adapter
+  "Adapter for asynchronous message sending. Takes Twilio response and returns a map
+  standardized for messaging subsystem."
+  ^IPersistentMap [^Messaging driver ^IPersistentMap response]
+  (when-some [headers (:headers response)]
+    (when-some [req-id (when (map? headers)
+                         (or (get headers "twilio-request-id")
+                             (get headers "x-message-id")))]
+      (-> (msg/response-stub driver)
+          (map/qassoc :provider/msg-id   req-id
+                      :provider/response response
+                      :status            :accepted)))))
+
+(defn- on-err-adapter
+  "Default exception adapter for asynchronous SMS sending. Takes Twilio exception and
+  returns a map standardized for messaging subsystem."
+  ^IPersistentMap [^Messaging driver exception]
+  (-> (msg/response-stub driver)
+      (map/qassoc :status             :failed
+                  :provider/exception exception)))
+
+(extend-protocol msg/Messaging
+
+  TwilioEmailMessaging
+
+  (provider      ^IPersistentMap [drv] (.provider      ^TwilioEmailMessaging drv))
+  (capabilities  ^IPersistentSet [drv] (.capabilities  ^TwilioEmailMessaging drv))
+  (response-stub ^IPersistentMap [drv] (.response-stub ^TwilioEmailMessaging drv))
+  (send! ^IPersistentMap [drv ^IPersistentMap msg]
+    (sendmail-l10n-template (.control ^TwilioEmailMessaging drv)
+                            (get msg :lang)
+                            (get msg :to)
+                            (get msg :template/key)
+                            (get msg :template/fallback-key)
+                            (get msg :template/data)))
+  (send-async! [drv ^IPersistentMap msg ^IPersistentMap opts]
+    (sendmail-l10n-template-async (.control ^TwilioEmailMessaging drv)
+                                  #((get opts :on-ok)  (on-ok-adapter  drv %))
+                                  #((get opts :on-err) (on-err-adapter drv %))
+                                  (get msg :lang)
+                                  (get msg :to)
+                                  (get msg :template/key)
+                                  (get msg :template/fallback-key)
+                                  (get msg :template/data)))
+
+  TwilioSMSMessaging
+
+  (provider      ^IPersistentMap [drv] (.provider      ^TwilioSMSMessaging drv))
+  (capabilities  ^IPersistentSet [drv] (.capabilities  ^TwilioSMSMessaging drv))
+  (response-stub ^IPersistentMap [drv] (.response-stub ^TwilioSMSMessaging drv))
+  (send! ^IPersistentMap [drv ^IPersistentMap msg]
+    (sendsms (.control ^TwilioSMSMessaging drv)
+             (get msg :to)
+             (get msg :body)))
+  (send-async! [drv ^IPersistentMap msg ^IPersistentMap opts]
+    (sendsms-async (.control ^TwilioSMSMessaging drv)
+                   #((get opts :on-ok)  (on-ok-adapter  drv %))
+                   #((get opts :on-err) (on-err-adapter drv %))
+                   (get msg :to)
+                   (get msg :body))))
 
 ;; Initialization helpers
 
@@ -227,17 +305,17 @@
 
 (defn- prep-client-opts
   [config]
-  (let [auth-pub (:auth-pub    config)
-        auth-key (:auth-key    config)
-        auth-tok (:auth-tok    config)
-        opts     (:client-opts config)
-        opts     (if (and (map? opts) (valuable? opts)) opts {})
-        opts     (if (and auth-pub auth-key) (map/assoc-missing opts :authenticator
-                                                                {:user auth-pub
-                                                                 :pass auth-key})
+  (let [auth-pub  (:auth-pub    config)
+        auth-key  (:auth-key    config)
+        _auth-tok (:auth-tok    config)
+        opts      (:client-opts config)
+        opts      (if (and (map? opts) (valuable? opts)) opts {})
+        opts      (if (and auth-pub auth-key) (map/assoc-missing opts :authenticator
+                                                                 {:user auth-pub
+                                                                  :pass auth-key})
                      opts)
-        opts     (map/update-existing opts :connect-timeout
-                                      #(if %
+        opts      (map/update-existing opts :connect-timeout
+                                      #(when %
                                          (time/milliseconds
                                           (time/parse-duration % :second))))]
     (assoc config :client-opts opts)))
@@ -255,17 +333,17 @@
         opts          {:url            url
                        :accept         accept
                        :request-method req-method}
-        opts          (if (is-json? accept) (qassoc opts :as :json) opts)
-        opts          (if auth-tok          (qassoc opts :oauth-token auth-tok) opts)
-        opts          (if content-type      (qassoc opts :content-type content-type) opts)
+        opts          (if (is-json? accept) (map/qassoc opts :as :json) opts)
+        opts          (if auth-tok          (map/qassoc opts :oauth-token auth-tok) opts)
+        opts          (if content-type      (map/qassoc opts :content-type content-type) opts)
         opts          (conj opts existing-opts)]
-    (qassoc config :request-opts opts)))
+    (map/qassoc config :request-opts opts)))
 
 (defn prep-twilio
   [{:keys [enabled? prepared? url]
     :or   {enabled? true prepared? false}
     :as   config}]
-  (if (:prepared? config)
+  (if prepared?
     config
     (-> config
         (assoc  :prepared?    true)
@@ -294,18 +372,20 @@
 
 (defn- stringify-params
   [p]
-  (if p (map/map-keys some-str p)))
+  (when p (map/map-keys some-str p)))
+
+;; Protocol implementation for nil
 
 (extend-protocol p/TwilioControl
   nil
-  (config [ctrl] nil)
-  (get-template-id [ctrl tg lang fb-tpl] nil)
+  (config                [_] nil)
+  (get-template-id [_ _ _ _] nil)
   (request
-    ([ctrl] nil)
-    ([ctrl params] nil)
-    ([ctrl opts params] nil)
-    ([ctrl opts params respond] nil)
-    ([ctrl opts params respond raise] nil)))
+    ([_]                     nil)
+    ([_ _]                   nil)
+    ([_ _ _]                 nil)
+    ([_ _ _ _]               nil)
+    ([_ _ _ _ _]             nil)))
 
 ;; Initialization
 
@@ -314,14 +394,16 @@
   (if-not (:enabled? config)
     (constantly nil)
     (let [client               (hc/build-http-client (:client-opts config))
-          req-opts             (qassoc (:request-opts config) :http-client client)
+          req-opts             (map/qassoc (:request-opts config) :http-client client)
           localized-templates  (:localized-templates config)
           ^TwilioConfig config (map->TwilioConfig config)]
       (log/msg "Registering Twilio client:" k)
+
       (if-some [default-params (:parameters config)]
         (reify p/TwilioControl
-          (config  ^TwilioConfig [_] config)
-          (get-template-id [_ tg lang fb-tpl] (get-template-id-core localized-templates tg lang fb-tpl))
+          (config ^TwilioConfig [_] config)
+          (get-template-id [_ tg lang fb-tpl]
+            (get-template-id-core localized-templates tg lang fb-tpl))
           (request [_ opts params respond raise]
             (let [opts       (conj (or req-opts {}) opts)
                   json?      (sending-json? opts)
@@ -335,7 +417,7 @@
                                (if fparams
                                  (deep-merge :into default-params fparams)
                                  default-params))
-                  opts       (qassoc opts :form-params all-params)]
+                  opts       (map/qassoc opts :form-params all-params)]
               (if (or respond raise)
                 (hc/request opts respond raise)
                 (hc/request opts))))
@@ -346,16 +428,18 @@
           (request [_ params]
             (let [params     (if (sending-json? req-opts) params (stringify-params params))
                   all-params (if params (deep-merge :into default-params params) default-params)]
-              (-> (qassoc req-opts :form-params all-params)
+              (-> (map/qassoc req-opts :form-params all-params)
                   (hc/request))))
           (request [_]
-            (-> (qassoc req-opts :form-params default-params)
+            (-> (map/qassoc req-opts :form-params default-params)
                 (hc/request))))
+
         (reify p/TwilioControl
           (config  ^TwilioConfig [_] config)
-          (get-template-id [_ tg lang fb-tpl] (get-template-id-core localized-templates tg lang fb-tpl))
+          (get-template-id [_ tg lang fb-tpl]
+            (get-template-id-core localized-templates tg lang fb-tpl))
           (request [_ opts params respond raise]
-            (let [opts       (conj req-opts opts)
+            (let [opts       (conj (or req-opts {}) opts)
                   json?      (sending-json? opts)
                   params     (if json? params (stringify-params params))
                   fparams    (get opts :form-params)
@@ -365,7 +449,7 @@
                                  (deep-merge :into fparams params)
                                  params)
                                fparams)
-                  opts       (qassoc opts :form-params (or all-params {}))]
+                  opts       (map/qassoc opts :form-params (or all-params {}))]
               (if (or respond raise)
                 (hc/request opts respond raise)
                 (hc/request opts))))
@@ -375,15 +459,73 @@
             (p/request c opts params nil nil))
           (request [_ params]
             (let [params (if (sending-json? req-opts) params (stringify-params params))]
-              (-> (qassoc req-opts :form-params (or params {}))
+              (-> (map/qassoc req-opts :form-params (or params {}))
                   (hc/request))))
           (request [_]
             (hc/request req-opts)))))))
 
+(defn init-channel
+  [k config constructor]
+  (if-not (:enabled? config)
+    (constantly nil)
+    (if (satisfies? config msg/Messaging)
+      config
+      (do
+        (log/msg "Setting up" (or (some-str (:channel-type config)) " ") "messaging channel:" k)
+        (constructor
+         (map/qupdate config :messaging/control init-twilio k))))))
+
+(defn prep-channel
+  [k config channel-type]
+  (when config
+    (cond
+      (not        config)                 nil
+      (satisfies? config msg/Messaging)   config
+      (symbol?    config)                 (prep-channel k (var/deref config) channel-type)
+      (satisfies? config p/TwilioControl) (prep-channel k {:enabled? true :messaging/control config} (:service (p/config config)))
+      :else
+      (let [
+            channel-type        (or (some-keyword (:messaging/channel-type config))
+                                    (some-keyword (:messaging/service      config))
+                                    (some-keyword (:channel/type           config))
+                                    (some-keyword (:channel                config))
+                                    (some-keyword (:service                config))
+                                    (some-keyword channel-type)
+                                    :email)
+            capabilities        (or (some-keyword (:messaging/capabilities config))
+                                    (some-keyword (:channel/capabilities   config))
+                                    (some-keyword (:capabilities           config))
+                                    #{:i18n :async :templates channel-type})
+            channel-description (or (some-str (:messaging/description      config))
+                                    (some-str (:channel/description        config))
+                                    (some-str (:description                config))
+                                    (str "Twilio " (name channel-type) " channel"))
+            response-stub       {:channel/type channel-type
+                                 :channel/id   (some-keyword k)
+                                 :provider/id  ::client/twilio}
+            provider            (map/qassoc response-stub
+                                            :provider/name "Twilio"
+                                            :channel/description channel-description)]
+        (-> config
+            (dissoc            :channel :capabilities :description
+                               :channel/type :channel/capabilities :channel/description)
+            (map/assoc-missing :service channel-type)
+            (map/qassoc        :messaging/capabilities  capabilities
+                               :messaging/provider      provider
+                               :messaging/response-stub response-stub
+                               :messaging/channel-type  channel-type))))))
+
 (system/add-expand ::default [k config] (expand-twilio k config))
 (system/add-init   ::default [k config] (var/make k (init-twilio k (prep-twilio config))))
-(system/add-halt!  ::default [k config] (var/make k nil))
+(system/add-halt!  ::default [k      _] (var/make k nil))
 
-(derive ::sms    ::default)
-(derive ::email  ::default)
+(system/add-expand ::email   [k config] {k (prep-channel k config :email)})
+(system/add-init   ::email   [k config] (var/make k (init-channel k config map->TwilioEmailMessaging)))
+(system/add-halt!  ::email   [k      _] (var/make k nil))
+
+(system/add-expand ::sms     [k config] {k (prep-channel k config :sms)})
+(system/add-init   ::sms     [k config] (var/make k (init-channel k config map->TwilioSMSMessaging)))
+(system/add-halt!  ::sms     [k      _] (var/make k nil))
+
 (derive ::verify ::default)
+(derive ::all    ::default)

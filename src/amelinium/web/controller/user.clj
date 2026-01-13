@@ -115,15 +115,13 @@
                           lang-qs           (common/query-string-encode req {"lang" lang-str})
                           url-type          (common/id-type->url-type id-type reason)
                           verify-link       (str (get rdata url-type) token "/?" lang-qs)
-                          req-updater       (get opts :async/responder super/verify-request-id-update)
-                          exc-handler       (get opts :async/raiser super/verify-process-error)
-                          req-updater       #(req-updater db id-type id code token %)
-                          exc-handler       #(exc-handler db id-type id code token %)
                           recovery-link     (when existing-uid (str (get rdata :url/recover) existing-uid "/?" lang-qs))
                           id-str            (identity/->str id-type id)
+                          async-opts        {:on-ok  #(confirmation/update-request-id db id-str code token (:provider/msg-id %))
+                                             :on-err #(czprint (:provider/exception %))} ;; fixme: stub
                           email?            (identical? :email id-type)
                           phone?            (and (not email?) (identical? :phone id-type))
-                          user-login        (if email? id-str (if existing-user-id (delay (user/email db :id existing-user-id))))
+                          user-login        (if email? id-str (when existing-user-id (delay (user/email db :id existing-user-id))))
                           qtoken            (delay (confirmation/make-qtoken-all id-str token))
                           template-params   {:serviceName      (tr :verify/app-name)
                                              :expiresInMinutes @in-mins
@@ -132,24 +130,27 @@
                                              :verifyLink       verify-link
                                              :recoveryLink     recovery-link}]
                       (condp identical? id-type
-                        :email (if-some [template (get opts (if exists?
-                                                              :tpl/email-exists
-                                                              :tpl/email-verify))]
-                                 (twilio/sendmail-l10n-template-async
-                                  (get rdata :twilio/email)
-                                  req-updater exc-handler
-                                  lang id-str
-                                  template
-                                  template-params)
-                                 (log/web-wrn req "No template, not sending e-mail to:" id-str))
-                        :phone (if-some [sms-tr-key (get opts (if exists?
-                                                                :tpl/phone-exists
-                                                                :tpl/phone-verify))]
-                                 (twilio/sendsms-async
-                                  (get rdata :twilio/sms)
-                                  req-updater exc-handler
-                                  id-str (tr sms-tr-key template-params))
-                                 (log/web-wrn req "No template, not sending SMS to:" id-str))
+
+                        :email
+                        (if-some [tkey ((if exists? :tpl/email-exists :tpl/email-verify) opts)]
+                          (msg/send-async! (get rdata :amelinium.messaging/email)
+                                           {:to            id-str
+                                            :lang          lang
+                                            :template/key  tkey
+                                            :template/data template-params}
+                                           async-opts)
+                          (log/web-wrn req "No template, not sending e-mail to:" id-str))
+
+                        :phone
+                        (if-some [tkey ((if exists? :tpl/phone-exists :tpl/phone-verify) opts)]
+                          (msg/send-async! (get rdata :amelinium.messaging/sms)
+                                           {:to              id-str
+                                            :lang            lang
+                                            :translation/key tkey
+                                            :body            (tr tkey template-params)}
+                                           async-opts)
+                          (log/web-wrn req "No template, not sending SMS to:" id-str))
+
                         (log/web-wrn req "Unknown identity type:" id-type))
                       (-> req
                           (web/add-status :verify/sent)

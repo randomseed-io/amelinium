@@ -175,11 +175,7 @@
   "Default confirmation request ID field updater for asynchronous identity
   confirmation."
   [db _id-type id code token response]
-  (when-some [headers (:headers response)]
-    (when-some [req-id (when (map? headers)
-                         (or (get headers "twilio-request-id")
-                             (get headers "x-message-id")))]
-      (confirmation/update-request-id db id code token req-id))))
+  (confirmation/update-request-id db id code token (:provider/msg-id response)))
 
 (defn verify-process-error
   "Default error processor for asynchronous e-mail or SMS sending."
