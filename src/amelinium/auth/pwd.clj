@@ -298,11 +298,11 @@
   (json/write-value-as-string suite json/keyword-keys-object-mapper))
 
 (def json-translation
-  {:prefix     b64-to-bytes
-   :suffix     b64-to-bytes
-   :infix      b64-to-bytes
-   :salt       b64-to-bytes
-   :password   b64-to-bytes
+  {:prefix     base64-url-safe->bin
+   :suffix     base64-url-safe->bin
+   :infix      base64-url-safe->bin
+   :salt       base64-url-safe->bin
+   :password   base64-url-safe->bin
    :handler-id symbol})
 
 (defn post-parse-json
