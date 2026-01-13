@@ -158,25 +158,15 @@
   `:auth/prolongate` target value for `:status/targets` map of a route
   data (given as `route-data`)."
   [req route-data sess]
-  (if (and sess (session/soft-expired? sess))
-    (if-some [hx-target (get (get req :headers) "hx-target")]
+  (if (and sess
+           (session/soft-expired? sess)
+           (htmx/use? req route-data :error/use-htmx?))
+    (if-some [hx-target (htmx/get-target-header req)]
       (if-some [t (get (get route-data :status/targets) :auth/prolongate)]
         (or (= t (strb "#" hx-target)) (= t hx-target))
         false)
       false)
     false))
-
-(defn hx-prolong?
-  "Returns `true` if authentication is about prolonging session with HTMX
-  request.
-
-  Requires session `sess` to be soft-expired and `HX-Target` request header taken
-  from `req` (under `:headers` key) to indicate the same target as configured
-  `:auth/prolongate` target value for `:status/targets` map of a route
-  data (given as `route-data`)."
-  [req route-data sess]
-  (and sess (session/soft-expired? sess)
-       (htmx/use? req route-data :error/use-htmx?)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions
