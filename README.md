@@ -296,7 +296,7 @@ Amelinium is based on the following Clojure and Java libraries:
     * [crypto-equality](https://github.com/weavejester/crypto-equality) for secure comparisons
 
 * Data manipulation and data formats:
-    * [lazy-map](https://github.com/raxod502/lazy-map) for lazy maps
+    * [lazy-map](https://github.com/raondomseed-io/lazy-map) for lazy maps
     * [Meta-Merge](https://github.com/weavejester/meta-merge) for merging nested structures
     * [jsonista](https://github.com/metosin/jsonista) for JSON handling
     * [Cheshire](https://github.com/dakrone/cheshire) for JSON handling
