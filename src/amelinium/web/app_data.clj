@@ -13,13 +13,13 @@
             [amelinium.common                     :as                     common]
             [io.randomseed.utils.map              :as map :refer        [qassoc]]
             [io.randomseed.utils                  :refer          [some-keyword]]
-            [lazy-map.core                        :as                   lazy-map]
+            [io.randomseed.lazy-map               :as                   lazy-map]
             [amelinium.utils                      :refer         [try-name
                                                                   try-namespace
                                                                   empty-lazy-map
                                                                   map-to-lazy]])
 
-  (:import (lazy_map.core LazyMapEntry)))
+  (:import (io.randomseed.lazy_map LazyMapEntry)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Request map keys exposed in views

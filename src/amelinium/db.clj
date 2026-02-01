@@ -39,24 +39,24 @@
             [amelinium.identity            :as               identity])
 
   (:import (amelinium         DBConfig)
-           (lazy_map.core     LazyMap)
-           (clojure.lang      IPersistentMap
-                              PersistentVector
-                              Keyword
-                              Fn)
-           (com.zaxxer.hikari HikariConfig
-                              HikariDataSource
-                              HikariPoolMXBean)
-           (javax.sql         DataSource)
-           (java.io           Closeable)
-           (java.lang.reflect Method)
-           (java.sql          Connection
-                              PreparedStatement
-                              DatabaseMetaData
-                              ParameterMetaData
-                              ResultSet
-                              ResultSetMetaData
-                              Statement)))
+           (io.randomseed.lazy_map LazyMap)
+           (clojure.lang           IPersistentMap
+                                   PersistentVector
+                                   Keyword
+                                   Fn)
+           (com.zaxxer.hikari      HikariConfig
+                                   HikariDataSource
+                                   HikariPoolMXBean)
+           (javax.sql              DataSource)
+           (java.io                Closeable)
+           (java.lang.reflect      Method)
+           (java.sql               Connection
+                                   PreparedStatement
+                                   DatabaseMetaData
+                                   ParameterMetaData
+                                   ResultSet
+                                   ResultSetMetaData
+                                   Statement)))
 
 (set! *warn-on-reflection* true)
 

@@ -11,7 +11,7 @@
   (:require [clojure.string           :as           str]
             [tick.core                :as             t]
             [clj-uuid                 :as          uuid]
-            [lazy-map.core            :as      lazy-map]
+            [io.randomseed.lazy-map   :as      lazy-map]
             [amelinium.system         :as        system]
             [amelinium.http           :as          http]
             [amelinium.proto.errors   :as             p]
@@ -31,7 +31,7 @@
            (amelinium              Response
                                    ErrorsConfig)
            (amelinium.proto.errors ErrorsConfigurable)
-           (lazy_map.core          LazyMap)))
+           (io.randomseed.lazy_map LazyMap)))
 
 (extend-protocol p/ErrorsConfigurable
 

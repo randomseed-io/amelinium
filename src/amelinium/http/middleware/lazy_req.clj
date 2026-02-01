@@ -9,7 +9,7 @@
   (:refer-clojure :exclude [parse-long uuid random-uuid])
 
   (:require [clojure.string          :as        str]
-            [lazy-map.core           :as   lazy-map]
+            [io.randomseed.lazy-map  :as   lazy-map]
             [amelinium.logging       :as        log]
             [amelinium.system        :as     system]))
 

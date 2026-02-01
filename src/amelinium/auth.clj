@@ -23,19 +23,19 @@
             [io.randomseed.utils.map  :as       map]
             [tick.core                :as         t])
 
-  (:import (amelinium     AccountTypes
-                          AuthLocking
-                          AuthConfirmation
-                          AuthPasswords
-                          AuthConfig
-                          AuthSettings)
-           (clojure.lang  Keyword
-                          Associative
-                          IPersistentMap)
-           (lazy_map.core LazyMap)
-           (javax.sql     DataSource)
-           (java.time     Duration)
-           (reitit.core   Match)))
+  (:import (amelinium               AccountTypes
+                                    AuthLocking
+                                    AuthConfirmation
+                                    AuthPasswords
+                                    AuthConfig
+                                    AuthSettings)
+           (clojure.lang           Keyword
+                                   Associative
+                                   IPersistentMap)
+           (io.randomseed.lazy_map LazyMap)
+           (javax.sql              DataSource)
+           (java.time              Duration)
+           (reitit.core            Match)))
 
 (defonce ^:redef setup nil)
 

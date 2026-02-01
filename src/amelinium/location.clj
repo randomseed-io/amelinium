@@ -10,7 +10,7 @@
 
   (:require [clojure.set                  :as         set]
             [clojure.string               :as         str]
-            [lazy-map.core                :as    lazy-map]
+            [io.randomseed.lazy-map       :as    lazy-map]
             [amelinium.proto.location     :as           p]
             [amelinium.types.location     :refer     :all]
             [amelinium                    :refer     :all]
@@ -32,7 +32,7 @@
                                           CoordinateXY)
             (amelinium                    Location)
             (amelinium.proto.location     Spatial)
-            (lazy_map.core                LazyMap)))
+            (io.randomseed.lazy_map       LazyMap)))
 
 (def ^:dynamic *default-srid* 4326)
 

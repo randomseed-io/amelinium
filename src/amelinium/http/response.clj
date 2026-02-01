@@ -50,7 +50,7 @@
 
   An object of type other than `amelinium.Response` is considered a response map if:
   - it is an associative structure,
-  - it is NOT a lazy map (of type `lazy_map.core.LazyMap`),
+  - it is NOT a lazy map (of type `io.randomseed.lazy_map.LazyMap`),
   - it has a `:status` key and its value is an integer,
   - it has a `:body` or `:headers` key present."
   ^Boolean [obj]

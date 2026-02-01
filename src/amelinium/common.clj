@@ -31,13 +31,13 @@
             [io.randomseed.utils.map               :as map    :refer [qassoc]]
             [io.randomseed.utils.db                :as                     db])
 
-  (:import (amelinium            Response)
-           (clojure.lang         Associative
-                                 IPersistentMap
-                                 Keyword
-                                 IFn)
-           (lazy_map.core        LazyMap)
-           (reitit.core          Match)))
+  (:import (amelinium              Response)
+           (clojure.lang           Associative
+                                   IPersistentMap
+                                   Keyword
+                                   IFn)
+           (io.randomseed.lazy_map LazyMap)
+           (reitit.core            Match)))
 
 ;; Operations logging
 
