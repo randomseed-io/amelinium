@@ -1,4 +1,4 @@
 #!/bin/sh
 
 test -f secrets.env && . secrets.env
-clojure -X:test
+clojure -M:test "$@"

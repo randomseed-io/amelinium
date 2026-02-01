@@ -1,0 +1,9 @@
+{:name         "amelinium"
+ :description  "Opinionated Web and API engine."
+ :license      "GNU Lesser General Public License 3.0"
+ :package      io.randomseed/amelinium
+ :output-path  "docs"
+ :source-uri   "https://github.com/randomseed-io/amelinium/blob/{version}/{filepath}#L{line}"
+ :metadata     {:doc/format :markdown}
+ :exclude-vars nil
+ :themes       [:default :randomseed]}

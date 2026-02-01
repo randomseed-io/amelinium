@@ -1,64 +1,99 @@
-APPNAME = "amelinium"
-VERSION = "1.0.1"
+SHELL       := /bin/sh
+BUILD       := bin/build
+DEPLOY      := bin/deploy
+DOCS        := bin/docs
+UPREADME    := bin/update-readme
 
-.PHONY: 		watch default docs deploy test test-clj sig jar pom clean tag
+VERSION     ?= 9.0.23-1
+GROUP       ?= io.randomseed
+APPNAME     ?= phone-number
+DESCRIPTION ?= Phone numbers as data: validate, inspect, search, generate.
+URL         ?= https://randomseed.io/software/$(APPNAME)/
+SCM         ?= github.com/randomseed-io/$(APPNAME)
+AOTNS       ?= 'nil'
 
-default:		docs
+POMFILE     := pom.xml
+JARNAME     := $(APPNAME)-$(VERSION).jar
+JARFILE     := target/$(APPNAME)-$(VERSION).jar
+DOCPREFIX   := $(GROUP)/$(APPNAME)
+
+.PHONY: default lint doc docs push-docs readme readers
+.PHONY: test test-full test-clj
+.PHONY: sync-pom pom jar
+.PHONY: deploy sig tag clean
+
+default: docs
 
 lint:
-			bin/lint
+	@bin/lint
 
-clean-kondo:
-			rm -rf .clj-kondo/.cache 2>/dev/null
-			rm -rf .clj-kondo/imports 2>/dev/null
+readme:
+	@echo "[readme]   -> README.md"
+	@$(UPREADME) "$(DOCPREFIX)" "$(VERSION)" README.md
 
-docs:
-			echo "# Introduction" > doc/10_introduction.md
-			tail -n +2 README.md >> doc/10_introduction.md
-			mkdir -p docs/doc
-			cp -r doc/img docs/doc
-			bin/docs "$(VERSION)"
-			cp -r docs/* ../amelinium-docs
+docs: readme
+	@echo "[doc]      -> docs/"
+	@echo "# Introduction" > doc/10_introduction.md
+	@tail -n +2 README.md >> doc/10_introduction.md
+	@$(DOCS) :version '"$(VERSION)"' :description '"$(DESCRIPTION)"'
+
+doc: docs
 
 push-docs:
-			cd ../amelinium-docs
-			git push
-
-test-clj:
-			bin/test
-
-test-full:
-			bin/test-full
+	git subtree push --prefix=docs docs master
 
 test:
-			@$(MAKE) test-clj
+	@rm -rf .cpcache || true
+	@bin/test --no-profiling
 
-pom: pom.xml
-			clojure -Spom && awk 'NF > 0' pom.xml > pom.new.xml && mv -f pom.new.xml pom.xml
-			mvn versions:set versions:commit -DnewVersion="$(VERSION)" versions:set-scm-tag -DnewTag="$(VERSION)"
-			rm -f pom.xml.asc
+test-full:
+	@rm -rf .cpcache || true
+	@bin/test-full
 
-$(APPNAME).jar: pom.xml
-			bin/build
+test-clj: test
 
-jar: $(APPNAME).jar
+sync-pom:
+	@echo "[pom]      -> $(POMFILE)"
+	@$(BUILD) sync-pom                  \
+	  :group       "\"$(GROUP)\""       \
+	  :name        "\"$(APPNAME)\""     \
+	  :version     "\"$(VERSION)\""     \
+	  :description "\"$(DESCRIPTION)\"" \
+	  :scm         "\"$(SCM)\""         \
+	  :url         "\"$(URL)\""
 
-sig: pom.xml
-			rm -f pom.xml.asc
-			gpg2 --armor --detach-sig pom.xml
+pom: clean sync-pom
 
-tag: pom.xml
-			git tag -s "$(VERSION)" -m "Release $(VERSION)"
+jar: pom
+	@echo "[jar]      -> $(JARNAME)"
+	@rm -rf target/classes .cpcache || true
+	@rm -f $(JARFILE) || true
+	@$(BUILD) jar               \
+	  :group   "\"$(GROUP)\""   \
+	  :name    "\"$(APPNAME)\"" \
+	  :version "\"$(VERSION)\"" \
+	  :aot-ns  $(AOTNS)
 
-deploy:
-			@$(MAKE) clean
-			@$(MAKE) pom
-			@$(MAKE) jar
-			mvn gpg:sign-and-deploy-file -Dfile=$(APPNAME).jar -DrepositoryId=clojars -Durl=https://clojars.org/repo -DpomFile=pom.xml
+sig:
+	@echo "[sig]      -> $(POMFILE).asc"
+	@rm -f "$(POMFILE).asc" || true
+	@gpg2 --armor --detach-sig "$(POMFILE)"
+
+release: test clean docs jar
+
+deploy: clean pom jar
+	@echo "[deploy]   -> $(GROUP)/$(APPNAME)-$(VERSION)"
+	@test -f "$(JARFILE)" || (echo "Missing $(JARFILE)"; exit 1)
+	@test -f "$(POMFILE)" || (echo "Missing $(POMFILE)"; exit 1)
+	@$(DEPLOY) deploy :pom-file "\"$(POMFILE)\"" :artifact "\"$(JARFILE)\""
+	@test -f "$(APPNAME)-$(VERSION).pom.asc" && mv -f "$(APPNAME)-$(VERSION).pom.asc" "sigs/" || true
+	@test -f "target/$(APPNAME)-$(VERSION).pom.asc" && mv -f "target/$(APPNAME)-$(VERSION).pom.asc" "sigs/" || true
+	@test -f "target/$(APPNAME)-$(VERSION).jar.asc" && mv -f "target/$(APPNAME)-$(VERSION).jar.asc" "sigs/" || true
+
+tag:
+	git tag -s "$(VERSION)" -m "Release $(VERSION)"
 
 clean:
-			rm -f $(APPNAME).jar pom.xml.asc
-
-.PHONY: list
-list:
-		@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | xargs
+	@rm -f target/*.jar "$(POMFILE).asc" || true
+	@rm -rf .cpcache target/classes || true
+	@find . -name .DS_Store -print0 | xargs -0 rm -f

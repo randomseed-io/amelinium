@@ -1,5 +1,3 @@
 #!/bin/sh
 
-echo "[amelinium] Running Eastwood lint tool..."
-
 clojure -A:eastwood

@@ -10,7 +10,6 @@
            danlentz/clj-uuid                    {:mvn/version "0.2.0"}        ;; UUID support
            tick/tick                            {:mvn/version "1.0"}          ;; time
            camel-snake-kebab/camel-snake-kebab  {:mvn/version "0.4.3"}        ;; case conversions
-           com.intuitiveexplanations/lazy-map   {:mvn/version "1.0.0"}        ;; lazy maps
            metosin/jsonista                     {:mvn/version "0.3.13"}       ;; JSON parser
            cheshire/cheshire                    {:mvn/version "6.1.0"}        ;; JSON parser for hato
            com.github.seancfoley/ipaddress      {:mvn/version "5.5.1"}        ;; IP ranges matching
@@ -25,11 +24,12 @@
            clojure-interop/javax.security       {:mvn/version "1.0.5"}        ;; inter-op for javax.security
            fipp/fipp                            {:mvn/version "0.6.29"}       ;; pretty printing
            mvxcvi/puget                         {:mvn/version "1.3.4"}        ;; pretty printing
-           zprint/zprint                        {:mvn/version "1.3.0"}
+           zprint/zprint                        {:mvn/version "1.3.0"}        ;; pretty printing
+           io.randomseed/lazy-map               {:mvn/version "1.0.4"}        ;; lazy maps
            io.randomseed/smangler               {:mvn/version "1.0.4"}        ;; fast string trimming
-           io.randomseed/bankster               {:mvn/version "1.2.16"}       ;; currency and money
-           io.randomseed/phone-number           {:mvn/version "8.13.6-3"}     ;; phone number validation
-           io.randomseed/utils                  {:mvn/version "1.2.39"}       ;; random utilities
+           io.randomseed/bankster               {:mvn/version "2.0.0"}        ;; currency and money
+           io.randomseed/phone-number           {:mvn/version "9.0.23-1"}     ;; phone number validation
+           io.randomseed/utils                  {:mvn/version "2.0.2"}        ;; random utilities
            factual/geo                          {:mvn/version "3.0.1"}        ;; geospatial information and geohashes
            iso-country-codes/iso-country-codes  {:git/url "https://github.com/randomseed-io/iso-country-codes.git"
                                                  :sha     "991336a419c3746979bc5a80e7a2447f081371be"}
