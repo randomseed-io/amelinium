@@ -29,3 +29,4 @@ pom.xml.versionsBackup
 /cljs-test-runner-out
 .eastwood
 doc/10_introduction.md
+/resources/public/assets/js/old
